@@ -1,0 +1,21 @@
+{
+  "name": "synesthetica",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Synesthetica monorepo",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -ws",
+    "clean": "npm run clean -ws",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/parser": "^6.18.0",
+    "@typescript-eslint/eslint-plugin": "^6.18.0"
+  }
+}

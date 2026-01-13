@@ -1,0 +1,72 @@
+# =========================
+# OS / Editor
+# =========================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# =========================
+# Node / TypeScript
+# =========================
+
+node_modules/
+dist/
+build/
+out/
+
+# TypeScript incremental builds
+*.tsbuildinfo
+
+# =========================
+# Logs
+# =========================
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Test artifacts
+# =========================
+
+coverage/
+.nyc_output/
+
+# =========================
+# Env / Secrets
+# =========================
+
+.env
+.env.*
+!.env.example
+
+# =========================
+# Temporary / Scratch
+# =========================
+
+.tmp/
+temp/
+scratch/
+*.swp
+*.swo
+
+# =========================
+# Misc
+# =========================
+
+# Generated archives
+*.zip
+
+# Python (just in case, from tooling)
+__pycache__/
+*.pyc

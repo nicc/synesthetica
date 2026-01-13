@@ -1,0 +1,6 @@
+{
+    "chatgpt.openOnStartup": true,
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit"
+    }
+}
