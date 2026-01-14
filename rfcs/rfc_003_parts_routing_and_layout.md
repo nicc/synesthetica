@@ -6,7 +6,7 @@ Date: 2026-01-09
 
 ### Related:
 - RFC 0001 — Interaction Model
-- RFC 0002 — Canonical Musical State + Style API v0
+- RFC 0002 — Canonical Musical State + Grammar API v0
 
 ## Summary
 
@@ -16,7 +16,7 @@ This RFC introduces Parts as a first-class concept, enabling:
 - multiple audio interface inputs
 - future MPE controllers
 - Independent visual treatment per instrument
-- distinct style stacks
+- distinct grammar stacks
 - distinct presets
 - distinct layout and compositing policies
 - Speech-driven binding such as:
@@ -27,7 +27,7 @@ This RFC introduces Parts as a first-class concept, enabling:
 This is achieved by:
 1) Introducing a stable PartId
 2) Adding a Router between CMS and downstream processing
-3) Instantiating style stacks per part
+3) Instantiating grammar stacks per part
 4) Making spatial layout and blending explicit compositor responsibilities
 
 All existing invariants remain intact.
@@ -45,19 +45,19 @@ In real musical practice, users expect:
 We want to support this without:
 - exposing internal mechanics to users
 - duplicating rulesets
-- allowing styles to redefine meaning
+- allowing grammars to redefine meaning
 
 Goals
 - G1: Support multiple simultaneous musical parts from MIDI and audio
-- G2: Allow independent presets and styles per part
+- G2: Allow independent presets and grammars per part
 - G3: Enable spatial layout and compositing per part
-- G4: Preserve separation of meaning (rulesets) and form (styles)
+- G4: Preserve separation of meaning (rulesets) and form (grammars)
 - G5: Maintain a speech-first interaction model
 
 Non-Goals
 - NG1: Automatic instrument recognition
 - NG2: A full spatial layout language (v0 is minimal)
-- NG3: Allowing styles to control spatial ownership or blending semantics
+- NG3: Allowing grammars to control spatial ownership or blending semantics
 - NG4: Redesigning CMS semantics beyond adding part identity
 
 ## Core Concept: Part
@@ -192,15 +192,15 @@ CMSFrame(part)
   → Stabilizers
   → Ruleset
   → IntentFrame
-  → Style Stack (per-part instances)
+  → Grammar Stack (per-part instances)
   → SceneFrame(part)
 ```
 
-Styles are instantiated per part to avoid state collisions.
+Grammars are instantiated per part to avoid state collisions.
 
-Styles (Clarification)
+Grammars (Clarification)
 
-### Styles:
+### Grammars:
 - are unaware of other parts
 - consume only intents and events for their part
 - emit entities tagged with their originating part
@@ -227,7 +227,7 @@ Spatial placement and blending are not musical meaning.
 
 Therefore they are:
 - not handled by rulesets
-- not handled by styles
+- not handled by grammars
 - handled in the compositor (or a dedicated layout stage)
 
 ### Layout Policy
@@ -264,8 +264,8 @@ export interface Preset {
   id: string;
   name: string;
 
-  styles: Array<{
-    styleId: string;
+  grammars: Array<{
+    grammarId: string;
     enabled: boolean;
     params?: Record<string, unknown>;
     priority?: number;
@@ -306,13 +306,13 @@ MPE support is additive:
 - adapters emit additional per-note expressive events or signals
 - all events continue to carry the same PartId
 - rulesets may map expression dimensions to intents
-- styles remain unchanged
+- grammars remain unchanged
 
 No redesign is required.
 
 Invariants (Additive)
 - I6: Every CMS item has exactly one PartId
-- I7: Styles do not read or reason about other parts
+- I7: Grammars do not read or reason about other parts
 - I8: Spatial layout and blending are compositor concerns only
 - I9: Musical meaning remains invariant across parts
 

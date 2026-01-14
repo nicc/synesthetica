@@ -6,15 +6,15 @@ Date: 2026-01-10
 
 ### Related:
 - RFC 0001 — Interaction Model
-- RFC 0002 — Canonical Musical State + Style API v0
+- RFC 0002 — Canonical Musical State + Grammar API v0
 - RFC 0003 — Parts, Routing, and Per-Instrument Layout
 
 ## Summary
 
-This RFC formalises the role of a language model–mediated control layer (for all speech interaction) and introduces annotation as the primary mechanism for expressing how styles and presets relate to musical concepts.
+This RFC formalises the role of a language model–mediated control layer (for all speech interaction) and introduces annotation as the primary mechanism for expressing how grammars and presets relate to musical concepts.
 
-Rather than codifying semantic commands such as “emphasise rhythm” into fixed control operations, the system:
-- annotates styles and presets with illustrative affordances
+Rather than codifying semantic commands such as "emphasise rhythm" into fixed control operations, the system:
+- annotates grammars and presets with illustrative affordances
 - exposes a bounded, deterministic execution surface
 - relies on an LLM to interpret user intent and select or adjust configurations accordingly
 
@@ -77,15 +77,15 @@ The User
 Annotations are descriptive, not prescriptive. They inform what a thing is good at, not how it must be used.
 
 Annotations appear in:
-- style documentation
+- grammar documentation
 - preset documentation
 - optional machine-readable metadata
 
-Annotations are mandatory for styles, presets and macros.
+Annotations are mandatory for grammars, presets and macros.
 
-## Style Annotation
+## Grammar Annotation
 
-Styles describe what they visually illustrate well.
+Grammars describe what they visually illustrate well.
 
 Conceptual Fields (Non-Normative)
 - Musical concepts:
@@ -269,7 +269,7 @@ notes:
 - User utterance(s)
 - Current parts and presets
 - Annotation metadata for:
-  - available styles
+  - available grammars
   - available presets
 - System state (posture, recent changes)
 
@@ -278,7 +278,7 @@ notes:
 The LLM produces intentful configuration changes, such as:
 - selecting a different preset
 - adjusting macro values
-- swapping or enabling styles
+- swapping or enabling grammars
 - modifying layout or compositing
 
 The engine executes these changes deterministically.
@@ -289,7 +289,7 @@ Although interpretation is flexible, execution remains bounded.
 
 Constraints include:
 - macro ranges are clamped
-- style parameters are schema-validated
+- grammar parameters are schema-validated
 - layout/compositing options are enumerated
 - changes are incremental unless explicitly reset
 
@@ -300,9 +300,9 @@ This ensures:
 
 ### Why “Emphasise Rhythm” Is Not a Control Op
 
-“Emphasise rhythm” is:
+"Emphasise rhythm" is:
 - context-dependent
-- style-dependent
+- grammar-dependent
 - subjective
 - multi-dimensional
 
@@ -327,7 +327,7 @@ User:
 LLM (internal reasoning):
 - current preset is harmony-forward
 - available preset X is rhythm-forward
-- style Y illustrates onsets clearly
+- grammar Y illustrates onsets clearly
 - articulation macro can be tightened slightly
 
 LLM (executed actions):
@@ -341,7 +341,7 @@ Engine:
 ### Documentation Requirements
 
 To support this model, the following must be documented:
-- style annotations
+- grammar annotations
 - preset annotations
 - macro semantics (qualitative descriptions)
 - system invariants and constraints

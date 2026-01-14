@@ -46,10 +46,10 @@ This document translates the **VISION** into concrete user-facing requirements, 
 - Parts can have independent Presets assigned
 - Parts can be spatially separated (left/right, overlay with transparency)
 
-### Styles and Presets
-- **Styles** are built-in visual grammars (e.g. "Stars", "Comets", "Rain")
-- User selects and combines Styles, adjusts macro controls
-- **Presets** are saved configurations: selected styles + macro values + layout
+### Grammars and Presets
+- **Grammars** are built-in visual grammars (e.g. "Stars", "Comets", "Rain")
+- User selects and combines Grammars, adjusts macro controls
+- **Presets** are saved configurations: selected grammars + macro values + layout
 - Presets can be named and recalled ("practice mode", "matching fireworks")
 - Macro controls adjust high-level characteristics:
   - **Articulation**: tight/discrete vs loose/blended
@@ -104,7 +104,7 @@ Native (Electron/Tauri) may be considered later if latency or system audio acces
 - Offline/installable PWA
 - Automatic transcription or notation
 - Music theory tutoring beyond visual feedback
-- User-authored Styles (visual grammars) — users compose from provided Styles only
+- User-authored Grammars — users compose from provided Grammars only
 
 ## Success Metrics
 - User can identify chord quality (major/minor/diminished) faster with visual aid than without

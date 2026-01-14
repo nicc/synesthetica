@@ -86,7 +86,7 @@ Users configure the visualisation through natural speech. The LLM interprets use
 Users speak in terms of three concepts:
 
 - **Presets** — named configurations they can recall by name ("use practice mode", "switch to starfield")
-- **Styles** — visual grammars that determine form ("make it more like rain", "add some sparkles")
+- **Grammars** — visual grammars that determine form ("make it more like rain", "add some sparkles")
 - **Macros** — continuous parameters that adjust feel ("tighten up the rhythm", "make it linger more")
 
 Users do not manipulate low-level parameters directly. The LLM selects appropriate adjustments based on annotated affordances (see RFC 004).

@@ -1,6 +1,6 @@
 /**
  * Annotations are advisory metadata designed to help an LLM operator
- * choose styles/presets/macros that fit user intent.
+ * choose grammars/presets/macros that fit user intent.
  *
  * They are NOT executable semantics.
  */
@@ -17,9 +17,10 @@ export type VisualTrait =
   | "high-contrast" | "low-contrast"
   | "stable" | "reactive";
 
-export interface StyleAnnotation {
-  id: string;                 // style id
+export interface GrammarAnnotation {
+  id: string;                 // grammar id
   name?: string;
+  aliases?: string[];         // user-facing synonyms: "style", "look", "effect"
   illustrates?: MusicalConcept[];
   traits?: VisualTrait[];
   notes?: string[];

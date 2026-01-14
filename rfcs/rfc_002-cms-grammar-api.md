@@ -1,4 +1,4 @@
-# RFC 0002: Canonical Musical State + Style API v0
+# RFC 0002: Canonical Musical State + Grammar API v0
 
 Status: Draft  
 Author(s): Synesthetica  
@@ -12,13 +12,13 @@ Amended by RFC 003
 Define a contract-first architecture for mapping music → visuals that supports:
 - Two input channels (MIDI + raw audio) through the same downstream rulesets
 - A fixed, “piano-like” synesthetic operating scheme (Instrument Definition)
-- Flexible visual grammars (Styles) composed into Presets (user-facing configurations)
+- Flexible visual grammars (Grammars) composed into Presets (user-facing configurations)
 - Strong modular boundaries so modules and tests can be authored independently
 
 This RFC specifies:
 1) A source-agnostic intermediate representation: **Canonical Musical State (CMS)**
 2) A rendering-agnostic intermediate representation: **Visual Intents**
-3) A constrained, testable interface for contributed visual grammars: **Style API**
+3) A constrained, testable interface for contributed visual grammars: **Grammar API**
 4) A speech-friendly user surface: **Presets**
 
 ## Motivation
@@ -34,17 +34,17 @@ MIDI and audio adapters produce the same CMS fields but with different confidenc
 ## Goals
 
 - G1: One ruleset consumes CMS from both MIDI and audio.
-- G2: Separate **meaning** (Instrument Definition / Ruleset) from **form** (Styles).
+- G2: Separate **meaning** (Instrument Definition / Ruleset) from **form** (Grammars).
 - G3: Enable independent development + testing of:
   - adapters
   - stabilizers
   - rulesets
-  - styles
+  - grammars
   - compositor
   - renderer
 - G4: Keep speech-only UX practical:
   - users select Presets and adjust macro controls
-  - users do not manipulate styles/rulesets directly in normal interaction
+  - users do not manipulate grammars/rulesets directly in normal interaction
 
 ## Non-goals (v0)
 
@@ -62,8 +62,8 @@ MIDI and audio adapters produce the same CMS fields but with different confidenc
 - Stabilizer: turns raw evidence into usable control signals (smoothing, gating).
 - Ruleset: maps CMS → Visual Intents via instrument invariants.
 - Visual Intent: rendering-agnostic "what to express" (palette/motion/texture/shape).
-- Style: visual grammar consuming intents to emit scene entities (stars/comets/rain).
-- Preset: user-facing selection of styles + macro controls (speech-friendly).
+- Grammar: visual grammar consuming intents to emit scene entities (stars/comets/rain).
+- Preset: user-facing selection of grammars + macro controls (speech-friendly).
 
 ## Architectural boundaries (aligned with RFC1 layers)
 
@@ -74,14 +74,14 @@ MIDI and audio adapters produce the same CMS fields but with different confidenc
 - Compositor base implementation
 - Renderer interface (implementation is pluggable)
 
-### Layer 2: Produced primitives (rulesets and baseline styles)
+### Layer 2: Produced primitives (rulesets and baseline grammars)
 - Reference Ruleset v0 (instrument definition)
-- Reference Styles v0 (note stars, chord comets, rain decay)
+- Reference Grammars v0 (note stars, chord comets, rain decay)
 - Reference Stabilizers (active note state, chord debounce)
 
 ### Composite layer: Orchestration + extensions
-- Preset bundles (style selection + macro defaults)
-- New styles, draw effects, and mutators authored against the Style API
+- Preset bundles (grammar selection + macro defaults)
+- New grammars, draw effects, and mutators authored against the Grammar API
 - Constraint policies (e.g. "max changes per beat", "entity budget")
 - Higher-level scene composition strategies
 
@@ -90,12 +90,12 @@ without changing the base interfaces.
 
 ## Invariants (instrument identity)
 
-These define the fixed operating scheme (piano-like identity). Styles do not redefine them.
+These define the fixed operating scheme (piano-like identity). Grammars do not redefine them.
 
 - I1: The same ruleset consumes CMS regardless of source.
 - I2: Pitch-class → hue mapping is deterministic under a named invariant.
-- I3: Meaning lives in rulesets, not styles.
-- I4: Styles may not compute musical semantics (no pitch/chord inference).
+- I3: Meaning lives in rulesets, not grammars.
+- I4: Grammars may not compute musical semantics (no pitch/chord inference).
 - I5: Confidence/entropy affects rendering stability/noise, not meaning.
 
 ## Vagueness commitments (explicitly left open)
@@ -348,16 +348,16 @@ export interface SceneFrame {
 }
 ```
 
-### Styles (visual grammar; may not change meaning)
+### Grammars (visual grammar; may not change meaning)
 ```ts
-export interface StyleContext {
+export interface GrammarContext {
   canvasSize: { width: number; height: number };
   rngSeed: number;
 }
 
-export interface IStyle {
+export interface IGrammar {
   id: string;
-  init(ctx: StyleContext): void;
+  init(ctx: GrammarContext): void;
   update(input: IntentFrame, previous: SceneFrame | null): SceneFrame;
   paramsSchema?: Record<string, unknown>;
 }
@@ -377,16 +377,16 @@ export interface IRenderer {
 ```
 
 ### Preset (speech-only surface)
-_Presets are the primary "player" UX. They bundle styles + macro controls._
-_No style IDs need to be spoken; names resolve to IDs internally._
+_Presets are the primary "player" UX. They bundle grammars + macro controls._
+_No grammar IDs need to be spoken; names resolve to IDs internally._
 
 ```ts
 export interface Preset {
   id: string;
   name: string;
 
-  styles: Array<{
-    styleId: string;
+  grammars: Array<{
+    grammarId: string;
     enabled: boolean;
     params?: Record<string, unknown>;
     priority?: number;
@@ -400,19 +400,19 @@ export interface Preset {
 }
 ```
 
-## Policy: what styles may and may not do
+## Policy: what grammars may and may not do
 
-### Styles MAY:
+### Grammars MAY:
 * emit and evolve entities (spawn on note_on, fade trails, apply decay fields)
 * interpret intents and event timing (beat/chord spans)
 * react to uncertainty (more jitter/blur/fuzz)
 
-### Styles MUST NOT:
+### Grammars MUST NOT:
 * infer pitch/chords/beat from audio or MIDI
 * redefine pitch→hue or other invariant mappings
 * change musical meaning (only form)
 
-If a style needs musical semantics, that belongs upstream (adapter/stabilizer/ruleset).
+If a grammar needs musical semantics, that belongs upstream (adapter/stabilizer/ruleset).
 
 ## Test plan: Golden corpus v0
 
@@ -427,16 +427,16 @@ We define deterministic fixtures that allow unit tests without a renderer.
 * synthetic pitch-class distributions with confidence drops
 * fixtures/expected/ruleset_v0_intents_*.json
 * expected intent frames for given CMS inputs
-* fixtures/expected/style_note_stars_entities_*.json
-* expected scene entity properties (counts, lifetimes, style ranges)
-* fixtures/expected/style_chord_comets_entities_*.json
+* fixtures/expected/grammar_note_stars_entities_*.json
+* expected scene entity properties (counts, lifetimes, parameter ranges)
+* fixtures/expected/grammar_chord_comets_entities_*.json
 * fixtures/expected/composed_scene_*.json
 
 ### Deterministic rules for tests
 * All modules must be deterministic given:
 * same input frames
 * same rngSeed
-* Styles must not use system time; use frame.t.
+* Grammars must not use system time; use frame.t.
 * Entity IDs should be stable (e.g. derived from event identity + time).
 
 ## Vertical slice v0 (implementation order)
@@ -459,10 +459,10 @@ We implement a minimal end-to-end path (MIDI-first) that exercises all boundarie
 * beat (if available) → motion.pulse
 * chord confidence/quality → texture regime
 
-4.	Styles
-* NoteStarsStyleV0 (spawn per note_on)
-* ChordCometsStyleV0 (aggregate chords into trails)
-* RainDecayStyleV0 (global decay/drift field)
+4.	Grammars
+* NoteStarsGrammarV0 (spawn per note_on)
+* ChordCometsGrammarV0 (aggregate chords into trails)
+* RainDecayGrammarV0 (global decay/drift field)
 
 5.	Compositor
 * SimpleCompositorV0 (concat entities + apply decay field deterministically)
@@ -475,7 +475,7 @@ We implement a minimal end-to-end path (MIDI-first) that exercises all boundarie
 * A2: triads_with_sustain produces chord comets with stable spans and controlled flicker.
 * A3: Same CMS fed into the ruleset produces identical intents regardless of source.
 * A4: Injected low-confidence/entropy (audio mock) increases jitter/decay effects but does not change core meaning.
-* A5: Speech surface can select a Preset by name; no exposure of style IDs required.
+* A5: Speech surface can select a Preset by name; no exposure of grammar IDs required.
 
 ## Interaction posture alignment (RFC1)
 
@@ -485,7 +485,7 @@ We implement a minimal end-to-end path (MIDI-first) that exercises all boundarie
 
 ### Conversational posture:
 * more reactive; more visible uncertainty; faster transitions
-* still respects invariants and style constraints
+* still respects invariants and grammar constraints
 
 Presets encode posture defaults; posture is not a separate engine mode.
 

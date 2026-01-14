@@ -6,7 +6,7 @@ A quick reference to the core concepts used across Synesthetica RFCs.
 
 ## Big Picture
 
-**Music → CMS → Visual Intents → Styles → Scene → Renderer**
+**Music → CMS → Visual Intents → Grammars → Scene → Renderer**
 
 Meaning flows *downstream*.
 Meaning is **never redefined** once it leaves the Ruleset.
@@ -17,12 +17,12 @@ Meaning is **never redefined** once it leaves the Ruleset.
 
 **Preset**
 A saved configuration users select by name.
-Bundles styles + macro values + layout.
+Bundles grammars + macro values + layout.
 > "Load my practice preset."
 
-**Style**
+**Grammar**
 A built-in visual grammar (stars, comets, rain).
-Users select and combine styles, then save as presets.
+Users select and combine grammars, then save as presets.
 
 **Macro Controls**
 High-level knobs users can safely adjust.
@@ -90,7 +90,7 @@ Time-stamped bundle of visual intents.
 
 ## Visual Form & Rendering
 
-**Style**
+**Grammar**
 A visual grammar (stars, comets, rain).
 Consumes intents, produces entities.
 Decides form, not meaning.
@@ -102,7 +102,7 @@ A collection of visual entities at a moment in time.
 A renderable visual object (particle, trail, field).
 
 **Compositor**
-Merges outputs from multiple styles.
+Merges outputs from multiple grammars.
 
 **Renderer**
 Turns a scene into pixels.
@@ -115,10 +115,10 @@ Turns a scene into pixels.
 Types, pipeline, stabilizers, interfaces.
 
 **Layer 2 — Produced Primitives**
-Adapters, stabilizers, rulesets, base styles.
+Adapters, stabilizers, rulesets, base grammars.
 
 **Composite Layer**
-Presets, style composition, draw effects.
+Presets, grammar composition, draw effects.
 
 ---
 
@@ -128,7 +128,7 @@ Presets, style composition, draw effects.
 Uses presets and macros.
 
 **Builder / Luthier**
-Authors styles and extensions.
+Authors grammars and extensions.
 
 ---
 
@@ -138,7 +138,7 @@ Authors styles and extensions.
 Fixed operating scheme, expressive through use.
 
 **Separation of Meaning and Form**
-Rulesets define meaning; styles define form.
+Rulesets define meaning; grammars define form.
 
 **Vagueness Commitment**
 Explicitly deferred decisions.
