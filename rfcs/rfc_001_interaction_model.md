@@ -77,26 +77,35 @@ Everything invoked in this layer must already exist in the composite layer. Invo
 
 ---
 
-## 4. Language and Commitment
+## 4. Language and Configuration
 
-### 4.1 Commitment Verbs
+Users configure the visualisation through natural speech. The LLM interprets user intent and translates it into bounded engine operations.
 
-Interaction relies on a small set of explicit linguistic acts:
+### 4.1 Configuration Surface
 
-- **try** — experiment without commitment
-- **keep / remember** — commit the current state as a new checkpoint
-- **discard** — revert to the most recent committed state
-- **queue** — prepare a sequence of committed states for later invocation
+Users speak in terms of three concepts:
 
-These verbs are first-class concepts. They determine what the system is allowed to remember, reuse, or forget.
+- **Presets** — named configurations they can recall by name ("use practice mode", "switch to starfield")
+- **Styles** — visual grammars that determine form ("make it more like rain", "add some sparkles")
+- **Macros** — continuous parameters that adjust feel ("tighten up the rhythm", "make it linger more")
 
-### 4.2 Vagueness and Guessing
+Users do not manipulate low-level parameters directly. The LLM selects appropriate adjustments based on annotated affordances (see RFC 004).
 
-- Vagueness is allowed only prior to commitment
-- When a request is ambiguous, the system should prefer producing a concrete artefact over asking clarifying questions
-- A guess must never be remembered unless explicitly kept
+### 4.2 Saving and Recall
 
-This ensures that exploration is productive while memory remains intentional.
+Users can save the current configuration as a named preset:
+- "Save this as 'jazz practice'"
+- "Remember this"
+
+And recall it later:
+- "Use jazz practice"
+- "Go back to what we had before"
+
+The engine provides CRUD operations for presets (`IPresetCatalog`). The conversational semantics of saving, recalling, and undoing are handled by the LLM based on conversation context.
+
+### 4.3 Vagueness
+
+When a request is ambiguous, the LLM should prefer producing a concrete result over asking clarifying questions. The user can then refine based on what they see.
 
 ---
 
