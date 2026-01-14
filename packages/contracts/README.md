@@ -10,7 +10,7 @@ to build modules independently.
 3. **CMS** (`cms/*`) — Canonical Musical State
 4. **Visual Intents** (`intents/*`)
 5. **Scene** (`scene/*`)
-6. **Pipeline interfaces** (`pipeline/*`) — adapters, stabilizers, rulesets, styles, compositor, renderer
+6. **Pipeline interfaces** (`pipeline/*`) — adapters, stabilizers, rulesets, grammars, compositor, renderer
 7. **Configuration** (`config/*`) — presets, layout, compositing
 8. **Control surface** (`control/*`) — ControlOps + Queries (mechanical, non-semantic)
 9. **Annotations** (`annotations/*`) — advisory metadata for LLM mediation (non-executable)
@@ -18,8 +18,8 @@ to build modules independently.
 
 ## Design invariants (high level)
 
-- Meaning is encoded in **rulesets**, not styles.
-- Styles decide **form**, not meaning.
+- Meaning is encoded in **rulesets**, not grammars.
+- Grammars decide **form**, not meaning.
 - Control operations are **mechanical**; interpretation happens outside the engine.
 - All signals/events/entities are attributable to exactly one **PartId**.
 

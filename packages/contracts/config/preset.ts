@@ -13,8 +13,8 @@ export interface Preset {
   id: string;
   name: string;
 
-  styles: Array<{
-    styleId: string;
+  grammars: Array<{
+    grammarId: string;
     enabled: boolean;
     params?: Record<string, unknown>;
     priority?: number;
@@ -50,7 +50,7 @@ export interface PresetMeta {
 export interface ValidationResult {
   valid: boolean;
   errors?: string[];
-  warnings?: string[];  // e.g. "style 'foo' not found"
+  warnings?: string[];  // e.g. "grammar 'foo' not found"
 }
 
 /**

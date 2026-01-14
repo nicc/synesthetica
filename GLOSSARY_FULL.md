@@ -55,21 +55,21 @@ Interaction postures:
 The primary **user-facing unit of configuration**.
 
 A preset bundles:
-- selected styles
-- style parameters
+- selected grammars
+- grammar parameters
 - macro control values (articulation, persistence, emphasis)
 - layout and compositing settings
 
 Presets are:
-- created by selecting styles and adjusting macros
+- created by selecting grammars and adjusting macros
 - saved with user-chosen names
 - recallable via speech
 - incapable of redefining synesthetic meaning
 
-### Style
+### Grammar
 A built-in visual grammar that produces visual entities from intents.
 
-Styles:
+Grammars:
 - are the building blocks users select and combine
 - define *form*, not *meaning*
 - may react to uncertainty with visual noise
@@ -91,7 +91,7 @@ Typical macros:
 - **Emphasis** (melody / harmony / rhythm / timbre weighting)
 
 Macros:
-- adjust stabilizers, styles, and compositor policies
+- adjust stabilizers, grammars, and compositor policies
 - never alter instrument invariants
 
 ---
@@ -100,12 +100,12 @@ Macros:
 A default user role.
 
 Players:
-- select and combine styles
+- select and combine grammars
 - adjust macro controls
 - save configurations as presets
 - describe desired outcomes in natural language
 
-Players do **not** author new styles or rulesets.
+Players do **not** author new grammars or rulesets.
 
 ---
 
@@ -113,9 +113,9 @@ Players do **not** author new styles or rulesets.
 An advanced contributor role.
 
 Builders:
-- author styles against a strict API
-- test styles independently
-- publish styles packaged inside presets
+- author grammars against a strict API
+- test grammars independently
+- publish grammars packaged inside presets
 
 Builders do **not** redefine synesthetic invariants.
 
@@ -146,7 +146,7 @@ Includes:
 - source adapters
 - stabilizers
 - rulesets (instrument definitions)
-- reference styles
+- reference grammars
 
 Layer 2 modules:
 - are testable in isolation
@@ -159,7 +159,7 @@ The orchestration and extension layer.
 
 Includes:
 - presets
-- style composition
+- grammar composition
 - draw effects and mutators
 - constraint policies
 - higher-level scene strategies
@@ -356,7 +356,7 @@ Visual intents:
 A time-indexed collection of visual intents and relevant events.
 
 Intent frames:
-- are the sole input to styles
+- are the sole input to grammars
 - preserve musical meaning
 - include uncertainty signals
 
@@ -364,10 +364,10 @@ Intent frames:
 
 ## Visual Form & Rendering
 
-### Style  
+### Grammar  
 A visual grammar that consumes intent frames and produces scene entities.
 
-Styles:
+Grammars:
 - decide *form*, not *meaning*
 - may spawn, group, and evolve entities
 - may react to uncertainty
@@ -401,13 +401,13 @@ Examples:
 
 Entities have:
 - lifecycle
-- style
+- grammar
 - optional motion
 
 ---
 
 ### Compositor  
-A module that merges multiple style-produced scenes into one.
+A module that merges multiple grammar-produced scenes into one.
 
 Responsibilities:
 - resolve collisions
@@ -465,7 +465,7 @@ The system should feel like an acoustic instrument:
 ---
 
 ### Separation of Meaning and Form  
-Musical meaning is encoded in rulesets; visual form is encoded in styles.
+Musical meaning is encoded in rulesets; visual form is encoded in grammars.
 
 Violating this boundary is considered an architectural error.
 

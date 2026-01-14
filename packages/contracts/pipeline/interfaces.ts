@@ -20,15 +20,15 @@ export interface IRuleset {
   map(frame: CMSFrame): IntentFrame;
 }
 
-export interface StyleContext {
+export interface GrammarContext {
   canvasSize: { width: number; height: number };
   rngSeed: number;
   part: PartId;
 }
 
-export interface IStyle {
+export interface IGrammar {
   id: string;
-  init(ctx: StyleContext): void;
+  init(ctx: GrammarContext): void;
   update(input: IntentFrame, previous: SceneFrame | null): SceneFrame;
   paramsSchema?: Record<string, unknown>;
 }
