@@ -51,20 +51,34 @@ Interaction postures:
 
 ---
 
-### Registration  
+### Preset
 The primary **user-facing unit of configuration**.
 
-A registration bundles:
-- enabled motifs
-- motif parameters
-- macro control defaults (articulation, persistence, emphasis)
+A preset bundles:
+- selected styles
+- style parameters
+- macro control values (articulation, persistence, emphasis)
+- layout and compositing settings
 
-Registrations are:
-- selectable and describable via speech
-- expressive but safe
+Presets are:
+- created by selecting styles and adjusting macros
+- saved with user-chosen names
+- recallable via speech
 - incapable of redefining synesthetic meaning
 
-> Analogy: piano registration or stop selection.
+### Style
+A built-in visual grammar that produces visual entities from intents.
+
+Styles:
+- are the building blocks users select and combine
+- define *form*, not *meaning*
+- may react to uncertainty with visual noise
+- may not infer musical semantics
+
+Examples:
+- Stars (particles per note)
+- Comets (chord trails)
+- Rain (global decay field)
 
 ---
 
@@ -77,20 +91,21 @@ Typical macros:
 - **Emphasis** (melody / harmony / rhythm / timbre weighting)
 
 Macros:
-- adjust stabilizers, motifs, and compositor policies
+- adjust stabilizers, styles, and compositor policies
 - never alter instrument invariants
 
 ---
 
-### Player  
+### Player
 A default user role.
 
 Players:
-- select registrations
+- select and combine styles
 - adjust macro controls
+- save configurations as presets
 - describe desired outcomes in natural language
 
-Players do **not** author motifs or rulesets.
+Players do **not** author new styles or rulesets.
 
 ---
 
@@ -98,9 +113,9 @@ Players do **not** author motifs or rulesets.
 An advanced contributor role.
 
 Builders:
-- author motifs against a strict API
-- test motifs independently
-- publish motifs packaged inside registrations
+- author styles against a strict API
+- test styles independently
+- publish styles packaged inside presets
 
 Builders do **not** redefine synesthetic invariants.
 
@@ -131,7 +146,7 @@ Includes:
 - source adapters
 - stabilizers
 - rulesets (instrument definitions)
-- reference motifs
+- reference styles
 
 Layer 2 modules:
 - are testable in isolation
@@ -143,8 +158,8 @@ Layer 2 modules:
 The orchestration and extension layer.
 
 Includes:
-- registrations
-- motif composition
+- presets
+- style composition
 - draw effects and mutators
 - constraint policies
 - higher-level scene strategies
@@ -341,7 +356,7 @@ Visual intents:
 A time-indexed collection of visual intents and relevant events.
 
 Intent frames:
-- are the sole input to motifs
+- are the sole input to styles
 - preserve musical meaning
 - include uncertainty signals
 
@@ -349,10 +364,10 @@ Intent frames:
 
 ## Visual Form & Rendering
 
-### Motif  
+### Style  
 A visual grammar that consumes intent frames and produces scene entities.
 
-Motifs:
+Styles:
 - decide *form*, not *meaning*
 - may spawn, group, and evolve entities
 - may react to uncertainty
@@ -392,7 +407,7 @@ Entities have:
 ---
 
 ### Compositor  
-A module that merges multiple motif-produced scenes into one.
+A module that merges multiple style-produced scenes into one.
 
 Responsibilities:
 - resolve collisions
@@ -450,7 +465,7 @@ The system should feel like an acoustic instrument:
 ---
 
 ### Separation of Meaning and Form  
-Musical meaning is encoded in rulesets; visual form is encoded in motifs.
+Musical meaning is encoded in rulesets; visual form is encoded in styles.
 
 Violating this boundary is considered an architectural error.
 

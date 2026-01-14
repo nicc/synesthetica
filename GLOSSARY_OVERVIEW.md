@@ -6,137 +6,141 @@ A quick reference to the core concepts used across Synesthetica RFCs.
 
 ## Big Picture
 
-**Music → CMS → Visual Intents → Motifs → Scene → Renderer**
+**Music → CMS → Visual Intents → Styles → Scene → Renderer**
 
-Meaning flows *downstream*.  
+Meaning flows *downstream*.
 Meaning is **never redefined** once it leaves the Ruleset.
 
 ---
 
 ## User-Facing Concepts
 
-**Registration**  
-A named visual style users select in speech.  
-Bundles motifs + macro defaults.  
-> “Use Rainy Comets.”
+**Preset**
+A saved configuration users select by name.
+Bundles styles + macro values + layout.
+> "Load my practice preset."
 
-**Macro Controls**  
-High-level knobs users can safely adjust.  
+**Style**
+A built-in visual grammar (stars, comets, rain).
+Users select and combine styles, then save as presets.
+
+**Macro Controls**
+High-level knobs users can safely adjust.
 Examples: articulation, persistence, emphasis.
 
-**Interaction Posture**  
-How reactive or stable the system feels.  
+**Interaction Posture**
+How reactive or stable the system feels.
 Examples: Quiet, Conversational.
 
 ---
 
 ## Musical Understanding
 
-**Source**  
+**Source**
 Where musical data comes from (MIDI, audio).
 
-**Adapter**  
+**Adapter**
 Turns a source into CMS frames.
 
-**Canonical Musical State (CMS)**  
+**Canonical Musical State (CMS)**
 The unified description of music used everywhere downstream.
 
-**CMS Frame**  
+**CMS Frame**
 A time-stamped snapshot of musical events + signals.
 
-**Musical Event**  
+**Musical Event**
 Discrete musical facts (note_on, chord, beat).
 
-**Control Signal**  
+**Control Signal**
 Continuous musical descriptors (loudness, tension).
 
-**Distribution Signal**  
+**Distribution Signal**
 Probabilistic musical descriptors (pitch-class distribution).
 
-**Confidence / Uncertainty**  
-How sure we are about a musical claim.  
+**Confidence / Uncertainty**
+How sure we are about a musical claim.
 Affects visual stability, not meaning.
 
 ---
 
 ## Meaning & Mapping
 
-**Instrument Definition**  
+**Instrument Definition**
 The fixed synesthetic operating scheme.
 
-**Invariant**  
+**Invariant**
 A rule that always holds (e.g. pitch-class → hue).
 
-**Ruleset**  
-Maps CMS → Visual Intents.  
+**Ruleset**
+Maps CMS → Visual Intents.
 Defines musical meaning.
 
 ---
 
 ## Visual Semantics
 
-**Visual Intent**  
-Rendering-agnostic description of what to express.  
+**Visual Intent**
+Rendering-agnostic description of what to express.
 Examples: palette, motion, texture, shape.
 
-**Intent Frame**  
+**Intent Frame**
 Time-stamped bundle of visual intents.
 
 ---
 
 ## Visual Form & Rendering
 
-**Motif**  
-A visual grammar (stars, comets, rain).  
-Consumes intents, produces entities.  
+**Style**
+A visual grammar (stars, comets, rain).
+Consumes intents, produces entities.
 Decides form, not meaning.
 
-**Scene**  
+**Scene**
 A collection of visual entities at a moment in time.
 
-**Entity**  
+**Entity**
 A renderable visual object (particle, trail, field).
 
-**Compositor**  
-Merges outputs from multiple motifs.
+**Compositor**
+Merges outputs from multiple styles.
 
-**Renderer**  
+**Renderer**
 Turns a scene into pixels.
 
 ---
 
 ## Architecture & Workflow
 
-**Layer 1 — System Core**  
+**Layer 1 — System Core**
 Types, pipeline, stabilizers, interfaces.
 
-**Layer 2 — Produced Primitives**  
-Adapters, stabilizers, rulesets, base motifs.
+**Layer 2 — Produced Primitives**
+Adapters, stabilizers, rulesets, base styles.
 
-**Composite Layer**  
-Registrations, motif composition, draw effects.
+**Composite Layer**
+Presets, style composition, draw effects.
 
 ---
 
 ## Roles
 
-**Player**  
-Uses registrations and macros.
+**Player**
+Uses presets and macros.
 
-**Builder / Luthier**  
-Authors motifs and extensions.
+**Builder / Luthier**
+Authors styles and extensions.
 
 ---
 
 ## Design Principles
 
-**Piano Principle**  
+**Piano Principle**
 Fixed operating scheme, expressive through use.
 
-**Separation of Meaning and Form**  
-Rulesets define meaning; motifs define form.
+**Separation of Meaning and Form**
+Rulesets define meaning; styles define form.
 
-**Vagueness Commitment**  
+**Vagueness Commitment**
 Explicitly deferred decisions.
 
 ---

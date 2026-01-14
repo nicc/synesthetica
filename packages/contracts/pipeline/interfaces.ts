@@ -20,15 +20,15 @@ export interface IRuleset {
   map(frame: CMSFrame): IntentFrame;
 }
 
-export interface MotifContext {
+export interface StyleContext {
   canvasSize: { width: number; height: number };
   rngSeed: number;
   part: PartId;
 }
 
-export interface IMotif {
+export interface IStyle {
   id: string;
-  init(ctx: MotifContext): void;
+  init(ctx: StyleContext): void;
   update(input: IntentFrame, previous: SceneFrame | null): SceneFrame;
   paramsSchema?: Record<string, unknown>;
 }

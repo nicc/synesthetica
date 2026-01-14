@@ -17,7 +17,7 @@ export * from "./scene/scene";
 
 export * from "./pipeline/interfaces";
 
-export * from "./config/registration";
+export * from "./config/preset";
 
 export * from "./control/control_ops";
 export * from "./control/queries";
