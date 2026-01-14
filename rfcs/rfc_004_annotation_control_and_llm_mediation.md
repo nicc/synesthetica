@@ -6,15 +6,15 @@ Date: 2026-01-10
 
 ### Related:
 - RFC 0001 — Interaction Model
-- RFC 0002 — Canonical Musical State + Motif API v0
+- RFC 0002 — Canonical Musical State + Style API v0
 - RFC 0003 — Parts, Routing, and Per-Instrument Layout
 
 ## Summary
 
-This RFC formalises the role of a language model–mediated control layer (for all speech interaction) and introduces annotation as the primary mechanism for expressing how motifs and registrations relate to musical concepts.
+This RFC formalises the role of a language model–mediated control layer (for all speech interaction) and introduces annotation as the primary mechanism for expressing how styles and presets relate to musical concepts.
 
 Rather than codifying semantic commands such as “emphasise rhythm” into fixed control operations, the system:
-- annotates motifs and registrations with illustrative affordances
+- annotates styles and presets with illustrative affordances
 - exposes a bounded, deterministic execution surface
 - relies on an LLM to interpret user intent and select or adjust configurations accordingly
 
@@ -77,15 +77,15 @@ The User
 Annotations are descriptive, not prescriptive. They inform what a thing is good at, not how it must be used.
 
 Annotations appear in:
-- motif documentation
-- registration documentation
+- style documentation
+- preset documentation
 - optional machine-readable metadata
 
-Annotations are mandatory for motifs, registrations and macros.
+Annotations are mandatory for styles, presets and macros.
 
-## Motif Annotation
+## Style Annotation
 
-Motifs describe what they visually illustrate well.
+Styles describe what they visually illustrate well.
 
 Conceptual Fields (Non-Normative)
 - Musical concepts:
@@ -123,9 +123,9 @@ notes:
 
 This does not imply any automatic behaviour — it is advisory context for the LLM.
 
-## Registration Annotation
+## Preset Annotation
 
-Registrations describe what kind of musical reading they favour overall.
+Presets describe what kind of musical reading they favour overall.
 
 Conceptual Fields
 - Emphasis tendencies:
@@ -267,18 +267,18 @@ notes:
 ### Inputs to the LLM
 
 - User utterance(s)
-- Current parts and registrations
+- Current parts and presets
 - Annotation metadata for:
-  - available motifs
-  - available registrations
+  - available styles
+  - available presets
 - System state (posture, recent changes)
 
 ### Outputs from the LLM
 
 The LLM produces intentful configuration changes, such as:
-- selecting a different registration
+- selecting a different preset
 - adjusting macro values
-- swapping or enabling motifs
+- swapping or enabling styles
 - modifying layout or compositing
 
 The engine executes these changes deterministically.
@@ -289,7 +289,7 @@ Although interpretation is flexible, execution remains bounded.
 
 Constraints include:
 - macro ranges are clamped
-- motif parameters are schema-validated
+- style parameters are schema-validated
 - layout/compositing options are enumerated
 - changes are incremental unless explicitly reset
 
@@ -325,13 +325,13 @@ User:
 > “Let’s emphasise rhythm.”
 
 LLM (internal reasoning):
-- current registration is harmony-forward
-- available registration X is rhythm-forward
-- motif Y illustrates onsets clearly
+- current preset is harmony-forward
+- available preset X is rhythm-forward
+- style Y illustrates onsets clearly
 - articulation macro can be tightened slightly
 
 LLM (executed actions):
-- switch registration to X
+- switch preset to X
 - adjust articulation +0.2
 
 Engine:
@@ -341,8 +341,8 @@ Engine:
 ### Documentation Requirements
 
 To support this model, the following must be documented:
-- motif annotations
-- registration annotations
+- style annotations
+- preset annotations
 - macro semantics (qualitative descriptions)
 - system invariants and constraints
 
@@ -362,5 +362,5 @@ This documentation is part of the LLM skill.
 
 ## Open Questions (Tracked)
 - How much annotation should be machine-readable vs prose?
-- Should user-created registrations require annotation?
+- Should user-created presets require annotation?
 - How do we surface “why did it change?” explanations?

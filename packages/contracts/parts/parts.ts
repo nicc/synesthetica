@@ -13,12 +13,12 @@ export type PartSelector =
 export interface PartMeta {
   id: PartId;
   label?: string;
-  registrationId?: string;
+  presetId?: string;
 }
 
 export interface PartRegistry {
   getParts(): PartId[];
   getMeta(part: PartId): PartMeta;
   setLabel(part: PartId, label: string): void;
-  assignRegistration(part: PartId, registrationId: string): void;
+  assignPreset(part: PartId, presetId: string): void;
 }

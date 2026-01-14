@@ -1,14 +1,14 @@
 import type { PartSelector } from "../parts/parts";
-import type { LayoutPolicy, CompositingPolicy, Registration } from "../config/registration";
+import type { LayoutPolicy, CompositingPolicy, Preset } from "../config/preset";
 
-export type RegistrationId = string;
-export type MotifId = string;
+export type PresetId = string;
+export type StyleId = string;
 
 export type ControlOp =
-  | { op: "applyRegistration"; target: PartSelector; registrationId: RegistrationId }
-  | { op: "setMacro"; target: PartSelector; patch: Partial<Registration["macros"]> }
-  | { op: "enableMotif"; target: PartSelector; motifId: MotifId; enabled: boolean }
-  | { op: "setMotifParams"; target: PartSelector; motifId: MotifId; params: Record<string, unknown> }
+  | { op: "applyPreset"; target: PartSelector; presetId: PresetId }
+  | { op: "setMacro"; target: PartSelector; patch: Partial<Preset["macros"]> }
+  | { op: "enableStyle"; target: PartSelector; styleId: StyleId; enabled: boolean }
+  | { op: "setStyleParams"; target: PartSelector; styleId: StyleId; params: Record<string, unknown> }
   | { op: "setLayout"; target: PartSelector; layout: LayoutPolicy }
   | { op: "setCompositing"; target: PartSelector; compositing: CompositingPolicy }
   | { op: "labelPart"; target: PartSelector; label: string }

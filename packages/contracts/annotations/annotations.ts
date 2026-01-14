@@ -1,6 +1,6 @@
 /**
  * Annotations are advisory metadata designed to help an LLM operator
- * choose motifs/registrations/macros that fit user intent.
+ * choose styles/presets/macros that fit user intent.
  *
  * They are NOT executable semantics.
  */
@@ -17,8 +17,8 @@ export type VisualTrait =
   | "high-contrast" | "low-contrast"
   | "stable" | "reactive";
 
-export interface MotifAnnotation {
-  id: string;                 // motif id
+export interface StyleAnnotation {
+  id: string;                 // style id
   name?: string;
   illustrates?: MusicalConcept[];
   traits?: VisualTrait[];
@@ -26,8 +26,8 @@ export interface MotifAnnotation {
   cautions?: string[];
 }
 
-export interface RegistrationAnnotation {
-  id: string;                 // registration id
+export interface PresetAnnotation {
+  id: string;                 // preset id
   name?: string;
   emphasises?: MusicalConcept[];
   deEmphasises?: MusicalConcept[];
