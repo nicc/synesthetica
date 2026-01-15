@@ -1,6 +1,7 @@
 import type { Ms } from "../core/time";
 import type { PartId } from "../parts/parts";
 import type { ColorHSVA } from "../intents/colors";
+import type { Diagnostic } from "../diagnostics/diagnostics";
 
 export type EntityId = string;
 
@@ -33,4 +34,6 @@ export interface Entity {
 export interface SceneFrame {
   t: Ms;
   entities: Entity[];
+  /** Diagnostics emitted during this frame's processing */
+  diagnostics: Diagnostic[];
 }
