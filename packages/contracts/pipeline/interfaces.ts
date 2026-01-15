@@ -12,7 +12,23 @@ export interface ISourceAdapter {
 
 export interface IStabilizer {
   id: string;
+
+  /** Called once when the stabilizer is initialized */
+  init(): void;
+
+  /** Called once when the session ends or stabilizer is removed */
+  dispose(): void;
+
+  /**
+   * Process a frame, potentially using and updating internal state.
+   * Returns an enriched CMSFrame with derived signals.
+   */
   apply(frame: CMSFrame): CMSFrame;
+
+  /**
+   * Reset internal state (e.g., on session restart or part reassignment).
+   */
+  reset(): void;
 }
 
 export interface IRuleset {
