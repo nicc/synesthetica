@@ -15,6 +15,7 @@ to build modules independently.
 8. **Control surface** (`control/*`) — ControlOps + Queries (mechanical, non-semantic)
 9. **Annotations** (`annotations/*`) — advisory metadata for LLM mediation (non-executable)
 10. **Routing** (`routing/*`) — parts-based routing
+11. **Diagnostics** (`diagnostics/*`) — runtime error and diagnostic types
 
 ## Design invariants (high level)
 
