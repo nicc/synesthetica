@@ -57,19 +57,20 @@ This document translates the **VISION** into concrete user-facing requirements, 
   - **Emphasis**: balance between melody, harmony, rhythm, timbre
 
 ### Interaction Model
-- Two interaction postures:
-  - **Conversational**: exploratory, tolerates ambiguity, system may suggest alternatives
-  - **Quiet**: performance-ready, short commands, no ambiguity tolerance, failures are silent no-ops
-- Commitment verbs for managing visual configurations:
-  - **try**: experiment without commitment
-  - **keep/remember**: save current configuration with a name
-  - **discard**: revert to last saved state
-  - **queue**: prepare a sequence for later invocation
+- Two interaction surfaces:
+  - Musical input through MIDI or audio
+  - Speech control through an LLM
 
 ### Speech Control
-- Primary control via natural language (speech or text)
-- User speaks in musical/perceptual terms ("emphasise rhythm", "make it calmer")
-- System interprets intent and adjusts configuration accordingly
+- Primary control via natural language (speech or text), mediated by user-supplied LLM
+-- Two interaction postures:
+-  - **Conversational**: exploratory, tolerates ambiguity, system may suggest alternatives
+-  - **Quiet**: performance-ready, short commands, no ambiguity tolerance, failures are silent no-ops
+- User explores, adjusts and combines visual grammars, defines presets, loads presets:
+  - musical/perceptual intent ("emphasise rhythm", "make it calmer")
+  - selects and combines visual grammars ("what styles are available?", "let's try comet with a rain decay")
+  - operational intent ("remember this, call it sparkles", "gimme sparkles")
+- LLM interprets intent and operates system controls appropriately
 - No requirement for users to know parameter names or internal structure
 
 ## Non-Functional Requirements
@@ -89,6 +90,11 @@ This document translates the **VISION** into concrete user-facing requirements, 
 - USB MIDI controller (keyboard, pad controller, etc.)
 - Audio interface with browser-accessible input (appears as microphone)
 - No DAW integration required; direct instrument input only
+
+### Interface assumptions
+- Docs are consumed by an LLM to acquire the skill of operating the system under user instruction
+- Documentation is clear and comprehensive
+- Visual grammars are individually annotated to convey the musical impact of macro controls
 
 ### Testing Support
 - Audio file input (WAV/MP3) for reproducible testing
