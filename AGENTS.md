@@ -38,4 +38,12 @@ bd sync               # Sync with git
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 
-Use 'bd' for task tracking
+## Task Tracking
+
+**Always use `bd` (beads) for tracking work items.** Never use TODO.md or other ad-hoc files.
+
+- Deferred work → `bd create --title="..." --type=task`
+- Design decisions → document in specs/RFCs, reference from issues
+- Implementation tasks → `bd create` with clear descriptions
+
+This ensures work survives session boundaries and context compaction.

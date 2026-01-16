@@ -1,4 +1,4 @@
-import type { Timestamp } from "../core/time";
+import type { SessionMs } from "../core/time";
 import type { PartId } from "../parts/parts";
 
 /**
@@ -29,7 +29,7 @@ export interface Diagnostic {
   message: string;
 
   /** When the diagnostic was emitted */
-  timestamp: Timestamp;
+  timestamp: SessionMs;
 
   /** Optional: which component emitted this */
   source?: string;

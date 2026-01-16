@@ -135,6 +135,8 @@ Typical use: playing, rehearsal, performance
 
 Posture is inferred from interaction style, not from context. It is possible to perform conversationally (e.g. in a talk) or explore quietly.
 
+**Note:** Posture is purely an LLM behavioural mode. The engine does not track or enforce postures — it simply executes control operations. The LLM decides how to behave based on conversational context.
+
 ---
 
 ## 6. Failure Semantics

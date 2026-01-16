@@ -295,7 +295,7 @@ Constraints include:
 
 This ensures:
 - safety
-- undoability
+- reversibility (LLM can issue compensating ops)
 - predictability
 
 ### Why “Emphasise Rhythm” Is Not a Control Op

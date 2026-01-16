@@ -62,7 +62,7 @@ export interface Diagnostic {
   message: string;
 
   /** When the diagnostic was emitted */
-  timestamp: Timestamp;
+  timestamp: SessionMs;
 
   /** Optional: which component emitted this */
   source?: string;
@@ -122,7 +122,7 @@ Component detects issue
 
 ```ts
 export interface SceneFrame {
-  timestamp: Timestamp;
+  timestamp: SessionMs;
   entities: Entity[];
   diagnostics: Diagnostic[];  // Added
 }

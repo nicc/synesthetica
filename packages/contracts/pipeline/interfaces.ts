@@ -1,4 +1,5 @@
 import type { SourceId, StreamId } from "../core/provenance";
+import type { Ms, SessionMs } from "../core/time";
 import type { CMSFrame } from "../cms/cms";
 import type { IntentFrame } from "../intents/intents";
 import type { SceneFrame } from "../scene/scene";
@@ -57,4 +58,29 @@ export interface ICompositor {
 export interface IRenderer {
   id: string;
   render(scene: SceneFrame): void;
+}
+
+/**
+ * The central pipeline orchestrator.
+ * Uses a pull-based model where the renderer requests frames at target times.
+ * See SPEC_005 and SPEC_008 for details.
+ */
+export interface IPipeline {
+  /**
+   * Request a frame for the given target time.
+   * The pipeline processes all active parts and returns a composited scene.
+   */
+  requestFrame(targetTime: SessionMs): SceneFrame;
+}
+
+/**
+ * Tracks recent activity per part to resolve deictic references like "this".
+ * Used by the speech interface to determine which part a user is referring to.
+ */
+export interface IActivityTracker {
+  /** Record activity for a part at a given time */
+  recordActivity(part: PartId, t: SessionMs): void;
+
+  /** Get the most active part within the given time window */
+  getMostActive(windowMs: Ms): PartId | null;
 }
