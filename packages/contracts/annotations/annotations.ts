@@ -17,6 +17,13 @@ export type VisualTrait =
   | "high-contrast" | "low-contrast"
   | "stable" | "reactive";
 
+export type MacroResponsiveness = "strong" | "moderate" | "weak" | "none";
+
+export interface MacroResponse {
+  responsiveness: MacroResponsiveness;
+  notes?: string;
+}
+
 export interface GrammarAnnotation {
   id: string;                 // grammar id
   name?: string;
@@ -25,6 +32,8 @@ export interface GrammarAnnotation {
   traits?: VisualTrait[];
   notes?: string[];
   cautions?: string[];
+  /** How this grammar responds to each macro (helps LLM choose adjustments) */
+  macroResponses?: Record<string, MacroResponse>;
 }
 
 export interface PresetAnnotation {

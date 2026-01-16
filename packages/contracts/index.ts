@@ -25,3 +25,5 @@ export * from "./control/queries";
 export * from "./annotations/annotations";
 
 export * from "./routing/router";
+
+export * from "./diagnostics/diagnostics";

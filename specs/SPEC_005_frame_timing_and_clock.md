@@ -44,7 +44,7 @@ Pull-based:
 All timestamps are **milliseconds relative to session start**, not Unix epoch.
 
 ```ts
-type Timestamp = number;  // ms since session start
+type SessionMs = number;  // ms since session start
 ```
 
 **Rationale:**
@@ -135,11 +135,11 @@ The compositor merges per-part SceneFrames into a unified visual output. This is
 
 ```ts
 // In packages/contracts/core/time.ts
-export type Timestamp = number;  // ms since session start
+export type SessionMs = number;  // ms since session start
 
-// Pipeline interface addition
+// Pipeline interface in packages/contracts/pipeline/interfaces.ts
 export interface IPipeline {
-  requestFrame(targetTime: Timestamp): SceneFrame;
+  requestFrame(targetTime: SessionMs): SceneFrame;
 }
 ```
 
