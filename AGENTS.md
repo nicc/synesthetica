@@ -47,3 +47,30 @@ bd sync               # Sync with git
 - Implementation tasks → `bd create` with clear descriptions
 
 This ensures work survives session boundaries and context compaction.
+
+## Commit Messages
+
+**Summarize product work in commit messages.** The git log is a project history — don't hide important work behind "bd sync".
+
+When committing beads changes, describe what was accomplished:
+
+```bash
+# BAD - hides the work
+git commit -m "bd sync"
+
+# GOOD - describes the product work
+git commit -m "Add design gap issues for Phase 1 blockers
+
+- Macro-to-grammar parameter binding (synesthetica-1wq)
+- Entity lifecycle and decay semantics (synesthetica-ray)
+- Coordinate system conventions (synesthetica-khj)
+- 8 more spec gaps identified and tracked"
+```
+
+For mixed commits (code + issues), lead with the code change and mention issue work:
+
+```bash
+git commit -m "Add pcToHue function to contracts
+
+Also created issues for derived signals schema and stabilizer ordering."
+```
