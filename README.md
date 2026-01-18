@@ -31,6 +31,15 @@ This README acts as the root index. A more detailed `INDEX.md` may be added once
 ## Status
 The project is in its **formative phase**. Initial documents are skeletal and expected to evolve rapidly.
 
+**Phase 0** (Playable Sketch) is complete. You can run the minimal vertical slice:
+```bash
+cd packages/web-app
+npm install
+npm run dev
+```
+
+See [packages/web-app/README.md](packages/web-app/README.md) for details.
+
 ## Module boundaries
 All module boundaries are defined in packages/contracts. Do not redefine types elsewhere.
 
