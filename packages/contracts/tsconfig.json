@@ -10,7 +10,8 @@
     "rootDir": ".",
     "strict": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "composite": true
   },
   "include": [
     "**/*.ts"
