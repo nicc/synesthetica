@@ -2,6 +2,57 @@
 
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
+## Communication Style
+
+**Use simple, direct language. Do not hype.**
+
+- Avoid marketing language, superlatives, or enthusiasm ("exciting", "powerful", "amazing")
+- Avoid unnecessary hedging ("should", "might", "could") when stating facts
+- Be precise about what exists vs what's planned
+- State limitations plainly without apology
+- Write as if documenting, not selling
+
+**Examples:**
+
+Bad: "This exciting new feature enables powerful real-time visualizations!"
+Good: "Converts MIDI input to visual output in real-time."
+
+Bad: "The innovative ruleset system provides amazing flexibility!"
+Good: "Rulesets map musical events to visual parameters."
+
+Bad: "Our architecture should make it easy to add new grammars."
+Good: "The grammar interface allows adding new visual styles."
+
+**This applies to:**
+- All documentation, commit messages, code comments, issue descriptions
+- Conversation with collaborators during development
+- Design proposals and technical discussion
+
+## Scope and Substantiation
+
+**Only document or implement what is substantiated by existing project documents.**
+
+When writing documentation or discussing features:
+- Reference existing specs, RFCs, or contract definitions
+- If something isn't documented, say "this isn't specified yet" rather than inventing details
+- Do not extrapolate features or interfaces beyond what's written
+- If you grasp the intent, use that intuition to ask clarifying questions, not to invent scope
+
+**Examples:**
+
+Bad: Adding query methods like `get_parts()` or `get_active_intents()` without finding them in specs
+Good: "I don't see query interfaces defined. Should I look in a different spec, or is this planned but not yet documented?"
+
+Bad: Describing detailed LLM interaction flows not in the specs
+Good: "SPEC_004 defines annotations and control ops. The query interface isn't specified yet."
+
+**When you discover a gap:**
+1. Note it explicitly ("This isn't specified yet")
+2. Ask if it should be added or if you missed something
+3. Only proceed with invention if explicitly asked to design something new
+
+This ensures documentation reflects actual project state, not assumptions.
+
 ## Quick Reference
 
 ```bash
