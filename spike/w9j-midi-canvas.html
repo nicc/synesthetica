@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>MIDI-to-Canvas Spike</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      overflow: hidden;
+      font-family: system-ui, sans-serif;
+    }
+    #status {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      color: #666;
+      font-size: 12px;
+      z-index: 100;
+    }
+    #status.error { color: #f44; }
+    #status.ok { color: #4f4; }
+    #latency {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      color: #666;
+      font-size: 12px;
+      z-index: 100;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="status">Initializing...</div>
+  <div id="latency"></div>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    // === Configuration ===
+    const FADE_DURATION_MS = 800;
+    const BASE_RADIUS = 30;
+    const VELOCITY_SCALE = 1.5; // radius multiplier at max velocity
+
+    // === State ===
+    const activeNotes = new Map(); // note -> { startTime, velocity, x, y }
+    const fadingNotes = []; // { note, releaseTime, velocity, x, y }
+    let sessionStart = performance.now();
+    let lastMidiEventTime = 0;
+    let lastFrameTime = 0;
+    let midiLatencies = [];
+
+    // === DOM ===
+    const status = document.getElementById('status');
+    const latencyDiv = document.getElementById('latency');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // === Canvas Setup ===
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // === Color: Pitch class to hue (A=0=red, chromatic clockwise) ===
+    function pcToHue(noteNumber) {
+      const pc = noteNumber % 12;
+      // A=9 in MIDI (where C=0), we want A=red=0
+      // So rotate: hue = ((pc - 9 + 12) % 12) * 30
+      return ((pc - 9 + 12) % 12) * 30;
+    }
+
+    // === Position: Note number to screen position ===
+    function noteToPosition(noteNumber) {
+      // Spread notes horizontally by pitch class, vertically by octave
+      const pc = noteNumber % 12;
+      const octave = Math.floor(noteNumber / 12);
+
+      const x = (pc / 11) * (canvas.width * 0.8) + canvas.width * 0.1;
+      const y = canvas.height - ((octave / 10) * (canvas.height * 0.8) + canvas.height * 0.1);
+
+      return { x, y };
+    }
+
+    // === Rendering ===
+    function render(timestamp) {
+      const sessionMs = timestamp - sessionStart;
+      const frameDelta = timestamp - lastFrameTime;
+      lastFrameTime = timestamp;
+
+      // Clear
+      ctx.fillStyle = 'rgba(17, 17, 17, 0.15)'; // slight trail effect
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Draw active notes
+      for (const [note, data] of activeNotes) {
+        const hue = pcToHue(note);
+        const radius = BASE_RADIUS * (0.5 + data.velocity * VELOCITY_SCALE);
+
+        ctx.beginPath();
+        ctx.arc(data.x, data.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = `hsl(${hue}, 80%, 60%)`;
+        ctx.fill();
+
+        // Glow effect
+        ctx.beginPath();
+        ctx.arc(data.x, data.y, radius * 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${hue}, 80%, 60%, 0.3)`;
+        ctx.fill();
+      }
+
+      // Draw fading notes
+      for (let i = fadingNotes.length - 1; i >= 0; i--) {
+        const note = fadingNotes[i];
+        const elapsed = sessionMs - note.releaseTime;
+        const progress = elapsed / FADE_DURATION_MS;
+
+        if (progress >= 1) {
+          fadingNotes.splice(i, 1);
+          continue;
+        }
+
+        const alpha = 1 - progress;
+        const hue = pcToHue(note.note);
+        const radius = BASE_RADIUS * (0.5 + note.velocity * VELOCITY_SCALE) * (1 + progress * 0.5);
+
+        ctx.beginPath();
+        ctx.arc(note.x, note.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${hue}, 80%, 60%, ${alpha * 0.6})`;
+        ctx.fill();
+      }
+
+      // Update latency display
+      if (midiLatencies.length > 0) {
+        const avg = midiLatencies.reduce((a, b) => a + b, 0) / midiLatencies.length;
+        const max = Math.max(...midiLatencies);
+        const min = Math.min(...midiLatencies);
+        latencyDiv.textContent = `Latency: ${avg.toFixed(1)}ms avg (${min.toFixed(0)}-${max.toFixed(0)}ms) | Frame: ${frameDelta.toFixed(1)}ms`;
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    // === MIDI Handling ===
+    function onMidiMessage(event) {
+      const now = performance.now();
+      const sessionMs = now - sessionStart;
+
+      // Calculate latency from MIDI event timestamp if available
+      if (event.timeStamp) {
+        const latency = now - event.timeStamp;
+        midiLatencies.push(latency);
+        if (midiLatencies.length > 100) midiLatencies.shift();
+        console.log(`MIDI event latency: ${latency.toFixed(2)}ms`);
+      }
+
+      const [status, note, velocity] = event.data;
+      const command = status >> 4;
+      const channel = status & 0x0f;
+
+      // Note On (0x9) with velocity > 0
+      if (command === 0x9 && velocity > 0) {
+        const pos = noteToPosition(note);
+        activeNotes.set(note, {
+          startTime: sessionMs,
+          velocity: velocity / 127,
+          x: pos.x,
+          y: pos.y
+        });
+        console.log(`Note ON: ${note} vel=${velocity} at ${sessionMs.toFixed(0)}ms`);
+      }
+      // Note Off (0x8) or Note On with velocity 0
+      else if (command === 0x8 || (command === 0x9 && velocity === 0)) {
+        const noteData = activeNotes.get(note);
+        if (noteData) {
+          fadingNotes.push({
+            note,
+            releaseTime: sessionMs,
+            velocity: noteData.velocity,
+            x: noteData.x,
+            y: noteData.y
+          });
+          activeNotes.delete(note);
+          console.log(`Note OFF: ${note} at ${sessionMs.toFixed(0)}ms`);
+        }
+      }
+
+      lastMidiEventTime = sessionMs;
+    }
+
+    function onMidiStateChange(event) {
+      console.log('MIDI state change:', event.port.name, event.port.state);
+      updateStatus();
+    }
+
+    function updateStatus() {
+      if (!navigator.requestMIDIAccess) {
+        status.textContent = 'Web MIDI not supported in this browser';
+        status.className = 'error';
+        return;
+      }
+    }
+
+    // === MIDI Setup ===
+    async function initMidi() {
+      if (!navigator.requestMIDIAccess) {
+        status.textContent = 'Web MIDI API not supported. Try Chrome or Edge.';
+        status.className = 'error';
+        return;
+      }
+
+      try {
+        const access = await navigator.requestMIDIAccess({ sysex: false });
+
+        // Log available inputs
+        console.log('MIDI inputs:');
+        const inputs = Array.from(access.inputs.values());
+        inputs.forEach(input => {
+          console.log(`  - ${input.name} (${input.manufacturer})`);
+        });
+
+        if (inputs.length === 0) {
+          status.textContent = 'No MIDI devices found. Connect a device and refresh.';
+          status.className = 'error';
+          return;
+        }
+
+        // Attach listeners to all inputs
+        let connectedCount = 0;
+        for (const input of inputs) {
+          input.onmidimessage = onMidiMessage;
+          connectedCount++;
+        }
+
+        // Watch for device changes
+        access.onstatechange = onMidiStateChange;
+
+        status.textContent = `Connected to ${connectedCount} MIDI device(s): ${inputs.map(i => i.name).join(', ')}`;
+        status.className = 'ok';
+
+        console.log('MIDI initialized. Session start:', sessionStart);
+
+      } catch (err) {
+        status.textContent = `MIDI access denied: ${err.message}`;
+        status.className = 'error';
+        console.error('MIDI init error:', err);
+      }
+    }
+
+    // === Start ===
+    initMidi();
+    requestAnimationFrame(render);
+
+    // === Debug: keyboard fallback for testing without MIDI ===
+    document.addEventListener('keydown', (e) => {
+      if (e.repeat) return;
+      // Map keyboard row to notes (a=60, s=62, d=64, etc.)
+      const keyMap = { 'a': 60, 's': 62, 'd': 64, 'f': 65, 'g': 67, 'h': 69, 'j': 71, 'k': 72 };
+      const note = keyMap[e.key.toLowerCase()];
+      if (note !== undefined) {
+        onMidiMessage({ data: [0x90, note, 100], timeStamp: performance.now() });
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      const keyMap = { 'a': 60, 's': 62, 'd': 64, 'f': 65, 'g': 67, 'h': 69, 'j': 71, 'k': 72 };
+      const note = keyMap[e.key.toLowerCase()];
+      if (note !== undefined) {
+        onMidiMessage({ data: [0x80, note, 0], timeStamp: performance.now() });
+      }
+    });
+
+    console.log('Keyboard fallback active: use A-K keys to test without MIDI');
+  </script>
+</body>
+</html>
