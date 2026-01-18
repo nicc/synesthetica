@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:chrome": "BROWSER='google chrome' vite",
     "build": "vite build",
     "preview": "vite preview"
   },
