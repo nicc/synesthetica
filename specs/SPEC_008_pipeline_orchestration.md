@@ -88,6 +88,16 @@ for (const adapter of adapters) {
 
 Adapters may return `null` if no new data is available.
 
+#### Push-to-Pull Reconciliation
+
+Adapters bridge between push-based input sources (e.g., Web MIDI events, Web Audio callbacks) and the pull-based pipeline model. This works via state buffering:
+
+1. **External events push state changes** — MIDI note-on updates the adapter's internal state
+2. **Pipeline pulls current state** — `nextFrame()` reads whatever state has accumulated since last call
+3. **Decoupling** — The two sides operate independently; events don't directly trigger frame production
+
+Adapters are **state-writers**, not frame-pushers. They maintain current musical state; the pipeline reads it on demand. This pattern was validated in the MIDI spike (see `docs/learnings/2026-01-18-midi-spike.md`).
+
 ### 2. Routing
 
 The router splits collected CMS data by part:
