@@ -31,12 +31,14 @@ This app provides:
 npm install
 npm run build -ws  # Build dependencies first
 
-# Start dev server
+# Start dev server (opens in Chrome - required for Web MIDI API)
 cd packages/web-app
-npm run dev
+npm run dev:chrome
 ```
 
-The app will open at `http://localhost:3000`.
+The app will open at `http://localhost:3000` in Chrome.
+
+**Note:** Use `npm run dev:chrome` instead of `npm run dev` to ensure Chrome is used (Safari/Firefox don't support Web MIDI API).
 
 ### Production Build
 

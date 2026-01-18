@@ -35,7 +35,7 @@ The project is in its **formative phase**. Initial documents are skeletal and ex
 ```bash
 cd packages/web-app
 npm install
-npm run dev
+npm run dev:chrome  # Opens in Chrome (required for Web MIDI)
 ```
 
 See [packages/web-app/README.md](packages/web-app/README.md) for details.
