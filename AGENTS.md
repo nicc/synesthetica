@@ -78,6 +78,27 @@ This ensures work survives session boundaries and context compaction.
 
 This synthesis should be a brief summary in your handoff message. If significant, it may warrant a dedicated document (e.g., `docs/learnings/2026-01-17-midi-spike.md`).
 
+## Testing Conventions
+
+**Test runner:** vitest (fast, native ESM, minimal config)
+
+**Principles:**
+- Use dependency injection to decouple from browser APIs (Web MIDI, Web Audio, Canvas)
+- Test transformation logic with mocks, not browser environments
+- Keep tests fast — if it needs a browser, it's probably an integration test
+
+**Current patterns:**
+- `MidiSource` interface allows testing `MidiAdapter` without Web MIDI API
+- Tests live in `packages/<pkg>/test/` mirroring `src/` structure
+- Run with `npm test` (per-package) or `npm test -ws` (all packages)
+
+**What we don't have yet:**
+- Golden tests for visual output (planned: synesthetica-901)
+- Integration tests across pipeline components
+- Browser-based end-to-end tests
+
+This section will evolve as we learn what works.
+
 ## Commit Messages
 
 **Summarize product work in commit messages.** The git log is a project history — don't hide important work behind "bd sync".
