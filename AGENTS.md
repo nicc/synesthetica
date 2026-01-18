@@ -19,7 +19,12 @@ bd sync               # Sync with git
 **MANDATORY WORKFLOW:**
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
+2. **Run quality gates** (if code changed):
+   ```bash
+   npm run lint        # Linting
+   npm test -ws        # Tests
+   npm run build -ws   # Build
+   ```
 3. **Update issue status** - Close finished work, update in-progress items
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
@@ -77,6 +82,24 @@ This ensures work survives session boundaries and context compaction.
 5. **Spec amendments needed** — concrete changes to specs/contracts
 
 This synthesis should be a brief summary in your handoff message. If significant, it may warrant a dedicated document (e.g., `docs/learnings/2026-01-17-midi-spike.md`).
+
+## Linting
+
+**Run `npm run lint` before committing.** This is part of the quality gates in the landing-the-plane checklist.
+
+**Commands:**
+```bash
+npm run lint        # Check for issues
+npm run lint:fix    # Auto-fix where possible
+```
+
+**Key rules enforced:**
+- **Contracts discipline**: All types come from `@synesthetica/contracts`, not internal paths
+- **Type-only imports**: Use `import type { ... }` for types (enforced by `consistent-type-imports`)
+- **No unused vars**: Except those prefixed with `_` (convention for intentionally unused)
+- **No debugger statements**: Remove before commit
+
+**If lint fails:** Fix the issues before pushing. Most are auto-fixable with `npm run lint:fix`.
 
 ## Testing Conventions
 
