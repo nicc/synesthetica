@@ -6,9 +6,16 @@ export * from "./core/uncertainty";
 
 export * from "./parts/parts";
 
+// Raw input types (RFC 005)
+export * from "./raw/raw";
+
+// Legacy CMS types (will be removed in Phase 9)
 export * from "./cms/music";
 export * from "./cms/signals";
 export * from "./cms/cms";
+
+// Musical abstractions (RFC 005)
+export * from "./musical/musical";
 
 export * from "./intents/colors";
 export * from "./intents/intents";
