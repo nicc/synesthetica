@@ -1,11 +1,11 @@
 import type { MidiInputInfo } from "@synesthetica/adapters";
-import { MidiAdapter, WebMidiSource } from "@synesthetica/adapters";
+import { RawMidiAdapter, WebMidiSource } from "@synesthetica/adapters";
 import {
-  Pipeline,
+  VisualPipeline,
   Canvas2DRenderer,
-  PassthroughStabilizer,
-  MinimalRuleset,
-  ParticleGrammar,
+  NoteTrackingStabilizer,
+  MusicalVisualRuleset,
+  VisualParticleGrammar,
   IdentityCompositor,
 } from "@synesthetica/engine";
 
@@ -24,7 +24,7 @@ window.addEventListener("resize", resizeCanvas);
 
 // App state
 let midiSource: WebMidiSource | null = null;
-let pipeline: Pipeline | null = null;
+let pipeline: VisualPipeline | null = null;
 let renderer: Canvas2DRenderer | null = null;
 let sessionStartTime: number = 0;
 let animationFrameId: number | null = null;
@@ -110,25 +110,26 @@ function startSession(midiInput: MidiInputInfo): void {
     sessionStartTime = performance.now();
 
     // Create adapter
-    const adapter = new MidiAdapter(midiSource, {
-      partStrategy: "single",
+    const adapter = new RawMidiAdapter(midiSource, {
       sessionStart: sessionStartTime,
     });
 
     // Start listening to MIDI
     adapter.start();
 
-    // Create pipeline
-    pipeline = new Pipeline({
+    // Create pipeline with RFC 005 components
+    const partId = "main";
+    pipeline = new VisualPipeline({
       canvasSize: { width: canvas.width, height: canvas.height },
       rngSeed: Date.now(),
+      partId,
     });
 
     // Wire up components
     pipeline.addAdapter(adapter);
-    pipeline.addStabilizer(new PassthroughStabilizer());
-    pipeline.setRuleset(new MinimalRuleset());
-    pipeline.addGrammar(new ParticleGrammar());
+    pipeline.setStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+    pipeline.setRuleset(new MusicalVisualRuleset());
+    pipeline.addGrammar(new VisualParticleGrammar());
     pipeline.setCompositor(new IdentityCompositor());
 
     // Create renderer
