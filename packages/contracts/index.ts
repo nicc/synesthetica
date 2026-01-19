@@ -6,8 +6,8 @@ export * from "./core/uncertainty";
 
 export * from "./parts/parts";
 
-// Core musical types (MidiNote, PitchClass, Velocity, ChordQuality)
-export * from "./music/music";
+// Primitive musical types (MidiNote, PitchClass, Velocity, ChordQuality)
+export * from "./primitives/primitives";
 
 // Raw input types (protocol-level)
 export * from "./raw/raw";

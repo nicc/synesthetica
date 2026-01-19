@@ -211,6 +211,59 @@ RFCs are for discovery and exploration. Specs are the source of truth. When you 
 - Specs are how humans and agents understand the system
 - The cost of updating a spec now is tiny; the cost of debugging a stale spec later is large
 
+## Context Awareness Before Action
+
+**Understand the space before modifying it.** Before making structural changes (renaming, moving, refactoring), gather context about the surrounding environment.
+
+**Before renaming or moving files:**
+```bash
+ls <parent-directory>           # What else is here?
+grep -r "<term>" --include="*.ts" --include="*.md"  # Where is this used?
+```
+
+**Before modifying types or interfaces:**
+- Read the file you're modifying
+- Check what imports it
+- Check what it imports
+- Understand the naming conventions in the surrounding code
+
+**Why this matters:**
+- Renaming `cms/` to `music/` when `musical/` already exists creates confusion
+- Moving code without understanding imports breaks builds
+- Naming decisions affect discoverability and understanding
+
+**Examples of context-gathering:**
+- "Let me check what folders exist in contracts before renaming"
+- "Let me see what imports this type before changing it"
+- "Let me understand the naming pattern used elsewhere"
+
+## Verification After Changes
+
+**Prove completeness before declaring done.** After making changes, systematically verify nothing was missed.
+
+**After terminology changes (renames, migrations):**
+```bash
+grep -ri "<old-term>" --include="*.ts" --include="*.md"  # Find ALL remaining uses
+ls <affected-directory>                                   # Verify structure is clean
+```
+
+**After documentation updates:**
+- List all markdown files that might reference the changed concept
+- Search for the old terminology across all docs
+- Check folder names match documented names
+
+**Verification checklist template:**
+```
+1. Code compiles: npm run build -ws
+2. Tests pass: npm test -ws
+3. Lint passes: npm run lint
+4. No stale references: grep -ri "<old-term>" --include="*.ts" --include="*.md"
+5. Folder structure makes sense: ls <affected-directories>
+6. Docs match code: compare README/glossary terms to actual folder names
+```
+
+**The goal:** A future session should find zero traces of stale terminology and a coherent structure.
+
 ## Commit Messages
 
 **Summarize product work in commit messages.** The git log is a project history — don't hide important work behind "bd sync".

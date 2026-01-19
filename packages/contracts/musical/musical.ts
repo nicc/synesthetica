@@ -11,7 +11,7 @@
 import type { Ms, Confidence } from "../core/time";
 import type { Provenance } from "../core/provenance";
 import type { PartId } from "../parts/parts";
-import type { PitchClass, ChordQuality, Velocity } from "../music/music";
+import type { PitchClass, ChordQuality, Velocity } from "../primitives/primitives";
 
 /**
  * Musical pitch - pitch class and octave.
