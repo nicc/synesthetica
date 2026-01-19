@@ -56,12 +56,32 @@ This ensures documentation reflects actual project state, not assumptions.
 ## Quick Reference
 
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
+# Discovery
+bd ready                    # Find available work
+bd show <id>                # View issue details
+bd list                     # List all issues
+
+# Status changes
+bd update <id> --status in_progress   # Claim work
+bd close <id>                         # Complete work
+bd close <id> -r "reason"             # Complete with reason (use -r, not --comment)
+
+# Creation
+bd create --title="..." --type=task --priority=2   # Create issue
+bd create --title="..." --body="..."               # With description
+
+# Dependencies
+bd dep add <id> <depends-on-id>       # Add dependency (NOT "bd dep <id> <id>")
+bd dep remove <id> <depends-on-id>    # Remove dependency
+
+# Sync
+bd sync                     # Sync with git
 ```
+
+**Common mistakes to avoid:**
+- `bd close --comment "..."` → use `-r "..."` instead
+- `bd dep <id1> <id2>` → use `bd dep add <id1> <id2>`
+- Never edit `.beads/issues.jsonl` directly — always use the CLI
 
 ## Landing the Plane (Session Completion)
 
