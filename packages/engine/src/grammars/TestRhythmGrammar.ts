@@ -113,9 +113,11 @@ export class TestRhythmGrammar implements IVisualGrammar {
     const pulseIntensity = annotatedBeat.visual.motion.pulse;
     const { phase, beatInBar, isDownbeat } = annotatedBeat.beat;
 
-    // Downbeats are brighter and wider
-    const opacity = isDownbeat ? 0.9 : 0.4 + pulseIntensity * 0.4;
-    const size = isDownbeat ? 8 : 4 + pulseIntensity * 4;
+    // Both downbeats and regular beats decay with phase
+    // pulseIntensity is (1 - phase), so it's 1 at beat start and 0 approaching next beat
+    const baseOpacity = isDownbeat ? 0.9 : 0.5;
+    const opacity = baseOpacity * pulseIntensity;
+    const size = (isDownbeat ? 150 : 80) * pulseIntensity;
 
     return {
       id: this.entityId("beat-pulse"),
