@@ -181,13 +181,13 @@ Sources do not determine meaning; they provide evidence.
 
 ---
 
-### Adapter  
-A source-specific module that converts raw input into CMS frames.
+### Adapter
+A source-specific module that converts raw input into RawInputFrame.
 
 Adapters:
-- emit musical events and control signals
-- annotate confidence, timing, and provenance
-- are source-specific but output a common format
+- emit protocol-level events (MIDI note_on/off, audio features)
+- annotate timing and provenance
+- are source-specific but output a common format (RawInputFrame)
 
 ---
 
@@ -222,77 +222,56 @@ Uncertainty:
 
 ---
 
-### Canonical Musical State (CMS)  
-A unified, source-agnostic representation of musical facts and signals.
+### RawInputFrame
+Protocol-level input from adapters.
 
-CMS includes:
-- discrete musical events (notes, beats, chords)
-- continuous control signals (loudness, tension, density)
-- probability distributions (e.g. pitch-class distributions)
-- confidence and provenance
+RawInputFrame includes:
+- MIDI events (note_on, note_off, CC)
+- Audio features (onset, pitch, loudness)
+- Timing and source identification
 
-All downstream mapping consumes CMS.
-
----
-
-### CMS Frame  
-A time-indexed snapshot of the Canonical Musical State.
-
-CMS frames are:
-- deterministic
-- ordered in time
-- the sole input to rulesets
+RawInputFrame is the adapter's output and stabilizer's input.
 
 ---
 
-### Musical Event  
-A discrete musical occurrence.
+### MusicalFrame
+A time-indexed snapshot of musical state produced by stabilizers.
 
-Examples:
-- note_on
-- note_off
-- beat
-- chord
+MusicalFrame includes:
+- Notes with duration and phase (attack/sustain/release)
+- Detected chords
+- Beat/meter context
+- Dynamics state
 
-Events may be definitive (MIDI) or inferred (audio).
+MusicalFrame is the stabilizer's output and ruleset's input.
 
 ---
 
-### Control Signal  
-A continuous, time-varying musical descriptor.
+### Note
+A musical abstraction representing a sounding pitch.
 
-Examples:
-- loudness
-- spectral centroid
-- harmonic tension
-
-Control signals include:
+Notes have:
+- pitch (pitch class + octave)
+- velocity
+- duration (time since onset)
+- phase (attack → sustain → release)
 - confidence
-- timescale metadata (micro / beat / phrase / section)
+
+Notes are not pairs of on/off messages - they are proper musical entities with lifecycle.
 
 ---
 
-### Distribution Signal  
-A probabilistic representation of a musical property.
-
-Examples:
-- pitch-class probability distribution
-
-Used primarily for audio-derived inference.
-
----
-
-### Stabilizer  
-A pure transformation that converts raw CMS evidence into usable control signals.
+### Stabilizer
+A stateful module that transforms RawInputFrame into MusicalFrame.
 
 Stabilizers handle:
-- smoothing
-- hysteresis
-- debouncing
-- confidence gating
-- latency compensation
+- Note duration tracking (correlating note_on/note_off)
+- Note phase transitions (attack → sustain → release)
+- Chord detection
+- Beat tracking
+- Dynamics analysis
 
-Stabilizers do **not** render visuals.
+Stabilizers accumulate temporal context to produce proper musical abstractions.
 
 ---
 
@@ -321,14 +300,14 @@ Invariants ensure internal coherence.
 
 ---
 
-### Ruleset  
-A deterministic mapping from CMS → Visual Intents.
+### Ruleset
+A pure function mapping MusicalFrame → VisualIntentFrame.
 
 Rulesets:
 - encode musical meaning
-- apply invariants
+- apply invariants (pitch-class → hue, etc.)
 - are source-agnostic
-- do not render visuals
+- produce visual intents, not visual output
 
 > Analogy: the acoustic physics of an instrument.
 
@@ -336,47 +315,52 @@ Rulesets:
 
 ## Visual Semantics
 
-### Visual Intent  
+### VisualIntent
 A rendering-agnostic description of *what should be expressed visually*.
 
-Examples:
-- palette (hue, saturation, brightness)
-- motion (pulse, flow, jitter)
-- texture (grain, turbulence)
-- shape (sharpness, complexity)
+Types:
+- PaletteIntent (hue, saturation, brightness, stability)
+- MotionIntent (pulse, flow, jitter)
+- TextureIntent (grain, turbulence, anisotropy)
+- ShapeIntent (sharpness, complexity)
 
 Visual intents:
+- have unique IDs for entity lifecycle correlation
 - carry confidence
-- are composable
-- are not pixels
+- can reference each other via group IDs
+- contain no musical concepts
 
 ---
 
-### Intent Frame  
-A time-indexed collection of visual intents and relevant events.
+### VisualIntentFrame
+A time-indexed collection of visual intents.
 
-Intent frames:
-- are the sole input to grammars
-- preserve musical meaning
-- include uncertainty signals
+VisualIntentFrame:
+- is the sole input to grammars
+- contains only visual concepts (no musical events)
+- includes overall uncertainty signal
 
 ---
 
 ## Visual Form & Rendering
 
-### Grammar  
-A visual grammar that consumes intent frames and produces scene entities.
+### Grammar
+A visual grammar that consumes VisualIntentFrame and produces SceneFrame.
 
 Grammars:
 - decide *form*, not *meaning*
+- respond to visual intents (not musical events)
 - may spawn, group, and evolve entities
 - may react to uncertainty
 - may not infer musical semantics
 
+Grammars use intent IDs to track entity lifecycle:
+- Intent appears → create entity
+- Intent continues → update entity
+- Intent disappears → begin fading entity
+
 Examples:
-- note stars
-- chord comets
-- rain decay fields
+- VisualParticleGrammar (particles per palette intent)
 
 ---
 
@@ -429,13 +413,14 @@ Renderers:
 
 ## Testing & Workflow Terms
 
-### Golden Corpus  
+### Golden Corpus
 A deterministic set of fixtures used for contract-first testing.
 
 Includes:
-- CMS fixtures
-- intent fixtures
-- scene/entity fixtures
+- RawInputFrame fixtures
+- MusicalFrame fixtures
+- VisualIntentFrame fixtures
+- SceneFrame fixtures
 
 Golden corpus enables:
 - independent module development

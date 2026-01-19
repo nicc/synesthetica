@@ -10,13 +10,14 @@ Synesthetica processes musical input through a series of transformations. Each s
 ### High-Level Flow
 
 ```
-MIDI/Audio Input → CMS → Intents → Scene → Canvas
+MIDI/Audio Input → RawInputFrame → MusicalFrame → VisualIntentFrame → SceneFrame → Canvas
 ```
 
 **What this means:**
-- Musical input gets converted to a common format (CMS)
-- A stack of rules decide what the music *means* (Intents)
-- A stack of grammars decide what it *looks like* (Scene)
+- Adapters emit protocol-level events (RawInputFrame)
+- Stabilizers produce musical abstractions with duration and phase (MusicalFrame)
+- Rulesets translate musical meaning to visual intents (VisualIntentFrame)
+- Grammars decide what it *looks like* (SceneFrame)
 - A renderer draws it (Canvas)
 
 ### The Stages (Per-Part Processing)
@@ -24,54 +25,55 @@ MIDI/Audio Input → CMS → Intents → Scene → Canvas
 Each stage processes one instrument's data independently. Multiple instruments flow through the pipeline in parallel and get composited at the end.
 
 #### 1. Adapters
-**Technical:** Convert external input (MIDI events, audio analysis) into `CMSFrame` (Canonical Musical State).
+**Technical:** Convert external input (MIDI events, audio analysis) into `RawInputFrame` (protocol-level events).
 
-**What it does:** Translates MIDI note-on/note-off or audio frequency data into a unified format the rest of the system can work with.
+**What it does:** Translates MIDI note-on/note-off or audio features into a unified format. Adapters do NOT interpret musical meaning - they just emit what they observe.
 
-**Phase 0 status:** MIDI adapter works. Audio adapter not yet implemented.
+**Current status:** RawMidiAdapter works. Audio adapter not yet implemented.
 
-#### 2. Stabilizers (Stack)
-**Technical:** A stack of stabilizers enrich `CMSFrame` with derived musical information (e.g., chord detection, beat tracking, phrase boundaries). Each stabilizer adds information for later stages.
+#### 2. Stabilizers
+**Technical:** Transform `RawInputFrame` into `MusicalFrame` by accumulating temporal context. Correlate note_on/note_off into Notes with duration and phase. Detect chords, track beats, analyze dynamics.
 
-**What it does:** Adds musical understanding. Detects patterns like "this is a C major chord" or "this is beat 1 of a measure" so later stages can respond to musical structure, not just individual notes.
+**What it does:** Produces proper musical abstractions. A Note is not a pair of on/off messages - it's an entity with pitch, velocity, duration, and lifecycle phase (attack → sustain → release). Notes persist in the frame during their release window, allowing visual fade-out.
 
-**Phase 0 status:** Passthrough only (no enrichment). Real stabilizers come in Phase 1.
+**Current status:** NoteTrackingStabilizer tracks note lifecycle with configurable attack duration and release window.
 
-#### 3. Ruleset (Stack of Rules)
-**Technical:** A ruleset is a stack of rules that map `CMSFrame` to `IntentFrame`. This is where musical *meaning* is encoded (e.g., "pitch class 0 → red hue", "harmonic tension → saturation"). Rules run in order; later rules can override or blend with earlier ones.
+#### 3. Ruleset
+**Technical:** A pure function mapping `MusicalFrame` to `VisualIntentFrame`. This is where musical *meaning* is encoded (e.g., "pitch class → hue", "velocity → brightness", "note phase → stability").
 
-**What it does:** Interprets musical qualities and assigns them semantic values (color, brightness, urgency, etc.). This layer expresses the musical idea being visualized. Stacking rules lets you layer multiple interpretations (e.g., one rule for pitch → hue, another for tension → saturation).
+**What it does:** Interprets musical qualities and assigns them visual intents. Each Note becomes a PaletteIntent; dynamics become MotionIntents. Rulesets see proper musical abstractions, not protocol events.
 
-**Phase 0 status:** Minimal ruleset with a single rule mapping pitch to hue and velocity to brightness.
+**Current status:** MusicalVisualRuleset maps notes to palette intents with phase-aware stability.
 
 #### 4. Grammar Stack
-**Technical:** A stack of grammars transforms `IntentFrame` into `SceneFrame` (a collection of visual entities). Each grammar produces entities based on its own logic; the stack combines them. Grammars decide *form*: particles vs trails vs fields vs glyphs.
+**Technical:** Transforms `VisualIntentFrame` into `SceneFrame` (a collection of visual entities). Grammars respond to intent IDs for entity lifecycle - when an intent appears, create an entity; when it disappears, begin fading.
 
-**What it does:** Determines the visual language. Given "red, bright, urgent," a particle grammar spawns a red dot, a trail grammar draws a red streak, a glyph grammar places a red symbol. Grammars can be stacked to layer visual elements (e.g., particles + trails + background field).
+**What it does:** Determines the visual language. Grammars see only visual concepts (palette, motion, texture) - never musical events. They track entities by correlating intent IDs across frames.
 
-**Phase 0 status:** Single particle grammar (spawns fading circles on note events).
+**Current status:** VisualParticleGrammar spawns particles per palette intent with intent-based lifecycle.
 
 #### 5. Compositor
 **Technical:** Merges multiple `SceneFrame`s (one per part/instrument) into a single composited scene, applying layout, blending, and z-ordering.
 
 **What it does:** Arranges multiple instruments on screen and handles how they overlap visually.
 
-**Phase 0 status:** Identity compositor (single part, no layout).
+**Current status:** IdentityCompositor (single part, no layout).
 
 #### 6. Renderer
 **Technical:** Draws the composited `SceneFrame` to a canvas using a specific rendering backend (Canvas2D, WebGL, SVG).
 
 **What it does:** Produces the visual output you see on screen.
 
-**Phase 0 status:** Canvas2D renderer with basic circle drawing.
+**Current status:** Canvas2DRenderer with circle drawing for particle entities.
 
 ### Key Architectural Principles
 
-1. **Meaning lives in rulesets, not grammars.** Grammars are dumb templates. All musical interpretation happens in the ruleset.
-2. **Rules and grammars are stacks.** You compose behavior by layering multiple rules or grammars, each contributing to the final output.
-3. **Every piece of data belongs to exactly one part (instrument).** Multi-instrument support is built-in from the start.
-4. **Contracts define all boundaries.** Modules communicate through types in [packages/contracts](packages/contracts/), not internal imports.
-5. **The renderer drives timing (pull-based).** The pipeline doesn't push frames; the renderer requests them at render time.
+1. **Meaning lives in rulesets, not grammars.** Grammars respond to visual intents, never musical events. All musical interpretation happens in the ruleset.
+2. **Grammars never see musical events.** They see only VisualIntentFrame - palette, motion, texture, shape. No notes, no chords, no beats.
+3. **Notes are proper abstractions.** A Note has duration and phase - it's not a pair of on/off messages.
+4. **Every piece of data belongs to exactly one part (instrument).** Multi-instrument support is built-in from the start.
+5. **Contracts define all boundaries.** Modules communicate through types in [packages/contracts](packages/contracts/), not internal imports.
+6. **The renderer drives timing (pull-based).** The pipeline doesn't push frames; the renderer requests them at render time.
 
 ## How We Work
 Our workflow embraces early ambiguity while enforcing discipline as ideas mature.
@@ -99,9 +101,9 @@ High-level principles live in `PRINCIPLES.md` and act as *constraints*, not aspi
 This README acts as the root index. A more detailed `INDEX.md` may be added once the document set grows.
 
 ## Status
-The project is in its **formative phase**. Initial documents are skeletal and expected to evolve rapidly.
+The project is in active development. The core pipeline is implemented with proper frame type separation (RawInputFrame → MusicalFrame → VisualIntentFrame → SceneFrame).
 
-**Phase 0** (Playable Sketch) is complete. You can run the minimal vertical slice:
+You can run the pipeline:
 ```bash
 cd packages/web-app
 npm install
@@ -166,14 +168,14 @@ Operations are deterministic and schema-validated. The engine provides no semant
 - **Context-aware suggestions:** "Which preset works for sparse material?" → LLM searches annotations
 - **Macro creation:** "Save this as 'sunset mode'" → LLM captures current parameter state
 
-### Phase 0 Status
+### Current Status
 
-The LLM control layer is *not implemented* in Phase 0. Current state:
+The LLM control layer is *not implemented* yet. Current state:
 - Control ops and annotations are specified (see [SPEC_004](specs/SPEC_004_llm_mediation_and_annotations.md))
 - Annotations are designed but not emitted
 - No speech interface or LLM integration
 
-Phase 0 focuses on the core pipeline. LLM control comes in Phase 1+.
+The current focus is on the core pipeline. LLM control comes later.
 
 ## Contributing
 
