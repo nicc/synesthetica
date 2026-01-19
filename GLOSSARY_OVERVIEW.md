@@ -6,7 +6,7 @@ A quick reference to the core concepts used across Synesthetica RFCs.
 
 ## Big Picture
 
-**Music → CMS → Visual Intents → Grammars → Scene → Renderer**
+**Music → RawInputFrame → MusicalFrame → VisualIntentFrame → SceneFrame → Renderer**
 
 Meaning flows *downstream*.
 Meaning is **never redefined** once it leaves the Ruleset.

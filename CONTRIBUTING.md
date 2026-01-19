@@ -112,10 +112,10 @@ All imports of shared types must come from `@synesthetica/contracts`, not intern
 
 ```typescript
 // Good
-import type { CMSFrame } from '@synesthetica/contracts/cms';
+import type { MusicalFrame } from '@synesthetica/contracts';
 
 // Bad - will fail lint
-import type { CMSFrame } from '../contracts/cms/frame';
+import type { MusicalFrame } from '../contracts/musical/musical';
 ```
 
 Run `npm run lint` before committing. Most violations are auto-fixable with `npm run lint:fix`.

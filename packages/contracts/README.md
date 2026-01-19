@@ -7,9 +7,9 @@ to build modules independently.
 
 1. **Core primitives** (`core/*`) — time, provenance, uncertainty
 2. **Parts** (`parts/*`) — part identity and routing
-3. **Raw input** (`raw/*`) — protocol-level input from adapters (MIDI events, audio features)
-4. **Musical abstractions** (`musical/*`) — stabilizer output (notes with duration, chords, beats)
-5. **Core music types** (`cms/*`) — fundamental types (MidiNote, PitchClass, ChordQuality)
+3. **Core music types** (`music/*`) — fundamental types (MidiNote, PitchClass, Velocity, ChordQuality)
+4. **Raw input** (`raw/*`) — protocol-level input from adapters (MIDI events, audio features)
+5. **Musical abstractions** (`musical/*`) — stabilizer output (notes with duration, chords, beats)
 6. **Visual Intents** (`intents/*`) — ruleset output, grammar input
 7. **Scene** (`scene/*`) — entities for rendering
 8. **Pipeline interfaces** (`pipeline/*`) — adapters, stabilizers, rulesets, grammars, compositor, renderer

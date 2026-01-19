@@ -1,6 +1,6 @@
-# Synesthetica Web App (Phase 0)
+# Synesthetica Web App
 
-Minimal web application shell for the Phase 0 vertical slice.
+Web application shell for the Synesthetica pipeline.
 
 ## Purpose
 
@@ -64,29 +64,29 @@ npm run preview
 
 ## Architecture
 
-The app wires together the full Phase 0 pipeline:
+The app wires together the full pipeline:
 
 ```
-WebMidiSource → MidiAdapter → Pipeline
-                              ↓
-                   PassthroughStabilizer
-                              ↓
-                      MinimalRuleset (CMS → Intents)
-                              ↓
-                      ParticleGrammar (Intents → Scene)
-                              ↓
-                    IdentityCompositor
-                              ↓
-                    Canvas2DRenderer → <canvas>
+WebMidiSource → RawMidiAdapter → VisualPipeline
+                                      ↓
+                         NoteTrackingStabilizer (RawInputFrame → MusicalFrame)
+                                      ↓
+                         MusicalVisualRuleset (MusicalFrame → VisualIntentFrame)
+                                      ↓
+                         VisualParticleGrammar (VisualIntentFrame → SceneFrame)
+                                      ↓
+                              IdentityCompositor
+                                      ↓
+                              Canvas2DRenderer → <canvas>
 ```
 
 ### Components Used
 
 - **WebMidiSource**: Wraps Web MIDI API for testability
-- **MidiAdapter**: Converts MIDI messages to CMSFrame events
-- **PassthroughStabilizer**: No-op stabilizer (enrichment comes later)
-- **MinimalRuleset**: Maps pitch → hue, velocity → brightness
-- **ParticleGrammar**: Spawns particle entities on note_on
+- **RawMidiAdapter**: Converts MIDI messages to RawInputFrame
+- **NoteTrackingStabilizer**: Tracks note lifecycle (attack → sustain → release)
+- **MusicalVisualRuleset**: Maps notes to palette intents with phase-aware stability
+- **VisualParticleGrammar**: Spawns particle entities per palette intent
 - **IdentityCompositor**: Simple pass-through (multi-part composition comes later)
 - **Canvas2DRenderer**: Draws particles as filled circles
 
@@ -97,17 +97,14 @@ WebMidiSource → MidiAdapter → Pipeline
 - **Session stop**: Automatically on page unload
 - **Reset**: Switching devices stops the old session and starts a new one
 
-## Known Limitations (Phase 0)
+## Known Limitations
 
 - No audio input (MIDI only)
 - Single part (no multi-instrument support)
-- No real stabilizers (just pass-through)
+- No chord/beat detection yet
 - No LLM integration
 - No presets or macro controls
 - Minimal visual polish
-- No note_off handling (particles fade on timer, not on release)
-
-These are intentional - Phase 0 is about proving the architecture, not building the full feature set.
 
 ## Troubleshooting
 
@@ -131,14 +128,11 @@ These are intentional - Phase 0 is about proving the architecture, not building 
 - Try a different MIDI channel
 - Check that you're using Chrome or Edge (Safari/Firefox don't support Web MIDI)
 
-## Next Steps (Phase 1)
+## Next Steps
 
-After Phase 0 is validated, we'll iterate on:
 - Better rulesets (harmonic tension, phrase awareness)
 - More expressive grammars (trails, fields, glyphs)
-- Real stabilizers (chord detection, beat tracking)
+- Enhanced stabilizers (chord detection, beat tracking)
 - Multi-part support
 - Preset system
 - LLM integration for control
-
-For now, this app serves as the foundation and test harness for that exploration.

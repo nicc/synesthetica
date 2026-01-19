@@ -1,4 +1,4 @@
-import type { PitchClass } from "../cms/music";
+import type { PitchClass } from "../music/music";
 
 export interface ColorHSVA {
   h: number; // 0..360

@@ -217,7 +217,7 @@ A derived notion representing ambiguity or entropy in the musical state.
 
 Uncertainty:
 - increases visual noise, jitter, diffusion
-- is especially relevant for audio-derived CMS
+- is especially relevant for audio-derived input
 - is first-class in the system
 
 ---
