@@ -100,8 +100,52 @@ Stabilizers produce MusicalFrame containing:
 |-------|-------------|--------|
 | `notes: Note[]` | Active notes with duration and phase | note_on/note_off correlation |
 | `chords: MusicalChord[]` | Detected chords | Note analysis |
+| `progression: ChordId[]` | Recent chord history (references) | Chord tracking over time |
+| `phrases: Phrase[]` | Phrase boundaries | Beat + density analysis |
 | `beat: BeatState` | Current beat position | Beat detection |
 | `dynamics: DynamicsState` | Current loudness level and trend | Velocity analysis |
+
+## MusicalFrame as Snapshot with Context
+
+MusicalFrame is a **snapshot with context**, not a history log. It contains:
+
+- **Current state** — What's sounding now (active notes, current chord)
+- **Recent context** — What led here, via references (progression, phrases)
+- **No raw events** — Those stay in RawInputFrame
+
+This allows rulesets to remain pure functions while still accessing temporal context like harmonic tension or phrase position.
+
+### Reference vs Copy
+
+To avoid duplication, MusicalFrame uses references:
+
+```ts
+interface MusicalFrame {
+  notes: Note[];           // Active notes (attack/sustain/release)
+  chords: MusicalChord[];  // Active chords (reference noteIds)
+  progression: ChordId[];  // Recent chord IDs (references, not copies)
+  phrases: Phrase[];       // Phrase boundaries (reference chordIds, noteIds)
+}
+```
+
+A chord in `progression` is not duplicated — it references `chords[]` by ID.
+
+### Context Windowing
+
+Stabilizers maintain sliding windows of context. Window sizes are:
+
+- **Derived from musical cues** when possible (e.g., phrase boundaries)
+- **Clamped by configurable maximums** to bound memory usage
+
+```ts
+interface StabilizerConfig {
+  maxProgressionChords?: number;   // Default: 16 chords
+  maxPhraseHistory?: number;       // Default: 4 phrases
+  maxContextWindowMs?: Ms;         // Default: 30000ms (30 seconds)
+}
+```
+
+These defaults are starting points; we expect to tune them through experimentation.
 
 ### Note Tracking
 

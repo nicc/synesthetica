@@ -84,6 +84,60 @@ See SPEC_009 for detailed frame type definitions. Summary:
 | Rulesets | MusicalFrame | VisualIntentFrame | IVisualRuleset |
 | Grammars | VisualIntentFrame | SceneFrame | IVisualGrammar |
 
+## Stabilizer DAG
+
+Stabilizers form a directed acyclic graph (DAG) based on their dependencies. Some stabilizers are independent (can run in parallel), while others depend on upstream stabilizer output.
+
+### Independent Stabilizers
+
+These process RawInputFrame directly:
+
+- **NoteTrackingStabilizer** — Correlates note_on/note_off into Notes with duration
+- **BeatDetectionStabilizer** — Detects beats from onset patterns
+- **DynamicsStabilizer** — Analyzes velocity patterns
+
+### Derived Stabilizers
+
+These require output from upstream stabilizers:
+
+- **ChordDetectionStabilizer** — Needs active notes from NoteTrackingStabilizer
+- **PhraseDetectionStabilizer** — Needs beats and note density patterns
+- **ProgressionStabilizer** — Needs chords over time
+
+### DAG Resolution
+
+The pipeline topologically sorts stabilizers based on declared dependencies:
+
+```ts
+export interface IMusicalStabilizer {
+  id: string;
+  dependencies?: string[];  // IDs of stabilizers this one depends on
+
+  // Derived stabilizers receive upstream MusicalFrame
+  apply(raw: RawInputFrame, upstream: MusicalFrame | null): MusicalFrame;
+}
+```
+
+Execution order:
+1. Run all stabilizers with no dependencies (in parallel if supported)
+2. Merge their outputs into an intermediate MusicalFrame
+3. Run stabilizers that depend only on completed ones
+4. Repeat until all stabilizers have run
+5. Final MusicalFrame goes to ruleset
+
+### Merge Semantics
+
+When multiple stabilizers produce output, their contributions merge:
+
+- `notes[]` — Union of all notes (NoteTrackingStabilizer owns this)
+- `chords[]` — Union of all chords (ChordDetectionStabilizer owns this)
+- `beat` — Single authoritative source (BeatDetectionStabilizer owns this)
+- `dynamics` — Single authoritative source (DynamicsStabilizer owns this)
+- `progression` — ChordId references (ProgressionStabilizer owns this)
+- `phrases` — Phrase boundaries (PhraseDetectionStabilizer owns this)
+
+Ownership is enforced: only one stabilizer may write to each field.
+
 ## Processing Steps
 
 ### 1. Adapter Collection
@@ -226,10 +280,10 @@ The canonical implementation is `VisualPipeline` in `packages/engine/src/VisualP
 
 ## What This Spec Does NOT Cover
 
-- Specific stabilizer ordering (implementation decides)
 - Grammar stack composition within a part
 - Renderer implementation
 - Session persistence
+- Specific stabilizer implementations (see SPEC_006)
 
 ## Contract Location
 

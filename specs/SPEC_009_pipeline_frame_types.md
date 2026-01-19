@@ -124,13 +124,17 @@ export interface PaletteIntent {
   t: Ms;
   base: ColorHSVA;
   stability: number;
+  phase: IntentPhase;       // Intent's own lifecycle phase
   confidence: Confidence;
 }
+
+export type IntentPhase = "attack" | "sustain" | "release";
 ```
 
 **Key properties:**
 - No musical events — grammars never see them
-- Intent IDs enable entity lifecycle correlation
+- Intent IDs enable correlation across frames
+- Intents have their own phase (attack/sustain/release envelope)
 - Purely visual semantics (color, motion, texture)
 
 ## Data Flow
@@ -167,14 +171,51 @@ note_on                                              note_off
 
 The release window (default 500ms) allows visual effects to fade gracefully.
 
-## Intent IDs and Entity Lifecycle
+## Intent Phase and Entity Lifecycle
+
+### Intent Phase
+
+Intents have their own lifecycle phase (attack/sustain/release), analogous to a musical envelope. This phase describes the intent's *current state*, not the entity's lifespan.
+
+- **attack** — Intent just appeared (e.g., first ~50ms)
+- **sustain** — Intent is active and stable
+- **release** — Intent is fading (source note released, etc.)
+
+The ruleset sets the intent phase based on the source musical event's phase.
+
+### Entity Lifecycle is Grammar's Domain
+
+**Critical distinction:** Intent lifecycle and entity lifecycle are decoupled.
+
+The grammar observes intents and decides how to respond visually. It is **not obligated** to tie entity lifetime to intent lifetime. Examples:
+
+| Intent behavior | Possible grammar response |
+|-----------------|---------------------------|
+| Intent appears | Spawn particle with 2s TTL |
+| Intent in attack phase | Spawn bright burst entity |
+| Intent in release phase | Spawn fade trail entity |
+| Intent disappears | Do nothing (entity has its own TTL) |
+| Intent continues | Reinforce existing entity (reset TTL, boost intensity) |
+
+Grammars may:
+- Spawn entities that outlive their source intent
+- Spawn multiple entities from one intent
+- Ignore intents entirely (based on grammar's visual language)
+- Use intent phase to vary visual representation (e.g., brighter during attack)
+
+### Why This Matters
+
+Consider an ear training use case: the intent to *play a note* is distinct from the intent to *display that note for extended study*. The note's visual representation might persist long after the musical note releases, allowing the user to study harmonic relationships.
+
+This is a grammar concern, not a ruleset concern. The grammar decides visual persistence based on its purpose.
+
+### Intent IDs for Correlation
 
 Intent IDs enable grammars to correlate intents across frames without seeing musical events:
 
-1. **Intent appears** → Grammar creates entity
-2. **Intent continues** → Grammar updates entity
-3. **Intent disappears** → Grammar starts fading entity
-4. **Fade complete** → Grammar removes entity
+- Same ID across frames → Same source (grammar may reinforce or ignore)
+- New ID → New source (grammar may spawn new entity)
+- ID absent → Source ended (grammar may spawn release effect or do nothing)
 
 This replaces the previous pattern of grammars reading note_on/note_off events.
 
