@@ -43,11 +43,11 @@ export interface VisualPipelineConfig {
  * Runtime state for a single part.
  */
 interface PartState {
-  /** Stabilizer for this part */
-  stabilizer: IMusicalStabilizer | null;
+  /** Stabilizers for this part, in dependency order */
+  stabilizers: IMusicalStabilizer[];
 
-  /** Previous musical frame from stabilizer */
-  previousMusicalFrame: MusicalFrame | null;
+  /** Previous musical frames per stabilizer (keyed by stabilizer id) */
+  previousMusicalFrames: Map<string, MusicalFrame | null>;
 
   /** Grammar contexts per grammar */
   grammarContexts: Map<string, GrammarContext>;
@@ -72,7 +72,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
 
   // Components
   private adapters: IRawSourceAdapter[] = [];
-  private stabilizerFactory: (() => IMusicalStabilizer) | null = null;
+  private stabilizerFactories: Array<() => IMusicalStabilizer> = [];
   private ruleset: IVisualRuleset | null = null;
   private grammars: IVisualGrammar[] = [];
   private compositor: ICompositor | null = null;
@@ -93,11 +93,19 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
   }
 
   /**
-   * Set the stabilizer factory.
-   * A factory is used because each part needs its own stabilizer instance.
+   * Set the stabilizer factory (legacy single-stabilizer API).
+   * @deprecated Use addStabilizerFactory for multiple stabilizers
    */
   setStabilizerFactory(factory: () => IMusicalStabilizer): void {
-    this.stabilizerFactory = factory;
+    this.stabilizerFactories = [factory];
+  }
+
+  /**
+   * Add a stabilizer factory. Stabilizers are sorted by dependencies.
+   * A factory is used because each part needs its own stabilizer instances.
+   */
+  addStabilizerFactory(factory: () => IMusicalStabilizer): void {
+    this.stabilizerFactories.push(factory);
   }
 
   setRuleset(ruleset: IVisualRuleset): void {
@@ -140,16 +148,12 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     // Get or create part state
     const partState = this.getOrCreatePartState(partId);
 
-    // Apply stabilizer
+    // Apply stabilizers in dependency order
     let musicalFrame: MusicalFrame;
-    if (partState.stabilizer) {
-      musicalFrame = partState.stabilizer.apply(
-        mergedRaw,
-        partState.previousMusicalFrame
-      );
-      partState.previousMusicalFrame = musicalFrame;
+    if (partState.stabilizers.length > 0) {
+      musicalFrame = this.applyStabilizers(partState, mergedRaw, targetTime, partId);
     } else {
-      // No stabilizer - create empty musical frame
+      // No stabilizers - create empty musical frame
       musicalFrame = this.createEmptyMusicalFrame(targetTime, partId);
     }
 
@@ -243,8 +247,8 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
 
   reset(): void {
     for (const [, state] of this.partStates) {
-      if (state.stabilizer) {
-        state.stabilizer.reset();
+      for (const stabilizer of state.stabilizers) {
+        stabilizer.reset();
       }
     }
     this.partStates.clear();
@@ -254,12 +258,12 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
 
   dispose(): void {
     for (const [, state] of this.partStates) {
-      if (state.stabilizer) {
-        state.stabilizer.dispose();
+      for (const stabilizer of state.stabilizers) {
+        stabilizer.dispose();
       }
     }
     this.adapters = [];
-    this.stabilizerFactory = null;
+    this.stabilizerFactories = [];
     this.grammars = [];
     this.ruleset = null;
     this.compositor = null;
@@ -309,22 +313,177 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
   private getOrCreatePartState(partId: PartId): PartState {
     let state = this.partStates.get(partId);
     if (!state) {
-      // Create stabilizer for this part if factory available
-      let stabilizer: IMusicalStabilizer | null = null;
-      if (this.stabilizerFactory) {
-        stabilizer = this.stabilizerFactory();
+      // Create stabilizers for this part
+      const stabilizers: IMusicalStabilizer[] = [];
+      for (const factory of this.stabilizerFactories) {
+        const stabilizer = factory();
         stabilizer.init();
+        stabilizers.push(stabilizer);
       }
 
+      // Sort stabilizers by dependencies (topological sort)
+      const sortedStabilizers = this.topologicalSortStabilizers(stabilizers);
+
       state = {
-        stabilizer,
-        previousMusicalFrame: null,
+        stabilizers: sortedStabilizers,
+        previousMusicalFrames: new Map(),
         grammarContexts: new Map(),
         previousScenes: new Map(),
       };
       this.partStates.set(partId, state);
     }
     return state;
+  }
+
+  /**
+   * Apply stabilizers in dependency order, merging their outputs.
+   */
+  private applyStabilizers(
+    partState: PartState,
+    raw: RawInputFrame,
+    t: SessionMs,
+    partId: PartId
+  ): MusicalFrame {
+    // Start with empty frame
+    let mergedFrame: MusicalFrame = this.createEmptyMusicalFrame(t, partId);
+
+    // Build a map of stabilizer outputs for dependency resolution
+    const outputs = new Map<string, MusicalFrame>();
+
+    for (const stabilizer of partState.stabilizers) {
+      // Determine upstream frame based on dependencies
+      let upstream: MusicalFrame | null = null;
+
+      if (stabilizer.dependencies && stabilizer.dependencies.length > 0) {
+        // Merge outputs from all dependencies
+        const depOutputs = stabilizer.dependencies
+          .map((depId) => outputs.get(depId))
+          .filter((f): f is MusicalFrame => f !== undefined);
+
+        if (depOutputs.length > 0) {
+          upstream = this.mergeMusicalFrames(depOutputs, t, partId);
+        }
+      }
+
+      // Get previous frame for this stabilizer
+      const previous = partState.previousMusicalFrames.get(stabilizer.id) ?? null;
+
+      // Apply stabilizer
+      const output = stabilizer.apply(raw, upstream ?? previous);
+
+      // Store output for dependent stabilizers
+      outputs.set(stabilizer.id, output);
+      partState.previousMusicalFrames.set(stabilizer.id, output);
+
+      // Merge into final frame
+      mergedFrame = this.mergeMusicalFrames([mergedFrame, output], t, partId);
+    }
+
+    return mergedFrame;
+  }
+
+  /**
+   * Topological sort of stabilizers based on dependencies.
+   */
+  private topologicalSortStabilizers(
+    stabilizers: IMusicalStabilizer[]
+  ): IMusicalStabilizer[] {
+    const result: IMusicalStabilizer[] = [];
+    const visited = new Set<string>();
+    const visiting = new Set<string>();
+    const stabilizerMap = new Map(stabilizers.map((s) => [s.id, s]));
+
+    const visit = (stabilizer: IMusicalStabilizer) => {
+      if (visited.has(stabilizer.id)) return;
+      if (visiting.has(stabilizer.id)) {
+        throw new Error(`Circular dependency detected: ${stabilizer.id}`);
+      }
+
+      visiting.add(stabilizer.id);
+
+      // Visit dependencies first
+      if (stabilizer.dependencies) {
+        for (const depId of stabilizer.dependencies) {
+          const dep = stabilizerMap.get(depId);
+          if (dep) {
+            visit(dep);
+          }
+          // If dependency not found, it might be external - ignore
+        }
+      }
+
+      visiting.delete(stabilizer.id);
+      visited.add(stabilizer.id);
+      result.push(stabilizer);
+    };
+
+    for (const stabilizer of stabilizers) {
+      visit(stabilizer);
+    }
+
+    return result;
+  }
+
+  /**
+   * Merge multiple MusicalFrames into one.
+   * Later frames override earlier ones for conflicting fields.
+   */
+  private mergeMusicalFrames(
+    frames: MusicalFrame[],
+    t: SessionMs,
+    partId: PartId
+  ): MusicalFrame {
+    if (frames.length === 0) {
+      return this.createEmptyMusicalFrame(t, partId);
+    }
+
+    if (frames.length === 1) {
+      return frames[0];
+    }
+
+    // Merge notes (concat, dedupe by id)
+    const notesMap = new Map<string, MusicalFrame["notes"][0]>();
+    for (const frame of frames) {
+      for (const note of frame.notes) {
+        notesMap.set(note.id, note);
+      }
+    }
+
+    // Merge chords (concat, dedupe by id)
+    const chordsMap = new Map<string, MusicalFrame["chords"][0]>();
+    for (const frame of frames) {
+      for (const chord of frame.chords) {
+        chordsMap.set(chord.id, chord);
+      }
+    }
+
+    // Merge progression (concat, dedupe)
+    const progressionSet = new Set<string>();
+    for (const frame of frames) {
+      if (frame.progression) {
+        for (const chordId of frame.progression) {
+          progressionSet.add(chordId);
+        }
+      }
+    }
+
+    // Take latest non-null values for beat and dynamics
+    let beat = null;
+    let dynamics: MusicalFrame["dynamics"] = { level: 0, trend: "stable" };
+    for (const frame of frames) {
+      if (frame.beat) beat = frame.beat;
+      if (frame.dynamics.level > 0) dynamics = frame.dynamics;
+    }
+
+    return {
+      t,
+      part: partId,
+      notes: Array.from(notesMap.values()),
+      chords: Array.from(chordsMap.values()),
+      beat,
+      dynamics,
+      progression: progressionSet.size > 0 ? Array.from(progressionSet) : undefined,
+    };
   }
 
   private mergeScenes(

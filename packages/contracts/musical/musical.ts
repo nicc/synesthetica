@@ -65,6 +65,9 @@ export interface MusicalChord {
   id: ChordId;
   root: PitchClass;
   quality: ChordQuality;
+  bass: PitchClass; // Lowest sounding pitch class (for slash chords like C/E)
+  inversion: number; // 0 = root position, 1 = first inversion, etc.
+  voicing: Pitch[]; // All pitches in the chord, ordered low to high
   noteIds: NoteId[];
   onset: Ms;
   duration: Ms;

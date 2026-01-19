@@ -4,6 +4,7 @@ import {
   VisualPipeline,
   Canvas2DRenderer,
   NoteTrackingStabilizer,
+  ChordDetectionStabilizer,
   MusicalVisualRuleset,
   VisualParticleGrammar,
   IdentityCompositor,
@@ -127,7 +128,8 @@ function startSession(midiInput: MidiInputInfo): void {
 
     // Wire up components
     pipeline.addAdapter(adapter);
-    pipeline.setStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+    pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+    pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
     pipeline.setRuleset(new MusicalVisualRuleset());
     pipeline.addGrammar(new VisualParticleGrammar());
     pipeline.setCompositor(new IdentityCompositor());

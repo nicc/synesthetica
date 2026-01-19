@@ -2,6 +2,28 @@
 
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
+## Implementation Approval
+
+**Always check with the user before starting implementation work.**
+
+Before writing code for any non-trivial task:
+1. Explain what you intend to build
+2. Describe the approach (what files, what changes, what trade-offs)
+3. Wait for approval before proceeding
+
+This applies to:
+- New features or components
+- Architectural changes (e.g., adding stabilizer DAG support)
+- Significant refactors
+- Anything that touches multiple files
+
+It does NOT apply to:
+- Trivial fixes (typos, obvious bugs)
+- Research and exploration (reading files, understanding code)
+- Questions and clarifications
+
+**Why:** The user wants visibility into approach before investment. Course-correcting after code is written wastes effort.
+
 ## Communication Style
 
 **Use simple, direct language. Do not hype.**
