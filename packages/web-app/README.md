@@ -58,22 +58,25 @@ npm run preview
 
 ### What You Should See
 
-- Each note triggers a particle with a color based on pitch class
-- Particles fade out over time
-- Different pitches = different hues (deterministic mapping)
+- Notes trigger visual markers and particles with colors based on pitch class
+- Beat pulses appear on downbeats (when beat detection is active)
+- Chords produce expanding glows with history trails
+- Different pitches = different hues (deterministic mapping per SPEC 002)
 
 ## Architecture
 
-The app wires together the full pipeline:
+The app wires together the full pipeline (RFC 005 / RFC 006):
 
 ```
 WebMidiSource → RawMidiAdapter → VisualPipeline
                                       ↓
                          NoteTrackingStabilizer (RawInputFrame → MusicalFrame)
+                         ChordDetectionStabilizer (MusicalFrame → MusicalFrame + chords)
                                       ↓
-                         MusicalVisualRuleset (MusicalFrame → VisualIntentFrame)
+                         MusicalVisualRuleset (MusicalFrame → AnnotatedMusicalFrame)
                                       ↓
-                         VisualParticleGrammar (VisualIntentFrame → SceneFrame)
+                         TestRhythmGrammar + TestChordProgressionGrammar
+                         (AnnotatedMusicalFrame → SceneFrame)
                                       ↓
                               IdentityCompositor
                                       ↓
@@ -85,10 +88,12 @@ WebMidiSource → RawMidiAdapter → VisualPipeline
 - **WebMidiSource**: Wraps Web MIDI API for testability
 - **RawMidiAdapter**: Converts MIDI messages to RawInputFrame
 - **NoteTrackingStabilizer**: Tracks note lifecycle (attack → sustain → release)
-- **MusicalVisualRuleset**: Maps notes to palette intents with phase-aware stability
-- **VisualParticleGrammar**: Spawns particle entities per palette intent
+- **ChordDetectionStabilizer**: Detects chords from active notes
+- **MusicalVisualRuleset**: Annotates musical elements with visual properties (palette, texture, motion)
+- **TestRhythmGrammar**: Renders beats and notes as timing markers (ignores chords)
+- **TestChordProgressionGrammar**: Renders chords as glows with history trail (ignores beats)
 - **IdentityCompositor**: Simple pass-through (multi-part composition comes later)
-- **Canvas2DRenderer**: Draws particles as filled circles
+- **Canvas2DRenderer**: Draws entities as shapes on canvas
 
 ## Session Lifecycle
 
@@ -101,7 +106,7 @@ WebMidiSource → RawMidiAdapter → VisualPipeline
 
 - No audio input (MIDI only)
 - Single part (no multi-instrument support)
-- No chord/beat detection yet
+- No beat detection stabilizer yet (beat annotation always null)
 - No LLM integration
 - No presets or macro controls
 - Minimal visual polish
@@ -130,9 +135,10 @@ WebMidiSource → RawMidiAdapter → VisualPipeline
 
 ## Next Steps
 
-- Better rulesets (harmonic tension, phrase awareness)
+- Beat detection stabilizer
+- Better rulesets (harmonic tension, phrase awareness, richer palette system)
 - More expressive grammars (trails, fields, glyphs)
-- Enhanced stabilizers (chord detection, beat tracking)
+- Enhanced stabilizers (phrase detection, progression tracking)
 - Multi-part support
 - Preset system
 - LLM integration for control

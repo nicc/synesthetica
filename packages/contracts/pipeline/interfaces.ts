@@ -9,11 +9,11 @@
 
 import type { SourceId, StreamId } from "../core/provenance";
 import type { Ms, SessionMs } from "../core/time";
-import type { VisualIntentFrame } from "../intents/intents";
 import type { SceneFrame } from "../scene/scene";
 import type { PartId } from "../parts/parts";
 import type { RawInputFrame } from "../raw/raw";
 import type { MusicalFrame } from "../musical/musical";
+import type { AnnotatedMusicalFrame } from "../annotated/annotated";
 
 // ============================================================================
 // Source Adapters
@@ -85,48 +85,64 @@ export interface IMusicalStabilizer {
 }
 
 // ============================================================================
-// Rulesets
+// Rulesets (RFC 006)
 // ============================================================================
 
 /**
- * Ruleset that maps musical state to visual intents.
+ * Ruleset that annotates musical frames with visual properties.
  *
- * Rulesets are pure functions that translate musical semantics to
- * visual intentions. They encode the "meaning" of musical events
- * without prescribing specific visual outcomes.
+ * Rulesets are pure functions that:
+ * - Assign palettes based on harmonic content
+ * - Assign textures based on timbral qualities
+ * - Assign motion properties based on rhythmic/dynamic context
+ *
+ * Rulesets do NOT:
+ * - Decide what shape a note should be
+ * - Filter out musical elements
+ * - Make rendering decisions
+ *
+ * Key responsibility: Define a consistent visual vocabulary that encodes
+ * musical meaning. All minor chords must share visual characteristics that
+ * distinguish them from major chords. Users learn this vocabulary; grammars
+ * respect it while making their own rendering choices.
  */
 export interface IVisualRuleset {
   id: string;
 
   /**
-   * Pure function: maps musical state to visual intents.
+   * Pure function: annotates musical state with visual properties.
    * No internal state. Same input always produces same output.
    */
-  map(frame: MusicalFrame): VisualIntentFrame;
+  annotate(frame: MusicalFrame): AnnotatedMusicalFrame;
 }
 
 // ============================================================================
-// Grammars
+// Grammars (RFC 006)
 // ============================================================================
 
 /**
- * Grammar that maps visual intents to scene entities.
+ * Grammar that renders annotated musical frames to scene entities.
+ *
+ * Grammars receive annotated musical elements and decide HOW to render them
+ * (or whether to render them at all). They are aware of musical element
+ * categories (notes, chords, beats) but not musical analysis details.
  *
  * Grammars:
- * - Decide visual form, not meaning
- * - See only visual intents, never musical events
- * - OWN entity lifecycle (TTL, decay, removal)
- * - Are NOT obligated to tie entity lifetime to intent lifetime
+ * - Decide which musical elements to render
+ * - Decide what visual representation to use (particles, shapes, trails, etc.)
+ * - Use visual annotations to style their chosen representations
+ * - Maintain entity state across frames
+ * - May filter elements (e.g., rhythm grammar ignores chords)
  *
- * Entity lifecycle model (see SPEC_009):
- * - Intent appears → Grammar may spawn entity with its own TTL
- * - Intent continues → Grammar may reinforce entity or ignore
- * - Intent disappears → Grammar may spawn release effect or do nothing
- * - Entity TTL expires → Entity is removed (grammar's decision)
+ * Grammars do NOT:
+ * - Perform musical analysis
+ * - Know pitch class, key, chord quality details
+ * - Access raw MIDI or audio data
  *
- * Grammars may spawn entities that outlive their source intent.
- * This decoupling enables use cases like ear training where visual
- * persistence differs from musical duration.
+ * Example interpretive choices:
+ * - Rhythm grammar: renders beats as pulses, notes as timing markers, ignores harmony
+ * - Chord grammar: renders chords as expanding blooms, notes as particles within
+ * - Both use the same visual annotations (palette, texture, motion) from the ruleset
  */
 export interface IVisualGrammar {
   id: string;
@@ -137,12 +153,20 @@ export interface IVisualGrammar {
   init(ctx: GrammarContext): void;
 
   /**
-   * Update the scene based on current intents and previous state.
-   *
-   * The grammar interprets intents and manages entity lifecycle.
-   * It is not required to track intent presence for entity lifetime.
+   * Dispose of any resources.
    */
-  update(input: VisualIntentFrame, previous: SceneFrame | null): SceneFrame;
+  dispose(): void;
+
+  /**
+   * Update the scene based on annotated musical elements and previous state.
+   *
+   * The grammar:
+   * - Iterates through musical elements it cares about
+   * - Creates/updates/removes entities based on its rendering strategy
+   * - Uses visual annotations for styling (palette, texture, motion)
+   * - Manages entity lifecycle independently
+   */
+  update(input: AnnotatedMusicalFrame, previous: SceneFrame | null): SceneFrame;
 
   /** Schema for configurable parameters (optional) */
   paramsSchema?: Record<string, unknown>;

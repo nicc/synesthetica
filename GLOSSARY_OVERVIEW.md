@@ -6,10 +6,11 @@ A quick reference to the core concepts used across Synesthetica RFCs.
 
 ## Big Picture
 
-**Music → RawInputFrame → MusicalFrame → VisualIntentFrame → SceneFrame → Renderer**
+**Music → RawInputFrame → MusicalFrame → AnnotatedMusicalFrame → SceneFrame → Renderer**
 
 Meaning flows *downstream*.
-Meaning is **never redefined** once it leaves the Ruleset.
+Rulesets define the *visual vocabulary*.
+Grammars decide *what to render and how*.
 
 ---
 
@@ -63,7 +64,7 @@ Affects visual stability, not meaning.
 
 ---
 
-## Meaning & Mapping
+## Meaning & Mapping (RFC 006)
 
 **Instrument Definition**
 The fixed synesthetic operating scheme.
@@ -72,28 +73,37 @@ The fixed synesthetic operating scheme.
 A rule that always holds (e.g. pitch-class → hue).
 
 **Ruleset**
-Maps MusicalFrame → VisualIntentFrame.
-Defines musical meaning.
+Maps MusicalFrame → AnnotatedMusicalFrame.
+Defines the *visual vocabulary* — what colors and textures mean musically.
+Does NOT decide what shapes to use or which elements to render.
+
+**Visual Annotation**
+Properties attached to each musical element: palette, texture, motion.
+Carries the semantic meaning so grammars don't need to know musical analysis.
 
 ---
 
-## Visual Semantics
+## Annotated Musical Elements (RFC 006)
 
-**VisualIntent**
-Rendering-agnostic description of what to express.
-Examples: PaletteIntent, MotionIntent, TextureIntent, ShapeIntent.
+**AnnotatedMusicalFrame**
+Musical elements (notes, chords, beats) with visual annotations attached.
+The ruleset's output and grammar's input.
 
-**VisualIntentFrame**
-Time-stamped bundle of visual intents. No musical concepts.
+**AnnotatedNote**
+A Note plus its visual annotation (palette, texture, motion).
+
+**AnnotatedChord**
+A Chord plus its visual annotation and list of constituent note IDs.
 
 ---
 
 ## Visual Form & Rendering
 
 **Grammar**
-A visual grammar (stars, comets, rain).
-Consumes intents, produces entities.
-Decides form, not meaning.
+Transforms AnnotatedMusicalFrame → SceneFrame.
+Decides *form*, not *meaning*.
+Knows musical element *categories* (note, chord, beat) but not analysis details.
+Has creative agency: decides which elements to render, what shapes to use.
 
 **Scene**
 A collection of visual entities at a moment in time.
@@ -138,7 +148,11 @@ Authors grammars and extensions.
 Fixed operating scheme, expressive through use.
 
 **Separation of Meaning and Form**
-Rulesets define meaning; grammars define form.
+Rulesets define meaning (visual vocabulary); grammars define form (rendering choices).
+
+**Grammar Agency (RFC 006)**
+Grammars see annotated musical elements and decide how to render them.
+They know categories (note vs chord) but not analysis (pitch class, chord quality).
 
 **Vagueness Commitment**
 Explicitly deferred decisions.

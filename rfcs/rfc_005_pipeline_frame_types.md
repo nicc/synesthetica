@@ -1,9 +1,14 @@
 # RFC 005: Pipeline Frame Types and Musical Abstraction
 
-Status: Implemented
+Status: Superseded by RFC 006
 Author(s): Synesthetica
 Date: 2026-01-18
 Related: RFC 002 (CMS + Grammar API), SPEC 006 (Ruleset/Stabilizer Statefulness), SPEC 008 (Pipeline Orchestration)
+
+> **Note**: This RFC established the `RawInputFrame` → `MusicalFrame` → `IntentFrame` pipeline.
+> RFC 006 superseded the `IntentFrame` concept with `AnnotatedMusicalFrame`, giving grammars
+> more agency while keeping them isolated from musical analysis. The `RawInputFrame` and
+> `MusicalFrame` types remain as defined here.
 
 ## Summary
 

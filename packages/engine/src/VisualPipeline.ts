@@ -1,10 +1,12 @@
 /**
- * Visual Pipeline (RFC 005)
+ * Visual Pipeline (RFC 005 / RFC 006)
  *
- * Orchestrates the new frame type flow:
+ * Orchestrates the frame type flow:
  * IRawSourceAdapter → IMusicalStabilizer → IVisualRuleset → IVisualGrammar → ICompositor
  *
- * This replaces the legacy Pipeline for new implementations.
+ * RFC 006 changes:
+ * - Ruleset.annotate() returns AnnotatedMusicalFrame instead of VisualIntentFrame
+ * - Grammars receive AnnotatedMusicalFrame, decide how/whether to render each element
  */
 
 import type {
@@ -176,7 +178,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       return this.mergeScenes([], targetTime, diagnostics);
     }
 
-    const intentFrame = this.ruleset.map(musicalFrame);
+    const annotatedFrame = this.ruleset.annotate(musicalFrame);
 
     // Run grammars
     for (const grammar of this.grammars) {
@@ -193,7 +195,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       }
 
       const previous = partState.previousScenes.get(grammar.id) ?? null;
-      const scene = grammar.update(intentFrame, previous);
+      const scene = grammar.update(annotatedFrame, previous);
       partState.previousScenes.set(grammar.id, scene);
       partScenes.push(scene);
     }

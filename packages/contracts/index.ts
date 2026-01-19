@@ -16,7 +16,6 @@ export * from "./raw/raw";
 export * from "./musical/musical";
 
 export * from "./intents/colors";
-export * from "./intents/intents";
 
 export * from "./scene/scene";
 
@@ -32,3 +31,6 @@ export * from "./annotations/annotations";
 export * from "./routing/router";
 
 export * from "./diagnostics/diagnostics";
+
+// RFC 006: Annotated musical frames
+export * from "./annotated";

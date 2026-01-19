@@ -1,4 +1,2 @@
-export {
-  VisualParticleGrammar,
-  type VisualParticleGrammarConfig,
-} from "./VisualParticleGrammar";
+export { TestRhythmGrammar } from "./TestRhythmGrammar";
+export { TestChordProgressionGrammar } from "./TestChordProgressionGrammar";
