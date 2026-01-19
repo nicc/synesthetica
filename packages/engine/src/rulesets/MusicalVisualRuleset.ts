@@ -136,6 +136,7 @@ export class MusicalVisualRuleset implements IVisualRuleset {
         a: alpha,
       },
       stability,
+      phase: note.phase, // Map note phase to intent phase
       confidence: note.confidence,
     };
   }
@@ -148,6 +149,7 @@ export class MusicalVisualRuleset implements IVisualRuleset {
       pulse: note.velocity / 127,
       flow: 0,
       jitter: 0.1,
+      phase: note.phase,
       confidence: note.confidence,
     };
   }
@@ -160,6 +162,7 @@ export class MusicalVisualRuleset implements IVisualRuleset {
       pulse: frame.dynamics.level,
       flow: frame.dynamics.trend === "rising" ? 0.3 : frame.dynamics.trend === "falling" ? -0.3 : 0,
       jitter: 0.05,
+      phase: "sustain", // Dynamics are continuous, so always sustain
       confidence: 1,
     };
   }

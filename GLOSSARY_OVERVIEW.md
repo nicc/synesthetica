@@ -47,9 +47,11 @@ Protocol-level input from adapters (MIDI note_on/off, audio features).
 
 **Stabilizer**
 Transforms RawInputFrame into MusicalFrame (proper musical abstractions).
+Stabilizers form a DAG based on dependencies.
 
 **MusicalFrame**
-A time-stamped snapshot of musical state: notes with duration, chords, beats, dynamics.
+A time-stamped snapshot with context: notes, chords, progression, phrases, beats, dynamics.
+Contains current state plus recent context via references.
 
 **Note**
 A musical abstraction with pitch, velocity, duration, and phase (attack/sustain/release).

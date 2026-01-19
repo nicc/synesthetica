@@ -91,16 +91,44 @@ export interface DynamicsState {
 }
 
 /**
+ * A musical phrase boundary detected by stabilizers.
+ */
+export interface Phrase {
+  id: string;
+  onset: Ms;
+  duration: Ms;
+  chordIds: ChordId[]; // Chords in this phrase (references)
+  noteIds: NoteId[]; // Notes in this phrase (references)
+  confidence: Confidence;
+}
+
+/**
  * Frame of musical state for a single part.
  * Produced by stabilizers, consumed by rulesets.
+ *
+ * MusicalFrame is a "snapshot with context" - it contains:
+ * - Current state: What's sounding now (notes, chords, beat, dynamics)
+ * - Recent context: What led here via references (progression, phrases)
+ * - No raw events: Those stay in RawInputFrame
+ *
+ * This allows rulesets to remain pure functions while accessing temporal
+ * context like harmonic tension or phrase position.
+ *
+ * See SPEC_006 for windowing and reference semantics.
  */
 export interface MusicalFrame {
   t: Ms;
   part: PartId;
+
+  // Current state
   notes: Note[];
   chords: MusicalChord[];
   beat: BeatState | null;
   dynamics: DynamicsState;
+
+  // Recent context (references, not copies)
+  progression?: ChordId[]; // Recent chord history
+  phrases?: Phrase[]; // Phrase boundaries
 }
 
 /**

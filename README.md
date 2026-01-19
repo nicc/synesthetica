@@ -36,6 +36,8 @@ Each stage processes one instrument's data independently. Multiple instruments f
 
 **What it does:** Produces proper musical abstractions. A Note is not a pair of on/off messages - it's an entity with pitch, velocity, duration, and lifecycle phase (attack → sustain → release). Notes persist in the frame during their release window, allowing visual fade-out.
 
+Stabilizers form a DAG based on dependencies. Independent stabilizers (note tracking, beat detection) process raw input directly; derived stabilizers (chord detection, phrase detection) require upstream output. MusicalFrame is a "snapshot with context" - it contains current state plus recent context (progression, phrases) via references.
+
 **Current status:** NoteTrackingStabilizer tracks note lifecycle with configurable attack duration and release window.
 
 #### 3. Ruleset
@@ -46,11 +48,11 @@ Each stage processes one instrument's data independently. Multiple instruments f
 **Current status:** MusicalVisualRuleset maps notes to palette intents with phase-aware stability.
 
 #### 4. Grammar Stack
-**Technical:** Transforms `VisualIntentFrame` into `SceneFrame` (a collection of visual entities). Grammars respond to intent IDs for entity lifecycle - when an intent appears, create an entity; when it disappears, begin fading.
+**Technical:** Transforms `VisualIntentFrame` into `SceneFrame` (a collection of visual entities). Grammars interpret visual intents and manage entity lifecycle independently.
 
-**What it does:** Determines the visual language. Grammars see only visual concepts (palette, motion, texture) - never musical events. They track entities by correlating intent IDs across frames.
+**What it does:** Determines the visual language. Grammars see only visual concepts (palette, motion, texture) - never musical events. Intents have their own phase (attack/sustain/release), but grammars own entity lifecycle. Grammars may spawn entities that outlive their source intent - this decoupling enables use cases like ear training where visual persistence differs from musical duration.
 
-**Current status:** VisualParticleGrammar spawns particles per palette intent with intent-based lifecycle.
+**Current status:** VisualParticleGrammar spawns particles per palette intent with configurable TTL.
 
 #### 5. Compositor
 **Technical:** Merges multiple `SceneFrame`s (one per part/instrument) into a single composited scene, applying layout, blending, and z-ordering.
@@ -71,9 +73,10 @@ Each stage processes one instrument's data independently. Multiple instruments f
 1. **Meaning lives in rulesets, not grammars.** Grammars respond to visual intents, never musical events. All musical interpretation happens in the ruleset.
 2. **Grammars never see musical events.** They see only VisualIntentFrame - palette, motion, texture, shape. No notes, no chords, no beats.
 3. **Notes are proper abstractions.** A Note has duration and phase - it's not a pair of on/off messages.
-4. **Every piece of data belongs to exactly one part (instrument).** Multi-instrument support is built-in from the start.
-5. **Contracts define all boundaries.** Modules communicate through types in [packages/contracts](packages/contracts/), not internal imports.
-6. **The renderer drives timing (pull-based).** The pipeline doesn't push frames; the renderer requests them at render time.
+4. **Intent lifecycle ≠ entity lifecycle.** Intents have phases (attack/sustain/release); grammars decide how long entities persist.
+5. **Every piece of data belongs to exactly one part (instrument).** Multi-instrument support is built-in from the start.
+6. **Contracts define all boundaries.** Modules communicate through types in [packages/contracts](packages/contracts/), not internal imports.
+7. **The renderer drives timing (pull-based).** The pipeline doesn't push frames; the renderer requests them at render time.
 
 ## How We Work
 Our workflow embraces early ambiguity while enforcing discipline as ideas mature.

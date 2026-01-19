@@ -47,9 +47,21 @@ export interface IRawSourceAdapter {
  * Stabilizers accumulate temporal context to produce proper musical
  * abstractions (notes with duration, chords, beats) from raw protocol
  * events (note_on, note_off).
+ *
+ * Stabilizers form a DAG based on dependencies. See SPEC_008 for details:
+ * - Independent stabilizers (no dependencies) process RawInputFrame directly
+ * - Derived stabilizers receive upstream MusicalFrame from dependencies
+ * - Pipeline topologically sorts and executes stabilizers in order
  */
 export interface IMusicalStabilizer {
   id: string;
+
+  /**
+   * IDs of stabilizers this one depends on.
+   * Derived stabilizers (e.g., ChordDetectionStabilizer) declare dependencies
+   * on upstream stabilizers (e.g., NoteTrackingStabilizer).
+   */
+  dependencies?: string[];
 
   /** Called once when the stabilizer is initialized */
   init(): void;
@@ -59,9 +71,12 @@ export interface IMusicalStabilizer {
 
   /**
    * Process raw input and produce musical state.
-   * Stabilizers maintain internal state to track note durations, etc.
+   *
+   * @param raw - Raw protocol input from adapters
+   * @param upstream - Merged MusicalFrame from upstream stabilizers (null if no dependencies)
+   * @returns MusicalFrame with this stabilizer's contributions
    */
-  apply(raw: RawInputFrame, previous: MusicalFrame | null): MusicalFrame;
+  apply(raw: RawInputFrame, upstream: MusicalFrame | null): MusicalFrame;
 
   /**
    * Reset internal state (e.g., on session restart or part reassignment).
@@ -97,8 +112,21 @@ export interface IVisualRuleset {
 /**
  * Grammar that maps visual intents to scene entities.
  *
- * Grammars interpret visual intents to produce concrete scene entities.
- * They may maintain state for entity lifecycle management.
+ * Grammars:
+ * - Decide visual form, not meaning
+ * - See only visual intents, never musical events
+ * - OWN entity lifecycle (TTL, decay, removal)
+ * - Are NOT obligated to tie entity lifetime to intent lifetime
+ *
+ * Entity lifecycle model (see SPEC_009):
+ * - Intent appears → Grammar may spawn entity with its own TTL
+ * - Intent continues → Grammar may reinforce entity or ignore
+ * - Intent disappears → Grammar may spawn release effect or do nothing
+ * - Entity TTL expires → Entity is removed (grammar's decision)
+ *
+ * Grammars may spawn entities that outlive their source intent.
+ * This decoupling enables use cases like ear training where visual
+ * persistence differs from musical duration.
  */
 export interface IVisualGrammar {
   id: string;
@@ -110,6 +138,9 @@ export interface IVisualGrammar {
 
   /**
    * Update the scene based on current intents and previous state.
+   *
+   * The grammar interprets intents and manages entity lifecycle.
+   * It is not required to track intent presence for entity lifetime.
    */
   update(input: VisualIntentFrame, previous: SceneFrame | null): SceneFrame;
 

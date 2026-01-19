@@ -4,7 +4,7 @@
 id: GLOSSARY.core-v1
 status: draft
 owner: user
-last_updated: 2026-01-05
+last_updated: 2026-01-19
 ---
 
 ## Purpose
@@ -72,6 +72,8 @@ A built-in visual grammar that produces visual entities from intents.
 Grammars:
 - are the building blocks users select and combine
 - define *form*, not *meaning*
+- **own entity lifecycle** (TTL, decay, removal)
+- are **not** obligated to tie entity lifetime to intent lifetime
 - may react to uncertainty with visual noise
 - may not infer musical semantics
 
@@ -235,13 +237,16 @@ RawInputFrame is the adapter's output and stabilizer's input.
 ---
 
 ### MusicalFrame
-A time-indexed snapshot of musical state produced by stabilizers.
+A time-indexed **snapshot with context** of musical state produced by stabilizers.
 
 MusicalFrame includes:
-- Notes with duration and phase (attack/sustain/release)
-- Detected chords
-- Beat/meter context
-- Dynamics state
+- **Current state**: Notes, chords, beat, dynamics (what's sounding now)
+- **Recent context**: Progression, phrases via references (what led here)
+- No raw events (those stay in RawInputFrame)
+
+This design allows rulesets to remain pure functions while accessing temporal context like harmonic tension or phrase position.
+
+Context uses **references, not copies** — a chord in `progression` references `chords[]` by ID.
 
 MusicalFrame is the stabilizer's output and ruleset's input.
 
@@ -264,12 +269,17 @@ Notes are not pairs of on/off messages - they are proper musical entities with l
 ### Stabilizer
 A stateful module that transforms RawInputFrame into MusicalFrame.
 
+Stabilizers form a **DAG (directed acyclic graph)** based on dependencies:
+- **Independent stabilizers** (note tracking, beat detection) process raw input directly
+- **Derived stabilizers** (chord detection, phrase detection) depend on upstream stabilizers
+
 Stabilizers handle:
 - Note duration tracking (correlating note_on/note_off)
 - Note phase transitions (attack → sustain → release)
 - Chord detection
 - Beat tracking
 - Dynamics analysis
+- Context windowing (progression history, phrase boundaries)
 
 Stabilizers accumulate temporal context to produce proper musical abstractions.
 
@@ -326,9 +336,22 @@ Types:
 
 Visual intents:
 - have unique IDs for entity lifecycle correlation
+- have their own **phase** (attack/sustain/release) — see IntentPhase
 - carry confidence
 - can reference each other via group IDs
 - contain no musical concepts
+
+---
+
+### IntentPhase
+The lifecycle phase of a visual intent: `attack | sustain | release`.
+
+IntentPhase describes the intent's *current state*, not the entity's lifespan:
+- **attack** — Intent just appeared (e.g., first ~50ms)
+- **sustain** — Intent is active and stable
+- **release** — Intent is fading (source released, etc.)
+
+**Critical distinction:** Intent lifecycle ≠ entity lifecycle. Grammars observe intent phase but decide entity lifecycle independently. A grammar may spawn entities that outlive their source intent (e.g., for ear training study).
 
 ---
 
@@ -350,14 +373,16 @@ A visual grammar that consumes VisualIntentFrame and produces SceneFrame.
 Grammars:
 - decide *form*, not *meaning*
 - respond to visual intents (not musical events)
+- **own entity lifecycle** (TTL, decay, removal)
+- are **not** obligated to tie entity lifetime to intent lifetime
 - may spawn, group, and evolve entities
 - may react to uncertainty
 - may not infer musical semantics
 
-Grammars use intent IDs to track entity lifecycle:
-- Intent appears → create entity
-- Intent continues → update entity
-- Intent disappears → begin fading entity
+Grammars use intent IDs for correlation (not lifecycle obligation):
+- Same ID across frames → Same source (grammar may reinforce or ignore)
+- New ID → New source (grammar may spawn new entity)
+- ID absent → Source ended (grammar may spawn release effect or do nothing)
 
 Examples:
 - VisualParticleGrammar (particles per palette intent)

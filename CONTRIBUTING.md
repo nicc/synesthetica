@@ -47,14 +47,14 @@ The Phase 0 pipeline is minimal. Here are directions to explore:
 
 #### Stabilizers (Musical Context)
 
-Phase 0 has a passthrough stabilizer only. Real musical understanding comes from:
+Phase 0 has NoteTrackingStabilizer. Real musical understanding comes from additional stabilizers:
 
 - **Chord detection:** Identify chord quality (major, minor, diminished, etc.) from active notes
 - **Beat tracking:** Detect tempo and downbeats from timing patterns
 - **Phrase boundaries:** Recognize when musical phrases start/end
 - **Harmonic analysis:** Calculate tension/resolution over time
 
-Stabilizers enrich `CMSFrame` with derived signals that rulesets can respond to.
+Stabilizers form a DAG based on dependencies. Independent stabilizers (note tracking, beat detection) process raw input; derived stabilizers (chord detection, phrase detection) require upstream output. Stabilizers enrich `MusicalFrame` with notes, chords, progression, phrases, beat, and dynamics.
 
 #### Rulesets (Musical Interpretation)
 
@@ -76,6 +76,8 @@ Phase 0 grammar: particle spawning on note events. Directions to explore:
 - **Stack grammars:** Layer multiple visual elements
 
 Grammars determine what the visuals *look like*. They receive abstract intents (color, urgency, size) and produce concrete entities.
+
+**Critical:** Grammars own entity lifecycle. Intents have their own phase (attack/sustain/release), but grammars decide how long entities persist. A grammar may spawn entities that outlive their source intent - useful for ear training where visual persistence differs from musical duration.
 
 ### Current Constraints (Phase 0)
 

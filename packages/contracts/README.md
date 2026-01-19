@@ -9,10 +9,10 @@ to build modules independently.
 2. **Parts** (`parts/*`) — part identity and routing
 3. **Primitives** (`primitives/*`) — fundamental music theory types (MidiNote, PitchClass, Velocity, ChordQuality)
 4. **Raw input** (`raw/*`) — protocol-level input from adapters (MIDI events, audio features)
-5. **Musical abstractions** (`musical/*`) — stabilizer output (notes with duration, chords, beats)
-6. **Visual Intents** (`intents/*`) — ruleset output, grammar input
+5. **Musical abstractions** (`musical/*`) — stabilizer output (notes with duration, chords, beats, progression, phrases)
+6. **Visual Intents** (`intents/*`) — ruleset output, grammar input (with intent phase: attack/sustain/release)
 7. **Scene** (`scene/*`) — entities for rendering
-8. **Pipeline interfaces** (`pipeline/*`) — adapters, stabilizers, rulesets, grammars, compositor, renderer
+8. **Pipeline interfaces** (`pipeline/*`) — adapters, stabilizers (DAG-based), rulesets, grammars, compositor, renderer
 9. **Configuration** (`config/*`) — presets, layout, compositing
 10. **Control surface** (`control/*`) — ControlOps + Queries (mechanical, non-semantic)
 11. **Annotations** (`annotations/*`) — advisory metadata for LLM mediation (non-executable)
@@ -23,6 +23,8 @@ to build modules independently.
 
 - Meaning is encoded in **rulesets**, not grammars.
 - Grammars decide **form**, not meaning.
+- **Intent lifecycle ≠ entity lifecycle.** Intents have phases; grammars own entity TTL.
+- Stabilizers form a **DAG** based on dependencies.
 - Control operations are **mechanical**; interpretation happens outside the engine.
 - All signals/events/entities are attributable to exactly one **PartId**.
 
