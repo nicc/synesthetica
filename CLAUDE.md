@@ -176,6 +176,45 @@ This ensures work survives session boundaries and context compaction.
 
 This synthesis should be a brief summary in your handoff message. If significant, it may warrant a dedicated document (e.g., `docs/learnings/2026-01-17-midi-spike.md`).
 
+## Feedback for the User
+
+**Provide feedback automatically at natural stopping points and before context compaction.**
+
+The user wants to improve their collaboration patterns. Don't wait to be asked — proactively offer observations at these moments:
+
+**When to provide feedback:**
+- After a commit (natural stopping point)
+- When the user says "let's pause", "let's stop there", or similar
+- Before context compaction (you'll lose this opportunity otherwise)
+- At the end of a significant feature or task
+
+**What to include:**
+1. **What went well** — effective patterns, good decisions, productive approaches
+2. **What could improve** — friction points, repeated issues, communication gaps
+3. **Suggestions** — specific, actionable changes for future sessions
+4. **Patterns noticed** — recurring themes across the work
+
+**Tone:** Direct, constructive, specific. Not effusive praise. The goal is genuine improvement, not validation.
+
+**Example:**
+```
+Feedback on this session:
+
+What went well:
+- Catching the asymptotic smoothing bug showed good attention to edge cases
+- Asking for literature review instead of continuing ad-hoc approaches was effective
+
+What could improve:
+- Initial tempo detection had several iterations that could have been avoided
+  with upfront research
+
+Suggestion:
+- For algorithm-heavy features, consider starting with a literature review
+  before implementing
+```
+
+**Why this matters:** Feedback at compaction time is the last chance to capture insights before context is lost. The user can't improve patterns they don't know about.
+
 ## Linting
 
 **Run `npm run lint` before committing.** This is part of the quality gates in the landing-the-plane checklist.
