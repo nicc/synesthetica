@@ -2,16 +2,22 @@
  * Beat Detection Stabilizer
  *
  * Detects tempo and beat phase from note onset timing patterns.
- * Uses inter-onset interval (IOI) analysis to find the dominant beat period.
+ * Based on Dixon's IOI clustering algorithm (2001) with simplifications
+ * for real-time performance.
  *
- * Algorithm:
+ * Algorithm (simplified Dixon):
  * 1. Collect note onset times in a rolling window
- * 2. Compute inter-onset intervals (IOIs)
- * 3. Cluster IOIs to find dominant beat period (median-based)
- * 4. Maintain a beat grid once tempo is established
- * 5. Calculate phase as position within current beat (0-1)
+ * 2. Compute consecutive inter-onset intervals (IOIs)
+ * 3. Cluster IOIs using 25ms tolerance
+ * 4. Score clusters with harmonic relationship bonuses
+ * 5. Select highest-scoring cluster as tempo
+ * 6. Maintain beat grid and calculate phase (0-1)
  *
- * This is an independent stabilizer - it has no dependencies on other stabilizers.
+ * Key optimization: Only recalculate tempo periodically (every 100ms),
+ * not on every frame.
+ *
+ * Reference: Dixon, S. (2001). Automatic extraction of tempo and beat
+ * from expressive performances. Journal of New Music Research, 30(1), 39-58.
  *
  * See RFC 005 for design rationale.
  */
@@ -64,6 +70,12 @@ export interface BeatDetectionConfig {
    * @default 0.3
    */
   minConfidence?: Confidence;
+
+  /**
+   * How often to recalculate tempo (ms). Throttles expensive clustering.
+   * @default 100
+   */
+  tempoUpdateIntervalMs?: Ms;
 }
 
 const DEFAULT_CONFIG: Required<Omit<BeatDetectionConfig, "partId">> = {
@@ -72,7 +84,20 @@ const DEFAULT_CONFIG: Required<Omit<BeatDetectionConfig, "partId">> = {
   tempoRange: [40, 200],
   beatsPerBar: 4,
   minConfidence: 0.3,
+  tempoUpdateIntervalMs: 100,
 };
+
+/**
+ * IOI cluster for tempo induction.
+ */
+interface IOICluster {
+  /** Sum of IOIs in cluster (for computing mean) */
+  sum: number;
+  /** Number of IOIs in cluster */
+  count: number;
+  /** Cluster score (count + harmonic bonuses) */
+  score: number;
+}
 
 /**
  * Internal state for tempo tracking.
@@ -91,12 +116,14 @@ interface TempoState {
   confidence: Confidence;
 }
 
+/** Dixon's cluster width: 25ms tolerance */
+const CLUSTER_WIDTH_MS = 25;
+
 /**
  * BeatDetectionStabilizer: Detects tempo and beat phase from note onsets.
  *
- * Maintains a rolling window of onset times and uses IOI analysis to
- * detect the dominant beat period. Once tempo is established, maintains
- * a beat grid and calculates phase within the current beat.
+ * Uses Dixon's IOI clustering algorithm with harmonic relationship scoring
+ * to prefer slower tempos over subdivisions.
  */
 export class BeatDetectionStabilizer implements IMusicalStabilizer {
   readonly id = "beat-detection";
@@ -109,6 +136,9 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
   /** Current tempo tracking state */
   private tempoState: TempoState | null = null;
 
+  /** Last time we recalculated tempo */
+  private lastTempoUpdate: Ms = 0;
+
   constructor(config: BeatDetectionConfig) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
@@ -116,6 +146,7 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
   init(): void {
     this.onsetTimes = [];
     this.tempoState = null;
+    this.lastTempoUpdate = 0;
   }
 
   dispose(): void {
@@ -126,6 +157,7 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
   reset(): void {
     this.onsetTimes = [];
     this.tempoState = null;
+    this.lastTempoUpdate = 0;
   }
 
   apply(raw: RawInputFrame, upstream: MusicalFrame | null): MusicalFrame {
@@ -141,8 +173,14 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
     // Prune old onsets outside the window
     this.pruneOldOnsets(t);
 
-    // Attempt to detect/update tempo
-    this.updateTempo(t);
+    // Throttled tempo update - only recalculate periodically
+    if (t - this.lastTempoUpdate >= this.config.tempoUpdateIntervalMs) {
+      this.updateTempo(t);
+      this.lastTempoUpdate = t;
+    }
+
+    // Always sync beat grid (cheap operation)
+    this.syncBeatGrid(t);
 
     // Calculate current beat state
     const beat = this.calculateBeatState(t);
@@ -176,88 +214,106 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
   }
 
   /**
-   * Attempt to detect or update tempo from recent onsets.
+   * Update tempo using Dixon's IOI clustering algorithm.
    */
   private updateTempo(currentTime: Ms): void {
     if (this.onsetTimes.length < this.config.minOnsets) {
-      // Not enough data yet - but keep existing tempo if we have one
       return;
     }
 
-    // Calculate inter-onset intervals
-    const iois = this.calculateIOIs();
-
-    if (iois.length === 0) {
+    // Step 1: Calculate consecutive IOIs
+    const iois = this.calculateConsecutiveIOIs();
+    if (iois.length < 2) {
       return;
     }
 
-    // Filter IOIs to valid tempo range
+    // Step 2: Cluster IOIs with 25ms tolerance
+    const clusters = this.clusterIOIs(iois);
+    if (clusters.length === 0) {
+      return;
+    }
+
+    // Step 3: Score clusters with harmonic bonuses
+    this.scoreClusterHarmonics(clusters);
+
+    // Step 4: Select best cluster (highest score)
+    let bestCluster: IOICluster | null = null;
+    let bestScore = -1;
+
     const [minBpm, maxBpm] = this.config.tempoRange;
-    const minPeriod = 60000 / maxBpm; // Max BPM = min period
-    const maxPeriod = 60000 / minBpm; // Min BPM = max period
+    const minPeriod = 60000 / maxBpm;
+    const maxPeriod = 60000 / minBpm;
 
-    const validIOIs = iois.filter((ioi) => ioi >= minPeriod && ioi <= maxPeriod);
+    for (const cluster of clusters) {
+      const meanIOI = cluster.sum / cluster.count;
 
-    if (validIOIs.length < 2) {
-      // Not enough valid IOIs
+      // Only consider clusters in valid tempo range
+      if (meanIOI >= minPeriod && meanIOI <= maxPeriod) {
+        if (cluster.score > bestScore) {
+          bestScore = cluster.score;
+          bestCluster = cluster;
+        }
+      }
+    }
+
+    if (!bestCluster) {
       return;
     }
 
-    // Find dominant beat period using median (robust to outliers)
-    const sortedIOIs = [...validIOIs].sort((a, b) => a - b);
-    const medianIOI = sortedIOIs[Math.floor(sortedIOIs.length / 2)];
+    const selectedPeriod = bestCluster.sum / bestCluster.count;
 
-    // Calculate confidence based on IOI consistency
-    const confidence = this.calculateConfidence(validIOIs, medianIOI);
+    // Calculate confidence from cluster dominance
+    const totalScore = clusters.reduce((sum, c) => sum + c.score, 0);
+    const confidence = Math.min(1, bestCluster.score / Math.max(1, totalScore));
 
     if (confidence < this.config.minConfidence) {
-      // Confidence too low - keep existing tempo if we have one
       return;
     }
 
-    // Update or establish tempo
+    // Step 5: Update tempo state
     if (this.tempoState === null) {
-      // First tempo detection
       this.tempoState = {
-        periodMs: medianIOI,
-        lastBeatTime: this.findNearestBeatTime(currentTime, medianIOI),
+        periodMs: selectedPeriod,
+        lastBeatTime: this.findNearestBeatTime(currentTime, selectedPeriod),
         beatCount: 1,
         confidence,
       };
     } else {
       // Check for significant tempo change (>25% difference)
-      const tempoRatio = medianIOI / this.tempoState.periodMs;
+      const tempoRatio = selectedPeriod / this.tempoState.periodMs;
       const isSignificantChange = tempoRatio < 0.75 || tempoRatio > 1.33;
 
       if (isSignificantChange && confidence > 0.5) {
-        // Reset to new tempo immediately
+        // Reset to new tempo
         this.tempoState = {
-          periodMs: medianIOI,
-          lastBeatTime: this.findNearestBeatTime(currentTime, medianIOI),
+          periodMs: selectedPeriod,
+          lastBeatTime: this.findNearestBeatTime(currentTime, selectedPeriod),
           beatCount: 1,
           confidence,
         };
       } else {
-        // Update existing tempo with smoothing (0.5 = more responsive)
-        const smoothingFactor = 0.5;
+        // Smooth update
+        const smoothingFactor = 0.3;
         const newPeriod =
           this.tempoState.periodMs * (1 - smoothingFactor) +
-          medianIOI * smoothingFactor;
+          selectedPeriod * smoothingFactor;
 
-        this.tempoState.periodMs = newPeriod;
+        // Snap when close to avoid asymptotic drift
+        const drift = Math.abs(newPeriod - selectedPeriod) / selectedPeriod;
+        this.tempoState.periodMs = drift < 0.02 ? selectedPeriod : newPeriod;
+
         this.tempoState.confidence =
-          this.tempoState.confidence * 0.6 + confidence * 0.4;
-
-        // Update beat grid if we've drifted too far
-        this.syncBeatGrid(currentTime);
+          this.tempoState.confidence * 0.7 + confidence * 0.3;
       }
     }
   }
 
   /**
-   * Calculate inter-onset intervals from recent onsets.
+   * Calculate consecutive inter-onset intervals.
+   * Unlike Dixon's all-pairs approach, we only use consecutive onsets
+   * for performance.
    */
-  private calculateIOIs(): Ms[] {
+  private calculateConsecutiveIOIs(): Ms[] {
     const iois: Ms[] = [];
     const sorted = [...this.onsetTimes].sort((a, b) => a - b);
 
@@ -269,47 +325,94 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
   }
 
   /**
-   * Calculate confidence based on IOI variance around the median.
-   * Lower variance = higher confidence.
+   * Cluster IOIs using Dixon's 25ms tolerance.
+   * Returns array of clusters, each tracking sum/count for mean calculation.
    */
-  private calculateConfidence(iois: Ms[], median: Ms): Confidence {
-    if (iois.length < 2) return 0;
+  private clusterIOIs(iois: Ms[]): IOICluster[] {
+    const clusters: IOICluster[] = [];
 
-    // Calculate variance
-    const squaredDiffs = iois.map((ioi) => Math.pow(ioi - median, 2));
-    const variance =
-      squaredDiffs.reduce((sum, d) => sum + d, 0) / squaredDiffs.length;
+    for (const ioi of iois) {
+      // Find existing cluster within tolerance
+      let foundCluster: IOICluster | null = null;
+      let minDistance = Infinity;
 
-    // Standard deviation as percentage of median
-    const stdDev = Math.sqrt(variance);
-    const relativeStdDev = stdDev / median;
+      for (const cluster of clusters) {
+        const clusterMean = cluster.sum / cluster.count;
+        const distance = Math.abs(ioi - clusterMean);
 
-    // Convert to confidence: low relative std dev = high confidence
-    // 0% deviation = 1.0 confidence, 50% deviation = ~0 confidence
-    const confidence = Math.max(0, Math.min(1, 1 - relativeStdDev * 2));
+        if (distance <= CLUSTER_WIDTH_MS && distance < minDistance) {
+          minDistance = distance;
+          foundCluster = cluster;
+        }
+      }
 
-    return confidence;
+      if (foundCluster) {
+        // Add to existing cluster
+        foundCluster.sum += ioi;
+        foundCluster.count += 1;
+        foundCluster.score = foundCluster.count; // Base score = count
+      } else {
+        // Create new cluster
+        clusters.push({
+          sum: ioi,
+          count: 1,
+          score: 1,
+        });
+      }
+    }
+
+    return clusters;
+  }
+
+  /**
+   * Apply harmonic relationship bonuses to cluster scores.
+   * Clusters related by factors of 2, 3, 4 get bonus points.
+   * This prefers slower tempos (longer IOIs) over subdivisions.
+   */
+  private scoreClusterHarmonics(clusters: IOICluster[]): void {
+    const harmonicFactors = [2, 3, 4];
+
+    for (let i = 0; i < clusters.length; i++) {
+      const clusterA = clusters[i];
+      const meanA = clusterA.sum / clusterA.count;
+
+      for (let j = 0; j < clusters.length; j++) {
+        if (i === j) continue;
+
+        const clusterB = clusters[j];
+        const meanB = clusterB.sum / clusterB.count;
+
+        // Check if B is a multiple of A
+        for (const factor of harmonicFactors) {
+          const expectedB = meanA * factor;
+          const tolerance = CLUSTER_WIDTH_MS * factor;
+
+          if (Math.abs(meanB - expectedB) <= tolerance) {
+            // B is a multiple of A - give bonus to the LONGER one (B)
+            // This prefers quarter notes over eighth notes
+            const bonus = (factor <= 2 ? 3 : factor <= 3 ? 2 : 1) * clusterA.count;
+            clusterB.score += bonus;
+          }
+        }
+      }
+    }
   }
 
   /**
    * Find the nearest beat time to align the grid.
    */
   private findNearestBeatTime(currentTime: Ms, _periodMs: Ms): Ms {
-    // Find the most recent onset as anchor
-    // In future, could use periodMs to quantize to nearest beat grid position
     const sortedOnsets = [...this.onsetTimes].sort((a, b) => b - a);
     if (sortedOnsets.length === 0) {
       return currentTime;
     }
 
-    const recentOnset = sortedOnsets[0];
-
-    // Align to this onset
-    return recentOnset;
+    // Use most recent onset as anchor
+    return sortedOnsets[0];
   }
 
   /**
-   * Synchronize beat grid if phase drift is too large.
+   * Synchronize beat grid and track bar boundaries.
    */
   private syncBeatGrid(currentTime: Ms): void {
     if (!this.tempoState) return;
@@ -317,12 +420,26 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
     const timeSinceLastBeat = currentTime - this.tempoState.lastBeatTime;
     const beatsSinceLastBeat = timeSinceLastBeat / this.tempoState.periodMs;
 
-    // If we've passed at least one beat, update the grid
     if (beatsSinceLastBeat >= 1) {
       const wholeBeatsPassed = Math.floor(beatsSinceLastBeat);
+      const oldBeatCount = this.tempoState.beatCount;
+
       this.tempoState.lastBeatTime +=
         wholeBeatsPassed * this.tempoState.periodMs;
       this.tempoState.beatCount += wholeBeatsPassed;
+
+      // Log BPM at start of every bar
+      const oldBeatInBar = ((oldBeatCount - 1) % this.config.beatsPerBar) + 1;
+      const newBeatInBar =
+        ((this.tempoState.beatCount - 1) % this.config.beatsPerBar) + 1;
+
+      if (
+        newBeatInBar < oldBeatInBar ||
+        wholeBeatsPassed >= this.config.beatsPerBar
+      ) {
+        const bpm = 60000 / this.tempoState.periodMs;
+        console.log(`[BeatDetection] New bar started | BPM: ${bpm.toFixed(1)}`);
+      }
     }
   }
 
@@ -334,21 +451,12 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
       return null;
     }
 
-    // Sync beat grid first
-    this.syncBeatGrid(currentTime);
-
     const { periodMs, lastBeatTime, beatCount, confidence } = this.tempoState;
 
-    // Calculate phase within current beat (0-1)
     const timeSinceLastBeat = currentTime - lastBeatTime;
     const phase = Math.max(0, Math.min(1, timeSinceLastBeat / periodMs));
-
-    // Calculate tempo in BPM
     const tempo = 60000 / periodMs;
-
-    // Calculate beat position in bar (1-indexed)
-    const beatInBar =
-      ((beatCount - 1) % this.config.beatsPerBar) + 1;
+    const beatInBar = ((beatCount - 1) % this.config.beatsPerBar) + 1;
     const isDownbeat = beatInBar === 1;
 
     return {
