@@ -225,18 +225,32 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
         confidence,
       };
     } else {
-      // Update existing tempo with smoothing
-      const smoothingFactor = 0.3;
-      const newPeriod =
-        this.tempoState.periodMs * (1 - smoothingFactor) +
-        medianIOI * smoothingFactor;
+      // Check for significant tempo change (>25% difference)
+      const tempoRatio = medianIOI / this.tempoState.periodMs;
+      const isSignificantChange = tempoRatio < 0.75 || tempoRatio > 1.33;
 
-      this.tempoState.periodMs = newPeriod;
-      this.tempoState.confidence =
-        this.tempoState.confidence * 0.7 + confidence * 0.3;
+      if (isSignificantChange && confidence > 0.5) {
+        // Reset to new tempo immediately
+        this.tempoState = {
+          periodMs: medianIOI,
+          lastBeatTime: this.findNearestBeatTime(currentTime, medianIOI),
+          beatCount: 1,
+          confidence,
+        };
+      } else {
+        // Update existing tempo with smoothing (0.5 = more responsive)
+        const smoothingFactor = 0.5;
+        const newPeriod =
+          this.tempoState.periodMs * (1 - smoothingFactor) +
+          medianIOI * smoothingFactor;
 
-      // Update beat grid if we've drifted too far
-      this.syncBeatGrid(currentTime);
+        this.tempoState.periodMs = newPeriod;
+        this.tempoState.confidence =
+          this.tempoState.confidence * 0.6 + confidence * 0.4;
+
+        // Update beat grid if we've drifted too far
+        this.syncBeatGrid(currentTime);
+      }
     }
   }
 
