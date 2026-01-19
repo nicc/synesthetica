@@ -9,12 +9,21 @@ import type { SceneFrame, Entity } from "@synesthetica/contracts";
 function createMockContext() {
   const calls: Array<{ method: string; args: unknown[] }> = [];
 
+  // Mock gradient object
+  const mockGradient = {
+    addColorStop: vi.fn(),
+  };
+
   return {
     fillStyle: "",
     fillRect: vi.fn((...args: unknown[]) => calls.push({ method: "fillRect", args })),
     beginPath: vi.fn(() => calls.push({ method: "beginPath", args: [] })),
     arc: vi.fn((...args: unknown[]) => calls.push({ method: "arc", args })),
     fill: vi.fn(() => calls.push({ method: "fill", args: [] })),
+    createRadialGradient: vi.fn((...args: unknown[]) => {
+      calls.push({ method: "createRadialGradient", args });
+      return mockGradient;
+    }),
     calls,
   } as unknown as CanvasRenderingContext2D & { calls: Array<{ method: string; args: unknown[] }> };
 }
@@ -34,7 +43,7 @@ function createEntity(overrides: Partial<Entity> = {}): Entity {
     kind: "particle",
     createdAt: 1000,
     updatedAt: 1000,
-    position: { x: 100, y: 200 },
+    position: { x: 0.5, y: 0.5 }, // Normalized coordinates (0-1)
     style: {
       color: { h: 0, s: 1, v: 1 }, // Red
       size: 20,
@@ -109,8 +118,10 @@ describe("Canvas2DRenderer", () => {
     });
 
     it("renders a particle entity", () => {
+      // Normalized coordinates (0-1) are converted to pixel coordinates
+      // Canvas is 800x600, so (0.125, 0.333) → (100, ~200)
       const entity = createEntity({
-        position: { x: 100, y: 200 },
+        position: { x: 0.125, y: 1 / 3 },
         style: { color: { h: 0, s: 1, v: 1 }, size: 20, opacity: 1 },
       });
       const frame = createSceneFrame([entity]);
@@ -125,9 +136,9 @@ describe("Canvas2DRenderer", () => {
 
     it("renders multiple particles", () => {
       const entities = [
-        createEntity({ id: "p1", position: { x: 100, y: 100 } }),
-        createEntity({ id: "p2", position: { x: 200, y: 200 } }),
-        createEntity({ id: "p3", position: { x: 300, y: 300 } }),
+        createEntity({ id: "p1", position: { x: 0.1, y: 0.1 } }),
+        createEntity({ id: "p2", position: { x: 0.2, y: 0.2 } }),
+        createEntity({ id: "p3", position: { x: 0.3, y: 0.3 } }),
       ];
       const frame = createSceneFrame(entities);
 
@@ -144,8 +155,9 @@ describe("Canvas2DRenderer", () => {
     });
 
     it("uses entity position", () => {
+      // Normalized coordinates: (0.5, 0.5) → pixel (400, 300) on 800x600 canvas
       const entity = createEntity({
-        position: { x: 400, y: 300 },
+        position: { x: 0.5, y: 0.5 },
       });
       const frame = createSceneFrame([entity]);
 
@@ -358,13 +370,20 @@ describe("Canvas2DRenderer", () => {
       expect(mockCtx.arc).not.toHaveBeenCalled();
     });
 
-    it("skips field entities without error", () => {
-      const entity = createEntity({ kind: "field" });
+    it("renders field entities as radial gradients", () => {
+      const entity = createEntity({
+        kind: "field",
+        position: { x: 0.5, y: 0.5 },
+        style: { color: { h: 0, s: 0, v: 1 }, size: 100, opacity: 0.5 },
+      });
       const frame = createSceneFrame([entity]);
 
+      renderer.attach(mockCanvas);
       renderer.render(frame);
 
-      expect(mockCtx.arc).not.toHaveBeenCalled();
+      // Should create radial gradient and draw arc
+      expect(mockCtx.createRadialGradient).toHaveBeenCalled();
+      expect(mockCtx.arc).toHaveBeenCalled();
     });
   });
 });

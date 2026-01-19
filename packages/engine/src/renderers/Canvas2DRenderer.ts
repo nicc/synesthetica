@@ -79,14 +79,16 @@ export class Canvas2DRenderer implements IRenderer {
   }
 
   private drawEntity(entity: Entity): void {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.canvas) return;
 
     switch (entity.kind) {
       case "particle":
         this.drawParticle(entity);
         break;
-      case "trail":
       case "field":
+        this.drawField(entity);
+        break;
+      case "trail":
       case "glyph":
       case "group":
         // Not implemented for Phase 0
@@ -95,10 +97,11 @@ export class Canvas2DRenderer implements IRenderer {
   }
 
   private drawParticle(entity: Entity): void {
-    if (!this.ctx) return;
+    if (!this.ctx || !this.canvas) return;
 
-    const x = entity.position?.x ?? 0;
-    const y = entity.position?.y ?? 0;
+    // Convert normalized coordinates (0-1) to pixel coordinates
+    const x = (entity.position?.x ?? 0) * this.canvas.width;
+    const y = (entity.position?.y ?? 0) * this.canvas.height;
     const size = entity.style.size ?? 10;
     const opacity = entity.style.opacity ?? 1;
     const color = entity.style.color ?? { h: 0, s: 1, v: 1 };
@@ -116,6 +119,43 @@ export class Canvas2DRenderer implements IRenderer {
     this.ctx.beginPath();
     this.ctx.arc(x, y, size / 2, 0, Math.PI * 2);
     this.ctx.fillStyle = cssColor;
+    this.ctx.fill();
+  }
+
+  /**
+   * Draw a field entity as a radial gradient circle.
+   * Fields represent ambient effects like beat pulses or chord glows.
+   */
+  private drawField(entity: Entity): void {
+    if (!this.ctx || !this.canvas) return;
+
+    // Convert normalized coordinates (0-1) to pixel coordinates
+    const x = (entity.position?.x ?? 0.5) * this.canvas.width;
+    const y = (entity.position?.y ?? 0.5) * this.canvas.height;
+    const size = entity.style.size ?? 100;
+    const opacity = entity.style.opacity ?? 0.5;
+    const color = entity.style.color ?? { h: 0, s: 0, v: 1 };
+
+    // Apply opacity from entity style and life decay
+    let finalOpacity = opacity;
+    if (entity.life) {
+      const lifeRatio = 1 - entity.life.ageMs / entity.life.ttlMs;
+      finalOpacity *= lifeRatio;
+    }
+
+    // Create radial gradient
+    const radius = size / 2;
+    const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, radius);
+
+    const centerColor = hsvaToRgba(color, finalOpacity);
+    const edgeColor = hsvaToRgba(color, 0);
+
+    gradient.addColorStop(0, centerColor);
+    gradient.addColorStop(1, edgeColor);
+
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, radius, 0, Math.PI * 2);
+    this.ctx.fillStyle = gradient;
     this.ctx.fill();
   }
 }
