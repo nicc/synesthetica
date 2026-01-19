@@ -1,31 +1,33 @@
 # SPEC 006: Ruleset and Stabilizer Statefulness
 
 Status: Approved
-Date: 2026-01-15
-Source: RFC 002
+Date: 2026-01-19
+Source: RFC 002, RFC 005
 
 ## Summary
 
-Defines where temporal state lives in the pipeline. Rulesets remain pure (stateless); stabilizers are explicitly stateful and responsible for computing time-dependent derived signals.
+Defines where temporal state lives in the pipeline. Rulesets remain pure (stateless); stabilizers are explicitly stateful and responsible for transforming raw protocol input into musical abstractions.
 
 ## The Problem
 
 Some musical mappings require history:
-- **Harmonic tension** depends on chord progression over time
+- **Note duration** requires correlating note_on with note_off
+- **Note phase** (attack/sustain/release) requires tracking time since onset
 - **Beat phase** requires memory of recent beats
-- **Phrase-level dynamics** need lookback over several bars
+- **Harmonic tension** depends on chord progression over time
 
 The question: where should this temporal reasoning live?
 
 ## Decision: Stabilizers Handle History, Rulesets Stay Pure
 
 **Stabilizers** are stateful. They:
-- Accumulate evidence over time
+- Transform raw protocol input (RawInputFrame) to musical abstractions (MusicalFrame)
+- Correlate note_on/note_off pairs into Note objects with duration
+- Track note phase (attack → sustain → release)
 - Compute derived signals (tension trajectory, beat phase, phrase position)
-- Enrich CMSFrames with these derived signals
 
 **Rulesets** remain pure functions. They:
-- Map a single enriched CMSFrame to IntentFrame
+- Map a single MusicalFrame to VisualIntentFrame
 - Do not maintain internal state
 - Are testable with single-frame fixtures
 
@@ -33,28 +35,28 @@ The question: where should this temporal reasoning live?
 
 ### Why Stabilizers Own Temporal State
 
-1. **Aligned with existing role** — Stabilizers already "convert raw CMS evidence into usable control signals" (Glossary). Derived signals like tension and beat phase are exactly that.
+1. **Proper abstraction boundary** — Stabilizers convert protocol-level events (note_on, note_off) into musical abstractions (Note with duration). This is inherently stateful.
 
-2. **Musical knowledge is acceptable** — Stabilizers already handle "chord debounce" which requires harmonic understanding. Extending to "harmonic tension over N beats" is natural.
+2. **Musical knowledge is acceptable** — Stabilizers already handle "chord detection" which requires harmonic understanding. Extending to "harmonic tension over N beats" is natural.
 
-3. **Clean separation** — Stabilizers accumulate and derive; rulesets interpret a snapshot. This keeps responsibilities clear.
+3. **Clean separation** — Stabilizers accumulate and derive; rulesets interpret a snapshot.
 
 4. **Testability** — Rulesets can be tested with single-frame fixtures. Stabilizers can be tested with sequences.
 
 ### Why Rulesets Stay Pure
 
-1. **Deterministic mapping** — Given the same enriched CMSFrame, a ruleset always produces the same IntentFrame. No hidden state.
+1. **Deterministic mapping** — Given the same MusicalFrame, a ruleset always produces the same VisualIntentFrame. No hidden state.
 
 2. **Easier to reason about** — The ruleset is the "instrument definition" — it shouldn't behave differently based on how long the session has been running.
 
 3. **Simpler testing** — Golden tests can use single frames, not sequences.
 
-## Interface Changes
+## Interfaces
 
-### IStabilizer (Updated)
+### IMusicalStabilizer
 
 ```ts
-export interface IStabilizer {
+export interface IMusicalStabilizer {
   id: string;
 
   /** Called once when the stabilizer is initialized */
@@ -64,10 +66,10 @@ export interface IStabilizer {
   dispose(): void;
 
   /**
-   * Process a frame, potentially using and updating internal state.
-   * Returns an enriched CMSFrame with derived signals.
+   * Process raw input and produce musical state.
+   * Stabilizers maintain internal state to track note durations, etc.
    */
-  apply(frame: CMSFrame): CMSFrame;
+  apply(raw: RawInputFrame, previous: MusicalFrame | null): MusicalFrame;
 
   /**
    * Reset internal state (e.g., on session restart or part reassignment).
@@ -76,33 +78,53 @@ export interface IStabilizer {
 }
 ```
 
-### IRuleset (Unchanged)
+### IVisualRuleset
 
 ```ts
-export interface IRuleset {
+export interface IVisualRuleset {
   id: string;
 
   /**
-   * Pure function: maps CMS snapshot to visual intents.
+   * Pure function: maps musical state to visual intents.
    * No internal state. Same input always produces same output.
    */
-  map(frame: CMSFrame): IntentFrame;
+  map(frame: MusicalFrame): VisualIntentFrame;
 }
 ```
 
-## Examples of Derived Signals
+## Stabilizer Responsibilities
 
-Stabilizers may add these to CMSFrame:
+Stabilizers produce MusicalFrame containing:
 
-| Signal | Description | Computed From |
-|--------|-------------|---------------|
-| `harmonicTension` | 0-1 tension level | Chord progression over N beats |
-| `beatPhase` | Position within current beat | Recent beat onsets |
-| `phrasePosition` | Position within musical phrase | Beat count, cadence detection |
-| `dynamicTrend` | Rising/falling/stable | Loudness over time window |
-| `activityDensity` | Note density over time | Recent note events |
+| Field | Description | Source |
+|-------|-------------|--------|
+| `notes: Note[]` | Active notes with duration and phase | note_on/note_off correlation |
+| `chords: MusicalChord[]` | Detected chords | Note analysis |
+| `beat: BeatState` | Current beat position | Beat detection |
+| `dynamics: DynamicsState` | Current loudness level and trend | Velocity analysis |
 
-These appear as control signals in CMSFrame, consumed by rulesets like any other signal.
+### Note Tracking
+
+The `NoteTrackingStabilizer` transforms MIDI events to Note objects:
+
+1. **note_on** → Create Note in "attack" phase
+2. **Time passes** → Transition to "sustain" phase (after attackDurationMs)
+3. **note_off** → Transition to "release" phase
+4. **Release window expires** → Remove Note from frame
+
+```ts
+export interface Note {
+  id: NoteId;
+  pitch: Pitch;
+  velocity: Velocity;
+  onset: Ms;
+  duration: Ms;
+  release: Ms | null;
+  phase: NotePhase;  // "attack" | "sustain" | "release"
+  confidence: Confidence;
+  provenance: Provenance;
+}
+```
 
 ## Stabilizer Lifecycle
 
@@ -111,7 +133,7 @@ Session Start
   → stabilizer.init()
 
 Each Frame
-  → stabilizer.apply(frame) → enriched CMSFrame
+  → stabilizer.apply(rawFrame, previousMusicalFrame) → MusicalFrame
 
 Part Reassignment / Mode Change
   → stabilizer.reset()
@@ -120,24 +142,40 @@ Session End
   → stabilizer.dispose()
 ```
 
+## Pipeline Integration
+
+The pipeline uses a stabilizer factory because each part needs its own instance:
+
+```ts
+pipeline.setStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+```
+
 ## Testing Implications
 
 ### Stabilizer Tests
-- Test with sequences of CMSFrames
-- Verify derived signals are computed correctly
+- Test with sequences of RawInputFrames
+- Verify Note phase transitions
+- Verify note expiration after release window
 - Test reset behavior
 
 ### Ruleset Tests
-- Test with single enriched CMSFrames
+- Test with single MusicalFrames
 - Golden tests can use snapshot fixtures
 - No sequence dependencies
 
+## Implementation
+
+The canonical implementation is `NoteTrackingStabilizer` in `packages/engine/src/stabilizers/NoteTrackingStabilizer.ts`.
+
 ## What This Spec Does NOT Cover
 
-- Specific stabilizer implementations (TensionStabilizer, BeatPhaseStabilizer, etc.)
-- Schema for derived signals in CMSFrame
+- Specific derived signal computations (TensionStabilizer, BeatPhaseStabilizer)
 - Stabilizer ordering/composition
+- Audio-based stabilizers
 
 ## Contract Location
 
-Updated interface in `packages/contracts/pipeline/interfaces.ts`
+- `IMusicalStabilizer`: `packages/contracts/pipeline/interfaces.ts`
+- `IVisualRuleset`: `packages/contracts/pipeline/interfaces.ts`
+- `MusicalFrame`: `packages/contracts/musical/musical.ts`
+- `Note`: `packages/contracts/musical/musical.ts`

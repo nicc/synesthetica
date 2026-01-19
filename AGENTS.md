@@ -173,6 +173,44 @@ npm run lint:fix    # Auto-fix where possible
 
 This section will evolve as we learn what works.
 
+## Spec Maintenance
+
+**Specs are canonical. Code and specs must always match.**
+
+RFCs are for discovery and exploration. Specs are the source of truth. When you change code that relates to a spec, you MUST update the spec in the same session.
+
+**Rules:**
+
+1. **Read specs at session start** — Before making significant changes, read relevant specs in `specs/` to understand the current architecture
+2. **Update specs with code** — If you modify behavior covered by a spec, update the spec immediately (not "later")
+3. **Create specs for new concepts** — If you introduce new architectural concepts not covered by existing specs, create a new spec
+4. **Never leave specs stale** — A session is not complete if specs don't match the code you changed
+
+**When changing code, ask yourself:**
+- Does this change contradict any spec? → Update the spec
+- Does this change implement something a spec describes differently? → Update the spec
+- Does this introduce a new pattern or concept? → Consider a new spec
+- Does this remove functionality a spec describes? → Update or retire the spec
+
+**Spec locations:**
+- `specs/SPEC_*.md` — Approved architectural decisions
+- `specs/RFC_*.md` — Discovery documents (may be outdated, not canonical)
+
+**Example workflow:**
+```
+1. Read SPEC_008 (pipeline orchestration)
+2. Implement new stabilizer interface
+3. Update SPEC_008 to reflect new interface
+4. Update SPEC_006 if stabilizer statefulness changed
+5. Run tests, commit code AND spec changes together
+```
+
+**Why this matters:**
+- Future sessions start by reading specs to build context
+- Stale specs cause incorrect implementations
+- Specs are how humans and agents understand the system
+- The cost of updating a spec now is tiny; the cost of debugging a stale spec later is large
+
 ## Commit Messages
 
 **Summarize product work in commit messages.** The git log is a project history — don't hide important work behind "bd sync".

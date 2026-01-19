@@ -1,8 +1,8 @@
 # SPEC 008: Pipeline Orchestration
 
 Status: Approved
-Date: 2026-01-16
-Source: RFC 002, RFC 003, SPEC 005
+Date: 2026-01-19
+Source: RFC 002, RFC 003, RFC 005, SPEC 005
 
 ## Summary
 
@@ -39,27 +39,27 @@ export interface IPipeline {
 │         │                                                                │
 │         ▼                                                                │
 │  ┌──────────────┐                                                        │
-│  │   Adapters   │  For each source: adapter.nextFrame() → CMSFrame       │
+│  │   Adapters   │  adapter.nextFrame() → RawInputFrame                   │
 │  └──────┬───────┘                                                        │
 │         │                                                                │
 │         ▼                                                                │
 │  ┌──────────────┐                                                        │
-│  │    Router    │  router.route(frame) → Map<PartId, CMSFrame>           │
+│  │    Router    │  router.route(frame) → Map<PartId, RawInputFrame>      │
 │  └──────┬───────┘                                                        │
 │         │                                                                │
 │         ▼  For each part:                                                │
 │  ┌──────────────┐                                                        │
-│  │  Stabilizers │  stabilizer.apply(frame) → enriched CMSFrame           │
+│  │  Stabilizers │  stabilizer.apply(raw) → MusicalFrame                  │
 │  └──────┬───────┘                                                        │
 │         │                                                                │
 │         ▼                                                                │
 │  ┌──────────────┐                                                        │
-│  │   Ruleset    │  ruleset.map(frame) → IntentFrame                      │
+│  │   Ruleset    │  ruleset.map(musical) → VisualIntentFrame              │
 │  └──────┬───────┘                                                        │
 │         │                                                                │
 │         ▼                                                                │
 │  ┌──────────────┐                                                        │
-│  │   Grammars   │  grammar.update(intents, prev) → SceneFrame(part)      │
+│  │   Grammars   │  grammar.update(intents, prev) → SceneFrame            │
 │  └──────┬───────┘                                                        │
 │         │                                                                │
 │         └─────────────────────────┐                                      │
@@ -72,6 +72,17 @@ export interface IPipeline {
 │                            SceneFrame                                    │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+## Frame Types
+
+See SPEC_009 for detailed frame type definitions. Summary:
+
+| Stage | Input | Output | Interface |
+|-------|-------|--------|-----------|
+| Adapters | External input | RawInputFrame | IRawSourceAdapter |
+| Stabilizers | RawInputFrame | MusicalFrame | IMusicalStabilizer |
+| Rulesets | MusicalFrame | VisualIntentFrame | IVisualRuleset |
+| Grammars | VisualIntentFrame | SceneFrame | IVisualGrammar |
 
 ## Processing Steps
 
@@ -96,35 +107,32 @@ Adapters bridge between push-based input sources (e.g., Web MIDI events, Web Aud
 2. **Pipeline pulls current state** — `nextFrame()` reads whatever state has accumulated since last call
 3. **Decoupling** — The two sides operate independently; events don't directly trigger frame production
 
-Adapters are **state-writers**, not frame-pushers. They maintain current musical state; the pipeline reads it on demand. This pattern was validated in the MIDI spike (see `docs/learnings/2026-01-18-midi-spike.md`).
+Adapters are **state-writers**, not frame-pushers. They maintain current raw input; the pipeline reads it on demand.
 
 ### 2. Routing
 
-The router splits collected CMS data by part:
+The router splits collected raw input by part:
 
 ```ts
-const partFrames: Map<PartId, CMSFrame> = router.route(mergedFrame);
+const partFrames: Map<PartId, RawInputFrame> = router.route(mergedFrame);
 ```
 
-Each part receives only its own events and signals.
+Each part receives only its own raw input.
 
 ### 3. Per-Part Processing
 
 For each part, the pipeline runs:
 
 ```ts
-for (const [partId, cmsFrame] of partFrames) {
-  // Stabilizers enrich the frame
-  let enriched = cmsFrame;
-  for (const stabilizer of stabilizers) {
-    enriched = stabilizer.apply(enriched);
-  }
+for (const [partId, rawFrame] of partFrames) {
+  // Stabilizers transform raw input to musical abstractions
+  const musicalFrame = stabilizer.apply(rawFrame, previousMusical);
 
-  // Ruleset maps to intents
-  const intents = ruleset.map(enriched);
+  // Ruleset maps to visual intents
+  const intentFrame = ruleset.map(musicalFrame);
 
-  // Grammar stack produces scene
-  const scene = grammarStack.update(intents, previousScene);
+  // Grammar produces scene
+  const scene = grammar.update(intentFrame, previousScene);
   partScenes.push(scene);
 }
 ```
@@ -145,7 +153,7 @@ The composited `SceneFrame` is returned to the caller (renderer).
 
 ## Activity Tracking
 
-The pipeline should record activity for deictic resolution (e.g. "this is the guitar"):
+The pipeline records activity for deictic resolution (e.g. "this is the guitar"):
 
 ```ts
 export interface IActivityTracker {
@@ -154,7 +162,7 @@ export interface IActivityTracker {
 }
 ```
 
-The pipeline records activity when processing events for a part. The activity tracker is used by the speech interface to resolve "this" to the most recently active part.
+Activity is recorded based on note count in the MusicalFrame.
 
 ## Diagnostics
 
@@ -168,31 +176,39 @@ export interface SceneFrame {
 }
 ```
 
-Components add diagnostics via the frame or a shared collector. The renderer may display visual indicators for active diagnostics.
+Components add diagnostics via the frame or a shared collector.
 
 ## Lifecycle
 
 ### Initialization
 
 ```ts
-pipeline.init({
-  adapters: [...],
-  stabilizers: [...],
-  ruleset: defaultRuleset,
-  grammars: [...],
-  compositor: defaultCompositor,
+const pipeline = new VisualPipeline({
+  canvasSize: { width, height },
+  rngSeed: Date.now(),
+  partId: "main",
 });
+
+pipeline.addAdapter(adapter);
+pipeline.setStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+pipeline.setRuleset(new MusicalVisualRuleset());
+pipeline.addGrammar(new VisualParticleGrammar());
+pipeline.setCompositor(new IdentityCompositor());
 ```
 
 ### Session Management
 
-- **Start**: Initialize all stabilizers, reset state
+- **Start**: Initialize all stabilizers via factory, reset state
 - **Running**: Process frame requests
 - **Stop**: Dispose stabilizers, clean up resources
 
-### Part Registration
+### Stabilizer Factory
 
-Parts are discovered dynamically as adapters emit events with new `PartId` values. The pipeline maintains a registry of known parts.
+The pipeline uses a stabilizer factory because each part needs its own stabilizer instance with its own state:
+
+```ts
+pipeline.setStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+```
 
 ## Invariants Preserved
 
@@ -200,9 +216,13 @@ This orchestration model preserves all system invariants:
 
 - **I1**: Same ruleset processes all parts regardless of source
 - **I3**: Meaning lives in ruleset, grammars only see intents
-- **I6**: Every CMS item has exactly one PartId
+- **I6**: Every raw input can be routed to a part
 - **I7**: Grammars don't read other parts (per-part instantiation)
 - **I8**: Layout/blending handled by compositor only
+
+## Implementation
+
+The canonical implementation is `VisualPipeline` in `packages/engine/src/VisualPipeline.ts`.
 
 ## What This Spec Does NOT Cover
 

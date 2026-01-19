@@ -5,7 +5,6 @@ import type {
   GrammarContext,
   PaletteIntent,
   MotionIntent,
-  SceneFrame,
 } from "@synesthetica/contracts";
 
 function makePaletteIntent(

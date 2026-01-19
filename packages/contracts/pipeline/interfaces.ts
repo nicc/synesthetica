@@ -4,35 +4,49 @@
  * Defines the contracts for pipeline components: adapters, stabilizers,
  * rulesets, grammars, compositor, and renderer.
  *
- * See RFC 005 for the new frame type architecture.
+ * See SPEC_008 for pipeline orchestration and SPEC_009 for frame types.
  */
 
 import type { SourceId, StreamId } from "../core/provenance";
 import type { Ms, SessionMs } from "../core/time";
-import type { CMSFrame } from "../cms/cms";
-import type { IntentFrame, VisualIntentFrame } from "../intents/intents";
+import type { VisualIntentFrame } from "../intents/intents";
 import type { SceneFrame } from "../scene/scene";
 import type { PartId } from "../parts/parts";
 import type { RawInputFrame } from "../raw/raw";
 import type { MusicalFrame } from "../musical/musical";
 
 // ============================================================================
-// New interfaces (RFC 005)
+// Source Adapters
 // ============================================================================
 
 /**
  * Source adapter that emits raw protocol-level input.
- * Use this for new implementations.
+ *
+ * Adapters bridge external input sources (MIDI, audio) to the pipeline.
+ * They emit RawInputFrame containing protocol-level events without
+ * musical interpretation.
  */
 export interface IRawSourceAdapter {
   readonly source: SourceId;
   readonly stream: StreamId;
+
+  /**
+   * Get the next frame of raw input, or null if no input available.
+   * Called by the pipeline on each frame request.
+   */
   nextFrame(): RawInputFrame | null;
 }
 
+// ============================================================================
+// Stabilizers
+// ============================================================================
+
 /**
  * Stabilizer that transforms raw input to musical abstractions.
- * Use this for new implementations.
+ *
+ * Stabilizers accumulate temporal context to produce proper musical
+ * abstractions (notes with duration, chords, beats) from raw protocol
+ * events (note_on, note_off).
  */
 export interface IMusicalStabilizer {
   id: string;
@@ -45,7 +59,7 @@ export interface IMusicalStabilizer {
 
   /**
    * Process raw input and produce musical state.
-   * Stabilizers accumulate temporal context internally.
+   * Stabilizers maintain internal state to track note durations, etc.
    */
   apply(raw: RawInputFrame, previous: MusicalFrame | null): MusicalFrame;
 
@@ -55,9 +69,16 @@ export interface IMusicalStabilizer {
   reset(): void;
 }
 
+// ============================================================================
+// Rulesets
+// ============================================================================
+
 /**
  * Ruleset that maps musical state to visual intents.
- * Use this for new implementations.
+ *
+ * Rulesets are pure functions that translate musical semantics to
+ * visual intentions. They encode the "meaning" of musical events
+ * without prescribing specific visual outcomes.
  */
 export interface IVisualRuleset {
   id: string;
@@ -69,97 +90,73 @@ export interface IVisualRuleset {
   map(frame: MusicalFrame): VisualIntentFrame;
 }
 
+// ============================================================================
+// Grammars
+// ============================================================================
+
 /**
  * Grammar that maps visual intents to scene entities.
- * Use this for new implementations.
+ *
+ * Grammars interpret visual intents to produce concrete scene entities.
+ * They may maintain state for entity lifecycle management.
  */
 export interface IVisualGrammar {
   id: string;
+
+  /**
+   * Initialize the grammar with context for this part.
+   */
   init(ctx: GrammarContext): void;
+
+  /**
+   * Update the scene based on current intents and previous state.
+   */
   update(input: VisualIntentFrame, previous: SceneFrame | null): SceneFrame;
+
+  /** Schema for configurable parameters (optional) */
   paramsSchema?: Record<string, unknown>;
 }
 
-// ============================================================================
-// Legacy interfaces (for backward compatibility during migration)
-// These will be removed in Phase 9
-// ============================================================================
-
 /**
- * @deprecated Use IRawSourceAdapter instead. Will be removed after migration.
+ * Context provided to grammars during initialization.
  */
-export interface ISourceAdapter {
-  readonly source: SourceId;
-  readonly stream: StreamId;
-  nextFrame(): CMSFrame | null;
-}
-
-/**
- * @deprecated Use IMusicalStabilizer instead. Will be removed after migration.
- */
-export interface IStabilizer {
-  id: string;
-
-  /** Called once when the stabilizer is initialized */
-  init(): void;
-
-  /** Called once when the session ends or stabilizer is removed */
-  dispose(): void;
-
-  /**
-   * Process a frame, potentially using and updating internal state.
-   * Returns an enriched CMSFrame with derived signals.
-   */
-  apply(frame: CMSFrame): CMSFrame;
-
-  /**
-   * Reset internal state (e.g., on session restart or part reassignment).
-   */
-  reset(): void;
-}
-
-/**
- * @deprecated Use IVisualRuleset instead. Will be removed after migration.
- */
-export interface IRuleset {
-  id: string;
-  map(frame: CMSFrame): IntentFrame;
-}
-
-/**
- * @deprecated Use IVisualGrammar instead. Will be removed after migration.
- */
-export interface IGrammar {
-  id: string;
-  init(ctx: GrammarContext): void;
-  update(input: IntentFrame, previous: SceneFrame | null): SceneFrame;
-  paramsSchema?: Record<string, unknown>;
-}
-
-// ============================================================================
-// Shared interfaces (unchanged)
-// ============================================================================
-
 export interface GrammarContext {
   canvasSize: { width: number; height: number };
   rngSeed: number;
   part: PartId;
 }
 
+// ============================================================================
+// Compositor and Renderer
+// ============================================================================
+
+/**
+ * Compositor that merges multiple scene frames into one.
+ */
 export interface ICompositor {
   id: string;
   compose(frames: SceneFrame[]): SceneFrame;
 }
 
+/**
+ * Renderer that draws a scene frame to output.
+ */
 export interface IRenderer {
   id: string;
   render(scene: SceneFrame): void;
 }
 
+// ============================================================================
+// Pipeline
+// ============================================================================
+
 /**
  * The central pipeline orchestrator.
+ *
  * Uses a pull-based model where the renderer requests frames at target times.
- * See SPEC_005 and SPEC_008 for details.
+ * The pipeline coordinates: Adapters → Stabilizers → Ruleset → Grammars → Compositor
+ *
+ * See SPEC_005 for frame timing and SPEC_008 for orchestration details.
  */
 export interface IPipeline {
   /**

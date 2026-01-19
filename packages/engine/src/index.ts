@@ -1,4 +1,4 @@
-export { Pipeline, type PipelineConfig } from "./Pipeline";
+// Pipeline
 export { VisualPipeline, type VisualPipelineConfig } from "./VisualPipeline";
 
 // Stabilizers
@@ -10,8 +10,8 @@ export * from "./rulesets";
 // Grammars
 export * from "./grammars";
 
-// Stub implementations for Phase 0
-export * from "./stubs";
+// Compositor
+export { IdentityCompositor } from "./stubs/IdentityCompositor";
 
 // Renderers
 export * from "./renderers";
