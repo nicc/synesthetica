@@ -24,7 +24,7 @@ Invariants ensure:
 
 | ID | Invariant | Meaning |
 |----|-----------|---------|
-| I1 | **Same ruleset consumes CMS regardless of source** | Whether input comes from MIDI or audio, the same ruleset processes it. Only confidence/entropy differs, not structure. |
+| I1 | **Same ruleset consumes MusicalFrame regardless of source** | Whether input comes from MIDI or audio, the same ruleset processes the same MusicalFrame structure. Only confidence differs, not structure. |
 | I2 | **Pitch-class → hue mapping is deterministic** | Given a named `PitchHueInvariant`, the same pitch always produces the same hue. See [SPEC_002](SPEC_002_pitch_class_hue_mapping.md). |
 | I3 | **Meaning lives in rulesets, not grammars** | Rulesets interpret musical events into intents. Grammars only determine visual form. |
 | I4 | **Grammars may not compute musical semantics** | Grammars cannot infer pitch, chords, beats, or any musical meaning. They consume pre-computed intents. |
@@ -34,7 +34,7 @@ Invariants ensure:
 
 | ID | Invariant | Meaning |
 |----|-----------|---------|
-| I6 | **Every CMS item has exactly one PartId** | All musical events and signals are tagged with their source part. No orphaned data. |
+| I6 | **Every MusicalFrame has exactly one PartId** | All musical frames are tagged with their source part. No orphaned data. |
 | I7 | **Grammars do not read or reason about other parts** | Each grammar instance sees only its own part's data. No cross-part logic. |
 | I8 | **Spatial layout and blending are compositor concerns** | Grammars emit entities; the compositor handles positioning, layering, and blending. |
 | I9 | **Musical meaning remains invariant across parts** | Parts affect routing and visual treatment, not interpretation. A C4 is a C4 regardless of which part plays it. |
@@ -66,7 +66,7 @@ Guarantee bounded, predictable execution.
 
 ## What Grammars MAY Do
 
-- Emit and evolve entities (spawn on note_on, fade trails, apply decay)
+- Emit and evolve entities (respond to palette intents, fade trails, apply decay)
 - Interpret intents and event timing (beat/chord spans)
 - React to uncertainty (more jitter/blur/fuzz)
 - Adjust saturation, brightness, opacity based on intents
@@ -85,15 +85,16 @@ Guarantee bounded, predictable execution.
 
 Invariants are enforced through:
 1. **Type system** — interfaces constrain what data flows where
-2. **API design** — grammars receive intents, not raw CMS
+2. **API design** — grammars receive VisualIntentFrame, not MusicalFrame
 3. **Code review** — new grammars are validated against this spec
 4. **Testing** — golden tests verify invariant preservation
 
 ## Contract Locations
 
-- CMS types: `packages/contracts/cms/`
-- Intent types: `packages/contracts/intents/`
-- Grammar interface: `packages/contracts/pipeline/interfaces.ts`
+- Raw input types: `packages/contracts/raw/raw.ts`
+- Musical abstractions: `packages/contracts/musical/musical.ts`
+- Visual intent types: `packages/contracts/intents/intents.ts`
+- Pipeline interfaces: `packages/contracts/pipeline/interfaces.ts`
 - Part types: `packages/contracts/parts/parts.ts`
 
 ## Adding New Invariants

@@ -59,7 +59,7 @@ A session begins when the engine initializes. The epoch (T=0) is:
 - The moment the pipeline becomes ready to process
 - Before any adapters begin emitting events
 
-All CMS events, intents, and scene frames share this timeline.
+All raw input, musical frames, intents, and scene frames share this timeline.
 
 ## Latency Handling
 
@@ -95,18 +95,18 @@ Adapters may expose a `defaultLatencyMs` hint that could be used for compensatio
 Each part operates on its own timeline segment:
 
 ```
-Source A → Adapter A → CMSFrame(partA, T) → Pipeline → SceneFrame(partA)
-Source B → Adapter B → CMSFrame(partB, T) → Pipeline → SceneFrame(partB)
+Source A → Adapter A → RawInputFrame → Stabilizer → MusicalFrame(partA, T) → Pipeline → SceneFrame(partA)
+Source B → Adapter B → RawInputFrame → Stabilizer → MusicalFrame(partB, T) → Pipeline → SceneFrame(partB)
 ```
 
-Parts do not share CMS state. Musical interpretation happens independently per part.
+Parts do not share musical state. Musical interpretation happens independently per part.
 
 ### Why Per-Part (Not Consolidated)
 
 Consolidated interpretation would require re-interpreting musical intent from combined evidence (e.g., Part 1's C-E-G + Part 2's E-G-B = Cmaj7). This:
 - Violates I3 (meaning lives in rulesets, not downstream)
 - Loses attribution needed for ear training
-- Requires fusion logic that belongs upstream of CMS
+- Requires fusion logic that belongs upstream of musical state
 
 Per-part preserves:
 - Attribution (who played what)
@@ -122,9 +122,9 @@ The compositor merges per-part SceneFrames into a unified visual output. This is
 ```
 1. Renderer calls pipeline.requestFrame(targetTime)
 2. For each active part:
-   a. Adapter provides CMSFrame up to targetTime
-   b. Stabilizers process CMS
-   c. Ruleset produces IntentFrame
+   a. Adapter provides RawInputFrame up to targetTime
+   b. Stabilizer transforms RawInputFrame → MusicalFrame
+   c. Ruleset transforms MusicalFrame → VisualIntentFrame
    d. Grammar stack produces SceneFrame(part)
 3. Compositor merges per-part SceneFrames
 4. Merged SceneFrame returned to renderer
@@ -153,8 +153,8 @@ export interface IPipeline {
 ## Deferred Work
 
 **Ensemble Mode**: A future mode where multiple sources contribute to a single unified musical interpretation (cross-part harmonic analysis). This would require:
-- A fusion step upstream of CMS generation
-- Loss of per-part attribution at the CMS level
+- A fusion step upstream of MusicalFrame generation
+- Loss of per-part attribution at the MusicalFrame level
 - Different architectural trade-offs
 
 This is explicitly deferred. The current per-part design is optimized for ear training where attribution matters. See beads issue for context.

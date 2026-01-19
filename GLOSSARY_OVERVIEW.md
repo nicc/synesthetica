@@ -40,22 +40,20 @@ Examples: Quiet, Conversational.
 Where musical data comes from (MIDI, audio).
 
 **Adapter**
-Turns a source into CMS frames.
+Turns a source into RawInputFrame (protocol-level events).
 
-**Canonical Musical State (CMS)**
-The unified description of music used everywhere downstream.
+**RawInputFrame**
+Protocol-level input from adapters (MIDI note_on/off, audio features).
 
-**CMS Frame**
-A time-stamped snapshot of musical events + signals.
+**Stabilizer**
+Transforms RawInputFrame into MusicalFrame (proper musical abstractions).
 
-**Musical Event**
-Discrete musical facts (note_on, chord, beat).
+**MusicalFrame**
+A time-stamped snapshot of musical state: notes with duration, chords, beats, dynamics.
 
-**Control Signal**
-Continuous musical descriptors (loudness, tension).
-
-**Distribution Signal**
-Probabilistic musical descriptors (pitch-class distribution).
+**Note**
+A musical abstraction with pitch, velocity, duration, and phase (attack/sustain/release).
+Not a pair of on/off messages.
 
 **Confidence / Uncertainty**
 How sure we are about a musical claim.
@@ -72,19 +70,19 @@ The fixed synesthetic operating scheme.
 A rule that always holds (e.g. pitch-class → hue).
 
 **Ruleset**
-Maps CMS → Visual Intents.
+Maps MusicalFrame → VisualIntentFrame.
 Defines musical meaning.
 
 ---
 
 ## Visual Semantics
 
-**Visual Intent**
+**VisualIntent**
 Rendering-agnostic description of what to express.
-Examples: palette, motion, texture, shape.
+Examples: PaletteIntent, MotionIntent, TextureIntent, ShapeIntent.
 
-**Intent Frame**
-Time-stamped bundle of visual intents.
+**VisualIntentFrame**
+Time-stamped bundle of visual intents. No musical concepts.
 
 ---
 
