@@ -31,6 +31,21 @@ export interface Fixture<TInput, TOutput> {
 }
 
 /**
+ * Sequence fixture for testing stateful modules across multiple frames.
+ * Each step feeds input and checks expected output at that point in time.
+ */
+export interface SequenceFixture<TInput, TOutput> {
+  name: string;
+  description: string;
+  config?: Record<string, unknown>;
+  steps: Array<{
+    t: number;
+    input: TInput;
+    expected: TOutput;
+  }>;
+}
+
+/**
  * Options for frame comparison.
  */
 export interface CompareOptions {

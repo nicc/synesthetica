@@ -1,0 +1,87 @@
+{
+  "name": "dynamics-variation",
+  "description": "DynamicsState level reflects average velocity of active notes",
+  "config": {
+    "partId": "default",
+    "attackDurationMs": 50,
+    "releaseWindowMs": 500
+  },
+  "steps": [
+    {
+      "t": 0,
+      "input": {
+        "t": 0,
+        "source": "midi",
+        "stream": "test",
+        "inputs": [
+          { "type": "midi_note_on", "t": 0, "note": 60, "velocity": 127, "channel": 0 }
+        ]
+      },
+      "expected": {
+        "noteCount": 1,
+        "notes": [
+          { "pitch": { "pc": 0, "octave": 4 }, "phase": "attack", "velocity": 127 }
+        ],
+        "dynamics": { "level": 1.0, "trend": "stable" }
+      }
+    },
+    {
+      "t": 100,
+      "input": {
+        "t": 100,
+        "source": "midi",
+        "stream": "test",
+        "inputs": [
+          { "type": "midi_note_on", "t": 100, "note": 64, "velocity": 64, "channel": 0 }
+        ]
+      },
+      "expected": {
+        "noteCount": 2,
+        "notes": [
+          { "pitch": { "pc": 0, "octave": 4 }, "phase": "sustain", "velocity": 127 },
+          { "pitch": { "pc": 4, "octave": 4 }, "phase": "attack", "velocity": 64 }
+        ],
+        "dynamics": { "level": 0.7519685039370079, "trend": "stable" }
+      }
+    },
+    {
+      "t": 200,
+      "input": {
+        "t": 200,
+        "source": "midi",
+        "stream": "test",
+        "inputs": [
+          { "type": "midi_note_off", "t": 200, "note": 60, "channel": 0 }
+        ]
+      },
+      "expected": {
+        "noteCount": 2,
+        "notes": [
+          { "pitch": { "pc": 0, "octave": 4 }, "phase": "release", "velocity": 127 },
+          { "pitch": { "pc": 4, "octave": 4 }, "phase": "sustain", "velocity": 64 }
+        ],
+        "dynamics": { "level": 0.5039370078740157, "trend": "stable" }
+      }
+    },
+    {
+      "t": 300,
+      "input": {
+        "t": 300,
+        "source": "midi",
+        "stream": "test",
+        "inputs": [
+          { "type": "midi_note_on", "t": 300, "note": 67, "velocity": 32, "channel": 0 }
+        ]
+      },
+      "expected": {
+        "noteCount": 3,
+        "notes": [
+          { "pitch": { "pc": 0, "octave": 4 }, "phase": "release", "velocity": 127 },
+          { "pitch": { "pc": 4, "octave": 4 }, "phase": "sustain", "velocity": 64 },
+          { "pitch": { "pc": 7, "octave": 4 }, "phase": "attack", "velocity": 32 }
+        ],
+        "dynamics": { "level": 0.3779527559055118, "trend": "stable" }
+      }
+    }
+  ]
+}

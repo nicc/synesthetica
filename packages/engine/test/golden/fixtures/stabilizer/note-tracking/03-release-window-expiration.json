@@ -1,0 +1,93 @@
+{
+  "name": "release-window-expiration",
+  "description": "Note remains in release phase for releaseWindowMs, then disappears",
+  "config": {
+    "partId": "default",
+    "attackDurationMs": 50,
+    "releaseWindowMs": 500
+  },
+  "steps": [
+    {
+      "t": 0,
+      "input": {
+        "t": 0,
+        "source": "midi",
+        "stream": "test",
+        "inputs": [
+          { "type": "midi_note_on", "t": 0, "note": 64, "velocity": 100, "channel": 0 }
+        ]
+      },
+      "expected": {
+        "noteCount": 1,
+        "notes": [
+          { "pitch": { "pc": 4, "octave": 4 }, "phase": "attack", "velocity": 100 }
+        ],
+        "dynamics": { "level": 0.7874015748031497, "trend": "stable" }
+      }
+    },
+    {
+      "t": 100,
+      "input": {
+        "t": 100,
+        "source": "midi",
+        "stream": "test",
+        "inputs": [
+          { "type": "midi_note_off", "t": 100, "note": 64, "channel": 0 }
+        ]
+      },
+      "expected": {
+        "noteCount": 1,
+        "notes": [
+          { "pitch": { "pc": 4, "octave": 4 }, "phase": "release", "velocity": 100 }
+        ],
+        "dynamics": { "level": 0.23622047244094488, "trend": "stable" }
+      }
+    },
+    {
+      "t": 500,
+      "input": {
+        "t": 500,
+        "source": "midi",
+        "stream": "test",
+        "inputs": []
+      },
+      "expected": {
+        "noteCount": 1,
+        "notes": [
+          { "pitch": { "pc": 4, "octave": 4 }, "phase": "release", "velocity": 100 }
+        ],
+        "dynamics": { "level": 0.23622047244094488, "trend": "stable" }
+      }
+    },
+    {
+      "t": 599,
+      "input": {
+        "t": 599,
+        "source": "midi",
+        "stream": "test",
+        "inputs": []
+      },
+      "expected": {
+        "noteCount": 1,
+        "notes": [
+          { "pitch": { "pc": 4, "octave": 4 }, "phase": "release", "velocity": 100 }
+        ],
+        "dynamics": { "level": 0.23622047244094488, "trend": "stable" }
+      }
+    },
+    {
+      "t": 601,
+      "input": {
+        "t": 601,
+        "source": "midi",
+        "stream": "test",
+        "inputs": []
+      },
+      "expected": {
+        "noteCount": 0,
+        "notes": [],
+        "dynamics": { "level": 0, "trend": "stable" }
+      }
+    }
+  ]
+}

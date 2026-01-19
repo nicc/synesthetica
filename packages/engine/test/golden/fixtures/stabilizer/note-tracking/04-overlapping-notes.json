@@ -1,0 +1,86 @@
+{
+  "name": "overlapping-notes",
+  "description": "Two notes played with overlapping durations tracked independently",
+  "config": {
+    "partId": "default",
+    "attackDurationMs": 50,
+    "releaseWindowMs": 500
+  },
+  "steps": [
+    {
+      "t": 0,
+      "input": {
+        "t": 0,
+        "source": "midi",
+        "stream": "test",
+        "inputs": [
+          { "type": "midi_note_on", "t": 0, "note": 60, "velocity": 100, "channel": 0 }
+        ]
+      },
+      "expected": {
+        "noteCount": 1,
+        "notes": [
+          { "pitch": { "pc": 0, "octave": 4 }, "phase": "attack", "velocity": 100 }
+        ],
+        "dynamics": { "level": 0.7874015748031497, "trend": "stable" }
+      }
+    },
+    {
+      "t": 50,
+      "input": {
+        "t": 50,
+        "source": "midi",
+        "stream": "test",
+        "inputs": [
+          { "type": "midi_note_on", "t": 50, "note": 64, "velocity": 80, "channel": 0 }
+        ]
+      },
+      "expected": {
+        "noteCount": 2,
+        "notes": [
+          { "pitch": { "pc": 0, "octave": 4 }, "phase": "sustain", "velocity": 100 },
+          { "pitch": { "pc": 4, "octave": 4 }, "phase": "attack", "velocity": 80 }
+        ],
+        "dynamics": { "level": 0.7086614173228346, "trend": "stable" }
+      }
+    },
+    {
+      "t": 200,
+      "input": {
+        "t": 200,
+        "source": "midi",
+        "stream": "test",
+        "inputs": [
+          { "type": "midi_note_off", "t": 200, "note": 60, "channel": 0 }
+        ]
+      },
+      "expected": {
+        "noteCount": 2,
+        "notes": [
+          { "pitch": { "pc": 0, "octave": 4 }, "phase": "release", "velocity": 100 },
+          { "pitch": { "pc": 4, "octave": 4 }, "phase": "sustain", "velocity": 80 }
+        ],
+        "dynamics": { "level": 0.6299212598425197, "trend": "stable" }
+      }
+    },
+    {
+      "t": 250,
+      "input": {
+        "t": 250,
+        "source": "midi",
+        "stream": "test",
+        "inputs": [
+          { "type": "midi_note_off", "t": 250, "note": 64, "channel": 0 }
+        ]
+      },
+      "expected": {
+        "noteCount": 2,
+        "notes": [
+          { "pitch": { "pc": 0, "octave": 4 }, "phase": "release", "velocity": 100 },
+          { "pitch": { "pc": 4, "octave": 4 }, "phase": "release", "velocity": 80 }
+        ],
+        "dynamics": { "level": 0.21259842519685041, "trend": "stable" }
+      }
+    }
+  ]
+}

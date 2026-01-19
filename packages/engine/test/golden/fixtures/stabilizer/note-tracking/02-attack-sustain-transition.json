@@ -1,0 +1,77 @@
+{
+  "name": "attack-sustain-transition",
+  "description": "Note transitions from attack to sustain after attackDurationMs",
+  "config": {
+    "partId": "default",
+    "attackDurationMs": 50,
+    "releaseWindowMs": 500
+  },
+  "steps": [
+    {
+      "t": 0,
+      "input": {
+        "t": 0,
+        "source": "midi",
+        "stream": "test",
+        "inputs": [
+          { "type": "midi_note_on", "t": 0, "note": 60, "velocity": 80, "channel": 0 }
+        ]
+      },
+      "expected": {
+        "noteCount": 1,
+        "notes": [
+          { "pitch": { "pc": 0, "octave": 4 }, "phase": "attack", "velocity": 80 }
+        ],
+        "dynamics": { "level": 0.6299212598425197, "trend": "stable" }
+      }
+    },
+    {
+      "t": 49,
+      "input": {
+        "t": 49,
+        "source": "midi",
+        "stream": "test",
+        "inputs": []
+      },
+      "expected": {
+        "noteCount": 1,
+        "notes": [
+          { "pitch": { "pc": 0, "octave": 4 }, "phase": "attack", "velocity": 80 }
+        ],
+        "dynamics": { "level": 0.6299212598425197, "trend": "stable" }
+      }
+    },
+    {
+      "t": 50,
+      "input": {
+        "t": 50,
+        "source": "midi",
+        "stream": "test",
+        "inputs": []
+      },
+      "expected": {
+        "noteCount": 1,
+        "notes": [
+          { "pitch": { "pc": 0, "octave": 4 }, "phase": "sustain", "velocity": 80 }
+        ],
+        "dynamics": { "level": 0.6299212598425197, "trend": "stable" }
+      }
+    },
+    {
+      "t": 51,
+      "input": {
+        "t": 51,
+        "source": "midi",
+        "stream": "test",
+        "inputs": []
+      },
+      "expected": {
+        "noteCount": 1,
+        "notes": [
+          { "pitch": { "pc": 0, "octave": 4 }, "phase": "sustain", "velocity": 80 }
+        ],
+        "dynamics": { "level": 0.6299212598425197, "trend": "stable" }
+      }
+    }
+  ]
+}
