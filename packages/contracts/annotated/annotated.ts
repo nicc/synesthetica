@@ -137,19 +137,16 @@ export interface AnnotatedChord {
 
 /**
  * Beat information with visual annotations.
+ *
+ * Note: beatInBar and isDownbeat are now part of BeatState (from stabilizer).
+ * Grammars access them via beat.beatInBar and beat.isDownbeat.
  */
 export interface AnnotatedBeat {
-  /** Current beat state */
+  /** Current beat state (includes tempo, phase, beatInBar, isDownbeat) */
   beat: BeatState;
 
   /** Visual properties for beat visualization */
   visual: VisualAnnotation;
-
-  /** Beat number within bar (1-indexed) */
-  beatInBar: number;
-
-  /** Whether this is a downbeat (beat 1) */
-  isDownbeat: boolean;
 }
 
 /**

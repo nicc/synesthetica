@@ -109,9 +109,9 @@ export class TestRhythmGrammar implements IVisualGrammar {
    * Create a beat pulse entity.
    * Vertical line at center that flashes more intensely on downbeats.
    */
-  private createBeatPulse(beat: AnnotatedBeat, t: number, part: string): Entity {
-    const pulseIntensity = beat.visual.motion.pulse;
-    const isDownbeat = beat.isDownbeat;
+  private createBeatPulse(annotatedBeat: AnnotatedBeat, t: number, part: string): Entity {
+    const pulseIntensity = annotatedBeat.visual.motion.pulse;
+    const { phase, beatInBar, isDownbeat } = annotatedBeat.beat;
 
     // Downbeats are brighter and wider
     const opacity = isDownbeat ? 0.9 : 0.4 + pulseIntensity * 0.4;
@@ -125,15 +125,15 @@ export class TestRhythmGrammar implements IVisualGrammar {
       updatedAt: t,
       position: { x: 0.5, y: 0.5 }, // Center
       style: {
-        color: beat.visual.palette.primary,
+        color: annotatedBeat.visual.palette.primary,
         size,
         opacity,
       },
       data: {
         type: "beat-pulse",
-        beatInBar: beat.beatInBar,
+        beatInBar,
         isDownbeat,
-        phase: beat.beat.phase,
+        phase,
       },
     };
   }

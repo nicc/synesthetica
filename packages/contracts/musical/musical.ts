@@ -78,11 +78,28 @@ export interface MusicalChord {
 
 /**
  * Current beat/meter context.
+ *
+ * Produced by BeatDetectionStabilizer from note onset timing patterns.
+ * Contains both tempo detection and bar position tracking.
  */
 export interface BeatState {
-  phase: number; // 0-1 position within current beat
-  tempo: number | null; // BPM if detected
+  /** Position within current beat (0 = beat start, 1 = next beat) */
+  phase: number;
+
+  /** Detected tempo in BPM, null if not yet detected */
+  tempo: number | null;
+
+  /** How confident we are in the tempo detection (0-1) */
   confidence: Confidence;
+
+  /** Beat number within bar (1-indexed, e.g., 1-4 for 4/4 time) */
+  beatInBar: number;
+
+  /** Number of beats per bar (from config, e.g., 4 for 4/4 time) */
+  beatsPerBar: number;
+
+  /** True when this is the downbeat (beatInBar === 1) */
+  isDownbeat: boolean;
 }
 
 /**

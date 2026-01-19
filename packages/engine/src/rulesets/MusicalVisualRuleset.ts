@@ -185,9 +185,12 @@ export class MusicalVisualRuleset implements IVisualRuleset {
 
   private annotateBeat(beat: BeatState): AnnotatedBeat {
     // Beat visualization uses neutral gray palette
+    // Downbeats are slightly brighter
+    const brightness = beat.isDownbeat ? 0.9 : 0.7;
+
     const palette: PaletteRef = {
       id: "beat",
-      primary: { h: 0, s: 0, v: 0.7, a: 1 },
+      primary: { h: 0, s: 0, v: brightness, a: 1 },
     };
 
     const texture: TextureRef = {
@@ -197,16 +200,14 @@ export class MusicalVisualRuleset implements IVisualRuleset {
       density: 0.5,
     };
 
-    // Pulse intensity based on beat phase (stronger at downbeat)
-    const isDownbeat = beat.phase < 0.1 || beat.phase > 0.9;
+    // Pulse intensity based on downbeat status and phase
+    // Stronger pulse at beat start (low phase), weaker as phase advances
+    const phasePulse = 1 - beat.phase; // Pulse strongest at phase 0
     const motion: MotionAnnotation = {
       jitter: 0,
-      pulse: isDownbeat ? 1.0 : 0.5,
+      pulse: beat.isDownbeat ? phasePulse : phasePulse * 0.5,
       flow: 0,
     };
-
-    // Infer beat in bar from phase (assuming 4/4 time)
-    const beatInBar = Math.floor(beat.phase * 4) + 1;
 
     return {
       beat,
@@ -216,8 +217,6 @@ export class MusicalVisualRuleset implements IVisualRuleset {
         motion,
         uncertainty: 1 - beat.confidence,
       },
-      beatInBar,
-      isDownbeat,
     };
   }
 

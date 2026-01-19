@@ -51,10 +51,10 @@ Stabilizers transform raw input into musical abstractions. Currently implemented
 
 - **NoteTrackingStabilizer:** Tracks note lifecycle (attack → sustain → release)
 - **ChordDetectionStabilizer:** Identifies chord quality from active notes
+- **BeatDetectionStabilizer:** Detects tempo and beat phase from note onset timing patterns
 
 Planned stabilizers (see beads issues):
 
-- **BeatDetectionStabilizer:** Detect tempo and downbeats from timing patterns
 - **DynamicsStabilizer:** Analyze velocity patterns
 - **PhraseDetectionStabilizer:** Recognize phrase boundaries
 - **ProgressionStabilizer:** Track chord progressions over time
@@ -95,7 +95,7 @@ Directions to explore:
 
 ### Current Constraints (Phase 0)
 
-- **Limited stabilizers:** Note tracking and chord detection work; beat, dynamics, phrase, and progression stabilizers are planned.
+- **Limited stabilizers:** Note tracking, chord detection, and beat detection work; dynamics, phrase, and progression stabilizers are planned.
 - **Single part:** Multi-instrument support exists in the architecture but isn't wired up yet.
 - **No presets:** Each iteration requires code changes. Preset system comes later.
 - **No LLM control:** Parameter adjustments are manual. Speech interface comes later.

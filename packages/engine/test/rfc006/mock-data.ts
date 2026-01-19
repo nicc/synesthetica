@@ -273,15 +273,13 @@ export const frame1: AnnotatedMusicalFrame = {
     ),
   ],
   beat: {
-    beat: { phase: 0, tempo: 120, confidence: 0.9 },
+    beat: { phase: 0, tempo: 120, confidence: 0.9, beatInBar: 1, beatsPerBar: 4, isDownbeat: true },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
       motion: { jitter: 0, pulse: 1.0, flow: 0 },
       uncertainty: 0.1,
     },
-    beatInBar: 1,
-    isDownbeat: true,
   },
   bars: [],
   phrases: [],
@@ -332,15 +330,13 @@ export const frame2: AnnotatedMusicalFrame = {
     ),
   ],
   beat: {
-    beat: { phase: 0.5, tempo: 120, confidence: 0.9 },
+    beat: { phase: 0.5, tempo: 120, confidence: 0.9, beatInBar: 2, beatsPerBar: 4, isDownbeat: false },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
       motion: { jitter: 0, pulse: 0.5, flow: 0 },
       uncertainty: 0.1,
     },
-    beatInBar: 2,
-    isDownbeat: false,
   },
   bars: [],
   phrases: [],
@@ -428,15 +424,13 @@ export const frame3: AnnotatedMusicalFrame = {
     ),
   ],
   beat: {
-    beat: { phase: 0, tempo: 120, confidence: 0.9 },
+    beat: { phase: 0, tempo: 120, confidence: 0.9, beatInBar: 1, beatsPerBar: 4, isDownbeat: true },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
       motion: { jitter: 0, pulse: 1.0, flow: 0 },
       uncertainty: 0.1,
     },
-    beatInBar: 1,
-    isDownbeat: true,
   },
   bars: [
     {
@@ -498,15 +492,13 @@ export const frame4: AnnotatedMusicalFrame = {
     ),
   ],
   beat: {
-    beat: { phase: 0.5, tempo: 120, confidence: 0.9 },
+    beat: { phase: 0.5, tempo: 120, confidence: 0.9, beatInBar: 2, beatsPerBar: 4, isDownbeat: false },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
       motion: { jitter: 0, pulse: 0.5, flow: 0 },
       uncertainty: 0.1,
     },
-    beatInBar: 2,
-    isDownbeat: false,
   },
   bars: [],
   phrases: [],
@@ -557,15 +549,13 @@ export const frame5: AnnotatedMusicalFrame = {
     ),
   ],
   beat: {
-    beat: { phase: 0, tempo: 120, confidence: 0.9 },
+    beat: { phase: 0, tempo: 120, confidence: 0.9, beatInBar: 1, beatsPerBar: 4, isDownbeat: true },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
       motion: { jitter: 0, pulse: 1.0, flow: 0 },
       uncertainty: 0.1,
     },
-    beatInBar: 1,
-    isDownbeat: true,
   },
   bars: [],
   phrases: [],

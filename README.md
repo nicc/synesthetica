@@ -38,7 +38,7 @@ Each stage processes one instrument's data independently. Multiple instruments f
 
 Stabilizers form a DAG based on dependencies. Independent stabilizers (note tracking, beat detection) process raw input directly; derived stabilizers (chord detection, phrase detection) require upstream output. MusicalFrame is a "snapshot with context" - it contains current state plus recent context (progression, phrases) via references.
 
-**Current status:** NoteTrackingStabilizer and ChordDetectionStabilizer implemented. Beat, dynamics, phrase, and progression stabilizers are planned.
+**Current status:** NoteTrackingStabilizer, ChordDetectionStabilizer, and BeatDetectionStabilizer implemented. Dynamics, phrase, and progression stabilizers are planned.
 
 #### 3. Ruleset
 **Technical:** A pure function mapping `MusicalFrame` to `AnnotatedMusicalFrame`. This is where musical *meaning* is encoded (e.g., "pitch class → hue", "velocity → brightness", "chord quality → warm/cool palette").

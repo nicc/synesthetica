@@ -5,6 +5,7 @@ import {
   Canvas2DRenderer,
   NoteTrackingStabilizer,
   ChordDetectionStabilizer,
+  BeatDetectionStabilizer,
   MusicalVisualRuleset,
   TestRhythmGrammar,
   TestChordProgressionGrammar,
@@ -131,6 +132,7 @@ function startSession(midiInput: MidiInputInfo): void {
     pipeline.addAdapter(adapter);
     pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
     pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
+    pipeline.addStabilizerFactory(() => new BeatDetectionStabilizer({ partId }));
     pipeline.setRuleset(new MusicalVisualRuleset());
     // Use both test grammars - they'll be composited together
     pipeline.addGrammar(new TestRhythmGrammar());
