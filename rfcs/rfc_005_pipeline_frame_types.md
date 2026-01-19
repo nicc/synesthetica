@@ -1,6 +1,6 @@
 # RFC 005: Pipeline Frame Types and Musical Abstraction
 
-Status: Draft
+Status: Implemented
 Author(s): Synesthetica
 Date: 2026-01-18
 Related: RFC 002 (CMS + Grammar API), SPEC 006 (Ruleset/Stabilizer Statefulness), SPEC 008 (Pipeline Orchestration)
