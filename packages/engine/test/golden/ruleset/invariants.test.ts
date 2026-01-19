@@ -1,10 +1,11 @@
 /**
- * Ruleset Invariant Tests
+ * Ruleset Invariant Tests (RFC 006)
  *
  * Property tests for ruleset invariants. These verify that instrument invariants hold,
  * not exact output values. The ruleset interface may evolve; we test properties.
  *
- * See synesthetica-i60 for specification.
+ * Updated for RFC 006: Tests annotate() returning AnnotatedMusicalFrame
+ * instead of map() returning VisualIntentFrame.
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
@@ -14,7 +15,7 @@ import type {
   Note,
   Pitch,
   PitchClass,
-  PaletteIntent,
+  AnnotatedNote,
 } from "@synesthetica/contracts";
 import { pcToHue } from "@synesthetica/contracts";
 
@@ -65,14 +66,12 @@ function makeFrame(t: number, notes: Note[]): MusicalFrame {
   };
 }
 
-function getPaletteIntent(
+function getAnnotatedNote(
   ruleset: MusicalVisualRuleset,
   frame: MusicalFrame
-): PaletteIntent | undefined {
-  const result = ruleset.map(frame);
-  return result.intents.find((i) => i.type === "palette") as
-    | PaletteIntent
-    | undefined;
+): AnnotatedNote | undefined {
+  const result = ruleset.annotate(frame);
+  return result.notes[0];
 }
 
 // ============================================================================
@@ -88,10 +87,10 @@ describe("Invariant: Pitch class → hue mapping", () => {
 
   it("A (reference pitch) maps to hue 0 (red)", () => {
     const frame = makeFrame(0, [makeNote("n1", makePitch(9, 4), 100, "sustain")]);
-    const palette = getPaletteIntent(ruleset, frame);
+    const annotated = getAnnotatedNote(ruleset, frame);
 
-    expect(palette).toBeDefined();
-    expect(palette!.base.h).toBe(0);
+    expect(annotated).toBeDefined();
+    expect(annotated!.visual.palette.primary.h).toBe(0);
   });
 
   it("all 12 pitch classes map to distinct hues", () => {
@@ -101,9 +100,9 @@ describe("Invariant: Pitch class → hue mapping", () => {
       const frame = makeFrame(0, [
         makeNote("n1", makePitch(pc as PitchClass, 4), 100, "sustain"),
       ]);
-      const palette = getPaletteIntent(ruleset, frame);
-      expect(palette).toBeDefined();
-      hues.add(palette!.base.h);
+      const annotated = getAnnotatedNote(ruleset, frame);
+      expect(annotated).toBeDefined();
+      hues.add(annotated!.visual.palette.primary.h);
     }
 
     expect(hues.size).toBe(12);
@@ -114,14 +113,14 @@ describe("Invariant: Pitch class → hue mapping", () => {
       const frame = makeFrame(0, [
         makeNote("n1", makePitch(pc as PitchClass, 4), 100, "sustain"),
       ]);
-      const palette = getPaletteIntent(ruleset, frame);
+      const annotated = getAnnotatedNote(ruleset, frame);
       const expectedHue = pcToHue(pc as PitchClass, {
         referencePc: 9,
         referenceHue: 0,
         direction: "cw",
       });
 
-      expect(palette!.base.h).toBe(expectedHue);
+      expect(annotated!.visual.palette.primary.h).toBe(expectedHue);
     }
   });
 
@@ -134,9 +133,9 @@ describe("Invariant: Pitch class → hue mapping", () => {
     const frame = makeFrame(0, [
       makeNote("n1", makePitch(11, 4), 100, "sustain"),
     ]);
-    const palette = getPaletteIntent(ruleset, frame);
+    const annotated = getAnnotatedNote(ruleset, frame);
 
-    expect(palette!.base.h).toBe(300);
+    expect(annotated!.visual.palette.primary.h).toBe(300);
   });
 
   it("custom reference point shifts all hues equally", () => {
@@ -150,11 +149,11 @@ describe("Invariant: Pitch class → hue mapping", () => {
       makeNote("n1", makePitch(2, 4), 100, "sustain"),
     ]);
 
-    const paletteC = getPaletteIntent(ruleset, frameC);
-    const paletteD = getPaletteIntent(ruleset, frameD);
+    const annotatedC = getAnnotatedNote(ruleset, frameC);
+    const annotatedD = getAnnotatedNote(ruleset, frameD);
 
-    expect(paletteC!.base.h).toBe(0); // C = reference
-    expect(paletteD!.base.h).toBe(60); // D = 2 semitones = 60°
+    expect(annotatedC!.visual.palette.primary.h).toBe(0); // C = reference
+    expect(annotatedD!.visual.palette.primary.h).toBe(60); // D = 2 semitones = 60°
   });
 });
 
@@ -177,10 +176,10 @@ describe("Invariant: Velocity → brightness mapping", () => {
       const frame = makeFrame(0, [
         makeNote("n1", makePitch(0, 4), velocity, "sustain"),
       ]);
-      const palette = getPaletteIntent(ruleset, frame);
+      const annotated = getAnnotatedNote(ruleset, frame);
 
-      expect(palette!.base.v).toBeGreaterThan(previousBrightness);
-      previousBrightness = palette!.base.v;
+      expect(annotated!.visual.palette.primary.v).toBeGreaterThan(previousBrightness);
+      previousBrightness = annotated!.visual.palette.primary.v;
     }
   });
 
@@ -188,20 +187,20 @@ describe("Invariant: Velocity → brightness mapping", () => {
     const frame = makeFrame(0, [
       makeNote("n1", makePitch(0, 4), 127, "sustain"),
     ]);
-    const palette = getPaletteIntent(ruleset, frame);
+    const annotated = getAnnotatedNote(ruleset, frame);
 
-    expect(palette!.base.v).toBeCloseTo(1.0, 2);
+    expect(annotated!.visual.palette.primary.v).toBeCloseTo(1.0, 2);
   });
 
   it("velocity 0 produces brightness above 0 (visible)", () => {
     const frame = makeFrame(0, [
       makeNote("n1", makePitch(0, 4), 0, "sustain"),
     ]);
-    const palette = getPaletteIntent(ruleset, frame);
+    const annotated = getAnnotatedNote(ruleset, frame);
 
     // Min brightness is 0.3 per implementation
-    expect(palette!.base.v).toBeGreaterThan(0);
-    expect(palette!.base.v).toBeLessThan(0.5);
+    expect(annotated!.visual.palette.primary.v).toBeGreaterThan(0);
+    expect(annotated!.visual.palette.primary.v).toBeLessThan(0.5);
   });
 
   it("brightness stays within [0, 1] range for all velocities", () => {
@@ -209,26 +208,26 @@ describe("Invariant: Velocity → brightness mapping", () => {
       const frame = makeFrame(0, [
         makeNote("n1", makePitch(0, 4), v, "sustain"),
       ]);
-      const palette = getPaletteIntent(ruleset, frame);
+      const annotated = getAnnotatedNote(ruleset, frame);
 
-      expect(palette!.base.v).toBeGreaterThanOrEqual(0);
-      expect(palette!.base.v).toBeLessThanOrEqual(1);
+      expect(annotated!.visual.palette.primary.v).toBeGreaterThanOrEqual(0);
+      expect(annotated!.visual.palette.primary.v).toBeLessThanOrEqual(1);
     }
   });
 });
 
 // ============================================================================
-// Invariant 3: Note Phase → Stability Mapping
+// Invariant 3: Note Phase → Motion/Texture Mapping
 // ============================================================================
 
-describe("Invariant: Note phase → stability mapping", () => {
+describe("Invariant: Note phase → motion mapping", () => {
   let ruleset: MusicalVisualRuleset;
 
   beforeEach(() => {
     ruleset = new MusicalVisualRuleset();
   });
 
-  it("attack phase has lower stability than sustain", () => {
+  it("attack phase has higher jitter than sustain", () => {
     const attackFrame = makeFrame(0, [
       makeNote("n1", makePitch(0, 4), 100, "attack"),
     ]);
@@ -236,62 +235,54 @@ describe("Invariant: Note phase → stability mapping", () => {
       makeNote("n1", makePitch(0, 4), 100, "sustain"),
     ]);
 
-    const attackPalette = getPaletteIntent(ruleset, attackFrame);
-    const sustainPalette = getPaletteIntent(ruleset, sustainFrame);
+    const attackAnnotated = getAnnotatedNote(ruleset, attackFrame);
+    const sustainAnnotated = getAnnotatedNote(ruleset, sustainFrame);
 
-    expect(attackPalette!.stability).toBeLessThan(sustainPalette!.stability);
+    expect(attackAnnotated!.visual.motion.jitter).toBeGreaterThan(
+      sustainAnnotated!.visual.motion.jitter
+    );
   });
 
-  it("sustain phase has highest stability", () => {
+  it("sustain phase has lowest jitter", () => {
     const phases: Note["phase"][] = ["attack", "sustain", "release"];
-    let maxStability = -1;
-    let maxPhase: Note["phase"] | null = null;
+    let minJitter = Infinity;
+    let minPhase: Note["phase"] | null = null;
 
     for (const phase of phases) {
       const frame = makeFrame(0, [
         makeNote("n1", makePitch(0, 4), 100, phase, 0, 100, phase === "release" ? 50 : null),
       ]);
-      const palette = getPaletteIntent(ruleset, frame);
+      const annotated = getAnnotatedNote(ruleset, frame);
 
-      if (palette!.stability > maxStability) {
-        maxStability = palette!.stability;
-        maxPhase = phase;
+      if (annotated!.visual.motion.jitter < minJitter) {
+        minJitter = annotated!.visual.motion.jitter;
+        minPhase = phase;
       }
     }
 
-    expect(maxPhase).toBe("sustain");
+    expect(minPhase).toBe("sustain");
   });
 
-  it("release phase has intermediate stability", () => {
-    const attackFrame = makeFrame(0, [
-      makeNote("n1", makePitch(0, 4), 100, "attack"),
-    ]);
-    const sustainFrame = makeFrame(0, [
-      makeNote("n1", makePitch(0, 4), 100, "sustain"),
-    ]);
-    const releaseFrame = makeFrame(0, [
-      makeNote("n1", makePitch(0, 4), 100, "release", 0, 100, 50),
-    ]);
-
-    const attackStability = getPaletteIntent(ruleset, attackFrame)!.stability;
-    const sustainStability = getPaletteIntent(ruleset, sustainFrame)!.stability;
-    const releaseStability = getPaletteIntent(ruleset, releaseFrame)!.stability;
-
-    expect(releaseStability).toBeGreaterThan(attackStability);
-    expect(releaseStability).toBeLessThan(sustainStability);
-  });
-
-  it("stability values are within [0, 1] range", () => {
+  it("motion values are within valid ranges", () => {
     const phases: Note["phase"][] = ["attack", "sustain", "release"];
 
     for (const phase of phases) {
       const frame = makeFrame(0, [
         makeNote("n1", makePitch(0, 4), 100, phase, 0, 100, phase === "release" ? 50 : null),
       ]);
-      const palette = getPaletteIntent(ruleset, frame);
+      const annotated = getAnnotatedNote(ruleset, frame);
 
-      expect(palette!.stability).toBeGreaterThanOrEqual(0);
-      expect(palette!.stability).toBeLessThanOrEqual(1);
+      // Jitter should be [0, 1]
+      expect(annotated!.visual.motion.jitter).toBeGreaterThanOrEqual(0);
+      expect(annotated!.visual.motion.jitter).toBeLessThanOrEqual(1);
+
+      // Pulse should be [0, 1]
+      expect(annotated!.visual.motion.pulse).toBeGreaterThanOrEqual(0);
+      expect(annotated!.visual.motion.pulse).toBeLessThanOrEqual(1);
+
+      // Flow should be [-1, 1]
+      expect(annotated!.visual.motion.flow).toBeGreaterThanOrEqual(-1);
+      expect(annotated!.visual.motion.flow).toBeLessThanOrEqual(1);
     }
   });
 });
@@ -317,8 +308,8 @@ describe("Invariant: Octave equivalence for hue", () => {
         const frame = makeFrame(0, [
           makeNote("n1", makePitch(pc, octave), 100, "sustain"),
         ]);
-        const palette = getPaletteIntent(ruleset, frame);
-        hues.push(palette!.base.h);
+        const annotated = getAnnotatedNote(ruleset, frame);
+        hues.push(annotated!.visual.palette.primary.h);
       }
 
       // All hues should be identical
@@ -334,10 +325,10 @@ describe("Invariant: Octave equivalence for hue", () => {
       makeNote("n1", makePitch(0, 5), 100, "sustain"),
     ]);
 
-    const paletteC4 = getPaletteIntent(ruleset, frameC4);
-    const paletteC5 = getPaletteIntent(ruleset, frameC5);
+    const annotatedC4 = getAnnotatedNote(ruleset, frameC4);
+    const annotatedC5 = getAnnotatedNote(ruleset, frameC5);
 
-    expect(paletteC4!.base.h).toBe(paletteC5!.base.h);
+    expect(annotatedC4!.visual.palette.primary.h).toBe(annotatedC5!.visual.palette.primary.h);
   });
 
   it("all pitch classes maintain octave equivalence", () => {
@@ -349,20 +340,20 @@ describe("Invariant: Octave equivalence for hue", () => {
         makeNote("n1", makePitch(pc as PitchClass, 6), 100, "sustain"),
       ]);
 
-      const palette3 = getPaletteIntent(ruleset, frame3);
-      const palette6 = getPaletteIntent(ruleset, frame6);
+      const annotated3 = getAnnotatedNote(ruleset, frame3);
+      const annotated6 = getAnnotatedNote(ruleset, frame6);
 
-      expect(palette3!.base.h).toBe(palette6!.base.h);
+      expect(annotated3!.visual.palette.primary.h).toBe(annotated6!.visual.palette.primary.h);
     }
   });
 });
 
 // ============================================================================
-// Invariant 5: Deterministic Intent IDs
+// Invariant 5: Pure Function (Deterministic Output)
 // ============================================================================
 
-describe("Invariant: Deterministic intent IDs", () => {
-  it("same NoteId produces same VisualIntentId", () => {
+describe("Invariant: Pure function - deterministic output", () => {
+  it("same input produces same output", () => {
     const ruleset1 = new MusicalVisualRuleset();
     const ruleset2 = new MusicalVisualRuleset();
 
@@ -370,30 +361,19 @@ describe("Invariant: Deterministic intent IDs", () => {
       makeNote("consistent-note-id", makePitch(0, 4), 100, "sustain"),
     ]);
 
-    const result1 = ruleset1.map(frame);
-    const result2 = ruleset2.map(frame);
+    const result1 = ruleset1.annotate(frame);
+    const result2 = ruleset2.annotate(frame);
 
-    const palette1 = result1.intents.find((i) => i.type === "palette");
-    const palette2 = result2.intents.find((i) => i.type === "palette");
-
-    expect(palette1!.id).toBe(palette2!.id);
+    // Should produce identical annotations
+    expect(result1.notes[0].visual.palette.primary.h).toBe(
+      result2.notes[0].visual.palette.primary.h
+    );
+    expect(result1.notes[0].visual.palette.primary.v).toBe(
+      result2.notes[0].visual.palette.primary.v
+    );
   });
 
-  it("intent ID contains note ID for correlation", () => {
-    const ruleset = new MusicalVisualRuleset();
-    const noteId = "test-note-123";
-
-    const frame = makeFrame(0, [
-      makeNote(noteId, makePitch(0, 4), 100, "sustain"),
-    ]);
-
-    const result = ruleset.map(frame);
-    const palette = result.intents.find((i) => i.type === "palette");
-
-    expect(palette!.id).toContain(noteId);
-  });
-
-  it("different NoteIds produce different VisualIntentIds", () => {
+  it("different notes produce different annotations", () => {
     const ruleset = new MusicalVisualRuleset();
 
     const frame = makeFrame(0, [
@@ -401,13 +381,15 @@ describe("Invariant: Deterministic intent IDs", () => {
       makeNote("note-b", makePitch(4, 4), 100, "sustain"),
     ]);
 
-    const result = ruleset.map(frame);
-    const palettes = result.intents.filter((i) => i.type === "palette");
+    const result = ruleset.annotate(frame);
 
-    expect(palettes[0].id).not.toBe(palettes[1].id);
+    // Different pitch classes should produce different hues
+    expect(result.notes[0].visual.palette.primary.h).not.toBe(
+      result.notes[1].visual.palette.primary.h
+    );
   });
 
-  it("intent IDs are stable across frames for same note", () => {
+  it("annotations are consistent across frames for same note", () => {
     const ruleset = new MusicalVisualRuleset();
     const noteId = "stable-note";
 
@@ -418,12 +400,16 @@ describe("Invariant: Deterministic intent IDs", () => {
       makeNote(noteId, makePitch(0, 4), 100, "sustain"),
     ]);
 
-    const result1 = ruleset.map(frame1);
-    const result2 = ruleset.map(frame2);
+    const result1 = ruleset.annotate(frame1);
+    const result2 = ruleset.annotate(frame2);
 
-    const palette1 = result1.intents.find((i) => i.type === "palette");
-    const palette2 = result2.intents.find((i) => i.type === "palette");
-
-    expect(palette1!.id).toBe(palette2!.id);
+    // Hue should be the same (based on pitch class)
+    expect(result1.notes[0].visual.palette.primary.h).toBe(
+      result2.notes[0].visual.palette.primary.h
+    );
+    // Brightness should be the same (based on velocity)
+    expect(result1.notes[0].visual.palette.primary.v).toBe(
+      result2.notes[0].visual.palette.primary.v
+    );
   });
 });

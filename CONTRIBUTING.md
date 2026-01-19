@@ -15,8 +15,8 @@ The "instrument" is the combination of stabilizers + rulesets + grammars that de
 
 2. **Identify what to change**
    - Musical context (chord detection, beat tracking) → edit stabilizers
-   - Musical interpretation (pitch → color, tension → movement) → edit ruleset
-   - Visual form (particles vs trails vs fields) → edit grammar
+   - Musical interpretation (pitch → hue, chord quality → warm/cool palette) → edit ruleset
+   - Visual form (which elements to render, particles vs trails vs fields) → edit grammar
    - All three can change independently
 
 3. **Make focused changes**
@@ -47,41 +47,55 @@ The Phase 0 pipeline is minimal. Here are directions to explore:
 
 #### Stabilizers (Musical Context)
 
-Phase 0 has NoteTrackingStabilizer. Real musical understanding comes from additional stabilizers:
+Stabilizers transform raw input into musical abstractions. Currently implemented:
 
-- **Chord detection:** Identify chord quality (major, minor, diminished, etc.) from active notes
-- **Beat tracking:** Detect tempo and downbeats from timing patterns
-- **Phrase boundaries:** Recognize when musical phrases start/end
-- **Harmonic analysis:** Calculate tension/resolution over time
+- **NoteTrackingStabilizer:** Tracks note lifecycle (attack → sustain → release)
+- **ChordDetectionStabilizer:** Identifies chord quality from active notes
+
+Planned stabilizers (see beads issues):
+
+- **BeatDetectionStabilizer:** Detect tempo and downbeats from timing patterns
+- **DynamicsStabilizer:** Analyze velocity patterns
+- **PhraseDetectionStabilizer:** Recognize phrase boundaries
+- **ProgressionStabilizer:** Track chord progressions over time
 
 Stabilizers form a DAG based on dependencies. Independent stabilizers (note tracking, beat detection) process raw input; derived stabilizers (chord detection, phrase detection) require upstream output. Stabilizers enrich `MusicalFrame` with notes, chords, progression, phrases, beat, and dynamics.
 
 #### Rulesets (Musical Interpretation)
 
-Phase 0 ruleset: pitch → hue, velocity → brightness. Directions to explore:
+Rulesets annotate musical elements with visual properties. Current ruleset:
+
+- **MusicalVisualRuleset:** pitch → hue, velocity → brightness, chord quality → warm/cool palette
+
+Rulesets define a *visual vocabulary* that users learn. Key principle: rulesets do NOT decide what shapes to use or which elements to render. They say "major chords are warm colors" - a consistent scheme across all grammars.
+
+Directions to explore:
 
 - **Harmonic awareness:** Map chord quality to color temperature, tension to saturation
-- **Temporal patterns:** Different responses for sustained notes vs staccato
-- **Multi-layered interpretation:** Stack multiple rules (pitch → hue, tension → saturation, rhythm → shape)
-
-Rulesets express a visual analog to the musical meaning identified by the stabilizers. This is where musical ideas become visual parameters.
+- **Temporal patterns:** Different motion annotations for sustained notes vs staccato
+- **Richer palettes:** Primary, secondary, accent colors per musical element
 
 #### Grammars (Visual Form)
 
-Phase 0 grammar: particle spawning on note events. Directions to explore:
+Grammars receive `AnnotatedMusicalFrame` and decide how to render it. Current grammars:
 
-- **Trail grammar:** Particles leave fading paths
+- **TestRhythmGrammar:** Renders beats and notes as timing markers (ignores chords)
+- **TestChordProgressionGrammar:** Renders chords as glows with history trail (ignores beats)
+
+Grammars know *what kind* of element something is (note vs chord vs beat) but not musical analysis details (pitch class, chord quality). They use visual annotations to style their chosen representations.
+
+Directions to explore:
+
+- **Trail grammar:** Notes leave fading paths
 - **Field grammar:** Background color shifts with harmony
-- **Glyph grammar:** Place symbolic shapes (circles, triangles) based on chord quality
+- **Glyph grammar:** Place symbolic shapes based on note annotations
 - **Stack grammars:** Layer multiple visual elements
 
-Grammars determine what the visuals *look like*. They receive abstract intents (color, urgency, size) and produce concrete entities.
-
-**Critical:** Grammars own entity lifecycle. Intents have their own phase (attack/sustain/release), but grammars decide how long entities persist. A grammar may spawn entities that outlive their source intent - useful for ear training where visual persistence differs from musical duration.
+**Key insight:** Grammars have creative agency. They decide which musical elements to render, what shapes to use, and how to animate. Different grammars can render the same annotated content completely differently.
 
 ### Current Constraints (Phase 0)
 
-- **Minimal stabilizers:** Only raw pitch/velocity data. Chord detection and beat tracking need implementation.
+- **Limited stabilizers:** Note tracking and chord detection work; beat, dynamics, phrase, and progression stabilizers are planned.
 - **Single part:** Multi-instrument support exists in the architecture but isn't wired up yet.
 - **No presets:** Each iteration requires code changes. Preset system comes later.
 - **No LLM control:** Parameter adjustments are manual. Speech interface comes later.

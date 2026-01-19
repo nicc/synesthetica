@@ -6,7 +6,8 @@ import {
   NoteTrackingStabilizer,
   ChordDetectionStabilizer,
   MusicalVisualRuleset,
-  VisualParticleGrammar,
+  TestRhythmGrammar,
+  TestChordProgressionGrammar,
   IdentityCompositor,
 } from "@synesthetica/engine";
 
@@ -131,7 +132,9 @@ function startSession(midiInput: MidiInputInfo): void {
     pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
     pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
     pipeline.setRuleset(new MusicalVisualRuleset());
-    pipeline.addGrammar(new VisualParticleGrammar());
+    // Use both test grammars - they'll be composited together
+    pipeline.addGrammar(new TestRhythmGrammar());
+    pipeline.addGrammar(new TestChordProgressionGrammar());
     pipeline.setCompositor(new IdentityCompositor());
 
     // Create renderer

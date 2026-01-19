@@ -1,6 +1,6 @@
 # RFC 006: Annotated Musical Frames and Grammar Responsibility
 
-Status: Draft
+Status: Implemented
 Author(s): Synesthetica
 Date: 2026-01-19
 Related: RFC 005 (Pipeline Frame Types), RFC 002 (CMS + Grammar API)

@@ -67,20 +67,20 @@ Presets are:
 - incapable of redefining synesthetic meaning
 
 ### Grammar
-A built-in visual grammar that produces visual entities from intents.
+A built-in visual grammar that produces visual entities from annotated musical elements.
 
 Grammars:
 - are the building blocks users select and combine
 - define *form*, not *meaning*
+- know musical element categories (note, chord, beat) but not analysis details
+- decide which elements to render (can filter)
 - **own entity lifecycle** (TTL, decay, removal)
-- are **not** obligated to tie entity lifetime to intent lifetime
 - may react to uncertainty with visual noise
 - may not infer musical semantics
 
 Examples:
-- Stars (particles per note)
-- Comets (chord trails)
-- Rain (global decay field)
+- TestRhythmGrammar (timing markers for beats and notes)
+- TestChordProgressionGrammar (chord glows with history trail)
 
 ---
 
@@ -311,81 +311,88 @@ Invariants ensure internal coherence.
 ---
 
 ### Ruleset
-A pure function mapping MusicalFrame → VisualIntentFrame.
+A pure function mapping MusicalFrame → AnnotatedMusicalFrame (RFC 006).
 
 Rulesets:
-- encode musical meaning
-- apply invariants (pitch-class → hue, etc.)
+- encode musical meaning as visual annotations
+- apply invariants (pitch-class → hue, chord quality → warm/cool palette)
+- define the *visual vocabulary* users learn
 - are source-agnostic
-- produce visual intents, not visual output
+- do NOT decide what shapes to use or which elements to render
 
-> Analogy: the acoustic physics of an instrument.
-
----
-
-## Visual Semantics
-
-### VisualIntent
-A rendering-agnostic description of *what should be expressed visually*.
-
-Types:
-- PaletteIntent (hue, saturation, brightness, stability)
-- MotionIntent (pulse, flow, jitter)
-- TextureIntent (grain, turbulence, anisotropy)
-- ShapeIntent (sharpness, complexity)
-
-Visual intents:
-- have unique IDs for entity lifecycle correlation
-- have their own **phase** (attack/sustain/release) — see IntentPhase
-- carry confidence
-- can reference each other via group IDs
-- contain no musical concepts
+> Analogy: defining what colors mean. Grammars decide how to paint with them.
 
 ---
 
-### IntentPhase
-The lifecycle phase of a visual intent: `attack | sustain | release`.
+## Visual Annotations (RFC 006)
 
-IntentPhase describes the intent's *current state*, not the entity's lifespan:
-- **attack** — Intent just appeared (e.g., first ~50ms)
-- **sustain** — Intent is active and stable
-- **release** — Intent is fading (source released, etc.)
+### VisualAnnotation
+Properties attached to a musical element describing how it should look visually.
 
-**Critical distinction:** Intent lifecycle ≠ entity lifecycle. Grammars observe intent phase but decide entity lifecycle independently. A grammar may spawn entities that outlive their source intent (e.g., for ear training study).
+Includes:
+- **PaletteRef**: Primary, secondary, accent colors (HSV)
+- **TextureRef**: Grain, turbulence, anisotropy
+- **MotionAnnotation**: Pulse, flow, jitter
+
+Visual annotations:
+- carry semantic meaning (e.g., warm colors = major, cool colors = minor)
+- are attached to musical elements, not separate intents
+- allow grammars to style their chosen representations
+- do NOT dictate what shapes to use
 
 ---
 
-### VisualIntentFrame
-A time-indexed collection of visual intents.
+### AnnotatedMusicalFrame
+Musical elements with visual annotations attached (RFC 006).
 
-VisualIntentFrame:
-- is the sole input to grammars
-- contains only visual concepts (no musical events)
-- includes overall uncertainty signal
+AnnotatedMusicalFrame:
+- is the ruleset's output and grammar's input
+- contains annotated notes, chords, beats, dynamics
+- preserves musical element identity (grammars know "this is a note")
+- carries visual properties without exposing musical analysis
+
+---
+
+### AnnotatedNote
+A Note with its visual annotation.
+
+Contains:
+- The underlying musical Note
+- Visual properties (palette, texture, motion)
+- Optional label for display
+
+---
+
+### AnnotatedChord
+A Chord with its visual annotation.
+
+Contains:
+- The underlying MusicalChord
+- Visual properties (palette, texture, motion)
+- List of constituent note IDs
+- Optional label (e.g., "Cmaj", "Am")
 
 ---
 
 ## Visual Form & Rendering
 
 ### Grammar
-A visual grammar that consumes VisualIntentFrame and produces SceneFrame.
+A visual grammar that consumes AnnotatedMusicalFrame and produces SceneFrame (RFC 006).
 
 Grammars:
 - decide *form*, not *meaning*
-- respond to visual intents (not musical events)
+- know musical element *categories* (note, chord, beat) but not analysis details
+- use visual annotations to style their representations
+- decide which elements to render (can filter, e.g., rhythm grammar ignores chords)
 - **own entity lifecycle** (TTL, decay, removal)
-- are **not** obligated to tie entity lifetime to intent lifetime
 - may spawn, group, and evolve entities
-- may react to uncertainty
 - may not infer musical semantics
 
-Grammars use intent IDs for correlation (not lifecycle obligation):
-- Same ID across frames → Same source (grammar may reinforce or ignore)
-- New ID → New source (grammar may spawn new entity)
-- ID absent → Source ended (grammar may spawn release effect or do nothing)
+**Key insight (RFC 006):** Grammars have creative agency. They decide which musical elements to render, what shapes to use, and how to animate. Different grammars can render the same annotated content completely differently.
 
 Examples:
-- VisualParticleGrammar (particles per palette intent)
+- TestRhythmGrammar (beats and notes as timing markers)
+- TestChordProgressionGrammar (chords as glows with history trail)
 
 ---
 
@@ -444,7 +451,7 @@ A deterministic set of fixtures used for contract-first testing.
 Includes:
 - RawInputFrame fixtures
 - MusicalFrame fixtures
-- VisualIntentFrame fixtures
+- AnnotatedMusicalFrame fixtures
 - SceneFrame fixtures
 
 Golden corpus enables:
@@ -474,8 +481,10 @@ The system should feel like an acoustic instrument:
 
 ---
 
-### Separation of Meaning and Form  
-Musical meaning is encoded in rulesets; visual form is encoded in grammars.
+### Separation of Meaning and Form
+Musical meaning is encoded in rulesets (visual vocabulary); visual form is encoded in grammars (rendering choices).
+
+Rulesets define what colors mean. Grammars decide how to paint with them.
 
 Violating this boundary is considered an architectural error.
 

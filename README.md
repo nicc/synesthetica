@@ -10,14 +10,14 @@ Synesthetica processes musical input through a series of transformations. Each s
 ### High-Level Flow
 
 ```
-MIDI/Audio Input → RawInputFrame → MusicalFrame → VisualIntentFrame → SceneFrame → Canvas
+MIDI/Audio Input → RawInputFrame → MusicalFrame → AnnotatedMusicalFrame → SceneFrame → Canvas
 ```
 
 **What this means:**
 - Adapters emit protocol-level events (RawInputFrame)
 - Stabilizers produce musical abstractions with duration and phase (MusicalFrame)
-- Rulesets translate musical meaning to visual intents (VisualIntentFrame)
-- Grammars decide what it *looks like* (SceneFrame)
+- Rulesets annotate musical elements with visual properties (AnnotatedMusicalFrame)
+- Grammars decide what it *looks like* and which elements to render (SceneFrame)
 - A renderer draws it (Canvas)
 
 ### The Stages (Per-Part Processing)
@@ -38,21 +38,25 @@ Each stage processes one instrument's data independently. Multiple instruments f
 
 Stabilizers form a DAG based on dependencies. Independent stabilizers (note tracking, beat detection) process raw input directly; derived stabilizers (chord detection, phrase detection) require upstream output. MusicalFrame is a "snapshot with context" - it contains current state plus recent context (progression, phrases) via references.
 
-**Current status:** NoteTrackingStabilizer tracks note lifecycle with configurable attack duration and release window.
+**Current status:** NoteTrackingStabilizer and ChordDetectionStabilizer implemented. Beat, dynamics, phrase, and progression stabilizers are planned.
 
 #### 3. Ruleset
-**Technical:** A pure function mapping `MusicalFrame` to `VisualIntentFrame`. This is where musical *meaning* is encoded (e.g., "pitch class → hue", "velocity → brightness", "note phase → stability").
+**Technical:** A pure function mapping `MusicalFrame` to `AnnotatedMusicalFrame`. This is where musical *meaning* is encoded (e.g., "pitch class → hue", "velocity → brightness", "chord quality → warm/cool palette").
 
-**What it does:** Interprets musical qualities and assigns them visual intents. Each Note becomes a PaletteIntent; dynamics become MotionIntents. Rulesets see proper musical abstractions, not protocol events.
+**What it does:** Annotates musical elements with visual properties (palette, texture, motion). Each Note gets a visual annotation; each Chord gets its own annotation. Rulesets define a consistent visual vocabulary that users learn across all grammars.
 
-**Current status:** MusicalVisualRuleset maps notes to palette intents with phase-aware stability.
+**Key responsibility:** Rulesets do NOT decide what shapes to use or which elements to render. They define "major chords are warm colors, minor chords are cool colors" - the consistent visual scheme. Grammars decide *how* to render each element.
+
+**Current status:** MusicalVisualRuleset annotates notes and chords with palette, texture, and motion properties.
 
 #### 4. Grammar Stack
-**Technical:** Transforms `VisualIntentFrame` into `SceneFrame` (a collection of visual entities). Grammars interpret visual intents and manage entity lifecycle independently.
+**Technical:** Transforms `AnnotatedMusicalFrame` into `SceneFrame` (a collection of visual entities). Grammars see musical element *categories* (notes, chords, beats) with their visual annotations, and decide how to render them.
 
-**What it does:** Determines the visual language. Grammars see only visual concepts (palette, motion, texture) - never musical events. Intents have their own phase (attack/sustain/release), but grammars own entity lifecycle. Grammars may spawn entities that outlive their source intent - this decoupling enables use cases like ear training where visual persistence differs from musical duration.
+**What it does:** Determines the visual language. Grammars know *what kind* of musical element something is (note vs chord vs beat) but not musical analysis details (pitch class, chord quality). They use visual annotations to style their chosen representations. Grammars can filter elements (e.g., a rhythm grammar ignores chords).
 
-**Current status:** VisualParticleGrammar spawns particles per palette intent with configurable TTL.
+**Key insight:** Rulesets define vocabulary; grammars write sentences. Different grammars can render the same annotated musical content in completely different ways - one as particles, another as trails, another as background color washes.
+
+**Current status:** TestRhythmGrammar (renders beats and notes as timing markers) and TestChordProgressionGrammar (renders chords as glows with history trail) demonstrate the RFC 006 architecture.
 
 #### 5. Compositor
 **Technical:** Merges multiple `SceneFrame`s (one per part/instrument) into a single composited scene, applying layout, blending, and z-ordering.
@@ -70,10 +74,10 @@ Stabilizers form a DAG based on dependencies. Independent stabilizers (note trac
 
 ### Key Architectural Principles
 
-1. **Meaning lives in rulesets, not grammars.** Grammars respond to visual intents, never musical events. All musical interpretation happens in the ruleset.
-2. **Grammars never see musical events.** They see only VisualIntentFrame - palette, motion, texture, shape. No notes, no chords, no beats.
+1. **Meaning lives in rulesets, not grammars.** Rulesets define the visual vocabulary (what colors mean). Grammars decide how to render.
+2. **Grammars see categories, not analysis.** Grammars know "this is a note" and "this is a chord" but not pitch class or chord quality. Visual annotations carry the semantic meaning.
 3. **Notes are proper abstractions.** A Note has duration and phase - it's not a pair of on/off messages.
-4. **Intent lifecycle ≠ entity lifecycle.** Intents have phases (attack/sustain/release); grammars decide how long entities persist.
+4. **Grammars have creative agency.** They decide which musical elements to render, what shapes to use, and how to animate them. Different grammars can render the same content completely differently.
 5. **Every piece of data belongs to exactly one part (instrument).** Multi-instrument support is built-in from the start.
 6. **Contracts define all boundaries.** Modules communicate through types in [packages/contracts](packages/contracts/), not internal imports.
 7. **The renderer drives timing (pull-based).** The pipeline doesn't push frames; the renderer requests them at render time.
@@ -104,7 +108,7 @@ High-level principles live in `PRINCIPLES.md` and act as *constraints*, not aspi
 This README acts as the root index. A more detailed `INDEX.md` may be added once the document set grows.
 
 ## Status
-The project is in active development. The core pipeline is implemented with proper frame type separation (RawInputFrame → MusicalFrame → VisualIntentFrame → SceneFrame).
+The project is in active development. The core pipeline is implemented with proper frame type separation (RawInputFrame → MusicalFrame → AnnotatedMusicalFrame → SceneFrame).
 
 You can run the pipeline:
 ```bash

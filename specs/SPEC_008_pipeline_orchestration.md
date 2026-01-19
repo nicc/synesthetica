@@ -2,7 +2,7 @@
 
 Status: Approved
 Date: 2026-01-19
-Source: RFC 002, RFC 003, RFC 005, SPEC 005
+Source: RFC 002, RFC 003, RFC 005, RFC 006, SPEC 005
 
 ## Summary
 
@@ -54,12 +54,12 @@ export interface IPipeline {
 │         │                                                                │
 │         ▼                                                                │
 │  ┌──────────────┐                                                        │
-│  │   Ruleset    │  ruleset.map(musical) → VisualIntentFrame              │
+│  │   Ruleset    │  ruleset.annotate(musical) → AnnotatedMusicalFrame     │
 │  └──────┬───────┘                                                        │
 │         │                                                                │
 │         ▼                                                                │
 │  ┌──────────────┐                                                        │
-│  │   Grammars   │  grammar.update(intents, prev) → SceneFrame            │
+│  │   Grammars   │  grammar.update(annotated, prev) → SceneFrame          │
 │  └──────┬───────┘                                                        │
 │         │                                                                │
 │         └─────────────────────────┐                                      │
@@ -81,8 +81,8 @@ See SPEC_009 for detailed frame type definitions. Summary:
 |-------|-------|--------|-----------|
 | Adapters | External input | RawInputFrame | IRawSourceAdapter |
 | Stabilizers | RawInputFrame | MusicalFrame | IMusicalStabilizer |
-| Rulesets | MusicalFrame | VisualIntentFrame | IVisualRuleset |
-| Grammars | VisualIntentFrame | SceneFrame | IVisualGrammar |
+| Rulesets | MusicalFrame | AnnotatedMusicalFrame | IVisualRuleset |
+| Grammars | AnnotatedMusicalFrame | SceneFrame | IVisualGrammar |
 
 ## Stabilizer DAG
 
@@ -182,11 +182,11 @@ for (const [partId, rawFrame] of partFrames) {
   // Stabilizers transform raw input to musical abstractions
   const musicalFrame = stabilizer.apply(rawFrame, previousMusical);
 
-  // Ruleset maps to visual intents
-  const intentFrame = ruleset.map(musicalFrame);
+  // Ruleset annotates musical elements with visual properties
+  const annotatedFrame = ruleset.annotate(musicalFrame);
 
-  // Grammar produces scene
-  const scene = grammar.update(intentFrame, previousScene);
+  // Grammar produces scene from annotated musical elements
+  const scene = grammar.update(annotatedFrame, previousScene);
   partScenes.push(scene);
 }
 ```
@@ -244,9 +244,12 @@ const pipeline = new VisualPipeline({
 });
 
 pipeline.addAdapter(adapter);
-pipeline.setStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
 pipeline.setRuleset(new MusicalVisualRuleset());
-pipeline.addGrammar(new VisualParticleGrammar());
+// Grammars receive AnnotatedMusicalFrame and decide how to render
+pipeline.addGrammar(new TestRhythmGrammar());
+pipeline.addGrammar(new TestChordProgressionGrammar());
 pipeline.setCompositor(new IdentityCompositor());
 ```
 
@@ -269,7 +272,7 @@ pipeline.setStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
 This orchestration model preserves all system invariants:
 
 - **I1**: Same ruleset processes all parts regardless of source
-- **I3**: Meaning lives in ruleset, grammars only see intents
+- **I3**: Meaning lives in ruleset; grammars see annotated musical elements (categories only, not analysis)
 - **I6**: Every raw input can be routed to a part
 - **I7**: Grammars don't read other parts (per-part instantiation)
 - **I8**: Layout/blending handled by compositor only
