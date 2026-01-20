@@ -16,6 +16,8 @@ import {
 } from "../harness";
 import type {
   AnnotatedMusicalFrame,
+  AnnotatedNote,
+  AnnotatedChord,
   SceneFrame,
   GrammarContext,
   PitchClass,
@@ -462,7 +464,7 @@ function createMinimalFrame(
   }
 ): AnnotatedMusicalFrame {
   const noteOnset = options.noteOnset ?? t;
-  const notes = [];
+  const notes: AnnotatedNote[] = [];
   for (let i = 0; i < options.noteCount; i++) {
     notes.push({
       note: {
@@ -489,7 +491,7 @@ function createMinimalFrame(
     });
   }
 
-  const chords = [];
+  const chords: AnnotatedChord[] = [];
   for (let i = 0; i < (options.chordCount ?? 0); i++) {
     chords.push({
       chord: {

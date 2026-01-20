@@ -12,8 +12,11 @@ import {
 } from "../harness";
 import type {
   AnnotatedMusicalFrame,
+  AnnotatedNote,
+  AnnotatedChord,
   SceneFrame,
   GrammarContext,
+  PitchClass,
 } from "@synesthetica/contracts";
 import { TestChordProgressionGrammar } from "../../../src/grammars/TestChordProgressionGrammar";
 
@@ -292,10 +295,10 @@ function createMinimalFrame(
 ): AnnotatedMusicalFrame {
   const noteIds = options.noteIds ?? Array.from({ length: options.noteCount }, (_, i) => `note-${i}`);
 
-  const notes = noteIds.map((id, i) => ({
+  const notes: AnnotatedNote[] = noteIds.map((id, i) => ({
     note: {
       id,
-      pitch: { pc: i % 12, octave: 4 },
+      pitch: { pc: (i % 12) as PitchClass, octave: 4 },
       velocity: 80,
       onset: t,
       duration: 0,
@@ -316,13 +319,17 @@ function createMinimalFrame(
     },
   }));
 
-  const chords = options.chords.map((c, i) => ({
+  const chords: AnnotatedChord[] = options.chords.map((c, i) => ({
     chord: {
       id: `chord-${i}`,
-      root: c.root,
+      root: c.root as PitchClass,
       quality: c.quality,
+      bass: c.root as PitchClass,
+      inversion: 0,
+      voicing: [],
       noteIds: c.noteIds ?? [],
       onset: t,
+      duration: 0,
       confidence: 0.9,
       phase: c.phase,
       provenance: { source: "test", stream: "test" },
