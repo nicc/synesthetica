@@ -185,17 +185,17 @@ describe("TestChordProgressionGrammar golden tests", () => {
       expect(noteParticles.length).toBe(1);
     });
 
-    it("ignores beat information", () => {
+    it("ignores rhythm information", () => {
       const frame = createMinimalFrame(0, {
         chords: [{ root: 0, quality: "maj", phase: "active", label: "Cmaj" }],
         noteCount: 0,
-        hasBeat: true,
+        hasPrescribedTempo: true,
       });
 
       const scene = grammar.update(frame, null);
 
-      const beatEntities = scene.entities.filter(e => e.data?.type === "beat-pulse");
-      expect(beatEntities.length).toBe(0);
+      const rhythmEntities = scene.entities.filter(e => e.data?.type === "rhythm-pulse" || e.data?.type === "division-indicator");
+      expect(rhythmEntities.length).toBe(0);
     });
 
     it("builds chord history over multiple frames", () => {
@@ -287,7 +287,7 @@ function createMinimalFrame(
     }>;
     noteCount: number;
     noteIds?: string[];
-    hasBeat?: boolean;
+    hasPrescribedTempo?: boolean;
   }
 ): AnnotatedMusicalFrame {
   const noteIds = options.noteIds ?? Array.from({ length: options.noteCount }, (_, i) => `note-${i}`);
@@ -345,24 +345,23 @@ function createMinimalFrame(
     part: "main",
     notes,
     chords,
-    beat: options.hasBeat
-      ? {
-          beat: {
-            phase: 0,
-            tempo: 120,
-            confidence: 0.9,
-            beatInBar: 1,
-            beatsPerBar: 4,
-            isDownbeat: true,
-          },
-          visual: {
-            palette: { id: "beat", primary: { h: 0, s: 0, v: 0.7, a: 1 } },
-            texture: { id: "beat", grain: 0.1, smoothness: 0.9, density: 0.5 },
-            motion: { jitter: 0, pulse: 1, flow: 0 },
-            uncertainty: 0.1,
-          },
-        }
-      : null,
+    rhythm: {
+      analysis: {
+        detectedDivision: options.hasPrescribedTempo ? 500 : null,
+        recentOnsets: options.hasPrescribedTempo ? [t] : [],
+        stability: options.hasPrescribedTempo ? 0.9 : 0,
+        confidence: options.hasPrescribedTempo ? 0.9 : 0,
+        referenceOnset: options.hasPrescribedTempo ? t : null,
+      },
+      visual: {
+        palette: { id: "rhythm", primary: { h: 0, s: 0, v: 0.7, a: 1 } },
+        texture: { id: "rhythm", grain: 0.1, smoothness: 0.9, density: 0.5 },
+        motion: { jitter: 0, pulse: 0.6, flow: 0 },
+        uncertainty: 0.1,
+      },
+      prescribedTempo: options.hasPrescribedTempo ? 120 : null,
+      prescribedMeter: options.hasPrescribedTempo ? { beatsPerBar: 4, beatUnit: 4 } : null,
+    },
     bars: [],
     phrases: [],
     dynamics: {

@@ -27,6 +27,35 @@
       padding: 15px;
       border-radius: 8px;
       border: 1px solid #333;
+      transition: opacity 0.2s;
+    }
+
+    #controls.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #toggle-controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 11;
+      background: rgba(0, 0, 0, 0.6);
+      color: #888;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    #toggle-controls:hover {
+      background: rgba(50, 50, 50, 0.8);
+      color: #fff;
+    }
+
+    #controls.hidden + #toggle-controls {
+      background: rgba(0, 0, 0, 0.8);
     }
 
     #controls label {
@@ -36,7 +65,8 @@
       color: #aaa;
     }
 
-    #controls select {
+    #controls select,
+    #controls input[type="number"] {
       width: 250px;
       padding: 8px;
       background: #222;
@@ -46,9 +76,58 @@
       font-size: 14px;
     }
 
-    #controls select:disabled {
+    #controls select:disabled,
+    #controls input:disabled {
       opacity: 0.5;
       cursor: not-allowed;
+    }
+
+    #controls .control-group {
+      margin-bottom: 15px;
+    }
+
+    #controls .control-group:last-child {
+      margin-bottom: 0;
+    }
+
+    #controls .inline-controls {
+      display: flex;
+      gap: 10px;
+    }
+
+    #controls .inline-controls input[type="number"] {
+      width: 70px;
+    }
+
+    #controls .inline-controls label {
+      margin-bottom: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    #controls .inline-controls .input-label {
+      font-size: 11px;
+      color: #666;
+    }
+
+    #controls button {
+      padding: 6px 12px;
+      background: #333;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    #controls button:hover {
+      background: #444;
+    }
+
+    #controls button:active {
+      background: #555;
     }
 
     #status {
@@ -70,16 +149,56 @@
     .success {
       color: #44ff44;
     }
+
+    .section-divider {
+      border-top: 1px solid #333;
+      margin: 15px 0;
+      padding-top: 15px;
+    }
+
+    .section-header {
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
   </style>
 </head>
 <body>
   <div id="controls">
-    <label for="midi-input">MIDI Input Device</label>
-    <select id="midi-input" disabled>
-      <option>Loading MIDI devices...</option>
-    </select>
+    <div class="control-group">
+      <label for="midi-input">MIDI Input Device</label>
+      <select id="midi-input" disabled>
+        <option>Loading MIDI devices...</option>
+      </select>
+    </div>
+
+    <div class="section-divider">
+      <div class="section-header">Tempo & Meter</div>
+      <div class="control-group">
+        <div class="inline-controls">
+          <label>
+            <span class="input-label">BPM</span>
+            <input type="number" id="tempo-input" min="20" max="300" placeholder="--" />
+          </label>
+          <label>
+            <span class="input-label">Beats/Bar</span>
+            <input type="number" id="beats-per-bar" min="1" max="16" placeholder="4" />
+          </label>
+          <label>
+            <span class="input-label">Beat Unit</span>
+            <input type="number" id="beat-unit" min="1" max="16" placeholder="4" />
+          </label>
+        </div>
+        <button id="clear-tempo">Clear Tempo/Meter</button>
+      </div>
+    </div>
+
     <div id="status">Initializing...</div>
   </div>
+
+  <button id="toggle-controls">Hide Controls</button>
 
   <canvas id="canvas"></canvas>
 

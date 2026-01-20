@@ -102,7 +102,9 @@ Stabilizers produce MusicalFrame containing:
 | `chords: MusicalChord[]` | Detected chords | Note analysis |
 | `progression: ChordId[]` | Recent chord history (references) | Chord tracking over time |
 | `phrases: Phrase[]` | Phrase boundaries | Beat + density analysis |
-| `beat: BeatState` | Current beat position | Beat detection |
+| `rhythmicAnalysis: RhythmicAnalysis` | Descriptive analysis of note timing patterns | IOI clustering |
+| `prescribedTempo: number \| null` | User-set tempo in BPM (not inferred) | Control op |
+| `prescribedMeter: { beatsPerBar, beatUnit } \| null` | User-set meter (not inferred) | Control op |
 | `dynamics: DynamicsState` | Current loudness level and trend | Velocity analysis |
 
 ## MusicalFrame as Snapshot with Context

@@ -84,6 +84,10 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
   private activityLog: Array<{ part: PartId; t: SessionMs; count: number }> = [];
   private currentTime: SessionMs = 0;
 
+  // Prescribed tempo/meter (user-set, not inferred)
+  private prescribedTempo: number | null = null;
+  private prescribedMeter: { beatsPerBar: number; beatUnit: number } | null = null;
+
   constructor(config: VisualPipelineConfig) {
     this.config = config;
   }
@@ -120,6 +124,36 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
 
   setCompositor(compositor: ICompositor): void {
     this.compositor = compositor;
+  }
+
+  // === Tempo/Meter Control (RFC 007) ===
+
+  /**
+   * Set the prescribed tempo in BPM.
+   * This enables beat-relative visualization in grammars.
+   */
+  setTempo(bpm: number | null): void {
+    this.prescribedTempo = bpm;
+  }
+
+  /**
+   * Set the prescribed time signature.
+   * This enables bar-relative visualization in grammars.
+   */
+  setMeter(beatsPerBar: number | null, beatUnit: number = 4): void {
+    if (beatsPerBar === null) {
+      this.prescribedMeter = null;
+    } else {
+      this.prescribedMeter = { beatsPerBar, beatUnit };
+    }
+  }
+
+  /**
+   * Clear both tempo and meter.
+   */
+  clearTempoAndMeter(): void {
+    this.prescribedTempo = null;
+    this.prescribedMeter = null;
   }
 
   // === IPipeline ===
@@ -304,11 +338,19 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       part: partId,
       notes: [],
       chords: [],
-      beat: null,
+      rhythmicAnalysis: {
+        detectedDivision: null,
+        recentOnsets: [],
+        stability: 0,
+        confidence: 0,
+        referenceOnset: null,
+      },
       dynamics: {
         level: 0,
         trend: "stable",
       },
+      prescribedTempo: this.prescribedTempo,
+      prescribedMeter: this.prescribedMeter,
     };
   }
 
@@ -469,21 +511,33 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       }
     }
 
-    // Take latest non-null values for beat and dynamics
-    let beat = null;
+    // Take latest non-null values for rhythmicAnalysis and dynamics
+    let rhythmicAnalysis: MusicalFrame["rhythmicAnalysis"] = {
+      detectedDivision: null,
+      recentOnsets: [],
+      stability: 0,
+      confidence: 0,
+      referenceOnset: null,
+    };
     let dynamics: MusicalFrame["dynamics"] = { level: 0, trend: "stable" };
+
     for (const frame of frames) {
-      if (frame.beat) beat = frame.beat;
+      if (frame.rhythmicAnalysis.detectedDivision !== null) {
+        rhythmicAnalysis = frame.rhythmicAnalysis;
+      }
       if (frame.dynamics.level > 0) dynamics = frame.dynamics;
     }
 
+    // prescribedTempo and prescribedMeter come from pipeline (user setting), not from stabilizers
     return {
       t,
       part: partId,
       notes: Array.from(notesMap.values()),
       chords: Array.from(chordsMap.values()),
-      beat,
+      rhythmicAnalysis,
       dynamics,
+      prescribedTempo: this.prescribedTempo,
+      prescribedMeter: this.prescribedMeter,
       progression: progressionSet.size > 0 ? Array.from(progressionSet) : undefined,
     };
   }

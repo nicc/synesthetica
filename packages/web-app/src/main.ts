@@ -16,6 +16,12 @@ import {
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
 const midiSelect = document.getElementById("midi-input") as HTMLSelectElement;
 const statusDiv = document.getElementById("status") as HTMLDivElement;
+const controlsDiv = document.getElementById("controls") as HTMLDivElement;
+const toggleControlsBtn = document.getElementById("toggle-controls") as HTMLButtonElement;
+const tempoInput = document.getElementById("tempo-input") as HTMLInputElement;
+const beatsPerBarInput = document.getElementById("beats-per-bar") as HTMLInputElement;
+const beatUnitInput = document.getElementById("beat-unit") as HTMLInputElement;
+const clearTempoBtn = document.getElementById("clear-tempo") as HTMLButtonElement;
 
 // Resize canvas to fill viewport
 function resizeCanvas() {
@@ -149,6 +155,9 @@ function startSession(midiInput: MidiInputInfo): void {
     // Reset pipeline (initializes stabilizers, sets T=0)
     pipeline.reset();
 
+    // Apply any existing tempo/meter settings
+    applyTempoMeterSettings();
+
     // Start render loop
     startRenderLoop();
 
@@ -220,6 +229,59 @@ window.addEventListener("beforeunload", () => {
     midiSource = null;
   }
 });
+
+/**
+ * Toggle visibility of controls panel
+ */
+function toggleControls(): void {
+  const isHidden = controlsDiv.classList.toggle("hidden");
+  toggleControlsBtn.textContent = isHidden ? "Show Controls" : "Hide Controls";
+}
+
+/**
+ * Apply tempo and meter settings to the pipeline
+ */
+function applyTempoMeterSettings(): void {
+  if (!pipeline) return;
+
+  // Apply tempo
+  const tempoValue = tempoInput.value ? parseInt(tempoInput.value, 10) : null;
+  if (tempoValue !== null && tempoValue >= 20 && tempoValue <= 300) {
+    pipeline.setTempo(tempoValue);
+  } else {
+    pipeline.setTempo(null);
+  }
+
+  // Apply meter
+  const beatsPerBar = beatsPerBarInput.value ? parseInt(beatsPerBarInput.value, 10) : null;
+  const beatUnit = beatUnitInput.value ? parseInt(beatUnitInput.value, 10) : 4;
+
+  if (beatsPerBar !== null && beatsPerBar >= 1 && beatsPerBar <= 16) {
+    pipeline.setMeter(beatsPerBar, beatUnit);
+  } else {
+    pipeline.setMeter(null);
+  }
+}
+
+/**
+ * Clear tempo and meter settings
+ */
+function clearTempoMeter(): void {
+  tempoInput.value = "";
+  beatsPerBarInput.value = "";
+  beatUnitInput.value = "";
+
+  if (pipeline) {
+    pipeline.clearTempoAndMeter();
+  }
+}
+
+// Event listeners for tempo/meter controls
+toggleControlsBtn.addEventListener("click", toggleControls);
+tempoInput.addEventListener("change", applyTempoMeterSettings);
+beatsPerBarInput.addEventListener("change", applyTempoMeterSettings);
+beatUnitInput.addEventListener("change", applyTempoMeterSettings);
+clearTempoBtn.addEventListener("click", clearTempoMeter);
 
 // Initialize on load
 initMidi();

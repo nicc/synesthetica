@@ -270,14 +270,16 @@ export const frame1: AnnotatedMusicalFrame = {
       "Cmaj"
     ),
   ],
-  beat: {
-    beat: { phase: 0, tempo: 120, confidence: 0.9, beatInBar: 1, beatsPerBar: 4, isDownbeat: true },
+  rhythm: {
+    analysis: { detectedDivision: 500, recentOnsets: [0], stability: 0.9, confidence: 0.9, referenceOnset: 0 },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
-      motion: { jitter: 0, pulse: 1.0, flow: 0 },
+      motion: { jitter: 0, pulse: 0.6, flow: 0 },
       uncertainty: 0.1,
     },
+    prescribedTempo: 120,
+    prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
   },
   bars: [],
   phrases: [],
@@ -327,14 +329,16 @@ export const frame2: AnnotatedMusicalFrame = {
       "Cmaj"
     ),
   ],
-  beat: {
-    beat: { phase: 0.5, tempo: 120, confidence: 0.9, beatInBar: 2, beatsPerBar: 4, isDownbeat: false },
+  rhythm: {
+    analysis: { detectedDivision: 500, recentOnsets: [0, 500], stability: 0.9, confidence: 0.9, referenceOnset: 500 },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
-      motion: { jitter: 0, pulse: 0.5, flow: 0 },
+      motion: { jitter: 0, pulse: 0.6, flow: 0 },
       uncertainty: 0.1,
     },
+    prescribedTempo: 120,
+    prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
   },
   bars: [],
   phrases: [],
@@ -421,14 +425,16 @@ export const frame3: AnnotatedMusicalFrame = {
       "Am"
     ),
   ],
-  beat: {
-    beat: { phase: 0, tempo: 120, confidence: 0.9, beatInBar: 1, beatsPerBar: 4, isDownbeat: true },
+  rhythm: {
+    analysis: { detectedDivision: 500, recentOnsets: [0], stability: 0.9, confidence: 0.9, referenceOnset: 0 },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
-      motion: { jitter: 0, pulse: 1.0, flow: 0 },
+      motion: { jitter: 0, pulse: 0.6, flow: 0 },
       uncertainty: 0.1,
     },
+    prescribedTempo: 120,
+    prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
   },
   bars: [
     {
@@ -489,14 +495,16 @@ export const frame4: AnnotatedMusicalFrame = {
       "Am"
     ),
   ],
-  beat: {
-    beat: { phase: 0.5, tempo: 120, confidence: 0.9, beatInBar: 2, beatsPerBar: 4, isDownbeat: false },
+  rhythm: {
+    analysis: { detectedDivision: 500, recentOnsets: [0, 500], stability: 0.9, confidence: 0.9, referenceOnset: 500 },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
-      motion: { jitter: 0, pulse: 0.5, flow: 0 },
+      motion: { jitter: 0, pulse: 0.6, flow: 0 },
       uncertainty: 0.1,
     },
+    prescribedTempo: 120,
+    prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
   },
   bars: [],
   phrases: [],
@@ -546,14 +554,16 @@ export const frame5: AnnotatedMusicalFrame = {
       "Am"
     ),
   ],
-  beat: {
-    beat: { phase: 0, tempo: 120, confidence: 0.9, beatInBar: 1, beatsPerBar: 4, isDownbeat: true },
+  rhythm: {
+    analysis: { detectedDivision: 500, recentOnsets: [0], stability: 0.9, confidence: 0.9, referenceOnset: 0 },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
-      motion: { jitter: 0, pulse: 1.0, flow: 0 },
+      motion: { jitter: 0, pulse: 0.6, flow: 0 },
       uncertainty: 0.1,
     },
+    prescribedTempo: 120,
+    prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
   },
   bars: [],
   phrases: [],

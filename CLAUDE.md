@@ -1,5 +1,7 @@
 # Agent Instructions
 
+**Read `PRINCIPLES.md` at session start.** It defines constraints that apply to all design and implementation decisions.
+
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
 ## Implementation Approval

@@ -73,8 +73,18 @@ export interface MusicalFrame {
   part: PartId;
   notes: Note[];
   chords: MusicalChord[];
-  beat: BeatState | null;
+  rhythmicAnalysis: RhythmicAnalysis;
+  prescribedTempo: number | null;  // User-set BPM (not inferred)
+  prescribedMeter: { beatsPerBar: number; beatUnit: number } | null;
   dynamics: DynamicsState;
+}
+
+export interface RhythmicAnalysis {
+  detectedDivision: Ms | null;     // Most prominent IOI (not a tempo)
+  recentOnsets: Ms[];              // Recent note onset timestamps
+  stability: number;               // [0,1] how consistent the division is
+  confidence: number;              // [0,1] detection confidence
+  referenceOnset: Ms | null;       // Most recent onset for grid alignment
 }
 
 export interface Note {
@@ -100,7 +110,9 @@ export interface Pitch {
 **Key properties:**
 - Notes have duration, not on/off pairs
 - Notes have phase (attack → sustain → release)
-- Includes derived state (dynamics, beat)
+- Includes derived state (dynamics)
+- Rhythmic analysis is purely descriptive (not tempo inference)
+- Tempo/meter are user-prescribed, not stabilizer-inferred
 
 ### AnnotatedMusicalFrame (RFC 006)
 
@@ -112,10 +124,17 @@ export interface AnnotatedMusicalFrame {
   part: PartId;
   notes: AnnotatedNote[];
   chords: AnnotatedChord[];
-  beat: AnnotatedBeat | null;
+  rhythm: AnnotatedRhythm;
   bars: AnnotatedBar[];
   phrases: AnnotatedPhrase[];
   dynamics: AnnotatedDynamics;
+}
+
+export interface AnnotatedRhythm {
+  analysis: RhythmicAnalysis;      // Descriptive analysis from stabilizer
+  visual: VisualAnnotation;        // Visual properties from ruleset
+  prescribedTempo: number | null;  // User-set BPM (from pipeline)
+  prescribedMeter: { beatsPerBar: number; beatUnit: number } | null;
 }
 
 export interface AnnotatedNote {
@@ -154,7 +173,7 @@ Adapters              Stabilizers           Rulesets              Grammars
    │                      │                     │                     │
    │  - MidiNoteOn        │  - Note             │  - AnnotatedNote    │
    │  - MidiNoteOff       │  - MusicalChord     │  - AnnotatedChord   │
-   │  - MidiCC            │  - BeatState        │  - AnnotatedBeat    │
+   │  - MidiCC            │  - RhythmicAnalysis │  - AnnotatedRhythm  │
    │  - AudioFeatures     │  - DynamicsState    │  - AnnotatedDynamics│
 ```
 

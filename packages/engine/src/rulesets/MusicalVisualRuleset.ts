@@ -24,7 +24,7 @@ import type {
   AnnotatedMusicalFrame,
   AnnotatedNote,
   AnnotatedChord,
-  AnnotatedBeat,
+  AnnotatedRhythm,
   AnnotatedDynamics,
   PaletteRef,
   TextureRef,
@@ -32,7 +32,7 @@ import type {
   PitchClass,
   Note,
   MusicalChord,
-  BeatState,
+  RhythmicAnalysis,
   DynamicsState,
 } from "@synesthetica/contracts";
 
@@ -88,7 +88,11 @@ export class MusicalVisualRuleset implements IVisualRuleset {
       part: frame.part,
       notes: frame.notes.map((note) => this.annotateNote(note)),
       chords: frame.chords.map((chord) => this.annotateChord(chord)),
-      beat: frame.beat ? this.annotateBeat(frame.beat) : null,
+      rhythm: this.annotateRhythm(
+        frame.rhythmicAnalysis,
+        frame.prescribedTempo,
+        frame.prescribedMeter
+      ),
       bars: [], // No bar detection yet
       phrases: [], // No phrase detection yet
       dynamics: this.annotateDynamics(frame.dynamics),
@@ -180,43 +184,47 @@ export class MusicalVisualRuleset implements IVisualRuleset {
   }
 
   // ===========================================================================
-  // Beat Annotation
+  // Rhythm Annotation
   // ===========================================================================
 
-  private annotateBeat(beat: BeatState): AnnotatedBeat {
-    // Beat visualization uses neutral gray palette
-    // Downbeats are slightly brighter
-    const brightness = beat.isDownbeat ? 0.9 : 0.7;
+  private annotateRhythm(
+    analysis: RhythmicAnalysis,
+    prescribedTempo: number | null,
+    prescribedMeter: MusicalFrame["prescribedMeter"]
+  ): AnnotatedRhythm {
+    // Rhythm visualization uses neutral gray palette
+    // Brightness based on stability (more stable = brighter)
+    const brightness = 0.5 + analysis.stability * 0.4;
 
     const palette: PaletteRef = {
-      id: "beat",
+      id: "rhythm",
       primary: { h: 0, s: 0, v: brightness, a: 1 },
     };
 
     const texture: TextureRef = {
-      id: "beat",
-      grain: 0.1,
-      smoothness: 0.9,
+      id: "rhythm",
+      grain: 0.1 + (1 - analysis.stability) * 0.2, // More grain when unstable
+      smoothness: 0.5 + analysis.stability * 0.4, // Smoother when stable
       density: 0.5,
     };
 
-    // Pulse intensity based on downbeat status and phase
-    // Stronger pulse at beat start (low phase), weaker as phase advances
-    const phasePulse = 1 - beat.phase; // Pulse strongest at phase 0
+    // Motion based on analysis - pulse follows detected division
     const motion: MotionAnnotation = {
-      jitter: 0,
-      pulse: beat.isDownbeat ? phasePulse : phasePulse * 0.5,
+      jitter: (1 - analysis.stability) * 0.1, // More jitter when unstable
+      pulse: analysis.confidence * 0.6, // Pulse based on confidence
       flow: 0,
     };
 
     return {
-      beat,
+      analysis,
       visual: {
         palette,
         texture,
         motion,
-        uncertainty: 1 - beat.confidence,
+        uncertainty: 1 - analysis.confidence,
       },
+      prescribedTempo,
+      prescribedMeter,
     };
   }
 

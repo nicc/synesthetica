@@ -16,7 +16,8 @@ import type {
   Note,
   NoteId,
   MusicalChord,
-  BeatState,
+  RhythmicAnalysis,
+  TimeSignature,
   DynamicsState,
 } from "../musical/musical";
 
@@ -136,17 +137,31 @@ export interface AnnotatedChord {
 }
 
 /**
- * Beat information with visual annotations.
+ * Rhythmic analysis with visual annotations.
  *
- * Note: beatInBar and isDownbeat are now part of BeatState (from stabilizer).
- * Grammars access them via beat.beatInBar and beat.isDownbeat.
+ * Contains purely descriptive analysis of onset patterns.
+ * Grammars check prescribedTempo/prescribedMeter for intent-relative visualization.
+ *
+ * See RFC 007 for design rationale.
  */
-export interface AnnotatedBeat {
-  /** Current beat state (includes tempo, phase, beatInBar, isDownbeat) */
-  beat: BeatState;
+export interface AnnotatedRhythm {
+  /** Rhythmic analysis (detected division, stability, onsets) */
+  analysis: RhythmicAnalysis;
 
-  /** Visual properties for beat visualization */
+  /** Visual properties for rhythm visualization */
   visual: VisualAnnotation;
+
+  /**
+   * User-prescribed tempo in BPM (from control op).
+   * When non-null, grammars can show beat-relative visuals (drift, grid).
+   */
+  prescribedTempo: number | null;
+
+  /**
+   * User-prescribed time signature (from control op).
+   * When non-null (and prescribedTempo is set), grammars can show bar-relative visuals.
+   */
+  prescribedMeter: TimeSignature | null;
 }
 
 /**
@@ -220,8 +235,8 @@ export interface AnnotatedMusicalFrame {
   /** Annotated chords - grammars decide how/whether to render */
   chords: AnnotatedChord[];
 
-  /** Beat/meter information with visual annotations */
-  beat: AnnotatedBeat | null;
+  /** Rhythmic analysis with visual annotations */
+  rhythm: AnnotatedRhythm;
 
   /** Bar boundaries with visual annotations */
   bars: AnnotatedBar[];

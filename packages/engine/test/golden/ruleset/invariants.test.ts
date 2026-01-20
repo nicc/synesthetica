@@ -55,7 +55,13 @@ function makeFrame(t: number, notes: Note[]): MusicalFrame {
     part: "test-part",
     notes,
     chords: [],
-    beat: null,
+    rhythmicAnalysis: {
+      detectedDivision: null,
+      recentOnsets: [],
+      stability: 0,
+      confidence: 0,
+      referenceOnset: null,
+    },
     dynamics: {
       level:
         notes.length > 0
@@ -63,6 +69,8 @@ function makeFrame(t: number, notes: Note[]): MusicalFrame {
           : 0,
       trend: "stable",
     },
+    prescribedTempo: null,
+    prescribedMeter: null,
   };
 }
 

@@ -129,12 +129,20 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
       t,
       part: this.config.partId,
       notes,
-      chords: [], // Chord detection not implemented yet
-      beat: null, // Beat detection not implemented yet
+      chords: [],
+      rhythmicAnalysis: {
+        detectedDivision: null,
+        recentOnsets: [],
+        stability: 0,
+        confidence: 0,
+        referenceOnset: null,
+      },
       dynamics: {
         level: this.calculateDynamicsLevel(notes),
         trend: "stable",
       },
+      prescribedTempo: null,
+      prescribedMeter: null,
     };
   }
 

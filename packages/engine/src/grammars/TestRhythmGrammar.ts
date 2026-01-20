@@ -24,7 +24,7 @@ import type {
   Entity,
   EntityId,
   AnnotatedNote,
-  AnnotatedBeat,
+  AnnotatedRhythm,
 } from "@synesthetica/contracts";
 
 /**
@@ -68,10 +68,15 @@ export class TestRhythmGrammar implements IVisualGrammar {
     const t = input.t;
     const part = input.part;
 
-    // 1. Render beat pulse (center of screen, vertical line that flashes)
-    if (input.beat) {
-      const beatEntity = this.createBeatPulse(input.beat, t, part);
-      entities.push(beatEntity);
+    // 1. Render rhythm visualization
+    // Only show beat-relative visuals when prescribedTempo is set
+    if (input.rhythm.prescribedTempo !== null) {
+      const rhythmEntity = this.createRhythmPulse(input.rhythm, t, part);
+      entities.push(rhythmEntity);
+    } else if (input.rhythm.analysis.detectedDivision !== null) {
+      // Show historic-only visualization when no prescribed tempo
+      const divisionEntity = this.createDivisionIndicator(input.rhythm, t, part);
+      entities.push(divisionEntity);
     }
 
     // 2. Render notes as timing markers on a horizontal timeline
@@ -106,36 +111,87 @@ export class TestRhythmGrammar implements IVisualGrammar {
   }
 
   /**
-   * Create a beat pulse entity.
-   * Vertical line at center that flashes more intensely on downbeats.
+   * Create a rhythm pulse entity when prescribedTempo is set.
+   * Uses the prescribed tempo to show beat-relative visualization.
    */
-  private createBeatPulse(annotatedBeat: AnnotatedBeat, t: number, part: string): Entity {
-    const pulseIntensity = annotatedBeat.visual.motion.pulse;
-    const { phase, beatInBar, isDownbeat } = annotatedBeat.beat;
+  private createRhythmPulse(rhythm: AnnotatedRhythm, t: number, part: string): Entity {
+    const { analysis, prescribedTempo, prescribedMeter } = rhythm;
+    const pulseIntensity = rhythm.visual.motion.pulse;
 
-    // Both downbeats and regular beats decay with phase
-    // pulseIntensity is (1 - phase), so it's 1 at beat start and 0 approaching next beat
+    // Calculate phase within the beat based on prescribed tempo
+    const beatDurationMs = 60000 / prescribedTempo!;
+    const referenceOnset = analysis.referenceOnset ?? t;
+    const timeSinceReference = t - referenceOnset;
+    const phase = (timeSinceReference % beatDurationMs) / beatDurationMs;
+
+    // Determine if this is a downbeat (requires meter)
+    let isDownbeat = false;
+    if (prescribedMeter !== null && analysis.referenceOnset !== null) {
+      const beatsFromReference = Math.floor(timeSinceReference / beatDurationMs);
+      isDownbeat = beatsFromReference % prescribedMeter.beatsPerBar === 0;
+    }
+
+    // Pulse strongest at beat start (low phase)
+    const phasePulse = 1 - phase;
     const baseOpacity = isDownbeat ? 0.9 : 0.5;
-    const opacity = baseOpacity * pulseIntensity;
-    const size = (isDownbeat ? 150 : 80) * pulseIntensity;
+    const opacity = baseOpacity * phasePulse * pulseIntensity;
+    const size = (isDownbeat ? 150 : 80) * phasePulse;
 
     return {
-      id: this.entityId("beat-pulse"),
+      id: this.entityId("rhythm-pulse"),
       part,
       kind: "field",
       createdAt: t,
       updatedAt: t,
       position: { x: 0.5, y: 0.5 }, // Center
       style: {
-        color: annotatedBeat.visual.palette.primary,
+        color: rhythm.visual.palette.primary,
         size,
         opacity,
       },
       data: {
-        type: "beat-pulse",
-        beatInBar,
-        isDownbeat,
+        type: "rhythm-pulse",
         phase,
+        isDownbeat,
+        prescribedTempo,
+        detectedDivision: analysis.detectedDivision,
+      },
+    };
+  }
+
+  /**
+   * Create a division indicator for historic-only visualization.
+   * Shows the detected division pattern without beat-relative assumptions.
+   */
+  private createDivisionIndicator(rhythm: AnnotatedRhythm, t: number, part: string): Entity {
+    const { analysis } = rhythm;
+    const pulseIntensity = rhythm.visual.motion.pulse;
+
+    // Use stability to modulate the visualization
+    const stability = analysis.stability;
+    const confidence = analysis.confidence;
+
+    // Size based on stability (more stable = larger, more confident pulse)
+    const size = 60 + stability * 40;
+    const opacity = 0.3 + confidence * 0.5;
+
+    return {
+      id: this.entityId("division-indicator"),
+      part,
+      kind: "field",
+      createdAt: t,
+      updatedAt: t,
+      position: { x: 0.5, y: 0.5 }, // Center
+      style: {
+        color: rhythm.visual.palette.primary,
+        size: size * pulseIntensity,
+        opacity,
+      },
+      data: {
+        type: "division-indicator",
+        detectedDivision: analysis.detectedDivision,
+        stability,
+        confidence,
       },
     };
   }

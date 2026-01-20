@@ -35,18 +35,17 @@ describe("RFC 006 Validation", () => {
       grammar.init(ctx);
     });
 
-    it("produces entities for notes and beats", () => {
+    it("produces entities for notes and rhythm", () => {
       const scene = grammar.update(frame1, null);
 
       expect(scene.t).toBe(0);
       expect(scene.entities.length).toBeGreaterThan(0);
 
-      // Should have beat pulse
-      const beatPulse = scene.entities.find(
-        (e) => e.data?.type === "beat-pulse"
+      // Should have rhythm pulse (when prescribedTempo is set)
+      const rhythmPulse = scene.entities.find(
+        (e) => e.data?.type === "rhythm-pulse"
       );
-      expect(beatPulse).toBeDefined();
-      expect(beatPulse!.data!.isDownbeat).toBe(true);
+      expect(rhythmPulse).toBeDefined();
 
       // Should have note markers for all 3 notes
       const noteMarkers = scene.entities.filter(
@@ -121,15 +120,15 @@ describe("RFC 006 Validation", () => {
       expect(chordGlow!.data!.label).toBe("Cmaj");
     });
 
-    it("ignores beat information", () => {
+    it("ignores rhythm information", () => {
       const scene = grammar.update(frame1, null);
 
-      // Frame 1 has beat information
-      // But chord grammar should produce no beat-related entities
-      const beatEntities = scene.entities.filter(
-        (e) => e.data?.type === "beat-pulse"
+      // Frame 1 has rhythm information
+      // But chord grammar should produce no rhythm-related entities
+      const rhythmEntities = scene.entities.filter(
+        (e) => e.data?.type === "rhythm-pulse" || e.data?.type === "division-indicator"
       );
-      expect(beatEntities.length).toBe(0);
+      expect(rhythmEntities.length).toBe(0);
     });
 
     it("renders notes belonging to chords as particles", () => {
@@ -219,11 +218,11 @@ describe("RFC 006 Validation", () => {
         rhythmScene.entities.length + chordScene.entities.length
       );
 
-      // Should have beat pulse from rhythm grammar
-      const beatPulse = composed.entities.find(
-        (e) => e.data?.type === "beat-pulse"
+      // Should have rhythm pulse from rhythm grammar
+      const rhythmPulse = composed.entities.find(
+        (e) => e.data?.type === "rhythm-pulse"
       );
-      expect(beatPulse).toBeDefined();
+      expect(rhythmPulse).toBeDefined();
 
       // Should have chord glow from chord grammar
       const chordGlow = composed.entities.find(

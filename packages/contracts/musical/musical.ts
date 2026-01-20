@@ -77,47 +77,63 @@ export interface MusicalChord {
 }
 
 /**
- * Current beat/meter context.
- *
- * Produced by BeatDetectionStabilizer from note onset timing patterns.
- * Contains both tempo detection and bar position tracking.
+ * Time signature.
+ * Set via control op, not detected by stabilizers.
  */
-export interface BeatState {
-  /** Position within current beat (0 = beat start, 1 = next beat) */
-  phase: number;
+export interface TimeSignature {
+  /** Beats per bar (e.g., 4 for 4/4, 3 for 3/4) */
+  beatsPerBar: number;
+  /** Beat unit (e.g., 4 for quarter note, 8 for eighth note) */
+  beatUnit: number;
+}
 
-  /** Detected tempo in BPM, null if not yet detected */
-  tempo: number | null;
+/**
+ * Rhythmic analysis produced by BeatDetectionStabilizer.
+ *
+ * This is purely DESCRIPTIVE - it analyzes historic onset patterns
+ * without inferring future intent. See RFC 007 for design rationale.
+ *
+ * Key insight: Tempo inference is a category error. We cannot distinguish
+ * subdivisions from tempo changes, drift from rubato, off-beat from syncopation
+ * based on historic data alone. Therefore:
+ * - Stabilizer outputs descriptive analysis (detectedDivision, stability)
+ * - Tempo/meter are set explicitly by user via control ops
+ */
+export interface RhythmicAnalysis {
+  /**
+   * Detected time division between recent onsets in ms.
+   * This is the most prominent IOI cluster, NOT a "tempo".
+   * Null if insufficient data or no clear pattern.
+   */
+  detectedDivision: Ms | null;
 
-  /** How confident we are in the tempo detection (0-1) */
+  /**
+   * Raw onset timestamps within the analysis window.
+   * Grammars can use these for historic visualization.
+   */
+  recentOnsets: Ms[];
+
+  /**
+   * How stable the detected division is across the window.
+   * High stability = consistent spacing between onsets.
+   * Range: 0.0 to 1.0
+   */
+  stability: number;
+
+  /**
+   * Confidence in the detected division.
+   * Based on cluster strength and sample count.
+   * Low confidence = "not enough data" or "ambiguous pattern".
+   * Range: 0.0 to 1.0
+   */
   confidence: Confidence;
 
-  /** Beat number within bar (1-indexed, e.g., 1-4 for 4/4 time) */
-  beatInBar: number;
-
-  /** Number of beats per bar (from config, e.g., 4 for 4/4 time) */
-  beatsPerBar: number;
-
-  /** True when this is the downbeat (beatInBar === 1) */
-  isDownbeat: boolean;
-
   /**
-   * Drift from the established beat grid, in range [-0.5, 0.5].
-   * - Negative = playing ahead (rushing)
-   * - Positive = playing behind (dragging)
-   * - Zero = on the beat
-   *
-   * This is a smoothed average of recent onset deviations from expected beat times.
-   * Grammars can use this to visualize timing accuracy.
+   * Reference point for alignment.
+   * The most recent onset that anchors the detected division.
+   * Grammars can extrapolate a grid backward/forward from this.
    */
-  drift?: number;
-
-  /**
-   * Instantaneous tempo of recent playing, in BPM.
-   * May differ from `tempo` (the locked/stable tempo).
-   * Useful for showing "you're speeding up" vs "you're slowing down".
-   */
-  instantaneousTempo?: number;
+  referenceOnset: Ms | null;
 }
 
 /**
@@ -145,24 +161,40 @@ export interface Phrase {
  * Produced by stabilizers, consumed by rulesets.
  *
  * MusicalFrame is a "snapshot with context" - it contains:
- * - Current state: What's sounding now (notes, chords, beat, dynamics)
+ * - Current state: What's sounding now (notes, chords, rhythmic analysis, dynamics)
+ * - Prescribed context: User-specified tempo and meter (via control ops)
  * - Recent context: What led here via references (progression, phrases)
  * - No raw events: Those stay in RawInputFrame
  *
  * This allows rulesets to remain pure functions while accessing temporal
  * context like harmonic tension or phrase position.
  *
- * See SPEC_006 for windowing and reference semantics.
+ * See SPEC_006 for windowing, SPEC_009 for frame types, RFC 007 for rhythmic analysis.
  */
 export interface MusicalFrame {
   t: Ms;
   part: PartId;
 
-  // Current state
+  // Current state (from stabilizers)
   notes: Note[];
   chords: MusicalChord[];
-  beat: BeatState | null;
+  rhythmicAnalysis: RhythmicAnalysis;
   dynamics: DynamicsState;
+
+  // Prescribed context (from control ops, not stabilizers)
+  /**
+   * User-prescribed tempo in BPM.
+   * Set via control op. Null means no explicit tempo.
+   * When null, grammars should not show drift or beat-grid visuals.
+   */
+  prescribedTempo: number | null;
+
+  /**
+   * User-prescribed time signature.
+   * Set via control op. Null means no explicit meter.
+   * When null, grammars should not show bar-boundary visuals.
+   */
+  prescribedMeter: TimeSignature | null;
 
   // Recent context (references, not copies)
   progression?: ChordId[]; // Recent chord history

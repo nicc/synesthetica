@@ -29,10 +29,18 @@
       }
     ],
     "chords": [],
-    "beat": null,
+    "rhythmicAnalysis": {
+      "detectedDivision": null,
+      "recentOnsets": [],
+      "stability": 0,
+      "confidence": 0,
+      "referenceOnset": null
+    },
     "dynamics": {
       "level": 0.7874015748031497,
       "trend": "stable"
-    }
+    },
+    "prescribedTempo": null,
+    "prescribedMeter": null
   }
 }

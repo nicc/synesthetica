@@ -25,8 +25,8 @@ import { TestRhythmGrammar } from "../../../src/grammars/TestRhythmGrammar";
 interface ExpectedOutput {
   entityCount: number;
   entityTypes: Record<string, number>; // type -> count
-  hasBeatPulse: boolean;
-  beatPulseIsDownbeat?: boolean;
+  hasRhythmPulse: boolean;
+  rhythmPulseIsDownbeat?: boolean;
 }
 
 type GrammarSequenceFixture = SequenceFixture<AnnotatedMusicalFrame, ExpectedOutput>;
@@ -59,20 +59,22 @@ function compareOutput(actual: SceneFrame, expected: ExpectedOutput): void {
     }
   }
 
-  // Check beat pulse
-  const beatPulse = actual.entities.find(e => e.data?.type === "beat-pulse");
-  if (expected.hasBeatPulse && !beatPulse) {
-    throw new Error("Expected beat-pulse entity but none found");
+  // Check rhythm pulse (either rhythm-pulse for prescribed tempo or division-indicator for historic-only)
+  const rhythmPulse = actual.entities.find(
+    e => e.data?.type === "rhythm-pulse" || e.data?.type === "division-indicator"
+  );
+  if (expected.hasRhythmPulse && !rhythmPulse) {
+    throw new Error("Expected rhythm-pulse or division-indicator entity but none found");
   }
-  if (!expected.hasBeatPulse && beatPulse) {
-    throw new Error("Unexpected beat-pulse entity found");
+  if (!expected.hasRhythmPulse && rhythmPulse) {
+    throw new Error("Unexpected rhythm-pulse or division-indicator entity found");
   }
 
   // Check downbeat status if specified
-  if (expected.hasBeatPulse && expected.beatPulseIsDownbeat !== undefined) {
-    if (beatPulse!.data!.isDownbeat !== expected.beatPulseIsDownbeat) {
+  if (expected.hasRhythmPulse && expected.rhythmPulseIsDownbeat !== undefined && rhythmPulse?.data?.type === "rhythm-pulse") {
+    if (rhythmPulse!.data!.isDownbeat !== expected.rhythmPulseIsDownbeat) {
       throw new Error(
-        `Beat pulse isDownbeat mismatch: expected ${expected.beatPulseIsDownbeat}, got ${beatPulse!.data!.isDownbeat}`
+        `Rhythm pulse isDownbeat mismatch: expected ${expected.rhythmPulseIsDownbeat}, got ${rhythmPulse!.data!.isDownbeat}`
       );
     }
   }
@@ -128,24 +130,23 @@ describe("TestRhythmGrammar golden tests", () => {
       grammar.init(ctx);
     });
 
-    it("produces beat pulse for frames with beat data", () => {
+    it("produces rhythm pulse for frames with prescribed tempo", () => {
       const frame: AnnotatedMusicalFrame = createMinimalFrame(0, {
-        hasBeat: true,
+        hasPrescribedTempo: true,
         isDownbeat: true,
         noteCount: 0,
       });
 
       const scene = grammar.update(frame, null);
 
-      const beatPulse = scene.entities.find(e => e.data?.type === "beat-pulse");
-      expect(beatPulse).toBeDefined();
-      expect(beatPulse!.data!.isDownbeat).toBe(true);
-      expect(beatPulse!.kind).toBe("field");
+      const rhythmPulse = scene.entities.find(e => e.data?.type === "rhythm-pulse");
+      expect(rhythmPulse).toBeDefined();
+      expect(rhythmPulse!.kind).toBe("field");
     });
 
     it("produces timing markers for notes", () => {
       const frame: AnnotatedMusicalFrame = createMinimalFrame(0, {
-        hasBeat: false,
+        hasPrescribedTempo: false,
         isDownbeat: false,
         noteCount: 3,
       });
@@ -159,7 +160,7 @@ describe("TestRhythmGrammar golden tests", () => {
 
     it("ignores chords in input", () => {
       const frame: AnnotatedMusicalFrame = createMinimalFrame(0, {
-        hasBeat: false,
+        hasPrescribedTempo: false,
         isDownbeat: false,
         noteCount: 2,
         chordCount: 2,
@@ -179,7 +180,7 @@ describe("TestRhythmGrammar golden tests", () => {
 
     it("respects palette colors from annotations", () => {
       const frame: AnnotatedMusicalFrame = createMinimalFrame(0, {
-        hasBeat: false,
+        hasPrescribedTempo: false,
         isDownbeat: false,
         noteCount: 1,
         noteHue: 180, // Cyan
@@ -194,7 +195,7 @@ describe("TestRhythmGrammar golden tests", () => {
 
     it("positions notes based on timing and pitch", () => {
       const frame: AnnotatedMusicalFrame = createMinimalFrame(0, {
-        hasBeat: false,
+        hasPrescribedTempo: false,
         isDownbeat: false,
         noteCount: 1,
         noteOctave: 5,
@@ -220,7 +221,7 @@ import { expect } from "vitest";
 function createMinimalFrame(
   t: number,
   options: {
-    hasBeat: boolean;
+    hasPrescribedTempo: boolean;
     isDownbeat: boolean;
     noteCount: number;
     chordCount?: number;
@@ -287,24 +288,23 @@ function createMinimalFrame(
     part: "main",
     notes,
     chords,
-    beat: options.hasBeat
-      ? {
-          beat: {
-            phase: 0,
-            tempo: 120,
-            confidence: 0.9,
-            beatInBar: options.isDownbeat ? 1 : 2,
-            beatsPerBar: 4,
-            isDownbeat: options.isDownbeat,
-          },
-          visual: {
-            palette: { id: "beat", primary: { h: 0, s: 0, v: 0.7, a: 1 } },
-            texture: { id: "beat", grain: 0.1, smoothness: 0.9, density: 0.5 },
-            motion: { jitter: 0, pulse: 1, flow: 0 },
-            uncertainty: 0.1,
-          },
-        }
-      : null,
+    rhythm: {
+      analysis: {
+        detectedDivision: options.hasPrescribedTempo ? 500 : null,
+        recentOnsets: options.hasPrescribedTempo ? [t] : [],
+        stability: options.hasPrescribedTempo ? 0.9 : 0,
+        confidence: options.hasPrescribedTempo ? 0.9 : 0,
+        referenceOnset: options.hasPrescribedTempo ? t : null,
+      },
+      visual: {
+        palette: { id: "rhythm", primary: { h: 0, s: 0, v: 0.7, a: 1 } },
+        texture: { id: "rhythm", grain: 0.1, smoothness: 0.9, density: 0.5 },
+        motion: { jitter: 0, pulse: 0.6, flow: 0 },
+        uncertainty: 0.1,
+      },
+      prescribedTempo: options.hasPrescribedTempo ? 120 : null,
+      prescribedMeter: options.hasPrescribedTempo && options.isDownbeat ? { beatsPerBar: 4, beatUnit: 4 } : null,
+    },
     bars: [],
     phrases: [],
     dynamics: {

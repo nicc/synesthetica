@@ -440,8 +440,16 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
       part: this.config.partId,
       notes: [],
       chords: [],
-      beat: null,
+      rhythmicAnalysis: {
+        detectedDivision: null,
+        recentOnsets: [],
+        stability: 0,
+        confidence: 0,
+        referenceOnset: null,
+      },
       dynamics: { level: 0, trend: "stable" },
+      prescribedTempo: null,
+      prescribedMeter: null,
       progression: this.recentChords.map((c) => c.id),
     };
   }

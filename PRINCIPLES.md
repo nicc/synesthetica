@@ -63,6 +63,21 @@ Components should:
 - Make parameters inspectable and adjustable
 - Avoid locking in aesthetic or pedagogical assumptions too early
 
+### 8. Experiential Feedback Through Simulation
+When developing algorithms or behaviors that are difficult to describe or predict:
+- Build diagnostic simulations that exercise the system with realistic input patterns
+- Use verbose logging to expose internal state and decision points
+- Analyze simulation output together before proposing implementation changes
+
+This approach:
+- Gives agents direct feedback loops without relying on human explanation of subjective experience
+- Exposes edge cases and failure modes that verbal description would miss
+- Creates a shared basis for reasoning about behavior
+
+Example: Testing beat detection with simulated MIDI sequences (subdivisions, rubato, tempo changes) rather than trying to describe "what feels wrong" about the output.
+
+Apply this principle whenever the system's behavior is experiential—where seeing it operate reveals more than describing it.
+
 ## Anti-Principles
 - Magic without explanation
 - Configuration without mental models
