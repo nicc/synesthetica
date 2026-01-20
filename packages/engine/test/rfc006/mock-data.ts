@@ -14,7 +14,6 @@ import type {
   AnnotatedNote,
   AnnotatedChord,
   AnnotatedDynamics,
-  VisualAnnotation,
   PaletteRef,
   TextureRef,
   MotionAnnotation,
@@ -22,7 +21,6 @@ import type {
 import type {
   Note,
   MusicalChord,
-  DynamicsState,
   Pitch,
   NoteId,
   ChordId,

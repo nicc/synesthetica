@@ -18,7 +18,7 @@ import { TestRhythmGrammar } from "../../src/grammars/TestRhythmGrammar";
 import { TestChordProgressionGrammar } from "../../src/grammars/TestChordProgressionGrammar";
 import { IdentityCompositor } from "../../src/stubs/IdentityCompositor";
 import { mockFrameSequence, frame1, frame3 } from "./mock-data";
-import type { GrammarContext, SceneFrame, Entity } from "@synesthetica/contracts";
+import type { GrammarContext, SceneFrame } from "@synesthetica/contracts";
 
 describe("RFC 006 Validation", () => {
   const ctx: GrammarContext = {
