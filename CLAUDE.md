@@ -359,9 +359,8 @@ git commit -m "bd sync"
 git commit -m "Add design gap issues for Phase 1 blockers
 
 - Macro-to-grammar parameter binding (synesthetica-1wq)
-- Entity lifecycle and decay semantics (synesthetica-ray)
 - Coordinate system conventions (synesthetica-khj)
-- 8 more spec gaps identified and tracked"
+- 6 more spec gaps identified and tracked"
 ```
 
 For mixed commits (code + issues), lead with the code change and mention issue work:

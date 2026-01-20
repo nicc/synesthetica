@@ -641,7 +641,7 @@ If the outputs are individually coherent and combined output is acceptable, proc
 4. Evaluate results
 
 ### Phase 4: Full Implementation (if validation passes)
-1. Update existing `VisualParticleGrammar` to new interface
+1. Develop production grammars (test grammars provide reference implementation)
 2. Update pipeline to use new flow
 3. Remove legacy `IntentFrame` code
 

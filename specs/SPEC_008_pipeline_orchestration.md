@@ -281,9 +281,65 @@ This orchestration model preserves all system invariants:
 
 The canonical implementation is `VisualPipeline` in `packages/engine/src/VisualPipeline.ts`.
 
+## Grammar Composition Model
+
+When multiple grammars are active within a part, their outputs combine additively.
+
+### Current Model: Additive Composition
+
+Each grammar receives the same `AnnotatedMusicalFrame` and produces its own `SceneFrame`. The compositor merges these frames by concatenating entity lists:
+
+```ts
+// Simplified composition
+const composed: SceneFrame = {
+  t: frames[0].t,
+  entities: frames.flatMap(f => f.entities),
+  diagnostics: frames.flatMap(f => f.diagnostics),
+};
+```
+
+### Design Constraints for Additive Composition
+
+For additive composition to produce coherent visuals, grammars must be designed to **not overlap**:
+
+1. **Non-overlapping entity types**: Each grammar should produce distinct visual entity types
+   - Example: TestRhythmGrammar produces `beat-pulse` and `timing-marker`
+   - Example: TestChordProgressionGrammar produces `chord-glow`, `chord-history`, `chord-note`
+   - These entity types never overlap, so combining grammars produces complementary visuals
+
+2. **Non-overlapping input consumption**: Grammars should focus on different aspects of the input
+   - Example: TestRhythmGrammar ignores chords entirely
+   - Example: TestChordProgressionGrammar ignores beat information
+   - This prevents "doubled" responses to the same musical event
+
+3. **Consistent palette usage**: Both grammars use the same visual annotations (palette colors from ruleset)
+   - Ensures visual coherence even when grammars produce different entity types
+   - Example: Both grammars use warm palette for major chords, cool palette for minor
+
+### Limitations
+
+This additive model works well when:
+- Grammars are designed as a complementary set
+- Presets curate compatible grammar combinations
+- Each grammar has a clear, non-overlapping visual domain
+
+It breaks down when:
+- Two grammars both respond to the same musical events with conflicting visuals
+- Grammars produce entities that visually compete for attention
+- No coordination exists between independent grammar authors
+
+### Future Work
+
+See synesthetica-n63 for exploration of more sophisticated composition models:
+- Priority-based layering
+- Domain declarations (grammar declares which channels it consumes)
+- Slot-based composition (grammars fill predefined visual slots)
+- Intent arbitration (intents merged before reaching grammars)
+
+For Phase 1, the additive model with carefully designed non-overlapping grammars is sufficient.
+
 ## What This Spec Does NOT Cover
 
-- Grammar stack composition within a part
 - Renderer implementation
 - Session persistence
 - Specific stabilizer implementations (see SPEC_006)
