@@ -352,4 +352,119 @@ describe("BeatDetectionStabilizer", () => {
       expect(stabilizer.id).toBe("beat-detection");
     });
   });
+
+  describe("drift tracking", () => {
+    it("reports drift when playing ahead of the beat", () => {
+      const upstream = makeUpstreamFrame(0);
+
+      // Establish tempo at 120 BPM (500ms per beat)
+      stabilizer.apply(makeFrame(0, [noteOn(60, 100, 0)]), upstream);
+      stabilizer.apply(makeFrame(500, [noteOn(64, 100, 500)]), upstream);
+      stabilizer.apply(makeFrame(1000, [noteOn(67, 100, 1000)]), upstream);
+      stabilizer.apply(makeFrame(1500, [noteOn(72, 100, 1500)]), upstream);
+      stabilizer.apply(makeFrame(2000, [noteOn(60, 100, 2000)]), upstream);
+
+      // Now play consistently early (450ms instead of 500ms intervals = rushing)
+      stabilizer.apply(makeFrame(2450, [noteOn(64, 100, 2450)]), upstream);
+      stabilizer.apply(makeFrame(2900, [noteOn(67, 100, 2900)]), upstream);
+      stabilizer.apply(makeFrame(3350, [noteOn(72, 100, 3350)]), upstream);
+      const result = stabilizer.apply(makeFrame(3800, [noteOn(60, 100, 3800)]), upstream);
+
+      expect(result.beat).not.toBeNull();
+      expect(result.beat!.drift).toBeDefined();
+      // Rushing = negative drift
+      expect(result.beat!.drift!).toBeLessThan(0);
+    });
+
+    it("reports drift when playing behind the beat", () => {
+      const upstream = makeUpstreamFrame(0);
+
+      // Establish tempo at 120 BPM
+      stabilizer.apply(makeFrame(0, [noteOn(60, 100, 0)]), upstream);
+      stabilizer.apply(makeFrame(500, [noteOn(64, 100, 500)]), upstream);
+      stabilizer.apply(makeFrame(1000, [noteOn(67, 100, 1000)]), upstream);
+      stabilizer.apply(makeFrame(1500, [noteOn(72, 100, 1500)]), upstream);
+      stabilizer.apply(makeFrame(2000, [noteOn(60, 100, 2000)]), upstream);
+
+      // Now play consistently late (550ms instead of 500ms intervals = dragging)
+      stabilizer.apply(makeFrame(2550, [noteOn(64, 100, 2550)]), upstream);
+      stabilizer.apply(makeFrame(3100, [noteOn(67, 100, 3100)]), upstream);
+      stabilizer.apply(makeFrame(3650, [noteOn(72, 100, 3650)]), upstream);
+      const result = stabilizer.apply(makeFrame(4200, [noteOn(60, 100, 4200)]), upstream);
+
+      expect(result.beat).not.toBeNull();
+      expect(result.beat!.drift).toBeDefined();
+      // Dragging = positive drift
+      expect(result.beat!.drift!).toBeGreaterThan(0);
+    });
+
+    it("reports near-zero drift when playing on the beat", () => {
+      const upstream = makeUpstreamFrame(0);
+
+      // Establish and maintain perfect timing
+      stabilizer.apply(makeFrame(0, [noteOn(60, 100, 0)]), upstream);
+      stabilizer.apply(makeFrame(500, [noteOn(64, 100, 500)]), upstream);
+      stabilizer.apply(makeFrame(1000, [noteOn(67, 100, 1000)]), upstream);
+      stabilizer.apply(makeFrame(1500, [noteOn(72, 100, 1500)]), upstream);
+      stabilizer.apply(makeFrame(2000, [noteOn(60, 100, 2000)]), upstream);
+      stabilizer.apply(makeFrame(2500, [noteOn(64, 100, 2500)]), upstream);
+      stabilizer.apply(makeFrame(3000, [noteOn(67, 100, 3000)]), upstream);
+      const result = stabilizer.apply(makeFrame(3500, [noteOn(72, 100, 3500)]), upstream);
+
+      expect(result.beat).not.toBeNull();
+      expect(result.beat!.drift).toBeDefined();
+      // Perfect timing = drift near zero
+      expect(Math.abs(result.beat!.drift!)).toBeLessThan(0.1);
+    });
+
+    it("reports instantaneous tempo", () => {
+      const upstream = makeUpstreamFrame(0);
+
+      // Establish tempo at 120 BPM
+      stabilizer.apply(makeFrame(0, [noteOn(60, 100, 0)]), upstream);
+      stabilizer.apply(makeFrame(500, [noteOn(64, 100, 500)]), upstream);
+      stabilizer.apply(makeFrame(1000, [noteOn(67, 100, 1000)]), upstream);
+      stabilizer.apply(makeFrame(1500, [noteOn(72, 100, 1500)]), upstream);
+      const result = stabilizer.apply(makeFrame(2000, [noteOn(60, 100, 2000)]), upstream);
+
+      expect(result.beat).not.toBeNull();
+      expect(result.beat!.instantaneousTempo).toBeDefined();
+      // Should be close to 120 BPM
+      expect(result.beat!.instantaneousTempo!).toBeCloseTo(120, 0);
+    });
+  });
+
+  describe("tempo stability", () => {
+    it("maintains locked tempo despite small variations", () => {
+      const stableStabilizer = new BeatDetectionStabilizer({
+        partId: "test-part",
+        minOnsets: 4,
+        minConfidence: 0.3,
+        driftBarsBeforeAdjust: 2,
+        driftThreshold: 0.15,
+      });
+      stableStabilizer.init();
+
+      const upstream = makeUpstreamFrame(0);
+
+      // Establish tempo at 120 BPM
+      stableStabilizer.apply(makeFrame(0, [noteOn(60, 100, 0)]), upstream);
+      stableStabilizer.apply(makeFrame(500, [noteOn(64, 100, 500)]), upstream);
+      stableStabilizer.apply(makeFrame(1000, [noteOn(67, 100, 1000)]), upstream);
+      stableStabilizer.apply(makeFrame(1500, [noteOn(72, 100, 1500)]), upstream);
+      stableStabilizer.apply(makeFrame(2000, [noteOn(60, 100, 2000)]), upstream);
+
+      const initialResult = stableStabilizer.apply(makeFrame(2500, [noteOn(64, 100, 2500)]), upstream);
+      const initialTempo = initialResult.beat!.tempo;
+
+      // Play with small variations (±20ms) - should NOT change locked tempo
+      stableStabilizer.apply(makeFrame(2980, [noteOn(67, 100, 2980)]), upstream); // 20ms early
+      stableStabilizer.apply(makeFrame(3520, [noteOn(72, 100, 3520)]), upstream); // 20ms late
+      stableStabilizer.apply(makeFrame(3990, [noteOn(60, 100, 3990)]), upstream); // 10ms early
+      const finalResult = stableStabilizer.apply(makeFrame(4510, [noteOn(64, 100, 4510)]), upstream); // 10ms late
+
+      // Tempo should remain stable (within 2 BPM of initial)
+      expect(Math.abs(finalResult.beat!.tempo! - initialTempo!)).toBeLessThan(2);
+    });
+  });
 });

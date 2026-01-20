@@ -100,6 +100,24 @@ export interface BeatState {
 
   /** True when this is the downbeat (beatInBar === 1) */
   isDownbeat: boolean;
+
+  /**
+   * Drift from the established beat grid, in range [-0.5, 0.5].
+   * - Negative = playing ahead (rushing)
+   * - Positive = playing behind (dragging)
+   * - Zero = on the beat
+   *
+   * This is a smoothed average of recent onset deviations from expected beat times.
+   * Grammars can use this to visualize timing accuracy.
+   */
+  drift?: number;
+
+  /**
+   * Instantaneous tempo of recent playing, in BPM.
+   * May differ from `tempo` (the locked/stable tempo).
+   * Useful for showing "you're speeding up" vs "you're slowing down".
+   */
+  instantaneousTempo?: number;
 }
 
 /**
