@@ -303,13 +303,13 @@ const composed: SceneFrame = {
 For additive composition to produce coherent visuals, grammars must be designed to **not overlap**:
 
 1. **Non-overlapping entity types**: Each grammar should produce distinct visual entity types
-   - Example: TestRhythmGrammar produces `beat-pulse` and `timing-marker`
+   - Example: TestRhythmGrammar produces `onset-marker`, `drift-ring`, `beat-line`, `bar-line`, `division-tick`, `downbeat-glow`
    - Example: TestChordProgressionGrammar produces `chord-glow`, `chord-history`, `chord-note`
    - These entity types never overlap, so combining grammars produces complementary visuals
 
 2. **Non-overlapping input consumption**: Grammars should focus on different aspects of the input
    - Example: TestRhythmGrammar ignores chords entirely
-   - Example: TestChordProgressionGrammar ignores beat information
+   - Example: TestChordProgressionGrammar ignores rhythm information
    - This prevents "doubled" responses to the same musical event
 
 3. **Consistent palette usage**: Both grammars use the same visual annotations (palette colors from ruleset)

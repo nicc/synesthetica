@@ -11,6 +11,13 @@
  * - Grammars correctly filter (rhythm ignores chords, chord ignores beats)
  * - Both respect visual annotations (palette colors are used)
  * - Composed output doesn't degrade into visual mud
+ *
+ * Note: The rhythm grammar now uses a three-tier visualization system:
+ * - Tier 1: onset-marker, division-tick (historic-only)
+ * - Tier 2: onset-marker, beat-line, drift-ring (tempo-relative)
+ * - Tier 3: onset-marker, beat-line, bar-line, drift-ring, downbeat-glow (meter-relative)
+ *
+ * The mock data has prescribedTempo and prescribedMeter, so it's tier 3.
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
@@ -41,17 +48,24 @@ describe("RFC 006 Validation", () => {
       expect(scene.t).toBe(0);
       expect(scene.entities.length).toBeGreaterThan(0);
 
-      // Should have rhythm pulse (when prescribedTempo is set)
-      const rhythmPulse = scene.entities.find(
-        (e) => e.data?.type === "rhythm-pulse"
+      // Mock data has prescribedTempo + prescribedMeter = tier 3
+      // Should have beat-line and bar-line entities
+      const beatLines = scene.entities.filter(
+        (e) => e.data?.type === "beat-line"
       );
-      expect(rhythmPulse).toBeDefined();
+      expect(beatLines.length).toBeGreaterThan(0);
 
-      // Should have note markers for all 3 notes
-      const noteMarkers = scene.entities.filter(
-        (e) => e.data?.type === "timing-marker"
+      // Should have onset markers for all 3 notes
+      const onsetMarkers = scene.entities.filter(
+        (e) => e.data?.type === "onset-marker"
       );
-      expect(noteMarkers.length).toBe(3);
+      expect(onsetMarkers.length).toBe(3);
+
+      // Should have drift rings for the notes (tier 2+)
+      const driftRings = scene.entities.filter(
+        (e) => e.data?.type === "drift-ring"
+      );
+      expect(driftRings.length).toBe(3);
     });
 
     it("ignores chords entirely", () => {
@@ -66,24 +80,24 @@ describe("RFC 006 Validation", () => {
       );
       expect(chordEntities.length).toBe(0);
 
-      // Should still have note markers though (6 notes in frame 3)
-      const noteMarkers = scene.entities.filter(
-        (e) => e.data?.type === "timing-marker"
+      // Should still have onset markers though (6 notes in frame 3)
+      const onsetMarkers = scene.entities.filter(
+        (e) => e.data?.type === "onset-marker"
       );
-      expect(noteMarkers.length).toBe(6);
+      expect(onsetMarkers.length).toBe(6);
     });
 
     it("uses palette colors from annotations", () => {
       const scene = grammar.update(frame1, null);
 
-      const noteMarker = scene.entities.find(
-        (e) => e.data?.type === "timing-marker"
+      const onsetMarker = scene.entities.find(
+        (e) => e.data?.type === "onset-marker"
       );
-      expect(noteMarker).toBeDefined();
+      expect(onsetMarker).toBeDefined();
 
       // Frame 1 notes have warm palette (orange hue ~30)
-      expect(noteMarker!.style.color).toBeDefined();
-      expect(noteMarker!.style.color!.h).toBeCloseTo(30, 0);
+      expect(onsetMarker!.style.color).toBeDefined();
+      expect(onsetMarker!.style.color!.h).toBeCloseTo(30, 0);
     });
 
     it("processes full sequence without errors", () => {
@@ -126,7 +140,11 @@ describe("RFC 006 Validation", () => {
       // Frame 1 has rhythm information
       // But chord grammar should produce no rhythm-related entities
       const rhythmEntities = scene.entities.filter(
-        (e) => e.data?.type === "rhythm-pulse" || e.data?.type === "division-indicator"
+        (e) => e.data?.type === "beat-line" ||
+               e.data?.type === "bar-line" ||
+               e.data?.type === "division-tick" ||
+               e.data?.type === "drift-ring" ||
+               e.data?.type === "downbeat-glow"
       );
       expect(rhythmEntities.length).toBe(0);
     });
@@ -218,11 +236,11 @@ describe("RFC 006 Validation", () => {
         rhythmScene.entities.length + chordScene.entities.length
       );
 
-      // Should have rhythm pulse from rhythm grammar
-      const rhythmPulse = composed.entities.find(
-        (e) => e.data?.type === "rhythm-pulse"
+      // Should have beat-line from rhythm grammar (tier 3)
+      const beatLine = composed.entities.find(
+        (e) => e.data?.type === "beat-line"
       );
-      expect(rhythmPulse).toBeDefined();
+      expect(beatLine).toBeDefined();
 
       // Should have chord glow from chord grammar
       const chordGlow = composed.entities.find(
@@ -299,11 +317,11 @@ describe("RFC 006 Validation", () => {
       const rhythmScene = rhythmGrammar.update(frame1, null);
       const chordScene = chordGrammar.update(frame1, null);
 
-      // Rhythm grammar: note markers should be orange
-      const noteMarker = rhythmScene.entities.find(
-        (e) => e.data?.type === "timing-marker"
+      // Rhythm grammar: onset markers should be orange
+      const onsetMarker = rhythmScene.entities.find(
+        (e) => e.data?.type === "onset-marker"
       );
-      expect(noteMarker!.style.color!.h).toBeCloseTo(30, 5); // Orange
+      expect(onsetMarker!.style.color!.h).toBeCloseTo(30, 5); // Orange
 
       // Chord grammar: chord glow should be orange
       const chordGlow = chordScene.entities.find(
@@ -323,11 +341,11 @@ describe("RFC 006 Validation", () => {
       const rhythmScene = rhythmGrammar.update(mockFrameSequence[3], null);
       const chordScene = chordGrammar.update(mockFrameSequence[3], null);
 
-      // Rhythm grammar: note markers should be blue
-      const noteMarker = rhythmScene.entities.find(
-        (e) => e.data?.type === "timing-marker"
+      // Rhythm grammar: onset markers should be blue
+      const onsetMarker = rhythmScene.entities.find(
+        (e) => e.data?.type === "onset-marker"
       );
-      expect(noteMarker!.style.color!.h).toBeCloseTo(220, 5); // Blue
+      expect(onsetMarker!.style.color!.h).toBeCloseTo(220, 5); // Blue
 
       // Chord grammar: chord glow should be blue
       const chordGlow = chordScene.entities.find(

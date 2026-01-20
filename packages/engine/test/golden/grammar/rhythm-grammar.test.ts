@@ -1,11 +1,15 @@
 /**
- * Golden Tests: TestRhythmGrammar
+ * Golden Tests: TestRhythmGrammar (Three-Tier Visualization)
  *
  * Tests the AnnotatedMusicalFrame → SceneFrame boundary for the rhythm grammar.
- * Verifies that annotated musical frames produce correct scene entities.
+ * Verifies that the three-tier visualization produces correct scene entities:
+ *
+ * Tier 1 (Historic-only): onset-marker, division-tick
+ * Tier 2 (Tempo-relative): onset-marker, beat-line, drift-ring
+ * Tier 3 (Meter-relative): onset-marker, beat-line, bar-line, drift-ring, downbeat-glow
  */
 
-import { describe, it, beforeEach } from "vitest";
+import { describe, it, beforeEach, expect } from "vitest";
 import {
   loadFixturesFromDir,
   type SequenceFixture,
@@ -19,14 +23,11 @@ import { TestRhythmGrammar } from "../../../src/grammars/TestRhythmGrammar";
 
 /**
  * Expected output shape for grammar fixtures.
- * We check entity counts and types rather than exact entity contents,
- * since entity IDs are generated dynamically.
  */
 interface ExpectedOutput {
-  entityCount: number;
-  entityTypes: Record<string, number>; // type -> count
-  hasRhythmPulse: boolean;
-  rhythmPulseIsDownbeat?: boolean;
+  entityCount?: number;
+  entityTypes: Record<string, number>;
+  tier: 1 | 2 | 3;
 }
 
 type GrammarSequenceFixture = SequenceFixture<AnnotatedMusicalFrame, ExpectedOutput>;
@@ -35,14 +36,6 @@ type GrammarSequenceFixture = SequenceFixture<AnnotatedMusicalFrame, ExpectedOut
  * Compare actual SceneFrame against expected output.
  */
 function compareOutput(actual: SceneFrame, expected: ExpectedOutput): void {
-  // Check total entity count
-  if (actual.entities.length !== expected.entityCount) {
-    throw new Error(
-      `Entity count mismatch: expected ${expected.entityCount}, got ${actual.entities.length}\n` +
-      `Entities: ${JSON.stringify(actual.entities.map(e => e.data?.type), null, 2)}`
-    );
-  }
-
   // Check entity type counts
   const actualTypeCounts: Record<string, number> = {};
   for (const entity of actual.entities) {
@@ -59,24 +52,12 @@ function compareOutput(actual: SceneFrame, expected: ExpectedOutput): void {
     }
   }
 
-  // Check rhythm pulse (either rhythm-pulse for prescribed tempo or division-indicator for historic-only)
-  const rhythmPulse = actual.entities.find(
-    e => e.data?.type === "rhythm-pulse" || e.data?.type === "division-indicator"
-  );
-  if (expected.hasRhythmPulse && !rhythmPulse) {
-    throw new Error("Expected rhythm-pulse or division-indicator entity but none found");
-  }
-  if (!expected.hasRhythmPulse && rhythmPulse) {
-    throw new Error("Unexpected rhythm-pulse or division-indicator entity found");
-  }
-
-  // Check downbeat status if specified
-  if (expected.hasRhythmPulse && expected.rhythmPulseIsDownbeat !== undefined && rhythmPulse?.data?.type === "rhythm-pulse") {
-    if (rhythmPulse!.data!.isDownbeat !== expected.rhythmPulseIsDownbeat) {
-      throw new Error(
-        `Rhythm pulse isDownbeat mismatch: expected ${expected.rhythmPulseIsDownbeat}, got ${rhythmPulse!.data!.isDownbeat}`
-      );
-    }
+  // Check total entity count if specified
+  if (expected.entityCount !== undefined && actual.entities.length !== expected.entityCount) {
+    throw new Error(
+      `Entity count mismatch: expected ${expected.entityCount}, got ${actual.entities.length}\n` +
+      `Entities: ${JSON.stringify(actualTypeCounts, null, 2)}`
+    );
   }
 }
 
@@ -121,8 +102,11 @@ describe("TestRhythmGrammar golden tests", () => {
     });
   }
 
-  // Inline tests for common scenarios (don't require fixture files)
-  describe("inline tests", () => {
+  // ============================================================================
+  // Tier 1: Historic-only (no prescribed tempo)
+  // ============================================================================
+
+  describe("Tier 1: Historic-only", () => {
     let grammar: TestRhythmGrammar;
 
     beforeEach(() => {
@@ -130,47 +114,273 @@ describe("TestRhythmGrammar golden tests", () => {
       grammar.init(ctx);
     });
 
-    it("produces rhythm pulse for frames with prescribed tempo", () => {
-      const frame: AnnotatedMusicalFrame = createMinimalFrame(0, {
-        hasPrescribedTempo: true,
-        isDownbeat: true,
-        noteCount: 0,
-      });
-
-      const scene = grammar.update(frame, null);
-
-      const rhythmPulse = scene.entities.find(e => e.data?.type === "rhythm-pulse");
-      expect(rhythmPulse).toBeDefined();
-      expect(rhythmPulse!.kind).toBe("field");
-    });
-
-    it("produces timing markers for notes", () => {
-      const frame: AnnotatedMusicalFrame = createMinimalFrame(0, {
-        hasPrescribedTempo: false,
-        isDownbeat: false,
+    it("produces onset markers for notes without tempo", () => {
+      const frame = createMinimalFrame(0, {
+        tier: 1,
         noteCount: 3,
       });
 
       const scene = grammar.update(frame, null);
 
-      const markers = scene.entities.filter(e => e.data?.type === "timing-marker");
+      const markers = scene.entities.filter(e => e.data?.type === "onset-marker");
       expect(markers.length).toBe(3);
       expect(markers[0].kind).toBe("particle");
     });
 
-    it("ignores chords in input", () => {
-      const frame: AnnotatedMusicalFrame = createMinimalFrame(0, {
-        hasPrescribedTempo: false,
-        isDownbeat: false,
+    it("produces division ticks when division is detected", () => {
+      const frame = createMinimalFrame(1000, {
+        tier: 1,
+        noteCount: 1,
+        detectedDivision: 500,
+        referenceOnset: 0,
+      });
+
+      const scene = grammar.update(frame, null);
+
+      const ticks = scene.entities.filter(e => e.data?.type === "division-tick");
+      expect(ticks.length).toBeGreaterThan(0);
+    });
+
+    it("positions onset markers by pitch octave (y-axis)", () => {
+      const frame = createMinimalFrame(0, {
+        tier: 1,
+        noteCount: 1,
+        noteOctave: 6,
+      });
+
+      const scene = grammar.update(frame, null);
+
+      const marker = scene.entities.find(e => e.data?.type === "onset-marker");
+      expect(marker).toBeDefined();
+      // Higher octave = higher on screen = lower y value
+      expect(marker!.position!.y).toBeLessThan(0.5);
+    });
+
+    it("respects palette colors from annotations (never overrides)", () => {
+      const frame = createMinimalFrame(0, {
+        tier: 1,
+        noteCount: 1,
+        noteHue: 180, // Cyan
+      });
+
+      const scene = grammar.update(frame, null);
+
+      const marker = scene.entities.find(e => e.data?.type === "onset-marker");
+      expect(marker).toBeDefined();
+      expect(marker!.style.color!.h).toBeCloseTo(180, 1);
+    });
+  });
+
+  // ============================================================================
+  // Tier 2: Tempo-relative (prescribed tempo, no meter)
+  // ============================================================================
+
+  describe("Tier 2: Tempo-relative", () => {
+    let grammar: TestRhythmGrammar;
+
+    beforeEach(() => {
+      grammar = new TestRhythmGrammar();
+      grammar.init(ctx);
+    });
+
+    it("produces beat-line entities at beat intervals", () => {
+      const frame = createMinimalFrame(1000, {
+        tier: 2,
+        noteCount: 0,
+        prescribedTempo: 120, // 500ms per beat
+        referenceOnset: 0,
+      });
+
+      const scene = grammar.update(frame, null);
+
+      const beatLines = scene.entities.filter(e => e.data?.type === "beat-line");
+      expect(beatLines.length).toBeGreaterThan(0);
+      expect(beatLines[0].kind).toBe("field");
+    });
+
+    it("produces drift rings for notes", () => {
+      const frame = createMinimalFrame(500, {
+        tier: 2,
+        noteCount: 1,
+        prescribedTempo: 120,
+        referenceOnset: 0,
+      });
+
+      const scene = grammar.update(frame, null);
+
+      const driftRings = scene.entities.filter(e => e.data?.type === "drift-ring");
+      expect(driftRings.length).toBe(1);
+      expect(driftRings[0].kind).toBe("field");
+    });
+
+    it("drift ring color reflects timing accuracy", () => {
+      // Note exactly on beat
+      const frameOnBeat = createMinimalFrame(500, {
+        tier: 2,
+        noteCount: 1,
+        prescribedTempo: 120,
+        referenceOnset: 0,
+        noteOnset: 500, // Exactly on beat
+      });
+
+      const sceneOnBeat = grammar.update(frameOnBeat, null);
+      const ringOnBeat = sceneOnBeat.entities.find(e => e.data?.type === "drift-ring");
+      expect(ringOnBeat!.data!.driftCategory).toBe("good");
+
+      // Reset grammar
+      grammar = new TestRhythmGrammar();
+      grammar.init(ctx);
+
+      // Note off beat
+      const frameOffBeat = createMinimalFrame(650, {
+        tier: 2,
+        noteCount: 1,
+        prescribedTempo: 120,
+        referenceOnset: 0,
+        noteOnset: 650, // 150ms late = 30% of beat
+      });
+
+      const sceneOffBeat = grammar.update(frameOffBeat, null);
+      const ringOffBeat = sceneOffBeat.entities.find(e => e.data?.type === "drift-ring");
+      expect(ringOffBeat!.data!.driftCategory).toBe("bad");
+    });
+
+    it("positions onset markers by drift (y-axis) not pitch", () => {
+      const frame = createMinimalFrame(500, {
+        tier: 2,
+        noteCount: 1,
+        prescribedTempo: 120,
+        referenceOnset: 0,
+        noteOnset: 500, // Exactly on beat
+      });
+
+      const scene = grammar.update(frame, null);
+
+      const marker = scene.entities.find(e => e.data?.type === "onset-marker");
+      expect(marker).toBeDefined();
+      // On beat = centered vertically
+      expect(marker!.position!.y).toBeCloseTo(0.5, 1);
+    });
+
+    it("does NOT produce bar lines (tier 2 has no meter)", () => {
+      const frame = createMinimalFrame(1000, {
+        tier: 2,
+        noteCount: 0,
+        prescribedTempo: 120,
+        referenceOnset: 0,
+      });
+
+      const scene = grammar.update(frame, null);
+
+      const barLines = scene.entities.filter(e => e.data?.type === "bar-line");
+      expect(barLines.length).toBe(0);
+    });
+  });
+
+  // ============================================================================
+  // Tier 3: Meter-relative (prescribed tempo + meter)
+  // ============================================================================
+
+  describe("Tier 3: Meter-relative", () => {
+    let grammar: TestRhythmGrammar;
+
+    beforeEach(() => {
+      grammar = new TestRhythmGrammar();
+      grammar.init(ctx);
+    });
+
+    it("produces both beat-lines and bar-lines", () => {
+      const frame = createMinimalFrame(3000, {
+        tier: 3,
+        noteCount: 0,
+        prescribedTempo: 120,
+        prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
+        referenceOnset: 0,
+      });
+
+      const scene = grammar.update(frame, null);
+
+      const beatLines = scene.entities.filter(e => e.data?.type === "beat-line");
+      const barLines = scene.entities.filter(e => e.data?.type === "bar-line");
+
+      expect(beatLines.length).toBeGreaterThan(0);
+      expect(barLines.length).toBeGreaterThan(0);
+    });
+
+    it("produces downbeat glow near bar start", () => {
+      // At t=100, we're 100ms into a bar (still in glow window)
+      const frame = createMinimalFrame(100, {
+        tier: 3,
+        noteCount: 0,
+        prescribedTempo: 120,
+        prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
+        referenceOnset: 0,
+      });
+
+      const scene = grammar.update(frame, null);
+
+      const downbeatGlow = scene.entities.find(e => e.data?.type === "downbeat-glow");
+      expect(downbeatGlow).toBeDefined();
+      expect(downbeatGlow!.kind).toBe("field");
+    });
+
+    it("no downbeat glow mid-bar", () => {
+      // At t=1000 (beat 2), we're past the glow window
+      const frame = createMinimalFrame(1000, {
+        tier: 3,
+        noteCount: 0,
+        prescribedTempo: 120,
+        prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
+        referenceOnset: 0,
+      });
+
+      const scene = grammar.update(frame, null);
+
+      const downbeatGlow = scene.entities.find(e => e.data?.type === "downbeat-glow");
+      expect(downbeatGlow).toBeUndefined();
+    });
+
+    it("bar lines are more prominent than beat lines", () => {
+      const frame = createMinimalFrame(3000, {
+        tier: 3,
+        noteCount: 0,
+        prescribedTempo: 120,
+        prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
+        referenceOnset: 0,
+      });
+
+      const scene = grammar.update(frame, null);
+
+      const beatLine = scene.entities.find(e => e.data?.type === "beat-line");
+      const barLine = scene.entities.find(e => e.data?.type === "bar-line");
+
+      expect(beatLine).toBeDefined();
+      expect(barLine).toBeDefined();
+      // Bar lines should be larger/more prominent
+      expect(barLine!.style.size).toBeGreaterThan(beatLine!.style.size!);
+    });
+  });
+
+  // ============================================================================
+  // Cross-tier behavior
+  // ============================================================================
+
+  describe("Cross-tier behavior", () => {
+    let grammar: TestRhythmGrammar;
+
+    beforeEach(() => {
+      grammar = new TestRhythmGrammar();
+      grammar.init(ctx);
+    });
+
+    it("ignores chords entirely", () => {
+      const frame = createMinimalFrame(0, {
+        tier: 1,
         noteCount: 2,
         chordCount: 2,
       });
 
       const scene = grammar.update(frame, null);
-
-      // Should have 2 note markers, no chord entities
-      const markers = scene.entities.filter(e => e.data?.type === "timing-marker");
-      expect(markers.length).toBe(2);
 
       const chordEntities = scene.entities.filter(
         e => e.data?.type === "chord-glow" || e.data?.type === "chord-history"
@@ -178,42 +388,59 @@ describe("TestRhythmGrammar golden tests", () => {
       expect(chordEntities.length).toBe(0);
     });
 
-    it("respects palette colors from annotations", () => {
-      const frame: AnnotatedMusicalFrame = createMinimalFrame(0, {
-        hasPrescribedTempo: false,
-        isDownbeat: false,
+    it("onset markers scroll left over time", () => {
+      const frame1 = createMinimalFrame(0, {
+        tier: 1,
         noteCount: 1,
-        noteHue: 180, // Cyan
+        noteOnset: 0,
       });
 
-      const scene = grammar.update(frame, null);
+      const scene1 = grammar.update(frame1, null);
+      const marker1 = scene1.entities.find(e => e.data?.type === "onset-marker");
+      const x1 = marker1!.position!.x;
 
-      const marker = scene.entities.find(e => e.data?.type === "timing-marker");
-      expect(marker).toBeDefined();
-      expect(marker!.style.color!.h).toBeCloseTo(180, 1);
+      // Same note, 1 second later
+      const frame2 = createMinimalFrame(1000, {
+        tier: 1,
+        noteCount: 1,
+        noteOnset: 0,
+      });
+
+      const scene2 = grammar.update(frame2, scene1);
+      const marker2 = scene2.entities.find(e => e.data?.type === "onset-marker");
+      const x2 = marker2!.position!.x;
+
+      // Marker should have moved left
+      expect(x2).toBeLessThan(x1);
     });
 
-    it("positions notes based on timing and pitch", () => {
-      const frame: AnnotatedMusicalFrame = createMinimalFrame(0, {
-        hasPrescribedTempo: false,
-        isDownbeat: false,
+    it("markers fade over time", () => {
+      const frame1 = createMinimalFrame(0, {
+        tier: 1,
         noteCount: 1,
-        noteOctave: 5,
+        noteOnset: 0,
       });
 
-      const scene = grammar.update(frame, null);
+      const scene1 = grammar.update(frame1, null);
+      const marker1 = scene1.entities.find(e => e.data?.type === "onset-marker");
+      const opacity1 = marker1!.style.opacity!;
 
-      const marker = scene.entities.find(e => e.data?.type === "timing-marker");
-      expect(marker).toBeDefined();
-      expect(marker!.position).toBeDefined();
-      // Higher octave = higher on screen (lower y in normalized coords)
-      expect(marker!.position!.y).toBeLessThan(0.5);
+      // Same note, 2 seconds later
+      const frame2 = createMinimalFrame(2000, {
+        tier: 1,
+        noteCount: 1,
+        noteOnset: 0,
+      });
+
+      const scene2 = grammar.update(frame2, scene1);
+      const marker2 = scene2.entities.find(e => e.data?.type === "onset-marker");
+      const opacity2 = marker2!.style.opacity!;
+
+      // Marker should have faded
+      expect(opacity2).toBeLessThan(opacity1);
     });
   });
 });
-
-// Helper to import expect from vitest (needed for inline tests)
-import { expect } from "vitest";
 
 /**
  * Create a minimal AnnotatedMusicalFrame for testing.
@@ -221,14 +448,19 @@ import { expect } from "vitest";
 function createMinimalFrame(
   t: number,
   options: {
-    hasPrescribedTempo: boolean;
-    isDownbeat: boolean;
+    tier: 1 | 2 | 3;
     noteCount: number;
     chordCount?: number;
     noteHue?: number;
     noteOctave?: number;
+    noteOnset?: number;
+    prescribedTempo?: number;
+    prescribedMeter?: { beatsPerBar: number; beatUnit: number };
+    detectedDivision?: number | null;
+    referenceOnset?: number | null;
   }
 ): AnnotatedMusicalFrame {
+  const noteOnset = options.noteOnset ?? t;
   const notes = [];
   for (let i = 0; i < options.noteCount; i++) {
     notes.push({
@@ -236,7 +468,7 @@ function createMinimalFrame(
         id: `note-${i}`,
         pitch: { pc: i % 12, octave: options.noteOctave ?? 4 },
         velocity: 80,
-        onset: t,
+        onset: noteOnset,
         duration: 0,
         release: null,
         phase: "sustain" as const,
@@ -283,6 +515,10 @@ function createMinimalFrame(
     });
   }
 
+  // Determine tempo and meter based on tier
+  const prescribedTempo = options.tier >= 2 ? (options.prescribedTempo ?? 120) : null;
+  const prescribedMeter = options.tier === 3 ? (options.prescribedMeter ?? { beatsPerBar: 4, beatUnit: 4 }) : null;
+
   return {
     t,
     part: "main",
@@ -290,11 +526,11 @@ function createMinimalFrame(
     chords,
     rhythm: {
       analysis: {
-        detectedDivision: options.hasPrescribedTempo ? 500 : null,
-        recentOnsets: options.hasPrescribedTempo ? [t] : [],
-        stability: options.hasPrescribedTempo ? 0.9 : 0,
-        confidence: options.hasPrescribedTempo ? 0.9 : 0,
-        referenceOnset: options.hasPrescribedTempo ? t : null,
+        detectedDivision: options.detectedDivision ?? (prescribedTempo !== null ? 60000 / prescribedTempo : null),
+        recentOnsets: prescribedTempo !== null ? [t] : [],
+        stability: prescribedTempo !== null ? 0.9 : 0,
+        confidence: prescribedTempo !== null ? 0.9 : 0,
+        referenceOnset: options.referenceOnset ?? (prescribedTempo !== null ? 0 : null),
       },
       visual: {
         palette: { id: "rhythm", primary: { h: 0, s: 0, v: 0.7, a: 1 } },
@@ -302,8 +538,8 @@ function createMinimalFrame(
         motion: { jitter: 0, pulse: 0.6, flow: 0 },
         uncertainty: 0.1,
       },
-      prescribedTempo: options.hasPrescribedTempo ? 120 : null,
-      prescribedMeter: options.hasPrescribedTempo && options.isDownbeat ? { beatsPerBar: 4, beatUnit: 4 } : null,
+      prescribedTempo,
+      prescribedMeter,
     },
     bars: [],
     phrases: [],

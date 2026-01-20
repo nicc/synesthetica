@@ -1,19 +1,23 @@
 /**
- * Test Rhythm Grammar (RFC 006)
+ * Test Rhythm Grammar - Three-Tier Visualization (RFC 006, Issue synesthetica-zv3)
  *
- * A rhythm-focused grammar that emphasizes beats and note timing.
- * Renders notes as timing indicators on a horizontal timeline.
- * Largely ignores harmonic content (chords).
+ * Visualizes rhythm with progressive enhancement based on available context:
  *
- * Visual strategy:
- * - Beat pulses as vertical lines that flash on downbeats
- * - Notes as small markers positioned by their timing relative to beats
- * - Uses palette from annotations for coloring, ignores texture
+ * Tier 1 (Historic-only): No prescribed tempo
+ * - Onset markers scroll left and fade over time
+ * - Optional: subtle ticks when a division is detected
  *
- * This grammar demonstrates:
- * - Filtering: ignores chords entirely
- * - Interpretation: notes become timing markers, not particles
- * - Palette respect: uses annotation colors while choosing its own shapes
+ * Tier 2 (Tempo-relative): prescribedTempo set
+ * - Beat grid lines at prescribed intervals
+ * - Onset markers positioned vertically by drift from nearest beat
+ * - Drift rings around markers (green=tight, yellow=loose, red=off)
+ *
+ * Tier 3 (Meter-relative): prescribedTempo + prescribedMeter set
+ * - Bar lines emphasized over beat lines
+ * - Downbeat glow on beat 1 of each bar
+ *
+ * Key principle: Each tier REPLACES previous decoration, not adds.
+ * Drift rings indicate timing accuracy without overriding marker's core color.
  */
 
 import type {
@@ -25,84 +29,117 @@ import type {
   EntityId,
   AnnotatedNote,
   AnnotatedRhythm,
+  ColorHSVA,
 } from "@synesthetica/contracts";
 
-/**
- * Internal state for tracking entities across frames.
- */
+// ============================================================================
+// Configuration
+// ============================================================================
+
+/** Timeline window in milliseconds (how much history we show) */
+const WINDOW_MS = 4000;
+
+/** Maximum vertical drift range (center ± this amount) */
+const DRIFT_RANGE = 0.3;
+
+/** Drift thresholds for color coding */
+const DRIFT_THRESHOLDS = {
+  good: 0.1, // Within 10% of beat = green
+  warning: 0.25, // Within 25% = yellow
+  // Beyond 25% = red
+};
+
+/** Drift ring colors (HSV with alpha) */
+const DRIFT_COLORS: Record<"good" | "warning" | "bad", ColorHSVA> = {
+  good: { h: 120, s: 0.7, v: 0.8, a: 0.6 }, // Green
+  warning: { h: 45, s: 0.8, v: 0.9, a: 0.6 }, // Yellow/orange
+  bad: { h: 0, s: 0.7, v: 0.8, a: 0.6 }, // Red
+};
+
+/** Grid line colors */
+const GRID_COLORS = {
+  beatLine: { h: 0, s: 0, v: 0.4, a: 0.3 } as ColorHSVA,
+  barLine: { h: 0, s: 0, v: 0.6, a: 0.5 } as ColorHSVA,
+  divisionTick: { h: 0, s: 0, v: 0.3, a: 0.2 } as ColorHSVA,
+};
+
+// ============================================================================
+// Types
+// ============================================================================
+
 interface RhythmGrammarState {
-  /** Active note markers */
-  noteMarkers: Map<string, Entity>;
-
-  /** Beat pulse entity (reused) */
-  beatPulse: Entity | null;
-
-  /** Entity ID counter */
   nextId: number;
+  ctx: GrammarContext | null;
 }
+
+type Tier = 1 | 2 | 3;
+
+// ============================================================================
+// Grammar Implementation
+// ============================================================================
 
 export class TestRhythmGrammar implements IVisualGrammar {
   readonly id = "test-rhythm-grammar";
 
   private state: RhythmGrammarState = {
-    noteMarkers: new Map(),
-    beatPulse: null,
     nextId: 0,
+    ctx: null,
   };
 
-  init(_ctx: GrammarContext): void {
+  init(ctx: GrammarContext): void {
     this.state = {
-      noteMarkers: new Map(),
-      beatPulse: null,
       nextId: 0,
+      ctx,
     };
   }
 
   dispose(): void {
-    this.state.noteMarkers.clear();
-    this.state.beatPulse = null;
+    this.state.ctx = null;
   }
 
   update(input: AnnotatedMusicalFrame, _previous: SceneFrame | null): SceneFrame {
     const entities: Entity[] = [];
     const t = input.t;
     const part = input.part;
+    const rhythm = input.rhythm;
 
-    // 1. Render rhythm visualization
-    // Only show beat-relative visuals when prescribedTempo is set
-    if (input.rhythm.prescribedTempo !== null) {
-      const rhythmEntity = this.createRhythmPulse(input.rhythm, t, part);
-      entities.push(rhythmEntity);
-    } else if (input.rhythm.analysis.detectedDivision !== null) {
-      // Show historic-only visualization when no prescribed tempo
-      const divisionEntity = this.createDivisionIndicator(input.rhythm, t, part);
-      entities.push(divisionEntity);
-    }
+    // Determine which tier we're operating at
+    const tier = this.determineTier(rhythm);
 
-    // 2. Render notes as timing markers on a horizontal timeline
-    // Track which notes we've seen this frame
-    const seenNoteIds = new Set<string>();
+    // Render grid/background elements based on tier
+    if (tier === 1 && rhythm.analysis.detectedDivision !== null) {
+      // Tier 1: Division ticks only
+      entities.push(...this.createDivisionTicks(rhythm, t, part));
+    } else if (tier >= 2) {
+      // Tier 2+: Beat grid
+      entities.push(...this.createBeatGrid(rhythm, t, part));
 
-    for (const annotatedNote of input.notes) {
-      seenNoteIds.add(annotatedNote.note.id);
-
-      // Create or update marker
-      const marker = this.createNoteMarker(annotatedNote, t, part);
-      this.state.noteMarkers.set(annotatedNote.note.id, marker);
-      entities.push(marker);
-    }
-
-    // 3. Remove markers for notes that are no longer present
-    for (const [noteId] of this.state.noteMarkers) {
-      if (!seenNoteIds.has(noteId)) {
-        // Note is gone - could add fade-out logic here
-        // For now, just remove immediately
-        this.state.noteMarkers.delete(noteId);
+      if (tier === 3) {
+        // Tier 3: Bar grid overlays beat grid (emphasized bar lines)
+        entities.push(...this.createBarGrid(rhythm, t, part));
+        // Downbeat glow
+        const downbeatGlow = this.createDownbeatGlow(rhythm, t, part);
+        if (downbeatGlow) {
+          entities.push(downbeatGlow);
+        }
       }
     }
 
-    // Note: We completely ignore input.chords - this grammar doesn't care about harmony
+    // Render onset markers for all notes
+    for (const annotatedNote of input.notes) {
+      const marker = this.createOnsetMarker(annotatedNote, rhythm, t, part, tier);
+      entities.push(marker);
 
+      // Add drift ring in tier 2+
+      if (tier >= 2) {
+        const driftRing = this.createDriftRing(annotatedNote, rhythm, t, part);
+        if (driftRing) {
+          entities.push(driftRing);
+        }
+      }
+    }
+
+    // We ignore chords entirely - this grammar focuses on rhythm
     return {
       t,
       entities,
@@ -110,152 +147,411 @@ export class TestRhythmGrammar implements IVisualGrammar {
     };
   }
 
+  // ============================================================================
+  // Tier Determination
+  // ============================================================================
+
+  private determineTier(rhythm: AnnotatedRhythm): Tier {
+    if (rhythm.prescribedTempo !== null && rhythm.prescribedMeter !== null) {
+      return 3;
+    }
+    if (rhythm.prescribedTempo !== null) {
+      return 2;
+    }
+    return 1;
+  }
+
+  // ============================================================================
+  // Tier 1: Division Ticks
+  // ============================================================================
+
   /**
-   * Create a rhythm pulse entity when prescribedTempo is set.
-   * Uses the prescribed tempo to show beat-relative visualization.
+   * Create subtle tick marks at detected division intervals.
+   * These scroll left with time, showing the detected rhythmic pattern.
    */
-  private createRhythmPulse(rhythm: AnnotatedRhythm, t: number, part: string): Entity {
-    const { analysis, prescribedTempo, prescribedMeter } = rhythm;
-    const pulseIntensity = rhythm.visual.motion.pulse;
+  private createDivisionTicks(rhythm: AnnotatedRhythm, t: number, part: string): Entity[] {
+    const entities: Entity[] = [];
+    const division = rhythm.analysis.detectedDivision;
+    if (division === null) return entities;
 
-    // Calculate phase within the beat based on prescribed tempo
-    const beatDurationMs = 60000 / prescribedTempo!;
-    const referenceOnset = analysis.referenceOnset ?? t;
-    const timeSinceReference = t - referenceOnset;
-    const phase = (timeSinceReference % beatDurationMs) / beatDurationMs;
+    // Calculate tick positions within the visible window
+    const windowStart = t - WINDOW_MS;
+    const referenceOnset = rhythm.analysis.referenceOnset ?? t;
 
-    // Determine if this is a downbeat (requires meter)
-    let isDownbeat = false;
-    if (prescribedMeter !== null && analysis.referenceOnset !== null) {
-      const beatsFromReference = Math.floor(timeSinceReference / beatDurationMs);
-      isDownbeat = beatsFromReference % prescribedMeter.beatsPerBar === 0;
+    // Find the first tick that would be visible
+    const ticksBeforeReference = Math.floor((referenceOnset - windowStart) / division);
+    let tickTime = referenceOnset - ticksBeforeReference * division;
+
+    // Generate ticks across the window
+    while (tickTime <= t) {
+      if (tickTime >= windowStart) {
+        const x = this.timeToX(tickTime, t);
+        const opacity = this.ageToOpacity(t - tickTime) * 0.3; // Subtle
+
+        entities.push({
+          id: this.entityId(`division-tick-${tickTime}`),
+          part,
+          kind: "field", // Rendered as vertical line by renderer
+          createdAt: tickTime,
+          updatedAt: t,
+          position: { x, y: 0.5 },
+          style: {
+            color: { ...GRID_COLORS.divisionTick, a: opacity },
+            size: 1,
+            opacity,
+          },
+          data: {
+            type: "division-tick",
+            tickTime,
+          },
+        });
+      }
+      tickTime += division;
     }
 
-    // Pulse strongest at beat start (low phase)
-    const phasePulse = 1 - phase;
-    const baseOpacity = isDownbeat ? 0.9 : 0.5;
-    const opacity = baseOpacity * phasePulse * pulseIntensity;
-    const size = (isDownbeat ? 150 : 80) * phasePulse;
+    return entities;
+  }
+
+  // ============================================================================
+  // Tier 2: Beat Grid and Drift Rings
+  // ============================================================================
+
+  /**
+   * Create vertical lines at each beat position.
+   */
+  private createBeatGrid(rhythm: AnnotatedRhythm, t: number, part: string): Entity[] {
+    const entities: Entity[] = [];
+    const tempo = rhythm.prescribedTempo;
+    if (tempo === null) return entities;
+
+    const beatMs = 60000 / tempo;
+    const windowStart = t - WINDOW_MS;
+    const referenceOnset = rhythm.analysis.referenceOnset ?? t;
+
+    // Find the first beat that would be visible
+    const beatsBeforeReference = Math.floor((referenceOnset - windowStart) / beatMs);
+    let beatTime = referenceOnset - beatsBeforeReference * beatMs;
+
+    // Generate beat lines across the window
+    while (beatTime <= t) {
+      if (beatTime >= windowStart) {
+        const x = this.timeToX(beatTime, t);
+        const opacity = this.ageToOpacity(t - beatTime) * 0.4;
+
+        entities.push({
+          id: this.entityId(`beat-line-${beatTime}`),
+          part,
+          kind: "field", // Rendered as vertical line by renderer
+          createdAt: beatTime,
+          updatedAt: t,
+          position: { x, y: 0.5 },
+          style: {
+            color: { ...GRID_COLORS.beatLine, a: opacity },
+            size: 2,
+            opacity,
+          },
+          data: {
+            type: "beat-line",
+            beatTime,
+          },
+        });
+      }
+      beatTime += beatMs;
+    }
+
+    return entities;
+  }
+
+  /**
+   * Create a drift ring around an onset marker showing timing accuracy.
+   * Color indicates how close to the beat: green=tight, yellow=loose, red=off.
+   * Does NOT override the marker's core color from the ruleset.
+   */
+  private createDriftRing(
+    an: AnnotatedNote,
+    rhythm: AnnotatedRhythm,
+    t: number,
+    part: string
+  ): Entity | null {
+    const tempo = rhythm.prescribedTempo;
+    if (tempo === null) return null;
+
+    const note = an.note;
+    const age = t - note.onset;
+    if (age > WINDOW_MS) return null;
+
+    const drift = this.calculateDrift(note.onset, rhythm);
+    const absDrift = Math.abs(drift);
+
+    // Determine drift color
+    let driftColor: ColorHSVA;
+    if (absDrift <= DRIFT_THRESHOLDS.good) {
+      driftColor = DRIFT_COLORS.good;
+    } else if (absDrift <= DRIFT_THRESHOLDS.warning) {
+      driftColor = DRIFT_COLORS.warning;
+    } else {
+      driftColor = DRIFT_COLORS.bad;
+    }
+
+    const x = this.timeToX(note.onset, t);
+    const y = this.driftToY(drift);
+    const opacity = this.ageToOpacity(age) * (driftColor.a ?? 1);
+
+    // Ring is slightly larger than the marker
+    const markerSize = 4 + (note.velocity / 127) * 8;
+    const ringSize = markerSize + 6;
 
     return {
-      id: this.entityId("rhythm-pulse"),
+      id: this.entityId(`drift-ring-${note.id}`),
       part,
-      kind: "field",
-      createdAt: t,
+      kind: "field", // Rendered as ring by renderer based on data.type
+      createdAt: note.onset,
       updatedAt: t,
-      position: { x: 0.5, y: 0.5 }, // Center
+      position: { x, y },
       style: {
-        color: rhythm.visual.palette.primary,
-        size,
+        color: { ...driftColor, a: opacity },
+        size: ringSize,
         opacity,
       },
       data: {
-        type: "rhythm-pulse",
-        phase,
-        isDownbeat,
-        prescribedTempo,
-        detectedDivision: analysis.detectedDivision,
+        type: "drift-ring",
+        noteId: note.id,
+        drift,
+        driftCategory: absDrift <= DRIFT_THRESHOLDS.good ? "good" : absDrift <= DRIFT_THRESHOLDS.warning ? "warning" : "bad",
       },
     };
   }
 
+  // ============================================================================
+  // Tier 3: Bar Grid and Downbeat Glow
+  // ============================================================================
+
   /**
-   * Create a division indicator for historic-only visualization.
-   * Shows the detected division pattern without beat-relative assumptions.
+   * Create emphasized bar lines (overriding beat lines at bar positions).
    */
-  private createDivisionIndicator(rhythm: AnnotatedRhythm, t: number, part: string): Entity {
-    const { analysis } = rhythm;
-    const pulseIntensity = rhythm.visual.motion.pulse;
+  private createBarGrid(rhythm: AnnotatedRhythm, t: number, part: string): Entity[] {
+    const entities: Entity[] = [];
+    const tempo = rhythm.prescribedTempo;
+    const meter = rhythm.prescribedMeter;
+    if (tempo === null || meter === null) return entities;
 
-    // Use stability to modulate the visualization
-    const stability = analysis.stability;
-    const confidence = analysis.confidence;
+    const beatMs = 60000 / tempo;
+    const barMs = beatMs * meter.beatsPerBar;
+    const windowStart = t - WINDOW_MS;
+    const referenceOnset = rhythm.analysis.referenceOnset ?? t;
 
-    // Size based on stability (more stable = larger, more confident pulse)
-    const size = 60 + stability * 40;
-    const opacity = 0.3 + confidence * 0.5;
+    // Find the first bar that would be visible
+    const barsBeforeReference = Math.floor((referenceOnset - windowStart) / barMs);
+    let barTime = referenceOnset - barsBeforeReference * barMs;
+
+    // Generate bar lines across the window
+    while (barTime <= t) {
+      if (barTime >= windowStart) {
+        const x = this.timeToX(barTime, t);
+        const opacity = this.ageToOpacity(t - barTime) * 0.6;
+
+        entities.push({
+          id: this.entityId(`bar-line-${barTime}`),
+          part,
+          kind: "field", // Rendered as vertical line by renderer
+          createdAt: barTime,
+          updatedAt: t,
+          position: { x, y: 0.5 },
+          style: {
+            color: { ...GRID_COLORS.barLine, a: opacity },
+            size: 3,
+            opacity,
+          },
+          data: {
+            type: "bar-line",
+            barTime,
+          },
+        });
+      }
+      barTime += barMs;
+    }
+
+    return entities;
+  }
+
+  /**
+   * Create a glow effect on the current downbeat position.
+   */
+  private createDownbeatGlow(rhythm: AnnotatedRhythm, t: number, part: string): Entity | null {
+    const tempo = rhythm.prescribedTempo;
+    const meter = rhythm.prescribedMeter;
+    if (tempo === null || meter === null) return null;
+
+    const beatMs = 60000 / tempo;
+    const barMs = beatMs * meter.beatsPerBar;
+    const referenceOnset = rhythm.analysis.referenceOnset ?? t;
+
+    // Find the most recent bar start
+    const timeSinceReference = t - referenceOnset;
+    const barsElapsed = Math.floor(timeSinceReference / barMs);
+    const currentBarStart = referenceOnset + barsElapsed * barMs;
+    const timeInBar = t - currentBarStart;
+
+    // Glow intensity fades after the downbeat
+    const glowDuration = beatMs * 0.5; // Half a beat
+    if (timeInBar > glowDuration) return null;
+
+    const intensity = 1 - timeInBar / glowDuration;
+    const x = this.timeToX(currentBarStart, t);
 
     return {
-      id: this.entityId("division-indicator"),
+      id: this.entityId(`downbeat-glow-${currentBarStart}`),
       part,
       kind: "field",
-      createdAt: t,
+      createdAt: currentBarStart,
       updatedAt: t,
-      position: { x: 0.5, y: 0.5 }, // Center
+      position: { x, y: 0.5 },
       style: {
-        color: rhythm.visual.palette.primary,
-        size: size * pulseIntensity,
-        opacity,
+        color: { h: 50, s: 0.3, v: 1, a: intensity * 0.4 },
+        size: 100,
+        opacity: intensity * 0.4,
       },
       data: {
-        type: "division-indicator",
-        detectedDivision: analysis.detectedDivision,
-        stability,
-        confidence,
+        type: "downbeat-glow",
+        barTime: currentBarStart,
+        intensity,
       },
     };
   }
 
+  // ============================================================================
+  // Onset Markers (All Tiers)
+  // ============================================================================
+
   /**
-   * Create a note timing marker.
-   * Positioned horizontally based on note onset time (relative to recent window).
-   * Height based on pitch octave, color from annotation palette.
+   * Create an onset marker for a note.
+   * - Tier 1: x from time, y from pitch octave
+   * - Tier 2+: x from time, y from drift (center = on beat)
+   * - Color always comes from ruleset annotation (never overridden)
    */
-  private createNoteMarker(an: AnnotatedNote, t: number, part: string): Entity {
+  private createOnsetMarker(
+    an: AnnotatedNote,
+    rhythm: AnnotatedRhythm,
+    t: number,
+    part: string,
+    tier: Tier
+  ): Entity {
     const note = an.note;
     const visual = an.visual;
+    const age = t - note.onset;
 
-    // Horizontal position: map onset time to 0-1 range
-    // Use a 2-second window for visualization
-    const windowMs = 2000;
-    const relativeTime = t - note.onset;
-    const x = 1 - Math.min(relativeTime / windowMs, 1); // Recent notes on right
+    const x = this.timeToX(note.onset, t);
 
-    // Vertical position: based on octave (higher octaves = higher on screen)
-    const octaveRange = 8; // Assume octaves 0-7
-    const y = 1 - (note.pitch.octave + 0.5) / octaveRange;
+    // Y position depends on tier
+    let y: number;
+    if (tier === 1) {
+      // Tier 1: Y based on pitch octave (higher = higher on screen)
+      const octaveRange = 8;
+      y = 1 - (note.pitch.octave + 0.5) / octaveRange;
+    } else {
+      // Tier 2+: Y based on drift from beat
+      const drift = this.calculateDrift(note.onset, rhythm);
+      y = this.driftToY(drift);
+    }
 
     // Size based on velocity
     const size = 4 + (note.velocity / 127) * 8;
 
-    // Opacity based on phase and motion jitter
-    let opacity: number;
+    // Opacity based on age and phase
+    let baseOpacity: number;
     switch (note.phase) {
       case "attack":
-        opacity = 1.0;
+        baseOpacity = 1.0;
         break;
       case "sustain":
-        opacity = 0.8;
+        baseOpacity = 0.9;
         break;
       case "release":
-        opacity = 0.4;
+        baseOpacity = 0.6;
         break;
     }
-
-    // Apply jitter from motion annotation as slight random offset
-    const jitterAmount = visual.motion.jitter * 0.02;
-    const jitterX = (Math.random() - 0.5) * jitterAmount;
-    const jitterY = (Math.random() - 0.5) * jitterAmount;
+    const opacity = baseOpacity * this.ageToOpacity(age);
 
     return {
-      id: this.entityId(`note-${note.id}`),
+      id: this.entityId(`onset-marker-${note.id}`),
       part,
       kind: "particle",
       createdAt: note.onset,
       updatedAt: t,
-      position: { x: x + jitterX, y: y + jitterY },
+      position: { x, y },
       style: {
+        // Color from ruleset - NEVER override
         color: visual.palette.primary,
         size,
         opacity,
       },
       data: {
-        type: "timing-marker",
+        type: "onset-marker",
         noteId: note.id,
         phase: note.phase,
+        tier,
         label: visual.label,
       },
     };
+  }
+
+  // ============================================================================
+  // Utility Functions
+  // ============================================================================
+
+  /**
+   * Convert a timestamp to x position (0 = left edge/oldest, 1 = right edge/now).
+   */
+  private timeToX(onset: number, now: number): number {
+    const age = now - onset;
+    return 1 - Math.min(age / WINDOW_MS, 1);
+  }
+
+  /**
+   * Convert age to opacity (newer = more opaque).
+   */
+  private ageToOpacity(age: number): number {
+    if (age <= 0) return 1;
+    if (age >= WINDOW_MS) return 0;
+    // Quadratic fade for smoother visual
+    const normalized = age / WINDOW_MS;
+    return 1 - normalized * normalized;
+  }
+
+  /**
+   * Calculate drift from nearest beat.
+   * Returns value in [-0.5, 0.5] where 0 = exactly on beat.
+   */
+  private calculateDrift(onset: number, rhythm: AnnotatedRhythm): number {
+    const tempo = rhythm.prescribedTempo;
+    if (tempo === null) return 0;
+
+    const beatMs = 60000 / tempo;
+    const referenceOnset = rhythm.analysis.referenceOnset ?? onset;
+
+    // Find time relative to reference
+    const timeSinceReference = onset - referenceOnset;
+
+    // Find position within beat cycle
+    const beatPosition = timeSinceReference / beatMs;
+    const fractionalBeat = beatPosition - Math.floor(beatPosition);
+
+    // Normalize to [-0.5, 0.5] where 0 = on beat
+    if (fractionalBeat > 0.5) {
+      return fractionalBeat - 1; // Slightly early for next beat
+    }
+    return fractionalBeat; // Slightly late from previous beat
+  }
+
+  /**
+   * Convert drift to y position.
+   * Center (0.5) = on beat, above = early, below = late.
+   */
+  private driftToY(drift: number): number {
+    // Clamp drift to prevent markers from going off screen
+    const clampedDrift = Math.max(-0.5, Math.min(0.5, drift));
+    // Map [-0.5, 0.5] to [0.5-DRIFT_RANGE, 0.5+DRIFT_RANGE]
+    return 0.5 - clampedDrift * DRIFT_RANGE * 2;
   }
 
   private entityId(base: string): EntityId {
