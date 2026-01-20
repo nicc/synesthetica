@@ -271,7 +271,7 @@ export const frame1: AnnotatedMusicalFrame = {
     ),
   ],
   rhythm: {
-    analysis: { detectedDivision: 500, recentOnsets: [0], stability: 0.9, confidence: 0.9, referenceOnset: 0 },
+    analysis: { detectedDivision: 500, recentOnsets: [0], stability: 0.9, confidence: 0.9, detectedDivisionTimes: [0] },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
@@ -330,7 +330,7 @@ export const frame2: AnnotatedMusicalFrame = {
     ),
   ],
   rhythm: {
-    analysis: { detectedDivision: 500, recentOnsets: [0, 500], stability: 0.9, confidence: 0.9, referenceOnset: 500 },
+    analysis: { detectedDivision: 500, recentOnsets: [0, 500], stability: 0.9, confidence: 0.9, detectedDivisionTimes: [0, 500] },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
@@ -426,7 +426,7 @@ export const frame3: AnnotatedMusicalFrame = {
     ),
   ],
   rhythm: {
-    analysis: { detectedDivision: 500, recentOnsets: [0], stability: 0.9, confidence: 0.9, referenceOnset: 0 },
+    analysis: { detectedDivision: 500, recentOnsets: [0], stability: 0.9, confidence: 0.9, detectedDivisionTimes: [0] },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
@@ -496,7 +496,7 @@ export const frame4: AnnotatedMusicalFrame = {
     ),
   ],
   rhythm: {
-    analysis: { detectedDivision: 500, recentOnsets: [0, 500], stability: 0.9, confidence: 0.9, referenceOnset: 500 },
+    analysis: { detectedDivision: 500, recentOnsets: [0, 500], stability: 0.9, confidence: 0.9, detectedDivisionTimes: [0, 500] },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
@@ -555,7 +555,7 @@ export const frame5: AnnotatedMusicalFrame = {
     ),
   ],
   rhythm: {
-    analysis: { detectedDivision: 500, recentOnsets: [0], stability: 0.9, confidence: 0.9, referenceOnset: 0 },
+    analysis: { detectedDivision: 500, recentOnsets: [0], stability: 0.9, confidence: 0.9, detectedDivisionTimes: [0] },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,

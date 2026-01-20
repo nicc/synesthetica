@@ -348,10 +348,10 @@ function createMinimalFrame(
     rhythm: {
       analysis: {
         detectedDivision: options.hasPrescribedTempo ? 500 : null,
+        detectedDivisionTimes: options.hasPrescribedTempo ? [t] : [],
         recentOnsets: options.hasPrescribedTempo ? [t] : [],
         stability: options.hasPrescribedTempo ? 0.9 : 0,
         confidence: options.hasPrescribedTempo ? 0.9 : 0,
-        referenceOnset: options.hasPrescribedTempo ? t : null,
       },
       visual: {
         palette: { id: "rhythm", primary: { h: 0, s: 0, v: 0.7, a: 1 } },

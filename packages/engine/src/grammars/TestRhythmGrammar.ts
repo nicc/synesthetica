@@ -167,24 +167,18 @@ export class TestRhythmGrammar implements IVisualGrammar {
 
   /**
    * Create subtle tick marks at detected division intervals.
-   * These scroll left with time, showing the detected rhythmic pattern.
+   * Uses detectedDivisionTimes directly from the stabilizer.
    */
   private createDivisionTicks(rhythm: AnnotatedRhythm, t: number, part: string): Entity[] {
     const entities: Entity[] = [];
-    const division = rhythm.analysis.detectedDivision;
-    if (division === null) return entities;
+    const divisionTimes = rhythm.analysis.detectedDivisionTimes;
+    if (divisionTimes.length === 0) return entities;
 
-    // Calculate tick positions within the visible window
     const windowStart = t - WINDOW_MS;
-    const referenceOnset = rhythm.analysis.referenceOnset ?? t;
 
-    // Find the first tick that would be visible
-    const ticksBeforeReference = Math.floor((referenceOnset - windowStart) / division);
-    let tickTime = referenceOnset - ticksBeforeReference * division;
-
-    // Generate ticks across the window
-    while (tickTime <= t) {
-      if (tickTime >= windowStart) {
+    for (const tickTime of divisionTimes) {
+      // Only render ticks within the visible window
+      if (tickTime >= windowStart && tickTime <= t) {
         const x = this.timeToX(tickTime, t);
         const opacity = this.ageToOpacity(t - tickTime) * 0.3; // Subtle
 
@@ -206,7 +200,6 @@ export class TestRhythmGrammar implements IVisualGrammar {
           },
         });
       }
-      tickTime += division;
     }
 
     return entities;
@@ -218,6 +211,7 @@ export class TestRhythmGrammar implements IVisualGrammar {
 
   /**
    * Create vertical lines at each beat position.
+   * Uses first onset in window as anchor for beat grid alignment.
    */
   private createBeatGrid(rhythm: AnnotatedRhythm, t: number, part: string): Entity[] {
     const entities: Entity[] = [];
@@ -226,11 +220,14 @@ export class TestRhythmGrammar implements IVisualGrammar {
 
     const beatMs = 60000 / tempo;
     const windowStart = t - WINDOW_MS;
-    const referenceOnset = rhythm.analysis.referenceOnset ?? t;
+
+    // Use first onset as anchor, or current time if no onsets
+    const recentOnsets = rhythm.analysis.recentOnsets;
+    const anchor = recentOnsets.length > 0 ? recentOnsets[0] : t;
 
     // Find the first beat that would be visible
-    const beatsBeforeReference = Math.floor((referenceOnset - windowStart) / beatMs);
-    let beatTime = referenceOnset - beatsBeforeReference * beatMs;
+    const beatsBeforeAnchor = Math.floor((anchor - windowStart) / beatMs);
+    let beatTime = anchor - beatsBeforeAnchor * beatMs;
 
     // Generate beat lines across the window
     while (beatTime <= t) {
@@ -328,6 +325,7 @@ export class TestRhythmGrammar implements IVisualGrammar {
 
   /**
    * Create emphasized bar lines (overriding beat lines at bar positions).
+   * Uses first onset in window as anchor for bar grid alignment.
    */
   private createBarGrid(rhythm: AnnotatedRhythm, t: number, part: string): Entity[] {
     const entities: Entity[] = [];
@@ -338,11 +336,14 @@ export class TestRhythmGrammar implements IVisualGrammar {
     const beatMs = 60000 / tempo;
     const barMs = beatMs * meter.beatsPerBar;
     const windowStart = t - WINDOW_MS;
-    const referenceOnset = rhythm.analysis.referenceOnset ?? t;
+
+    // Use first onset as anchor, or current time if no onsets
+    const recentOnsets = rhythm.analysis.recentOnsets;
+    const anchor = recentOnsets.length > 0 ? recentOnsets[0] : t;
 
     // Find the first bar that would be visible
-    const barsBeforeReference = Math.floor((referenceOnset - windowStart) / barMs);
-    let barTime = referenceOnset - barsBeforeReference * barMs;
+    const barsBeforeAnchor = Math.floor((anchor - windowStart) / barMs);
+    let barTime = anchor - barsBeforeAnchor * barMs;
 
     // Generate bar lines across the window
     while (barTime <= t) {
@@ -376,6 +377,7 @@ export class TestRhythmGrammar implements IVisualGrammar {
 
   /**
    * Create a glow effect on the current downbeat position.
+   * Uses first onset in window as anchor for bar alignment.
    */
   private createDownbeatGlow(rhythm: AnnotatedRhythm, t: number, part: string): Entity | null {
     const tempo = rhythm.prescribedTempo;
@@ -384,12 +386,15 @@ export class TestRhythmGrammar implements IVisualGrammar {
 
     const beatMs = 60000 / tempo;
     const barMs = beatMs * meter.beatsPerBar;
-    const referenceOnset = rhythm.analysis.referenceOnset ?? t;
+
+    // Use first onset as anchor, or current time if no onsets
+    const recentOnsets = rhythm.analysis.recentOnsets;
+    const anchor = recentOnsets.length > 0 ? recentOnsets[0] : t;
 
     // Find the most recent bar start
-    const timeSinceReference = t - referenceOnset;
-    const barsElapsed = Math.floor(timeSinceReference / barMs);
-    const currentBarStart = referenceOnset + barsElapsed * barMs;
+    const timeSinceAnchor = t - anchor;
+    const barsElapsed = Math.floor(timeSinceAnchor / barMs);
+    const currentBarStart = anchor + barsElapsed * barMs;
     const timeInBar = t - currentBarStart;
 
     // Glow intensity fades after the downbeat
@@ -521,19 +526,23 @@ export class TestRhythmGrammar implements IVisualGrammar {
   /**
    * Calculate drift from nearest beat.
    * Returns value in [-0.5, 0.5] where 0 = exactly on beat.
+   * Uses first onset in window as anchor for beat alignment.
    */
   private calculateDrift(onset: number, rhythm: AnnotatedRhythm): number {
     const tempo = rhythm.prescribedTempo;
     if (tempo === null) return 0;
 
     const beatMs = 60000 / tempo;
-    const referenceOnset = rhythm.analysis.referenceOnset ?? onset;
 
-    // Find time relative to reference
-    const timeSinceReference = onset - referenceOnset;
+    // Use first onset as anchor, or the onset itself if no recent onsets
+    const recentOnsets = rhythm.analysis.recentOnsets;
+    const anchor = recentOnsets.length > 0 ? recentOnsets[0] : onset;
+
+    // Find time relative to anchor
+    const timeSinceAnchor = onset - anchor;
 
     // Find position within beat cycle
-    const beatPosition = timeSinceReference / beatMs;
+    const beatPosition = timeSinceAnchor / beatMs;
     const fractionalBeat = beatPosition - Math.floor(beatPosition);
 
     // Normalize to [-0.5, 0.5] where 0 = on beat

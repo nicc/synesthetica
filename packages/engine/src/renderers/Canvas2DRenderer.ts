@@ -85,9 +85,19 @@ export class Canvas2DRenderer implements IRenderer {
       case "particle":
         this.drawParticle(entity);
         break;
-      case "field":
-        this.drawField(entity);
+      case "field": {
+        // Check data.type to determine rendering style
+        const fieldType = entity.data?.type as string | undefined;
+        if (fieldType === "beat-line" || fieldType === "bar-line" || fieldType === "division-tick") {
+          this.drawVerticalLine(entity);
+        } else if (fieldType === "drift-ring") {
+          this.drawRing(entity);
+        } else {
+          // Default field rendering (glow)
+          this.drawField(entity);
+        }
         break;
+      }
       case "trail":
       case "glyph":
       case "group":
@@ -120,6 +130,50 @@ export class Canvas2DRenderer implements IRenderer {
     this.ctx.arc(x, y, size / 2, 0, Math.PI * 2);
     this.ctx.fillStyle = cssColor;
     this.ctx.fill();
+  }
+
+  /**
+   * Draw a vertical line entity (beat-line, bar-line, division-tick).
+   * Line spans full canvas height at x position.
+   */
+  private drawVerticalLine(entity: Entity): void {
+    if (!this.ctx || !this.canvas) return;
+
+    const x = (entity.position?.x ?? 0.5) * this.canvas.width;
+    const size = entity.style.size ?? 2;
+    const opacity = entity.style.opacity ?? 0.3;
+    const color = entity.style.color ?? { h: 0, s: 0, v: 0.5 };
+
+    const cssColor = hsvaToRgba(color, opacity);
+
+    this.ctx.beginPath();
+    this.ctx.moveTo(x, 0);
+    this.ctx.lineTo(x, this.canvas.height);
+    this.ctx.strokeStyle = cssColor;
+    this.ctx.lineWidth = size;
+    this.ctx.stroke();
+  }
+
+  /**
+   * Draw a ring entity (drift-ring).
+   * Ring is centered at entity position with stroke (not fill).
+   */
+  private drawRing(entity: Entity): void {
+    if (!this.ctx || !this.canvas) return;
+
+    const x = (entity.position?.x ?? 0.5) * this.canvas.width;
+    const y = (entity.position?.y ?? 0.5) * this.canvas.height;
+    const size = entity.style.size ?? 20;
+    const opacity = entity.style.opacity ?? 0.6;
+    const color = entity.style.color ?? { h: 120, s: 0.7, v: 0.8 };
+
+    const cssColor = hsvaToRgba(color, opacity);
+
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+    this.ctx.strokeStyle = cssColor;
+    this.ctx.lineWidth = 2;
+    this.ctx.stroke();
   }
 
   /**

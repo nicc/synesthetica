@@ -71,10 +71,10 @@ interface IOICluster {
  *
  * Outputs RhythmicAnalysis with:
  * - detectedDivision: Most prominent IOI cluster (not a "tempo")
+ * - detectedDivisionTimes: Timestamps where divisions fall (for direct rendering)
  * - recentOnsets: Raw onset timestamps for historic visualization
  * - stability: How consistent the division is (0-1)
  * - confidence: How sure we are about the detection (0-1)
- * - referenceOnset: Most recent onset for grid alignment
  */
 export class BeatDetectionStabilizer implements IMusicalStabilizer {
   readonly id = "beat-detection";
@@ -90,10 +90,10 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
   /** Cached analysis result (updated on clustering interval) */
   private cachedAnalysis: RhythmicAnalysis = {
     detectedDivision: null,
+    detectedDivisionTimes: [],
     recentOnsets: [],
     stability: 0,
     confidence: 0,
-    referenceOnset: null,
   };
 
   constructor(config: BeatDetectionConfig) {
@@ -105,10 +105,10 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
     this.lastClusteringTime = 0;
     this.cachedAnalysis = {
       detectedDivision: null,
+      detectedDivisionTimes: [],
       recentOnsets: [],
       stability: 0,
       confidence: 0,
-      referenceOnset: null,
     };
   }
 
@@ -190,13 +190,10 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
     if (this.onsetTimes.length < this.config.minOnsets) {
       this.cachedAnalysis = {
         detectedDivision: null,
+        detectedDivisionTimes: [],
         recentOnsets: [...this.onsetTimes],
         stability: 0,
         confidence: 0,
-        referenceOnset:
-          this.onsetTimes.length > 0
-            ? this.onsetTimes[this.onsetTimes.length - 1]
-            : null,
       };
       return;
     }
@@ -206,10 +203,10 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
     if (iois.length < 2) {
       this.cachedAnalysis = {
         detectedDivision: null,
+        detectedDivisionTimes: [],
         recentOnsets: [...this.onsetTimes],
         stability: 0,
         confidence: 0,
-        referenceOnset: this.onsetTimes[this.onsetTimes.length - 1],
       };
       return;
     }
@@ -219,10 +216,10 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
     if (clusters.length === 0) {
       this.cachedAnalysis = {
         detectedDivision: null,
+        detectedDivisionTimes: [],
         recentOnsets: [...this.onsetTimes],
         stability: 0,
         confidence: 0,
-        referenceOnset: this.onsetTimes[this.onsetTimes.length - 1],
       };
       return;
     }
@@ -244,10 +241,10 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
     if (!bestCluster || bestCluster.count < 2) {
       this.cachedAnalysis = {
         detectedDivision: null,
+        detectedDivisionTimes: [],
         recentOnsets: [...this.onsetTimes],
         stability: 0,
         confidence: 0,
-        referenceOnset: this.onsetTimes[this.onsetTimes.length - 1],
       };
       return;
     }
@@ -268,13 +265,53 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
     // Normalize: stdDev of 50ms = stability 0, stdDev of 0 = stability 1
     const stability = Math.max(0, Math.min(1, 1 - stdDev / 50));
 
+    // Compute division timestamps within the window
+    const detectedDivisionTimes = this.computeDivisionTimes(detectedDivision);
+
     this.cachedAnalysis = {
       detectedDivision,
+      detectedDivisionTimes,
       recentOnsets: [...this.onsetTimes],
       stability,
       confidence,
-      referenceOnset: this.onsetTimes[this.onsetTimes.length - 1],
     };
+  }
+
+  /**
+   * Compute timestamps where detected divisions fall within the onset window.
+   * Uses the median onset as anchor to minimize drift from any single onset.
+   */
+  private computeDivisionTimes(division: Ms): Ms[] {
+    if (this.onsetTimes.length === 0 || division <= 0) {
+      return [];
+    }
+
+    const sorted = [...this.onsetTimes].sort((a, b) => a - b);
+    const windowStart = sorted[0];
+    const windowEnd = sorted[sorted.length - 1];
+
+    // Use median onset as anchor for stability
+    const medianIndex = Math.floor(sorted.length / 2);
+    const anchor = sorted[medianIndex];
+
+    const times: Ms[] = [];
+
+    // Extend backward from anchor
+    let t = anchor;
+    while (t >= windowStart) {
+      times.push(t);
+      t -= division;
+    }
+
+    // Extend forward from anchor (skip anchor itself)
+    t = anchor + division;
+    while (t <= windowEnd) {
+      times.push(t);
+      t += division;
+    }
+
+    // Sort chronologically
+    return times.sort((a, b) => a - b);
   }
 
   private calculateConsecutiveIOIs(): Ms[] {

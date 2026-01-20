@@ -59,6 +59,14 @@ export interface RhythmicAnalysis {
   detectedDivision: Ms | null;
 
   /**
+   * Computed timestamps where detected divisions fall within the analysis window.
+   * Grammars draw these directly without computing grid positions.
+   * Bounded to the same window as recentOnsets.
+   * Empty if no detectedDivision or insufficient data.
+   */
+  detectedDivisionTimes: SessionMs[];
+
+  /**
    * Raw onset timestamps within the analysis window.
    * Grammars can use these for historic visualization.
    */
@@ -77,13 +85,6 @@ export interface RhythmicAnalysis {
    * Range: 0.0 to 1.0
    */
   confidence: Confidence;
-
-  /**
-   * Reference point for alignment.
-   * The most recent onset that anchors the detected division.
-   * Grammars can extrapolate a grid backward/forward from this.
-   */
-  referenceOnset: SessionMs | null;
 }
 ```
 

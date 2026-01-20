@@ -18,6 +18,7 @@ import type {
   AnnotatedMusicalFrame,
   SceneFrame,
   GrammarContext,
+  PitchClass,
 } from "@synesthetica/contracts";
 import { TestRhythmGrammar } from "../../../src/grammars/TestRhythmGrammar";
 
@@ -132,7 +133,7 @@ describe("TestRhythmGrammar golden tests", () => {
         tier: 1,
         noteCount: 1,
         detectedDivision: 500,
-        referenceOnset: 0,
+        detectedDivisionTimes: [0],
       });
 
       const scene = grammar.update(frame, null);
@@ -188,7 +189,7 @@ describe("TestRhythmGrammar golden tests", () => {
         tier: 2,
         noteCount: 0,
         prescribedTempo: 120, // 500ms per beat
-        referenceOnset: 0,
+        detectedDivisionTimes: [0],
       });
 
       const scene = grammar.update(frame, null);
@@ -203,7 +204,7 @@ describe("TestRhythmGrammar golden tests", () => {
         tier: 2,
         noteCount: 1,
         prescribedTempo: 120,
-        referenceOnset: 0,
+        detectedDivisionTimes: [0],
       });
 
       const scene = grammar.update(frame, null);
@@ -219,7 +220,7 @@ describe("TestRhythmGrammar golden tests", () => {
         tier: 2,
         noteCount: 1,
         prescribedTempo: 120,
-        referenceOnset: 0,
+        detectedDivisionTimes: [0],
         noteOnset: 500, // Exactly on beat
       });
 
@@ -236,7 +237,7 @@ describe("TestRhythmGrammar golden tests", () => {
         tier: 2,
         noteCount: 1,
         prescribedTempo: 120,
-        referenceOnset: 0,
+        detectedDivisionTimes: [0],
         noteOnset: 650, // 150ms late = 30% of beat
       });
 
@@ -250,7 +251,7 @@ describe("TestRhythmGrammar golden tests", () => {
         tier: 2,
         noteCount: 1,
         prescribedTempo: 120,
-        referenceOnset: 0,
+        detectedDivisionTimes: [0],
         noteOnset: 500, // Exactly on beat
       });
 
@@ -267,7 +268,7 @@ describe("TestRhythmGrammar golden tests", () => {
         tier: 2,
         noteCount: 0,
         prescribedTempo: 120,
-        referenceOnset: 0,
+        detectedDivisionTimes: [0],
       });
 
       const scene = grammar.update(frame, null);
@@ -295,7 +296,7 @@ describe("TestRhythmGrammar golden tests", () => {
         noteCount: 0,
         prescribedTempo: 120,
         prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
-        referenceOnset: 0,
+        detectedDivisionTimes: [0],
       });
 
       const scene = grammar.update(frame, null);
@@ -314,7 +315,7 @@ describe("TestRhythmGrammar golden tests", () => {
         noteCount: 0,
         prescribedTempo: 120,
         prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
-        referenceOnset: 0,
+        detectedDivisionTimes: [0],
       });
 
       const scene = grammar.update(frame, null);
@@ -331,7 +332,7 @@ describe("TestRhythmGrammar golden tests", () => {
         noteCount: 0,
         prescribedTempo: 120,
         prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
-        referenceOnset: 0,
+        detectedDivisionTimes: [0],
       });
 
       const scene = grammar.update(frame, null);
@@ -346,7 +347,7 @@ describe("TestRhythmGrammar golden tests", () => {
         noteCount: 0,
         prescribedTempo: 120,
         prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
-        referenceOnset: 0,
+        detectedDivisionTimes: [0],
       });
 
       const scene = grammar.update(frame, null);
@@ -457,7 +458,7 @@ function createMinimalFrame(
     prescribedTempo?: number;
     prescribedMeter?: { beatsPerBar: number; beatUnit: number };
     detectedDivision?: number | null;
-    referenceOnset?: number | null;
+    detectedDivisionTimes?: number[];
   }
 ): AnnotatedMusicalFrame {
   const noteOnset = options.noteOnset ?? t;
@@ -466,7 +467,7 @@ function createMinimalFrame(
     notes.push({
       note: {
         id: `note-${i}`,
-        pitch: { pc: i % 12, octave: options.noteOctave ?? 4 },
+        pitch: { pc: (i % 12) as PitchClass, octave: options.noteOctave ?? 4 },
         velocity: 80,
         onset: noteOnset,
         duration: 0,
@@ -493,10 +494,14 @@ function createMinimalFrame(
     chords.push({
       chord: {
         id: `chord-${i}`,
-        root: 0,
+        root: 0 as PitchClass,
+        bass: 0 as PitchClass,
         quality: "maj" as const,
+        inversion: 0,
+        voicing: [],
         noteIds: [],
         onset: t,
+        duration: 0,
         confidence: 0.9,
         phase: "active" as const,
         provenance: { source: "test", stream: "test" },
@@ -527,10 +532,10 @@ function createMinimalFrame(
     rhythm: {
       analysis: {
         detectedDivision: options.detectedDivision ?? (prescribedTempo !== null ? 60000 / prescribedTempo : null),
-        recentOnsets: prescribedTempo !== null ? [t] : [],
+        detectedDivisionTimes: options.detectedDivisionTimes ?? (prescribedTempo !== null ? [0] : []),
+        recentOnsets: prescribedTempo !== null ? [0, t] : [],
         stability: prescribedTempo !== null ? 0.9 : 0,
         confidence: prescribedTempo !== null ? 0.9 : 0,
-        referenceOnset: options.referenceOnset ?? (prescribedTempo !== null ? 0 : null),
       },
       visual: {
         palette: { id: "rhythm", primary: { h: 0, s: 0, v: 0.7, a: 1 } },

@@ -81,10 +81,10 @@ export interface MusicalFrame {
 
 export interface RhythmicAnalysis {
   detectedDivision: Ms | null;     // Most prominent IOI (not a tempo)
+  detectedDivisionTimes: Ms[];     // Timestamps where divisions fall (for direct rendering)
   recentOnsets: Ms[];              // Recent note onset timestamps
   stability: number;               // [0,1] how consistent the division is
   confidence: number;              // [0,1] detection confidence
-  referenceOnset: Ms | null;       // Most recent onset for grid alignment
 }
 
 export interface Note {

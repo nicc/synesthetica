@@ -26,10 +26,10 @@ function makeUpstreamFrame(t: number): MusicalFrame {
     chords: [],
     rhythmicAnalysis: {
       detectedDivision: null,
+      detectedDivisionTimes: [],
       recentOnsets: [],
       stability: 0,
       confidence: 0,
-      referenceOnset: null,
     },
     dynamics: { level: 0, trend: "stable" },
     prescribedTempo: null,
@@ -90,10 +90,10 @@ describe("BeatDetectionStabilizer (RFC 007)", () => {
         chords: [],
         rhythmicAnalysis: {
           detectedDivision: null,
+          detectedDivisionTimes: [],
           recentOnsets: [],
           stability: 0,
           confidence: 0,
-          referenceOnset: null,
         },
         dynamics: { level: 0.8, trend: "rising" },
         prescribedTempo: null,
@@ -239,8 +239,8 @@ describe("BeatDetectionStabilizer (RFC 007)", () => {
     });
   });
 
-  describe("reference onset", () => {
-    it("sets referenceOnset to most recent onset", () => {
+  describe("detectedDivisionTimes", () => {
+    it("computes division timestamps within the onset window", () => {
       const upstream = makeUpstreamFrame(0);
 
       stabilizer.apply(makeFrame(0, [noteOn(60, 100, 0)]), upstream);
@@ -249,7 +249,23 @@ describe("BeatDetectionStabilizer (RFC 007)", () => {
       stabilizer.apply(makeFrame(1500, [noteOn(72, 100, 1500)]), upstream);
       const result = stabilizer.apply(makeFrame(2000, [noteOn(60, 100, 2000)]), upstream);
 
-      expect(result.rhythmicAnalysis.referenceOnset).toBe(2000);
+      // Should have division times spanning the onset window
+      expect(result.rhythmicAnalysis.detectedDivisionTimes.length).toBeGreaterThan(0);
+      // Times should be sorted chronologically
+      const times = result.rhythmicAnalysis.detectedDivisionTimes;
+      for (let i = 1; i < times.length; i++) {
+        expect(times[i]).toBeGreaterThan(times[i - 1]);
+      }
+    });
+
+    it("returns empty array when no division detected", () => {
+      const upstream = makeUpstreamFrame(0);
+
+      // Only 2 onsets, not enough for detection
+      stabilizer.apply(makeFrame(0, [noteOn(60, 100, 0)]), upstream);
+      const result = stabilizer.apply(makeFrame(500, [noteOn(64, 100, 500)]), upstream);
+
+      expect(result.rhythmicAnalysis.detectedDivisionTimes).toEqual([]);
     });
   });
 

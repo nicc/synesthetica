@@ -372,3 +372,5 @@ git commit -m "Add pcToHue function to contracts
 
 Also created issues for derived signals schema and stabilizer ordering."
 ```
+
+If you are resuming from compaction, re-read this file before proceeding.

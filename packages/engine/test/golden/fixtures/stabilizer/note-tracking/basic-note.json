@@ -31,10 +31,10 @@
     "chords": [],
     "rhythmicAnalysis": {
       "detectedDivision": null,
+      "detectedDivisionTimes": [],
       "recentOnsets": [],
       "stability": 0,
-      "confidence": 0,
-      "referenceOnset": null
+      "confidence": 0
     },
     "dynamics": {
       "level": 0.7874015748031497,
