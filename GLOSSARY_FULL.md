@@ -267,7 +267,9 @@ Notes are not pairs of on/off messages - they are proper musical entities with l
 ---
 
 ### Stabilizer
-A stateful module that transforms RawInputFrame into MusicalFrame.
+A stateful musical analyzer that transforms transient events into stable, temporal abstractions.
+
+The name "stabilizer" (rather than "analyzer") reflects the core function: these components don't just observe — they **stabilize** fleeting signals into persistent musical state. A note-on/note-off pair becomes a Note with duration. Scattered onsets become a coherent Beat with tempo. This temporal stabilization, with hysteresis and state tracking, is the defining characteristic.
 
 Stabilizers form a **DAG (directed acyclic graph)** based on dependencies:
 - **Independent stabilizers** (note tracking, beat detection) process raw input directly
