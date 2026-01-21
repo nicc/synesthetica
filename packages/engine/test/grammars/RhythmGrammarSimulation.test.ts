@@ -484,8 +484,10 @@ describe("RhythmGrammar Pipeline Simulation", () => {
         adapter.addNoteOff(60, onsetTime + 200);
       }
       // Then add notes that are 200ms late (40% of beat) from established pattern
+      // Note: With RFC 008 subdivision-aware drift, 200ms into a 500ms beat is close
+      // to an 8th note (250ms), so may be categorized as "good" or "warning" for that subdivision
       for (let i = 4; i < 8; i++) {
-        const onsetTime = i * 500 + 200; // 200ms late
+        const onsetTime = i * 500 + 200; // 200ms late from quarter beat
         adapter.addNoteOn(64, 80, onsetTime);
         adapter.addNoteOff(64, onsetTime + 200);
       }
@@ -494,13 +496,16 @@ describe("RhythmGrammar Pipeline Simulation", () => {
 
       const driftRings = result.allEntities.filter(e => e.data?.type === "drift-ring");
       const goodRings = driftRings.filter(e => e.data?.driftCategory === "good");
+      const warningRings = driftRings.filter(e => e.data?.driftCategory === "warning");
       const badRings = driftRings.filter(e => e.data?.driftCategory === "bad");
 
-      console.log(`\n  Drift pattern: good=${goodRings.length}, bad=${badRings.length}/${driftRings.length}`);
+      console.log(`\n  Drift pattern: good=${goodRings.length}, warning=${warningRings.length}, bad=${badRings.length}/${driftRings.length}`);
 
-      // Notes 40% off-beat should be categorized as "bad"
-      // The first 4 notes establish the reference, the next 4 should show drift
-      expect(badRings.length).toBeGreaterThan(0);
+      // With subdivision-aware drift (RFC 008), notes should be analyzed
+      // On-beat notes should be "good", 200ms-off notes are close to 8th note subdivision
+      expect(driftRings.length).toBeGreaterThan(0);
+      // The on-beat notes should mostly be categorized as "good"
+      expect(goodRings.length).toBeGreaterThan(0);
     });
 
     it("handles chord clusters (multiple simultaneous notes)", () => {
@@ -523,6 +528,83 @@ describe("RhythmGrammar Pipeline Simulation", () => {
       // Should have markers for all notes
       const markers = result.allEntities.filter(e => e.data?.type === "onset-marker");
       expect(markers.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Diagnostic: frame-by-frame state", () => {
+    it("Tier 1 only (no tempo): shows division-ticks with continuous render", () => {
+      // NO tempo/meter set - pure Tier 1
+
+      // Play 8 notes at 500ms intervals
+      for (let i = 0; i < 8; i++) {
+        const t = i * 500;
+        adapter.addNoteOn(60 + (i % 12), 80, t);
+        adapter.addNoteOff(60 + (i % 12), t + 400);
+      }
+
+      // Simulate continuous render loop (every 100ms) like the real app
+      console.log("\n=== DIAGNOSTIC: Tier 1 (continuous render, no tempo) ===\n");
+
+      for (let t = 0; t <= 4000; t += 100) {
+        const scene = pipeline.requestFrame(t);
+        if (!scene) continue;
+
+        const typeCounts = new Map<string, number>();
+        for (const e of scene.entities) {
+          const type = (e.data?.type as string) || "unknown";
+          typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
+        }
+
+        const divTicks = scene.entities.filter(e => e.data?.type === "division-tick");
+        const divXs = divTicks.map(e => e.position?.x?.toFixed(3)).join(", ");
+
+        const onsetMarkers = typeCounts.get("onset-marker") || 0;
+        const divTickCount = typeCounts.get("division-tick") || 0;
+
+        // Only log frames with rhythm-related entities
+        if (onsetMarkers > 0 || divTickCount > 0) {
+          console.log(`t=${t}ms: onset-marker:${onsetMarkers}, division-tick:${divTickCount}`);
+          if (divXs) console.log(`  x: [${divXs}]`);
+        }
+      }
+
+      console.log("\n=== END Tier 1 ===\n");
+      expect(true).toBe(true);
+    });
+
+    it("Tier 2/3 (with tempo): shows beat grid snapping", () => {
+      pipeline.setTempo(120);
+      pipeline.setMeter(4);
+
+      // Simple pattern: quarter notes at 500ms intervals
+      for (let i = 0; i < 8; i++) {
+        const t = i * 500;
+        adapter.addNoteOn(60 + (i % 12), 80, t);
+        adapter.addNoteOff(60 + (i % 12), t + 400);
+      }
+
+      const timestamps = adapter.getTimestamps();
+      console.log("\n=== DIAGNOSTIC: Tier 2/3 (with tempo) ===\n");
+
+      for (const t of timestamps) {
+        const scene = pipeline.requestFrame(t);
+        if (!scene) continue;
+
+        const typeCounts = new Map<string, number>();
+        for (const e of scene.entities) {
+          const type = (e.data?.type as string) || "unknown";
+          typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
+        }
+
+        const beatLines = scene.entities.filter(e => e.data?.type === "beat-line");
+        const beatXs = beatLines.map(e => e.position?.x?.toFixed(3)).join(", ");
+
+        console.log(`t=${t}ms: ${Array.from(typeCounts.entries()).map(([k, v]) => `${k}:${v}`).join(", ")}`);
+        if (beatXs) console.log(`  beat-line x: [${beatXs}]`);
+      }
+
+      console.log("\n=== END Tier 2/3 ===\n");
+      expect(true).toBe(true);
     });
   });
 });

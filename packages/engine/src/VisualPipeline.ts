@@ -340,8 +340,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       chords: [],
       rhythmicAnalysis: {
         detectedDivision: null,
-        detectedDivisionTimes: [],
-        recentOnsets: [],
+        onsetDrifts: [],
         stability: 0,
         confidence: 0,
       },
@@ -514,8 +513,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     // Take latest non-null values for rhythmicAnalysis and dynamics
     let rhythmicAnalysis: MusicalFrame["rhythmicAnalysis"] = {
       detectedDivision: null,
-      detectedDivisionTimes: [],
-      recentOnsets: [],
+      onsetDrifts: [],
       stability: 0,
       confidence: 0,
     };

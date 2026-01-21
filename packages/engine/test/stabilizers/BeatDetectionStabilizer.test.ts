@@ -18,7 +18,7 @@ function noteOn(note: number, velocity: number, t: number, channel = 0): MidiNot
 /**
  * Create a minimal upstream MusicalFrame for testing.
  */
-function makeUpstreamFrame(t: number): MusicalFrame {
+function makeUpstreamFrame(t: number, prescribedTempo: number | null = null): MusicalFrame {
   return {
     t,
     part: "test-part",
@@ -26,15 +26,19 @@ function makeUpstreamFrame(t: number): MusicalFrame {
     chords: [],
     rhythmicAnalysis: {
       detectedDivision: null,
-      detectedDivisionTimes: [],
-      recentOnsets: [],
+      onsetDrifts: [],
       stability: 0,
       confidence: 0,
     },
     dynamics: { level: 0, trend: "stable" },
-    prescribedTempo: null,
+    prescribedTempo,
     prescribedMeter: null,
   };
+}
+
+/** Helper to extract onset timestamps from onsetDrifts */
+function getOnsetTimestamps(frame: MusicalFrame): number[] {
+  return frame.rhythmicAnalysis.onsetDrifts.map((od) => od.t);
 }
 
 describe("BeatDetectionStabilizer (RFC 007)", () => {
@@ -90,8 +94,7 @@ describe("BeatDetectionStabilizer (RFC 007)", () => {
         chords: [],
         rhythmicAnalysis: {
           detectedDivision: null,
-          detectedDivisionTimes: [],
-          recentOnsets: [],
+          onsetDrifts: [],
           stability: 0,
           confidence: 0,
         },
@@ -201,8 +204,8 @@ describe("BeatDetectionStabilizer (RFC 007)", () => {
     });
   });
 
-  describe("recent onsets tracking", () => {
-    it("tracks onset timestamps", () => {
+  describe("onset tracking via onsetDrifts", () => {
+    it("tracks onset timestamps in onsetDrifts", () => {
       const upstream = makeUpstreamFrame(0);
 
       stabilizer.apply(makeFrame(0, [noteOn(60, 100, 0)]), upstream);
@@ -210,10 +213,11 @@ describe("BeatDetectionStabilizer (RFC 007)", () => {
       stabilizer.apply(makeFrame(1000, [noteOn(67, 100, 1000)]), upstream);
       const result = stabilizer.apply(makeFrame(1500, [noteOn(72, 100, 1500)]), upstream);
 
-      expect(result.rhythmicAnalysis.recentOnsets).toContain(0);
-      expect(result.rhythmicAnalysis.recentOnsets).toContain(500);
-      expect(result.rhythmicAnalysis.recentOnsets).toContain(1000);
-      expect(result.rhythmicAnalysis.recentOnsets).toContain(1500);
+      const timestamps = getOnsetTimestamps(result);
+      expect(timestamps).toContain(0);
+      expect(timestamps).toContain(500);
+      expect(timestamps).toContain(1000);
+      expect(timestamps).toContain(1500);
     });
 
     it("prunes old onsets outside window", () => {
@@ -231,16 +235,17 @@ describe("BeatDetectionStabilizer (RFC 007)", () => {
       shortWindowStabilizer.apply(makeFrame(1000, [noteOn(67, 100, 1000)]), upstream);
       const result = shortWindowStabilizer.apply(makeFrame(1500, [noteOn(72, 100, 1500)]), upstream);
 
+      const timestamps = getOnsetTimestamps(result);
       // Onset at 0 should be pruned (older than 1500 - 1000 = 500)
-      expect(result.rhythmicAnalysis.recentOnsets).not.toContain(0);
-      expect(result.rhythmicAnalysis.recentOnsets).toContain(500);
-      expect(result.rhythmicAnalysis.recentOnsets).toContain(1000);
-      expect(result.rhythmicAnalysis.recentOnsets).toContain(1500);
+      expect(timestamps).not.toContain(0);
+      expect(timestamps).toContain(500);
+      expect(timestamps).toContain(1000);
+      expect(timestamps).toContain(1500);
     });
   });
 
-  describe("detectedDivisionTimes", () => {
-    it("computes division timestamps within the onset window", () => {
+  describe("onsetDrifts subdivision structure", () => {
+    it("provides 4 subdivision levels per onset when division detected", () => {
       const upstream = makeUpstreamFrame(0);
 
       stabilizer.apply(makeFrame(0, [noteOn(60, 100, 0)]), upstream);
@@ -249,23 +254,71 @@ describe("BeatDetectionStabilizer (RFC 007)", () => {
       stabilizer.apply(makeFrame(1500, [noteOn(72, 100, 1500)]), upstream);
       const result = stabilizer.apply(makeFrame(2000, [noteOn(60, 100, 2000)]), upstream);
 
-      // Should have division times spanning the onset window
-      expect(result.rhythmicAnalysis.detectedDivisionTimes.length).toBeGreaterThan(0);
-      // Times should be sorted chronologically
-      const times = result.rhythmicAnalysis.detectedDivisionTimes;
-      for (let i = 1; i < times.length; i++) {
-        expect(times[i]).toBeGreaterThan(times[i - 1]);
+      // Each onset should have 4 subdivision levels
+      expect(result.rhythmicAnalysis.onsetDrifts.length).toBeGreaterThan(0);
+      for (const onset of result.rhythmicAnalysis.onsetDrifts) {
+        expect(onset.subdivisions).toHaveLength(4);
+        // Labels should be 1x, 2x, 4x, 8x (no prescribed tempo)
+        expect(onset.subdivisions.map((s) => s.label)).toEqual(["1x", "2x", "4x", "8x"]);
+        // Exactly one should be marked as nearest
+        const nearestCount = onset.subdivisions.filter((s) => s.nearest).length;
+        expect(nearestCount).toBe(1);
       }
     });
 
-    it("returns empty array when no division detected", () => {
+    it("uses musical labels when prescribed tempo is provided", () => {
+      const upstream = makeUpstreamFrame(0, 120); // 120 BPM = 500ms quarter
+
+      stabilizer.apply(makeFrame(0, [noteOn(60, 100, 0)]), upstream);
+      stabilizer.apply(makeFrame(500, [noteOn(64, 100, 500)]), upstream);
+      stabilizer.apply(makeFrame(1000, [noteOn(67, 100, 1000)]), upstream);
+      stabilizer.apply(makeFrame(1500, [noteOn(72, 100, 1500)]), upstream);
+      const result = stabilizer.apply(makeFrame(2000, [noteOn(60, 100, 2000)]), upstream);
+
+      // Labels should be quarter, 8th, 16th, 32nd
+      for (const onset of result.rhythmicAnalysis.onsetDrifts) {
+        expect(onset.subdivisions.map((s) => s.label)).toEqual([
+          "quarter",
+          "8th",
+          "16th",
+          "32nd",
+        ]);
+      }
+    });
+
+    it("returns empty subdivisions when no division detected", () => {
       const upstream = makeUpstreamFrame(0);
 
       // Only 2 onsets, not enough for detection
       stabilizer.apply(makeFrame(0, [noteOn(60, 100, 0)]), upstream);
       const result = stabilizer.apply(makeFrame(500, [noteOn(64, 100, 500)]), upstream);
 
-      expect(result.rhythmicAnalysis.detectedDivisionTimes).toEqual([]);
+      // Onsets should exist but with empty subdivisions
+      expect(result.rhythmicAnalysis.onsetDrifts.length).toBe(2);
+      for (const onset of result.rhythmicAnalysis.onsetDrifts) {
+        expect(onset.subdivisions).toEqual([]);
+      }
+    });
+
+    it("marks nearest subdivision correctly for on-beat notes", () => {
+      const upstream = makeUpstreamFrame(0);
+
+      // Play exactly on 500ms intervals
+      stabilizer.apply(makeFrame(0, [noteOn(60, 100, 0)]), upstream);
+      stabilizer.apply(makeFrame(500, [noteOn(64, 100, 500)]), upstream);
+      stabilizer.apply(makeFrame(1000, [noteOn(67, 100, 1000)]), upstream);
+      stabilizer.apply(makeFrame(1500, [noteOn(72, 100, 1500)]), upstream);
+      const result = stabilizer.apply(makeFrame(2000, [noteOn(60, 100, 2000)]), upstream);
+
+      // For on-beat notes, the 1x subdivision should have smallest drift
+      const onset = result.rhythmicAnalysis.onsetDrifts.find((o) => o.t === 500);
+      expect(onset).toBeDefined();
+      if (onset) {
+        const nearest = onset.subdivisions.find((s) => s.nearest);
+        expect(nearest).toBeDefined();
+        // On-beat note should have very small drift
+        expect(Math.abs(nearest!.drift)).toBeLessThan(50);
+      }
     });
   });
 
@@ -296,7 +349,7 @@ describe("BeatDetectionStabilizer (RFC 007)", () => {
 
       const result = stabilizer.apply(makeFrame(2000, []), upstream);
       expect(result.rhythmicAnalysis.detectedDivision).toBeNull();
-      expect(result.rhythmicAnalysis.recentOnsets).toHaveLength(0);
+      expect(result.rhythmicAnalysis.onsetDrifts).toHaveLength(0);
     });
 
     it("clears state on dispose", () => {

@@ -140,11 +140,19 @@ bd sync                     # Sync with git
 
 ## Task Tracking
 
-**Always use `bd` (beads) for tracking work items.** Never use TODO.md or other ad-hoc files.
+**Always use `bd` (beads) for tracking work items.** Never use TODO.md, PLAN.md, or other ad-hoc files.
 
 - Deferred work → `bd create --title="..." --type=task`
 - Design decisions → document in specs/RFCs, reference from issues
 - Implementation tasks → `bd create` with clear descriptions
+
+**Never create plan documents (PLAN.md, TODO.md, etc.).** They go stale quickly and create redundancy with beads issues, RFCs, and specs. Instead:
+- For architectural changes → write a spec
+- For design exploration → write an RFC (can be implementation-specific)
+- For task tracking → use beads issues
+- For implementation approval → describe the approach in conversation, then implement
+
+**Assume breaking changes are fine.** At this early stage, prefer clean interfaces over migration paths. Only add backward compatibility if the need is explicitly identified. Don't add deprecated aliases, shims, or compatibility layers unless asked.
 
 This ensures work survives session boundaries and context compaction.
 

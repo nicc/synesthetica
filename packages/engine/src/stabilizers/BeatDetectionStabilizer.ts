@@ -25,6 +25,8 @@ import type {
   RawInputFrame,
   MusicalFrame,
   RhythmicAnalysis,
+  OnsetDrift,
+  SubdivisionDrift,
   PartId,
   Ms,
 } from "@synesthetica/contracts";
@@ -66,13 +68,18 @@ interface IOICluster {
   sumSquaredDev: number;
 }
 
+/** Subdivision labels for Tier 2/3 (with prescribed tempo) */
+const TEMPO_LABELS = ["quarter", "8th", "16th", "32nd"] as const;
+
+/** Subdivision labels for Tier 1 (detected division only) */
+const DETECTED_LABELS = ["1x", "2x", "4x", "8x"] as const;
+
 /**
  * BeatDetectionStabilizer: Purely descriptive rhythmic analysis.
  *
  * Outputs RhythmicAnalysis with:
  * - detectedDivision: Most prominent IOI cluster (not a "tempo")
- * - detectedDivisionTimes: Timestamps where divisions fall (for direct rendering)
- * - recentOnsets: Raw onset timestamps for historic visualization
+ * - onsetDrifts: Per-onset drift at 4 subdivision levels (RFC 008)
  * - stability: How consistent the division is (0-1)
  * - confidence: How sure we are about the detection (0-1)
  */
@@ -87,14 +94,14 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
   /** Last time we ran IOI clustering */
   private lastClusteringTime: Ms = 0;
 
-  /** Cached analysis result (updated on clustering interval) */
-  private cachedAnalysis: RhythmicAnalysis = {
-    detectedDivision: null,
-    detectedDivisionTimes: [],
-    recentOnsets: [],
-    stability: 0,
-    confidence: 0,
-  };
+  /** Cached detected division (updated on clustering interval) */
+  private cachedDetectedDivision: Ms | null = null;
+
+  /** Cached stability (updated on clustering interval) */
+  private cachedStability: number = 0;
+
+  /** Cached confidence (updated on clustering interval) */
+  private cachedConfidence: number = 0;
 
   constructor(config: BeatDetectionConfig) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -103,13 +110,9 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
   init(): void {
     this.onsetTimes = [];
     this.lastClusteringTime = 0;
-    this.cachedAnalysis = {
-      detectedDivision: null,
-      detectedDivisionTimes: [],
-      recentOnsets: [],
-      stability: 0,
-      confidence: 0,
-    };
+    this.cachedDetectedDivision = null;
+    this.cachedStability = 0;
+    this.cachedConfidence = 0;
   }
 
   dispose(): void {
@@ -139,14 +142,33 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
       this.lastClusteringTime = t;
     }
 
-    // Update recent onsets in cached analysis (always current)
-    this.cachedAnalysis.recentOnsets = [...this.onsetTimes];
+    // Determine base period and labels for drift computation
+    const prescribedTempo = upstream?.prescribedTempo ?? null;
+    const basePeriod = prescribedTempo !== null
+      ? 60000 / prescribedTempo
+      : this.cachedDetectedDivision;
+    const labels = prescribedTempo !== null ? TEMPO_LABELS : DETECTED_LABELS;
+
+    // Compute per-onset drifts
+    const onsetDrifts = basePeriod !== null
+      ? this.computeOnsetDrifts(basePeriod, labels)
+      : this.onsetTimes.map((onset) => ({
+          t: onset,
+          subdivisions: [],
+        }));
+
+    const rhythmicAnalysis: RhythmicAnalysis = {
+      detectedDivision: this.cachedDetectedDivision,
+      onsetDrifts,
+      stability: this.cachedStability,
+      confidence: this.cachedConfidence,
+    };
 
     if (upstream) {
       return {
         ...upstream,
         t,
-        rhythmicAnalysis: { ...this.cachedAnalysis },
+        rhythmicAnalysis,
       };
     }
 
@@ -155,7 +177,7 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
       part: this.config.partId,
       notes: [],
       chords: [],
-      rhythmicAnalysis: { ...this.cachedAnalysis },
+      rhythmicAnalysis,
       dynamics: { level: 0, trend: "stable" },
       prescribedTempo: null,
       prescribedMeter: null,
@@ -185,42 +207,31 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
 
   /**
    * Update rhythmic analysis using Dixon's IOI clustering.
+   * Updates cached division, stability, and confidence.
    */
   private updateAnalysis(): void {
     if (this.onsetTimes.length < this.config.minOnsets) {
-      this.cachedAnalysis = {
-        detectedDivision: null,
-        detectedDivisionTimes: [],
-        recentOnsets: [...this.onsetTimes],
-        stability: 0,
-        confidence: 0,
-      };
+      this.cachedDetectedDivision = null;
+      this.cachedStability = 0;
+      this.cachedConfidence = 0;
       return;
     }
 
     // Calculate consecutive IOIs
     const iois = this.calculateConsecutiveIOIs();
     if (iois.length < 2) {
-      this.cachedAnalysis = {
-        detectedDivision: null,
-        detectedDivisionTimes: [],
-        recentOnsets: [...this.onsetTimes],
-        stability: 0,
-        confidence: 0,
-      };
+      this.cachedDetectedDivision = null;
+      this.cachedStability = 0;
+      this.cachedConfidence = 0;
       return;
     }
 
     // Cluster IOIs
     const clusters = this.clusterIOIs(iois);
     if (clusters.length === 0) {
-      this.cachedAnalysis = {
-        detectedDivision: null,
-        detectedDivisionTimes: [],
-        recentOnsets: [...this.onsetTimes],
-        stability: 0,
-        confidence: 0,
-      };
+      this.cachedDetectedDivision = null;
+      this.cachedStability = 0;
+      this.cachedConfidence = 0;
       return;
     }
 
@@ -239,21 +250,17 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
     }
 
     if (!bestCluster || bestCluster.count < 2) {
-      this.cachedAnalysis = {
-        detectedDivision: null,
-        detectedDivisionTimes: [],
-        recentOnsets: [...this.onsetTimes],
-        stability: 0,
-        confidence: 0,
-      };
+      this.cachedDetectedDivision = null;
+      this.cachedStability = 0;
+      this.cachedConfidence = 0;
       return;
     }
 
-    const detectedDivision = bestCluster.sum / bestCluster.count;
+    this.cachedDetectedDivision = bestCluster.sum / bestCluster.count;
 
     // Calculate confidence from cluster dominance
     const totalScore = clusters.reduce((sum, c) => sum + c.score, 0);
-    const confidence = Math.min(
+    this.cachedConfidence = Math.min(
       1,
       bestCluster.score / Math.max(1, totalScore)
     );
@@ -263,55 +270,63 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
     const variance = bestCluster.sumSquaredDev / bestCluster.count;
     const stdDev = Math.sqrt(variance);
     // Normalize: stdDev of 50ms = stability 0, stdDev of 0 = stability 1
-    const stability = Math.max(0, Math.min(1, 1 - stdDev / 50));
-
-    // Compute division timestamps within the window
-    const detectedDivisionTimes = this.computeDivisionTimes(detectedDivision);
-
-    this.cachedAnalysis = {
-      detectedDivision,
-      detectedDivisionTimes,
-      recentOnsets: [...this.onsetTimes],
-      stability,
-      confidence,
-    };
+    this.cachedStability = Math.max(0, Math.min(1, 1 - stdDev / 50));
   }
 
   /**
-   * Compute timestamps where detected divisions fall within the onset window.
-   * Uses the median onset as anchor to minimize drift from any single onset.
+   * Compute per-onset drift at 4 subdivision levels.
+   * Each onset gets drift measurements from coarse (base) to fine (base/8).
    */
-  private computeDivisionTimes(division: Ms): Ms[] {
-    if (this.onsetTimes.length === 0 || division <= 0) {
-      return [];
+  private computeOnsetDrifts(
+    basePeriod: Ms,
+    labels: readonly string[]
+  ): OnsetDrift[] {
+    const divisors = [1, 2, 4, 8];
+
+    return this.onsetTimes.map((onset) => {
+      const subdivisions: SubdivisionDrift[] = [];
+      let minAbsDrift = Infinity;
+      let nearestIndex = 0;
+
+      for (let i = 0; i < 4; i++) {
+        const period = basePeriod / divisors[i];
+        const drift = this.computeDriftForPeriod(onset, period);
+
+        if (Math.abs(drift) < minAbsDrift) {
+          minAbsDrift = Math.abs(drift);
+          nearestIndex = i;
+        }
+
+        subdivisions.push({
+          label: labels[i],
+          period,
+          drift,
+          nearest: false, // Will set the correct one below
+        });
+      }
+
+      // Mark the nearest subdivision
+      subdivisions[nearestIndex].nearest = true;
+
+      return { t: onset, subdivisions };
+    });
+  }
+
+  /**
+   * Compute drift for a single onset against a given period.
+   * Returns signed error in ms (negative = early, positive = late).
+   * Uses T=0 as anchor for consistent measurement.
+   */
+  private computeDriftForPeriod(onset: Ms, period: Ms): Ms {
+    // Position within the period cycle (anchored on T=0)
+    const position = onset / period;
+    const fractional = position - Math.floor(position);
+
+    // Normalize to [-0.5, 0.5] range, then convert to ms
+    if (fractional > 0.5) {
+      return (fractional - 1) * period; // Early for next grid point
     }
-
-    const sorted = [...this.onsetTimes].sort((a, b) => a - b);
-    const windowStart = sorted[0];
-    const windowEnd = sorted[sorted.length - 1];
-
-    // Use median onset as anchor for stability
-    const medianIndex = Math.floor(sorted.length / 2);
-    const anchor = sorted[medianIndex];
-
-    const times: Ms[] = [];
-
-    // Extend backward from anchor
-    let t = anchor;
-    while (t >= windowStart) {
-      times.push(t);
-      t -= division;
-    }
-
-    // Extend forward from anchor (skip anchor itself)
-    t = anchor + division;
-    while (t <= windowEnd) {
-      times.push(t);
-      t += division;
-    }
-
-    // Sort chronologically
-    return times.sort((a, b) => a - b);
+    return fractional * period; // Late from previous grid point
   }
 
   private calculateConsecutiveIOIs(): Ms[] {

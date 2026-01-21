@@ -135,7 +135,6 @@ describe("TestRhythmGrammar golden tests", () => {
         tier: 1,
         noteCount: 1,
         detectedDivision: 500,
-        detectedDivisionTimes: [0],
       });
 
       const scene = grammar.update(frame, null);
@@ -191,8 +190,7 @@ describe("TestRhythmGrammar golden tests", () => {
         tier: 2,
         noteCount: 0,
         prescribedTempo: 120, // 500ms per beat
-        detectedDivisionTimes: [0],
-      });
+              });
 
       const scene = grammar.update(frame, null);
 
@@ -206,8 +204,7 @@ describe("TestRhythmGrammar golden tests", () => {
         tier: 2,
         noteCount: 1,
         prescribedTempo: 120,
-        detectedDivisionTimes: [0],
-      });
+              });
 
       const scene = grammar.update(frame, null);
 
@@ -222,8 +219,7 @@ describe("TestRhythmGrammar golden tests", () => {
         tier: 2,
         noteCount: 1,
         prescribedTempo: 120,
-        detectedDivisionTimes: [0],
-        noteOnset: 500, // Exactly on beat
+                noteOnset: 500, // Exactly on beat
       });
 
       const sceneOnBeat = grammar.update(frameOnBeat, null);
@@ -239,8 +235,7 @@ describe("TestRhythmGrammar golden tests", () => {
         tier: 2,
         noteCount: 1,
         prescribedTempo: 120,
-        detectedDivisionTimes: [0],
-        noteOnset: 650, // 150ms late = 30% of beat
+                noteOnset: 650, // 150ms late = 30% of beat
       });
 
       const sceneOffBeat = grammar.update(frameOffBeat, null);
@@ -253,8 +248,7 @@ describe("TestRhythmGrammar golden tests", () => {
         tier: 2,
         noteCount: 1,
         prescribedTempo: 120,
-        detectedDivisionTimes: [0],
-        noteOnset: 500, // Exactly on beat
+                noteOnset: 500, // Exactly on beat
       });
 
       const scene = grammar.update(frame, null);
@@ -270,8 +264,7 @@ describe("TestRhythmGrammar golden tests", () => {
         tier: 2,
         noteCount: 0,
         prescribedTempo: 120,
-        detectedDivisionTimes: [0],
-      });
+              });
 
       const scene = grammar.update(frame, null);
 
@@ -298,8 +291,7 @@ describe("TestRhythmGrammar golden tests", () => {
         noteCount: 0,
         prescribedTempo: 120,
         prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
-        detectedDivisionTimes: [0],
-      });
+              });
 
       const scene = grammar.update(frame, null);
 
@@ -317,8 +309,7 @@ describe("TestRhythmGrammar golden tests", () => {
         noteCount: 0,
         prescribedTempo: 120,
         prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
-        detectedDivisionTimes: [0],
-      });
+              });
 
       const scene = grammar.update(frame, null);
 
@@ -334,8 +325,7 @@ describe("TestRhythmGrammar golden tests", () => {
         noteCount: 0,
         prescribedTempo: 120,
         prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
-        detectedDivisionTimes: [0],
-      });
+              });
 
       const scene = grammar.update(frame, null);
 
@@ -349,8 +339,7 @@ describe("TestRhythmGrammar golden tests", () => {
         noteCount: 0,
         prescribedTempo: 120,
         prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
-        detectedDivisionTimes: [0],
-      });
+              });
 
       const scene = grammar.update(frame, null);
 
@@ -460,7 +449,7 @@ function createMinimalFrame(
     prescribedTempo?: number;
     prescribedMeter?: { beatsPerBar: number; beatUnit: number };
     detectedDivision?: number | null;
-    detectedDivisionTimes?: number[];
+    onsetDrifts?: Array<{ t: number; subdivisions: Array<{ label: string; period: number; drift: number; nearest: boolean }> }>;
   }
 ): AnnotatedMusicalFrame {
   const noteOnset = options.noteOnset ?? t;
@@ -526,6 +515,35 @@ function createMinimalFrame(
   const prescribedTempo = options.tier >= 2 ? (options.prescribedTempo ?? 120) : null;
   const prescribedMeter = options.tier === 3 ? (options.prescribedMeter ?? { beatsPerBar: 4, beatUnit: 4 }) : null;
 
+  // Build onsetDrifts - for Tier 2+ with prescribed tempo, include drift data for note onset
+  const detectedDivision = options.detectedDivision ?? (prescribedTempo !== null ? 60000 / prescribedTempo : null);
+  let onsetDrifts = options.onsetDrifts ?? [];
+
+  // If no explicit onsetDrifts provided but we have a tempo, generate default drift data
+  if (onsetDrifts.length === 0 && prescribedTempo !== null && options.noteCount > 0) {
+    const basePeriod = 60000 / prescribedTempo;
+    onsetDrifts = [{
+      t: noteOnset,
+      subdivisions: [
+        { label: "quarter", period: basePeriod, drift: (noteOnset % basePeriod), nearest: true },
+        { label: "8th", period: basePeriod / 2, drift: (noteOnset % (basePeriod / 2)), nearest: false },
+        { label: "16th", period: basePeriod / 4, drift: (noteOnset % (basePeriod / 4)), nearest: false },
+        { label: "32nd", period: basePeriod / 8, drift: (noteOnset % (basePeriod / 8)), nearest: false },
+      ],
+    }];
+  } else if (onsetDrifts.length === 0 && detectedDivision !== null && options.noteCount > 0) {
+    // Tier 1 with detected division
+    onsetDrifts = [{
+      t: noteOnset,
+      subdivisions: [
+        { label: "1x", period: detectedDivision, drift: 0, nearest: true },
+        { label: "2x", period: detectedDivision / 2, drift: 0, nearest: false },
+        { label: "4x", period: detectedDivision / 4, drift: 0, nearest: false },
+        { label: "8x", period: detectedDivision / 8, drift: 0, nearest: false },
+      ],
+    }];
+  }
+
   return {
     t,
     part: "main",
@@ -533,9 +551,8 @@ function createMinimalFrame(
     chords,
     rhythm: {
       analysis: {
-        detectedDivision: options.detectedDivision ?? (prescribedTempo !== null ? 60000 / prescribedTempo : null),
-        detectedDivisionTimes: options.detectedDivisionTimes ?? (prescribedTempo !== null ? [0] : []),
-        recentOnsets: prescribedTempo !== null ? [0, t] : [],
+        detectedDivision,
+        onsetDrifts,
         stability: prescribedTempo !== null ? 0.9 : 0,
         confidence: prescribedTempo !== null ? 0.9 : 0,
       },

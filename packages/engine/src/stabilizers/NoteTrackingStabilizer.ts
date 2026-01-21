@@ -132,8 +132,7 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
       chords: [],
       rhythmicAnalysis: {
         detectedDivision: null,
-        detectedDivisionTimes: [],
-        recentOnsets: [],
+        onsetDrifts: [],
         stability: 0,
         confidence: 0,
       },

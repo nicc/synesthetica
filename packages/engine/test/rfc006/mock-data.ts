@@ -271,7 +271,19 @@ export const frame1: AnnotatedMusicalFrame = {
     ),
   ],
   rhythm: {
-    analysis: { detectedDivision: 500, recentOnsets: [0], stability: 0.9, confidence: 0.9, detectedDivisionTimes: [0] },
+    analysis: {
+      detectedDivision: 500,
+      onsetDrifts: [
+        { t: 0, subdivisions: [
+          { label: "quarter", period: 500, drift: 0, nearest: true },
+          { label: "8th", period: 250, drift: 0, nearest: false },
+          { label: "16th", period: 125, drift: 0, nearest: false },
+          { label: "32nd", period: 62.5, drift: 0, nearest: false },
+        ]},
+      ],
+      stability: 0.9,
+      confidence: 0.9,
+    },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
@@ -330,7 +342,25 @@ export const frame2: AnnotatedMusicalFrame = {
     ),
   ],
   rhythm: {
-    analysis: { detectedDivision: 500, recentOnsets: [0, 500], stability: 0.9, confidence: 0.9, detectedDivisionTimes: [0, 500] },
+    analysis: {
+      detectedDivision: 500,
+      onsetDrifts: [
+        { t: 0, subdivisions: [
+          { label: "quarter", period: 500, drift: 0, nearest: true },
+          { label: "8th", period: 250, drift: 0, nearest: false },
+          { label: "16th", period: 125, drift: 0, nearest: false },
+          { label: "32nd", period: 62.5, drift: 0, nearest: false },
+        ]},
+        { t: 500, subdivisions: [
+          { label: "quarter", period: 500, drift: 0, nearest: true },
+          { label: "8th", period: 250, drift: 0, nearest: false },
+          { label: "16th", period: 125, drift: 0, nearest: false },
+          { label: "32nd", period: 62.5, drift: 0, nearest: false },
+        ]},
+      ],
+      stability: 0.9,
+      confidence: 0.9,
+    },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
@@ -426,7 +456,25 @@ export const frame3: AnnotatedMusicalFrame = {
     ),
   ],
   rhythm: {
-    analysis: { detectedDivision: 500, recentOnsets: [0], stability: 0.9, confidence: 0.9, detectedDivisionTimes: [0] },
+    analysis: {
+      detectedDivision: 500,
+      onsetDrifts: [
+        { t: 0, subdivisions: [
+          { label: "quarter", period: 500, drift: 0, nearest: true },
+          { label: "8th", period: 250, drift: 0, nearest: false },
+          { label: "16th", period: 125, drift: 0, nearest: false },
+          { label: "32nd", period: 62.5, drift: 0, nearest: false },
+        ]},
+        { t: 1000, subdivisions: [
+          { label: "quarter", period: 500, drift: 0, nearest: true },
+          { label: "8th", period: 250, drift: 0, nearest: false },
+          { label: "16th", period: 125, drift: 0, nearest: false },
+          { label: "32nd", period: 62.5, drift: 0, nearest: false },
+        ]},
+      ],
+      stability: 0.9,
+      confidence: 0.9,
+    },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
@@ -496,7 +544,25 @@ export const frame4: AnnotatedMusicalFrame = {
     ),
   ],
   rhythm: {
-    analysis: { detectedDivision: 500, recentOnsets: [0, 500], stability: 0.9, confidence: 0.9, detectedDivisionTimes: [0, 500] },
+    analysis: {
+      detectedDivision: 500,
+      onsetDrifts: [
+        { t: 0, subdivisions: [
+          { label: "quarter", period: 500, drift: 0, nearest: true },
+          { label: "8th", period: 250, drift: 0, nearest: false },
+          { label: "16th", period: 125, drift: 0, nearest: false },
+          { label: "32nd", period: 62.5, drift: 0, nearest: false },
+        ]},
+        { t: 1000, subdivisions: [
+          { label: "quarter", period: 500, drift: 0, nearest: true },
+          { label: "8th", period: 250, drift: 0, nearest: false },
+          { label: "16th", period: 125, drift: 0, nearest: false },
+          { label: "32nd", period: 62.5, drift: 0, nearest: false },
+        ]},
+      ],
+      stability: 0.9,
+      confidence: 0.9,
+    },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
@@ -555,7 +621,25 @@ export const frame5: AnnotatedMusicalFrame = {
     ),
   ],
   rhythm: {
-    analysis: { detectedDivision: 500, recentOnsets: [0], stability: 0.9, confidence: 0.9, detectedDivisionTimes: [0] },
+    analysis: {
+      detectedDivision: 500,
+      onsetDrifts: [
+        { t: 0, subdivisions: [
+          { label: "quarter", period: 500, drift: 0, nearest: true },
+          { label: "8th", period: 250, drift: 0, nearest: false },
+          { label: "16th", period: 125, drift: 0, nearest: false },
+          { label: "32nd", period: 62.5, drift: 0, nearest: false },
+        ]},
+        { t: 1000, subdivisions: [
+          { label: "quarter", period: 500, drift: 0, nearest: true },
+          { label: "8th", period: 250, drift: 0, nearest: false },
+          { label: "16th", period: 125, drift: 0, nearest: false },
+          { label: "32nd", period: 62.5, drift: 0, nearest: false },
+        ]},
+      ],
+      stability: 0.9,
+      confidence: 0.9,
+    },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,

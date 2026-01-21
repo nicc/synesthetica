@@ -196,6 +196,9 @@ function stopSession(): void {
   }
 }
 
+// Debug counter for throttled logging
+let debugFrameCount = 0;
+
 /**
  * Render loop - pull-based frame production
  */
@@ -208,6 +211,22 @@ function startRenderLoop(): void {
 
     // Request frame from pipeline
     const sceneFrame = pipeline.requestFrame(sessionMs);
+
+    // Debug: log entity counts every 60 frames (~1 second)
+    debugFrameCount++;
+    if (debugFrameCount % 60 === 0) {
+      const typeCounts = new Map<string, number>();
+      for (const e of sceneFrame.entities) {
+        const type = (e.data?.type as string) || "unknown";
+        typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
+      }
+      if (typeCounts.size > 0) {
+        const divTicks = typeCounts.get("division-tick") || 0;
+        const beatLines = typeCounts.get("beat-line") || 0;
+        const onsetMarkers = typeCounts.get("onset-marker") || 0;
+        console.log(`t=${Math.round(sessionMs)}ms: onset-marker:${onsetMarkers}, division-tick:${divTicks}, beat-line:${beatLines}`);
+      }
+    }
 
     // Render to canvas
     renderer.render(sceneFrame);

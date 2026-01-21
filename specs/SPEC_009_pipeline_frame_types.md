@@ -1,8 +1,8 @@
 # SPEC 009: Pipeline Frame Types
 
 Status: Approved
-Date: 2026-01-19
-Source: RFC 005, RFC 006
+Date: 2026-01-21
+Source: RFC 005, RFC 006, RFC 008
 
 ## Summary
 
@@ -81,10 +81,22 @@ export interface MusicalFrame {
 
 export interface RhythmicAnalysis {
   detectedDivision: Ms | null;     // Most prominent IOI (not a tempo)
-  detectedDivisionTimes: Ms[];     // Timestamps where divisions fall (for direct rendering)
-  recentOnsets: Ms[];              // Recent note onset timestamps
+  onsetDrifts: OnsetDrift[];       // Per-onset drift data at 4 subdivision levels
   stability: number;               // [0,1] how consistent the division is
   confidence: number;              // [0,1] detection confidence
+}
+
+// Per-onset subdivision drift analysis (RFC 008)
+export interface OnsetDrift {
+  t: Ms;                           // Onset timestamp
+  subdivisions: SubdivisionDrift[]; // 4 elements, coarse to fine
+}
+
+export interface SubdivisionDrift {
+  label: string;                   // "quarter"|"8th"|"16th"|"32nd" or "1x"|"2x"|"4x"|"8x"
+  period: Ms;                      // Subdivision period in ms
+  drift: Ms;                       // Signed error (negative = early, positive = late)
+  nearest: boolean;                // True if this is the closest subdivision
 }
 
 export interface Note {
