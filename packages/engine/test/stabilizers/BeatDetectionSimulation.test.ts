@@ -43,8 +43,7 @@ function makeUpstreamFrame(t: number): MusicalFrame {
     chords: [],
     rhythmicAnalysis: {
       detectedDivision: null,
-      detectedDivisionTimes: [],
-      recentOnsets: [],
+      onsetDrifts: [],
       stability: 0,
       confidence: 0,
     },

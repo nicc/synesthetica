@@ -4,7 +4,7 @@
 id: PRINCIPLES.core-v1
 status: draft
 owner: user
-last_updated: 2026-01-05
+last_updated: 2026-01-21
 ---
 
 ## How to Use This Document
@@ -41,10 +41,21 @@ Prefer a small number of well-designed primitives with wide, meaningful ranges.
 A good system feels deeper over time without growing more complex.
 
 ### 4. Perceptual Honesty
-Mappings between sound, MIDI, and visuals should:
-- reflect meaningful musical structure
-- avoid arbitrary or misleading representations
-- privilege learning and intuition over spectacle
+
+**What we measure**
+- Observations are accurate and consistent
+- Measurements are relative to established musical structure (beat, subdivision, harmony)
+- We report what happened, not what we think the player meant
+
+**What we show**
+- Mappings between sound, MIDI, and visuals reflect meaningful musical structure
+- Representations are honest—not arbitrary or misleading
+- We privilege learning and intuition over spectacle
+
+**What we don't claim**
+- Intent (why the player did something)
+- Correctness (whether it was "right")
+- Judgment (whether it was "good")
 
 ### 5. Real-Time Respect
 The system must respect real-time interaction:
