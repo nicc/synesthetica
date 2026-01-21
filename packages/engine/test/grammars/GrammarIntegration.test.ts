@@ -1,5 +1,5 @@
 /**
- * RFC 006 Validation Test
+ * Grammar Integration Tests
  *
  * Tests the annotated musical frame architecture by:
  * 1. Running two toy grammars (rhythm-focused, chord-focused) on mock data
@@ -24,10 +24,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { TestRhythmGrammar } from "../../src/grammars/TestRhythmGrammar";
 import { TestChordProgressionGrammar } from "../../src/grammars/TestChordProgressionGrammar";
 import { IdentityCompositor } from "../../src/stubs/IdentityCompositor";
-import { mockFrameSequence, frame1, frame3 } from "./mock-data";
+import { mockFrameSequence, frame1, frame3 } from "../_fixtures/frames/annotated-sequences";
 import type { GrammarContext, SceneFrame } from "@synesthetica/contracts";
 
-describe("RFC 006 Validation", () => {
+describe("Grammar Integration", () => {
   const ctx: GrammarContext = {
     canvasSize: { width: 1920, height: 1080 },
     rngSeed: 12345,

@@ -13,7 +13,7 @@ import { describe, it, beforeEach, expect } from "vitest";
 import {
   loadFixturesFromDir,
   type SequenceFixture,
-} from "../harness";
+} from "../../_harness/golden";
 import type {
   AnnotatedMusicalFrame,
   AnnotatedNote,

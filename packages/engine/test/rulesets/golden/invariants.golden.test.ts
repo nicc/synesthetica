@@ -57,8 +57,7 @@ function makeFrame(t: number, notes: Note[]): MusicalFrame {
     chords: [],
     rhythmicAnalysis: {
       detectedDivision: null,
-      detectedDivisionTimes: [],
-      recentOnsets: [],
+      onsetDrifts: [],
       stability: 0,
       confidence: 0,
     },

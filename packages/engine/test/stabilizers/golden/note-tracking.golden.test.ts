@@ -11,7 +11,7 @@ import {
   loadFixturesFromDir,
   expectFrameEquals,
   type SequenceFixture,
-} from "../harness";
+} from "../../_harness/golden";
 import type { RawInputFrame, MusicalFrame, Pitch, NotePhase } from "@synesthetica/contracts";
 import { NoteTrackingStabilizer } from "../../../src/stabilizers/NoteTrackingStabilizer";
 

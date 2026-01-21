@@ -9,7 +9,7 @@ import { describe, it, beforeEach, expect } from "vitest";
 import {
   loadFixturesFromDir,
   type SequenceFixture,
-} from "../harness";
+} from "../../_harness/golden";
 import type {
   AnnotatedMusicalFrame,
   AnnotatedNote,
@@ -355,8 +355,7 @@ function createMinimalFrame(
     rhythm: {
       analysis: {
         detectedDivision: options.hasPrescribedTempo ? 500 : null,
-        detectedDivisionTimes: options.hasPrescribedTempo ? [t] : [],
-        recentOnsets: options.hasPrescribedTempo ? [t] : [],
+        onsetDrifts: [],
         stability: options.hasPrescribedTempo ? 0.9 : 0,
         confidence: options.hasPrescribedTempo ? 0.9 : 0,
       },

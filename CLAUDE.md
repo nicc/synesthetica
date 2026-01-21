@@ -2,7 +2,26 @@
 
 **Read `PRINCIPLES.md` at session start.** It defines constraints that apply to all design and implementation decisions.
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started. See [docs/bd-quickref.md](docs/bd-quickref.md) for command reference.
+
+## Contents
+
+1. [Implementation Approval](#implementation-approval)
+2. [Communication Style](#communication-style)
+3. [Scope and Substantiation](#scope-and-substantiation)
+4. [Landing the Plane](#landing-the-plane-session-completion)
+5. [Task Tracking](#task-tracking)
+6. [Discovery Capture](#discovery-capture-during-implementation)
+7. [Session Synthesis](#session-synthesis-end-of-session)
+8. [Feedback for the User](#feedback-for-the-user)
+9. [Linting](#linting)
+10. [Testing Conventions](#testing-conventions)
+11. [Spec Maintenance](#spec-maintenance)
+12. [Context Awareness](#context-awareness-before-action)
+13. [Verification After Changes](#verification-after-changes)
+14. [Commit Messages](#commit-messages)
+
+---
 
 ## Implementation Approval
 
@@ -76,36 +95,6 @@ Good: "SPEC_004 defines annotations and control ops. The query interface isn't s
 3. Only proceed with invention if explicitly asked to design something new
 
 This ensures documentation reflects actual project state, not assumptions.
-
-## Quick Reference
-
-```bash
-# Discovery
-bd ready                    # Find available work
-bd show <id>                # View issue details
-bd list                     # List all issues
-
-# Status changes
-bd update <id> --status in_progress   # Claim work
-bd close <id>                         # Complete work
-bd close <id> -r "reason"             # Complete with reason (use -r, not --comment)
-
-# Creation
-bd create --title="..." --type=task --priority=2   # Create issue
-bd create --title="..." --body="..."               # With description
-
-# Dependencies
-bd dep add <id> <depends-on-id>       # Add dependency (NOT "bd dep <id> <id>")
-bd dep remove <id> <depends-on-id>    # Remove dependency
-
-# Sync
-bd sync                     # Sync with git
-```
-
-**Common mistakes to avoid:**
-- `bd close --comment "..."` → use `-r "..."` instead
-- `bd dep <id1> <id2>` → use `bd dep add <id1> <id2>`
-- Never edit `.beads/issues.jsonl` directly — always use the CLI
 
 ## Landing the Plane (Session Completion)
 

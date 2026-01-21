@@ -59,7 +59,7 @@ export interface CompareOptions {
 // Fixture Loading
 // ============================================================================
 
-const FIXTURES_DIR = resolve(__dirname, "fixtures");
+const FIXTURES_DIR = resolve(__dirname, "../_fixtures");
 
 /**
  * Load a JSON fixture file.
