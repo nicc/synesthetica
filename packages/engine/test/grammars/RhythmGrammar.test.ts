@@ -602,4 +602,76 @@ describe("RhythmGrammar snapshots", () => {
     // All notes get reference lines showing where the beat was
     expect(metrics.byType["reference-line"]).toBe(3);
   });
+
+  it("renders lingering reference window (streaks outlive notes)", () => {
+    // This test shows the reference window (streaks + reference lines)
+    // lingering after note bars have faded.
+    //
+    // At horizon=0.5, note window is ~4s but reference window is ~4.8s (1.2x).
+    // We set t=5000 with notes from t=1000-2000, so:
+    // - Notes at t=1000-2000 are 3000-4000ms old
+    // - At horizon=0.5, noteHistoryMs ≈ 4250ms, streakHistoryMs ≈ 5100ms
+    // - Notes should be visible but fading; reference elements still visible
+    grammar.setMacros({ horizon: 0.5 });
+
+    const frame = createTestFrame(5000, {
+      tempo: 120,
+      notes: [
+        { id: "old-early", pc: 2, onset: 1200, duration: 300 }, // 3800ms old, early
+        { id: "old-late", pc: 9, onset: 1800, duration: 300 }, // 3200ms old, late
+        { id: "recent", pc: 5, onset: 4500, duration: 300 }, // 500ms old, on-beat
+      ],
+      onsetDrifts: [
+        {
+          t: 1200,
+          subdivisions: [{ label: "quarter", period: 500, drift: -80, nearest: true }],
+        },
+        {
+          t: 1800,
+          subdivisions: [{ label: "quarter", period: 500, drift: 80, nearest: true }],
+        },
+        {
+          t: 4500,
+          subdivisions: [{ label: "quarter", period: 500, drift: 0, nearest: true }],
+        },
+      ],
+    });
+
+    const scene = grammar.update(frame, null);
+    maybeWriteSnapshot("rhythm-reference-window", scene);
+    const metrics = extractMetrics(scene);
+
+    console.log("\nReference Window (lingering):\n" + formatMetrics(metrics));
+
+    // Should have reference lines for old notes (in reference window)
+    // and the recent note
+    expect(metrics.byType["reference-line"]).toBeGreaterThanOrEqual(2);
+    // Old notes with drift should still have streaks (in reference window)
+    expect(metrics.byType["streak"]).toBeGreaterThan(0);
+  });
+
+  it("renders at middle horizon (0.5)", () => {
+    grammar.setMacros({ horizon: 0.5 });
+
+    const frame = createTestFrame(4000, {
+      tempo: 120,
+      meter: { beatsPerBar: 4, beatUnit: 4 },
+      notes: [
+        { id: "n1", pc: 0, onset: 1000, duration: 500 }, // 3s old
+        { id: "n2", pc: 4, onset: 2000, duration: 500 }, // 2s old
+        { id: "n3", pc: 7, onset: 3000, duration: 500 }, // 1s old
+        { id: "n4", pc: 11, onset: 3800, duration: 200 }, // 200ms old
+      ],
+    });
+
+    const scene = grammar.update(frame, null);
+    maybeWriteSnapshot("rhythm-mid-horizon", scene);
+    const metrics = extractMetrics(scene);
+
+    console.log("\nMid Horizon (0.5):\n" + formatMetrics(metrics));
+
+    // Should have fewer elements than max horizon but more than min
+    expect(metrics.byType["note-bar"]).toBeGreaterThanOrEqual(2);
+    expect(metrics.byType["beat-line"]).toBeGreaterThan(0);
+  });
 });

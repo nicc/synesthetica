@@ -397,10 +397,15 @@ export class RhythmGrammar implements IVisualGrammar {
     const note = an.note;
     const visual = an.visual;
 
-    // Check if note onset is in visible window
     const age = t - note.onset;
-    if (age > windows.noteHistoryMs) return entities;
     if (age < 0) return entities; // Future notes not shown
+
+    // Reference window (streaks + reference lines) lingers longer than notes
+    const inReferenceWindow = age <= windows.streakHistoryMs;
+    const inNoteWindow = age <= windows.noteHistoryMs;
+
+    // If outside both windows, nothing to render
+    if (!inReferenceWindow) return entities;
 
     // Position: x is pitch class, y is onset time (bottom of bar)
     const x = this.pitchClassToX(note.pitch.pc);
@@ -408,16 +413,76 @@ export class RhythmGrammar implements IVisualGrammar {
 
     if (onsetY < 0 || onsetY > 1) return entities;
 
+    // Get drift info (needed for reference lines and streaks)
+    const driftInfo = this.getDriftInfo(note.onset, rhythm, tier);
+
+    // Reference window elements: reference lines and streaks
+    // These linger longer than note bars
+    if (inReferenceWindow && driftInfo) {
+      // Calculate opacity based on reference window
+      const refOpacity = this.distanceToOpacity(age, windows.streakHistoryMs) * 0.6;
+
+      // Add reference line showing where the beat was
+      const refLineY = this.timeToY(
+        note.onset - driftInfo.driftMs, // Where the beat actually was
+        t
+      );
+
+      if (refLineY >= 0 && refLineY <= 1) {
+        const barWidth = NOTE_BAR_WIDTH * (0.5 + (note.velocity / 127) * 0.5);
+        entities.push({
+          id: this.entityId(`ref-line-${note.id}`),
+          part,
+          kind: "trail",
+          createdAt: note.onset,
+          updatedAt: t,
+          position: { x, y: refLineY },
+          style: {
+            color: GRID_COLORS.referenceLine,
+            size: barWidth * 1000 * 3, // Wider than note bar
+            opacity: refOpacity,
+          },
+          data: {
+            type: "reference-line",
+            noteId: note.id,
+          },
+        });
+      }
+
+      // Add streak lines if there's drift beyond tight tolerance
+      if (Math.abs(driftInfo.driftMs) > TIGHT_TOLERANCE_MS) {
+        const barWidth = NOTE_BAR_WIDTH * (0.5 + (note.velocity / 127) * 0.5);
+        const streaks = this.createStreakLines(
+          note.id,
+          x,
+          onsetY, // Use onset Y (bottom of bar) for streak anchor
+          barWidth,
+          driftInfo.driftMs,
+          visual.palette.primary,
+          refOpacity, // Use reference window opacity
+          part,
+          t
+        );
+        entities.push(...streaks);
+      }
+    }
+
+    // Note bars only render within the note window
+    if (!inNoteWindow) return entities;
+
     // Calculate bar height from duration
     // In our coordinate system: smaller y = higher on screen = further in past
     // onset is in the past (smaller y), note end is closer to now (larger y)
     // So bar extends from onsetY (top) down to endY (bottom, closer to NOW line)
+    // BUT: the bar should never extend past the NOW line into the future
     const noteEndTime = note.onset + note.duration;
-    const endY = this.timeToY(noteEndTime, t);
+    const rawEndY = this.timeToY(noteEndTime, t);
 
-    // Bar height: endY (bottom) - onsetY (top), clamped to visible area
-    const clampedEndY = Math.min(1, endY); // Don't extend past bottom of screen
-    const barHeight = Math.max(clampedEndY - onsetY, MIN_NOTE_BAR_HEIGHT);
+    // Clamp endY to NOW line - we don't render notes into the future
+    const endY = Math.min(rawEndY, NOW_LINE_Y);
+
+    // Bar height: endY (bottom) - onsetY (top)
+    const barHeight = Math.max(endY - onsetY, MIN_NOTE_BAR_HEIGHT);
 
     // Width based on velocity
     const barWidth = NOTE_BAR_WIDTH * (0.5 + (note.velocity / 127) * 0.5);
@@ -437,13 +502,14 @@ export class RhythmGrammar implements IVisualGrammar {
     }
     const opacity = baseOpacity * this.distanceToOpacity(age, windows.noteHistoryMs);
 
-    // Get drift info
-    const driftInfo = this.getDriftInfo(note.onset, rhythm, tier);
-
     // Create main note bar entity
     // Position is center of the bar, with barHeight stored in data for renderer
-    // Bar extends from onsetY (top) to endY (bottom), so center is onset + half height
-    const barCenterY = onsetY + barHeight / 2;
+    // Bar extends from onsetY (top) down toward NOW line
+    // Since endY is clamped to NOW_LINE_Y, the bar bottom is at min(endY, NOW_LINE_Y)
+    // Center = top + height/2 = onsetY + barHeight/2
+    // But we need to ensure the bar doesn't visually extend past NOW line
+    // So we position center such that bottom edge is at endY (which is clamped)
+    const barCenterY = endY - barHeight / 2;
     entities.push({
       id: this.entityId(`note-${note.id}`),
       part,
@@ -467,50 +533,6 @@ export class RhythmGrammar implements IVisualGrammar {
         onsetY, // Bottom of bar (for streak positioning)
       },
     });
-
-    // Add reference line showing where the beat was
-    if (driftInfo) {
-      const refLineY = this.timeToY(
-        note.onset - driftInfo.driftMs, // Where the beat actually was
-        t
-      );
-
-      if (refLineY >= 0 && refLineY <= 1) {
-        entities.push({
-          id: this.entityId(`ref-line-${note.id}`),
-          part,
-          kind: "trail",
-          createdAt: note.onset,
-          updatedAt: t,
-          position: { x, y: refLineY },
-          style: {
-            color: GRID_COLORS.referenceLine,
-            size: barWidth * 1000 * 3, // Wider than note bar
-            opacity: opacity * 0.5,
-          },
-          data: {
-            type: "reference-line",
-            noteId: note.id,
-          },
-        });
-      }
-    }
-
-    // Add streak lines if there's drift beyond tight tolerance
-    if (driftInfo && Math.abs(driftInfo.driftMs) > TIGHT_TOLERANCE_MS) {
-      const streaks = this.createStreakLines(
-        note.id,
-        x,
-        onsetY, // Use onset Y (bottom of bar) for streak anchor
-        barWidth,
-        driftInfo.driftMs,
-        visual.palette.primary,
-        opacity,
-        part,
-        t
-      );
-      entities.push(...streaks);
-    }
 
     return entities;
   }

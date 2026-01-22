@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { VisualPipeline } from "../src/VisualPipeline";
 import { NoteTrackingStabilizer } from "../src/stabilizers/NoteTrackingStabilizer";
 import { MusicalVisualRuleset } from "../src/rulesets/MusicalVisualRuleset";
-import { TestRhythmGrammar } from "../src/grammars/TestRhythmGrammar";
+import { RhythmGrammar } from "../src/grammars/RhythmGrammar";
 import { IdentityCompositor } from "../src/stubs/IdentityCompositor";
 import type {
   IRawSourceAdapter,
@@ -108,17 +108,21 @@ describe("VisualPipeline", () => {
       expect(frame.t).toBe(1000);
     });
 
-    it("returns empty frame when adapter has no data", () => {
+    it("returns frame with only structural elements when adapter has no data", () => {
       pipeline.addAdapter(adapter);
       pipeline.setStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
       pipeline.setRuleset(new MusicalVisualRuleset());
-      pipeline.addGrammar(new TestRhythmGrammar());
+      pipeline.addGrammar(new RhythmGrammar());
 
       const frame = pipeline.requestFrame(1000);
 
-      expect(frame.entities).toHaveLength(0);
+      // RhythmGrammar always produces a NOW line even with no notes
+      const noteEntities = frame.entities.filter(
+        (e) => e.data?.type === "note-bar"
+      );
+      expect(noteEntities).toHaveLength(0);
     });
 
     it("emits warning when no ruleset configured", () => {
@@ -139,7 +143,7 @@ describe("VisualPipeline", () => {
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
       pipeline.setRuleset(new MusicalVisualRuleset());
-      pipeline.addGrammar(new TestRhythmGrammar());
+      pipeline.addGrammar(new RhythmGrammar());
       pipeline.setCompositor(new IdentityCompositor());
     });
 
@@ -148,7 +152,7 @@ describe("VisualPipeline", () => {
 
       const frame = pipeline.requestFrame(1000);
 
-      // TestRhythmGrammar creates timing markers for notes
+      // RhythmGrammar creates note-bar entities for notes
       expect(frame.entities.length).toBeGreaterThan(0);
       expect(frame.entities[0].part).toBe("test-part");
     });
@@ -199,7 +203,7 @@ describe("VisualPipeline", () => {
 
       // Different velocities should produce different sizes
       const sizes = frame.entities
-        .filter((e) => e.data?.type === "timing-marker")
+        .filter((e) => e.data?.type === "note-bar")
         .map((e) => e.style.size);
       if (sizes.length > 1) {
         expect(new Set(sizes).size).toBeGreaterThan(1); // Not all same size
@@ -214,7 +218,7 @@ describe("VisualPipeline", () => {
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
       pipeline.setRuleset(new MusicalVisualRuleset());
-      pipeline.addGrammar(new TestRhythmGrammar());
+      pipeline.addGrammar(new RhythmGrammar());
     });
 
     it("tracks activity when notes are played", () => {
@@ -238,7 +242,7 @@ describe("VisualPipeline", () => {
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
       pipeline.setRuleset(new MusicalVisualRuleset());
-      pipeline.addGrammar(new TestRhythmGrammar());
+      pipeline.addGrammar(new RhythmGrammar());
 
       adapter.addNoteOn(60, 100, 1000);
       pipeline.requestFrame(1000);
@@ -254,7 +258,7 @@ describe("VisualPipeline", () => {
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
       pipeline.setRuleset(new MusicalVisualRuleset());
-      pipeline.addGrammar(new TestRhythmGrammar());
+      pipeline.addGrammar(new RhythmGrammar());
 
       pipeline.dispose();
 
@@ -272,7 +276,7 @@ describe("VisualPipeline", () => {
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
       pipeline.setRuleset(new MusicalVisualRuleset());
-      pipeline.addGrammar(new TestRhythmGrammar());
+      pipeline.addGrammar(new RhythmGrammar());
       // No compositor set
 
       adapter.addNoteOn(60, 100, 1000);

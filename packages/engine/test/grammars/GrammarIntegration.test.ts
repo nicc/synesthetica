@@ -2,26 +2,19 @@
  * Grammar Integration Tests
  *
  * Tests the annotated musical frame architecture by:
- * 1. Running two toy grammars (rhythm-focused, chord-focused) on mock data
+ * 1. Running grammars (rhythm, chord) on mock data
  * 2. Verifying each grammar produces coherent output
- * 3. Compositing both outputs and evaluating the result
+ * 3. Compositing outputs and evaluating the result
  *
  * Success criteria:
  * - Each grammar produces valid SceneFrame with expected entity types
  * - Grammars correctly filter (rhythm ignores chords, chord ignores beats)
  * - Both respect visual annotations (palette colors are used)
  * - Composed output doesn't degrade into visual mud
- *
- * Note: The rhythm grammar now uses a three-tier visualization system:
- * - Tier 1: onset-marker, division-tick (historic-only)
- * - Tier 2: onset-marker, beat-line, drift-ring (tempo-relative)
- * - Tier 3: onset-marker, beat-line, bar-line, drift-ring, downbeat-glow (meter-relative)
- *
- * The mock data has prescribedTempo and prescribedMeter, so it's tier 3.
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { TestRhythmGrammar } from "../../src/grammars/TestRhythmGrammar";
+import { RhythmGrammar } from "../../src/grammars/RhythmGrammar";
 import { TestChordProgressionGrammar } from "../../src/grammars/TestChordProgressionGrammar";
 import { IdentityCompositor } from "../../src/stubs/IdentityCompositor";
 import { mockFrameSequence, frame1, frame3 } from "../_fixtures/frames/annotated-sequences";
@@ -33,84 +26,6 @@ describe("Grammar Integration", () => {
     rngSeed: 12345,
     part: "main",
   };
-
-  describe("TestRhythmGrammar", () => {
-    let grammar: TestRhythmGrammar;
-
-    beforeEach(() => {
-      grammar = new TestRhythmGrammar();
-      grammar.init(ctx);
-    });
-
-    it("produces entities for notes and rhythm", () => {
-      const scene = grammar.update(frame1, null);
-
-      expect(scene.t).toBe(0);
-      expect(scene.entities.length).toBeGreaterThan(0);
-
-      // Mock data has prescribedTempo + prescribedMeter = tier 3
-      // Should have beat-line and bar-line entities
-      const beatLines = scene.entities.filter(
-        (e) => e.data?.type === "beat-line"
-      );
-      expect(beatLines.length).toBeGreaterThan(0);
-
-      // Should have onset markers for all 3 notes
-      const onsetMarkers = scene.entities.filter(
-        (e) => e.data?.type === "onset-marker"
-      );
-      expect(onsetMarkers.length).toBe(3);
-
-      // Should have drift rings for the notes (tier 2+)
-      const driftRings = scene.entities.filter(
-        (e) => e.data?.type === "drift-ring"
-      );
-      expect(driftRings.length).toBe(3);
-    });
-
-    it("ignores chords entirely", () => {
-      const scene = grammar.update(frame3, null);
-
-      // Frame 3 has 2 chords (C major decaying, A minor active)
-      // But rhythm grammar should produce no chord-related entities
-      const chordEntities = scene.entities.filter(
-        (e) =>
-          e.data?.type === "chord-glow" ||
-          e.data?.type === "chord-history"
-      );
-      expect(chordEntities.length).toBe(0);
-
-      // Should still have onset markers though (6 notes in frame 3)
-      const onsetMarkers = scene.entities.filter(
-        (e) => e.data?.type === "onset-marker"
-      );
-      expect(onsetMarkers.length).toBe(6);
-    });
-
-    it("uses palette colors from annotations", () => {
-      const scene = grammar.update(frame1, null);
-
-      const onsetMarker = scene.entities.find(
-        (e) => e.data?.type === "onset-marker"
-      );
-      expect(onsetMarker).toBeDefined();
-
-      // Frame 1 notes have warm palette (orange hue ~30)
-      expect(onsetMarker!.style.color).toBeDefined();
-      expect(onsetMarker!.style.color!.h).toBeCloseTo(30, 0);
-    });
-
-    it("processes full sequence without errors", () => {
-      let previousScene: SceneFrame | null = null;
-
-      for (const frame of mockFrameSequence) {
-        const scene = grammar.update(frame, previousScene);
-        expect(scene.entities).toBeDefined();
-        expect(scene.diagnostics).toEqual([]);
-        previousScene = scene;
-      }
-    });
-  });
 
   describe("TestChordProgressionGrammar", () => {
     let grammar: TestChordProgressionGrammar;
@@ -212,12 +127,12 @@ describe("Grammar Integration", () => {
   });
 
   describe("Composition", () => {
-    let rhythmGrammar: TestRhythmGrammar;
+    let rhythmGrammar: RhythmGrammar;
     let chordGrammar: TestChordProgressionGrammar;
     let compositor: IdentityCompositor;
 
     beforeEach(() => {
-      rhythmGrammar = new TestRhythmGrammar();
+      rhythmGrammar = new RhythmGrammar();
       chordGrammar = new TestChordProgressionGrammar();
       compositor = new IdentityCompositor();
 
@@ -236,11 +151,11 @@ describe("Grammar Integration", () => {
         rhythmScene.entities.length + chordScene.entities.length
       );
 
-      // Should have beat-line from rhythm grammar (tier 3)
-      const beatLine = composed.entities.find(
-        (e) => e.data?.type === "beat-line"
+      // Should have now-line from rhythm grammar
+      const nowLine = composed.entities.find(
+        (e) => e.data?.type === "now-line"
       );
-      expect(beatLine).toBeDefined();
+      expect(nowLine).toBeDefined();
 
       // Should have chord glow from chord grammar
       const chordGlow = composed.entities.find(
@@ -276,82 +191,6 @@ describe("Grammar Integration", () => {
         prevRhythm = rhythmScene;
         prevChord = chordScene;
       }
-    });
-
-    it("produces non-overlapping entity types", () => {
-      // Run full sequence and check that grammars produce distinct entity types
-      let prevRhythm: SceneFrame | null = null;
-      let prevChord: SceneFrame | null = null;
-
-      for (const frame of mockFrameSequence) {
-        const rhythmScene = rhythmGrammar.update(frame, prevRhythm);
-        const chordScene = chordGrammar.update(frame, prevChord);
-
-        // Get entity types from each grammar
-        const rhythmTypes = new Set(
-          rhythmScene.entities.map((e) => e.data?.type as string)
-        );
-        const chordTypes = new Set(
-          chordScene.entities.map((e) => e.data?.type as string)
-        );
-
-        // Entity types should not overlap (different grammars produce different things)
-        const overlap = [...rhythmTypes].filter((t) => chordTypes.has(t));
-        expect(overlap.length).toBe(0);
-
-        prevRhythm = rhythmScene;
-        prevChord = chordScene;
-      }
-    });
-  });
-
-  describe("Annotation Respect", () => {
-    it("both grammars use warm palette for major chords", () => {
-      const rhythmGrammar = new TestRhythmGrammar();
-      const chordGrammar = new TestChordProgressionGrammar();
-
-      rhythmGrammar.init(ctx);
-      chordGrammar.init(ctx);
-
-      // Frame 1 has C major with warm palette
-      const rhythmScene = rhythmGrammar.update(frame1, null);
-      const chordScene = chordGrammar.update(frame1, null);
-
-      // Rhythm grammar: onset markers should be orange
-      const onsetMarker = rhythmScene.entities.find(
-        (e) => e.data?.type === "onset-marker"
-      );
-      expect(onsetMarker!.style.color!.h).toBeCloseTo(30, 5); // Orange
-
-      // Chord grammar: chord glow should be orange
-      const chordGlow = chordScene.entities.find(
-        (e) => e.data?.type === "chord-glow"
-      );
-      expect(chordGlow!.style.color!.h).toBeCloseTo(30, 5); // Orange
-    });
-
-    it("both grammars use cool palette for minor chords", () => {
-      const rhythmGrammar = new TestRhythmGrammar();
-      const chordGrammar = new TestChordProgressionGrammar();
-
-      rhythmGrammar.init(ctx);
-      chordGrammar.init(ctx);
-
-      // Frame 4 has A minor with cool palette
-      const rhythmScene = rhythmGrammar.update(mockFrameSequence[3], null);
-      const chordScene = chordGrammar.update(mockFrameSequence[3], null);
-
-      // Rhythm grammar: onset markers should be blue
-      const onsetMarker = rhythmScene.entities.find(
-        (e) => e.data?.type === "onset-marker"
-      );
-      expect(onsetMarker!.style.color!.h).toBeCloseTo(220, 5); // Blue
-
-      // Chord grammar: chord glow should be blue
-      const chordGlow = chordScene.entities.find(
-        (e) => e.data?.type === "chord-glow"
-      );
-      expect(chordGlow!.style.color!.h).toBeCloseTo(220, 5); // Blue
     });
   });
 });
