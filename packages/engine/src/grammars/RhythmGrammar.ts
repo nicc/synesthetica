@@ -64,7 +64,7 @@ const MAX_NOTE_HISTORY_MS = 8000;
 const MIN_NOTE_HISTORY_BEATS = 1;
 
 /** Reference window (streaks + reference lines) lingers longer than notes (multiplier) */
-const REFERENCE_LINGER_MULTIPLIER = 1.5;
+const DEFAULT_REFERENCE_LINGER_MULTIPLIER = 1.3;
 
 /** Drift tolerance in ms - within this, note is considered "tight" and shows reference line */
 const TIGHT_TOLERANCE_MS = 30;
@@ -106,6 +106,8 @@ interface RhythmGrammarMacros {
   horizon: number;
   /** Which subdivision to use for drift calculation */
   subdivisionDepth: SubdivisionDepth;
+  /** How long reference window lingers beyond note window (multiplier) */
+  referenceLinger: number;
 }
 
 // ============================================================================
@@ -123,6 +125,7 @@ export class RhythmGrammar implements IVisualGrammar {
   private macros: RhythmGrammarMacros = {
     horizon: 1.0, // Default to full view
     subdivisionDepth: "16th", // Default to finest subdivision
+    referenceLinger: DEFAULT_REFERENCE_LINGER_MULTIPLIER,
   };
 
   /** Seeded RNG for consistent streak randomness */
@@ -227,7 +230,7 @@ export class RhythmGrammar implements IVisualGrammar {
     }
 
     // Streaks linger slightly longer than notes
-    const streakHistoryMs = noteHistoryMs * REFERENCE_LINGER_MULTIPLIER;
+    const streakHistoryMs = noteHistoryMs * this.macros.referenceLinger;
 
     return { gridHistoryMs, gridFutureMs, noteHistoryMs, streakHistoryMs };
   }

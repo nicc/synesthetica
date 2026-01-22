@@ -21,7 +21,7 @@ Controls visibility of beat lines and bar lines. Scales linearly with the horizo
 Controls visibility of note bars. At min horizon, shows approximately 1 beat of history; at max horizon, shows full history.
 
 **Reference window**
-Controls visibility of reference lines and drift streaks. Lingers 1.5x longer than the note window, allowing these elements to remain visible after note bars have faded. This creates a trailing effect where timing feedback persists after the note itself.
+Controls visibility of reference lines and drift streaks. Lingers longer than the note window (controlled by `referenceLinger` macro, default 1.3x), allowing these elements to remain visible after note bars have faded. This creates a trailing effect where timing feedback persists after the note itself.
 
 ## Visual Elements
 
@@ -58,3 +58,6 @@ Controls field of vision. At 0, minimal history shown (tight focus on present). 
 
 **Subdivision depth** (quarter | 8th | 16th)
 Which subdivision to use for drift calculation. Finer subdivisions catch smaller timing deviations.
+
+**Reference linger** (default 1.3)
+Multiplier controlling how long reference lines and streaks remain visible after note bars fade. At 1.3, reference elements persist 30% longer than notes.

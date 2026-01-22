@@ -607,10 +607,10 @@ describe("RhythmGrammar snapshots", () => {
     // This test shows the reference window (streaks + reference lines)
     // lingering after note bars have faded.
     //
-    // At horizon=0.5, note window is ~4s but reference window is ~4.8s (1.2x).
+    // At horizon=0.5, note window is ~4.25s but reference window is ~5.5s (1.3x).
     // We set t=5000 with notes from t=1000-2000, so:
     // - Notes at t=1000-2000 are 3000-4000ms old
-    // - At horizon=0.5, noteHistoryMs ≈ 4250ms, streakHistoryMs ≈ 5100ms
+    // - At horizon=0.5, noteHistoryMs ≈ 4250ms, streakHistoryMs ≈ 5525ms
     // - Notes should be visible but fading; reference elements still visible
     grammar.setMacros({ horizon: 0.5 });
 
@@ -678,31 +678,31 @@ describe("RhythmGrammar snapshots", () => {
   it("shows reference lines lingering after notes fade", () => {
     // This snapshot clearly demonstrates the linger effect:
     // - Note window at horizon=1.0 is 8000ms
-    // - Reference window is 1.5x = 12000ms
+    // - Reference window is 1.3x = 10400ms
     // - Notes >8000ms old are OUTSIDE note window (no bars)
-    // - But INSIDE reference window (<12000ms) so reference lines visible
+    // - But INSIDE reference window (<10400ms) so reference lines visible
     // - Recent notes show both bars AND reference lines for comparison
     grammar.setMacros({ horizon: 1.0 });
 
-    const frame = createTestFrame(13000, {
+    const frame = createTestFrame(10000, {
       tempo: 120,
       notes: [
         // These notes are OUTSIDE note window (>8000ms old) but INSIDE reference window
         // They should show reference lines but NO note bars
-        { id: "faded-early", pc: 0, onset: 4000, duration: 200 }, // 9000ms old - outside note window
-        { id: "faded-late", pc: 3, onset: 4500, duration: 200 }, // 8500ms old - outside note window
-        { id: "faded-tight", pc: 6, onset: 4800, duration: 200 }, // 8200ms old - outside note window
+        { id: "faded-early", pc: 0, onset: 1500, duration: 200 }, // 8500ms old - outside note window
+        { id: "faded-late", pc: 3, onset: 1700, duration: 200 }, // 8300ms old - outside note window
+        { id: "faded-tight", pc: 6, onset: 1900, duration: 200 }, // 8100ms old - outside note window
 
         // These notes are INSIDE note window - should show both bars AND reference lines
-        { id: "visible-early", pc: 9, onset: 11500, duration: 200 }, // 1500ms old
-        { id: "visible-late", pc: 11, onset: 12500, duration: 200 }, // 500ms old
+        { id: "visible-early", pc: 9, onset: 8500, duration: 200 }, // 1500ms old
+        { id: "visible-late", pc: 11, onset: 9500, duration: 200 }, // 500ms old
       ],
       onsetDrifts: [
-        { t: 4000, subdivisions: [{ label: "quarter", period: 500, drift: -60, nearest: true }] },
-        { t: 4500, subdivisions: [{ label: "quarter", period: 500, drift: 70, nearest: true }] },
-        { t: 4800, subdivisions: [{ label: "quarter", period: 500, drift: 50, nearest: true }] },
-        { t: 11500, subdivisions: [{ label: "quarter", period: 500, drift: -50, nearest: true }] },
-        { t: 12500, subdivisions: [{ label: "quarter", period: 500, drift: 80, nearest: true }] },
+        { t: 1500, subdivisions: [{ label: "quarter", period: 500, drift: -60, nearest: true }] },
+        { t: 1700, subdivisions: [{ label: "quarter", period: 500, drift: 70, nearest: true }] },
+        { t: 1900, subdivisions: [{ label: "quarter", period: 500, drift: 50, nearest: true }] },
+        { t: 8500, subdivisions: [{ label: "quarter", period: 500, drift: -50, nearest: true }] },
+        { t: 9500, subdivisions: [{ label: "quarter", period: 500, drift: 80, nearest: true }] },
       ],
     });
 
@@ -714,7 +714,7 @@ describe("RhythmGrammar snapshots", () => {
 
     // Should have 2 note bars (only visible notes inside 8000ms window)
     expect(metrics.byType["note-bar"]).toBe(2);
-    // Should have 5 reference lines (all notes in 12000ms reference window)
+    // Should have 5 reference lines (all notes in 10400ms reference window)
     expect(metrics.byType["reference-line"]).toBe(5);
     // Faded notes with drift should still have streaks
     expect(metrics.byType["streak"]).toBeGreaterThan(0);
