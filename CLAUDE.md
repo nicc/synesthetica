@@ -251,6 +251,8 @@ npm run lint:fix    # Auto-fix where possible
 - Integration tests across pipeline components
 - Browser-based end-to-end tests
 
+**Grammar development:** See [packages/engine/src/grammars/README.md](packages/engine/src/grammars/README.md) for the incremental development approach using ASCII diagrams, SVG snapshots, and simulation metrics.
+
 This section will evolve as we learn what works.
 
 ## Spec Maintenance

@@ -44,14 +44,27 @@ const NOW_LINE_Y = 0.85;
 /** Margins on left/right for pitch class positioning */
 const PITCH_MARGIN = 0.05;
 
-/** Time window in ms shown above NOW line (history) at max horizon */
-const MAX_HISTORY_WINDOW_MS = 8000;
+/**
+ * Time horizon scale (fixed mapping from time to screen position).
+ * This is the total time range that maps to the visible past area.
+ * Visible windows filter what's shown, but don't change this scale.
+ * Future: this will become a macro (see synesthetica-135).
+ */
+const TIME_HORIZON_HISTORY_MS = 8000;
+const TIME_HORIZON_FUTURE_MS = 2000;
 
-/** Time window in ms shown below NOW line (future) at max horizon */
-const MAX_FUTURE_WINDOW_MS = 2000;
+/** Maximum visible window for grid elements at max horizon */
+const MAX_GRID_HISTORY_MS = 8000;
+const MAX_GRID_FUTURE_MS = 2000;
 
-/** Time window for note history at min horizon (in beats, converted to ms based on tempo) */
-const MIN_HORIZON_NOTE_BEATS = 1;
+/** Maximum visible window for notes at max horizon */
+const MAX_NOTE_HISTORY_MS = 8000;
+
+/** Minimum visible window for notes at min horizon (in beats) */
+const MIN_NOTE_HISTORY_BEATS = 1;
+
+/** Drift streaks linger slightly longer than notes (multiplier) */
+const STREAK_LINGER_MULTIPLIER = 1.2;
 
 /** Drift tolerance in ms - within this, note is considered "tight" and shows reference line */
 const TIGHT_TOLERANCE_MS = 30;
@@ -190,27 +203,33 @@ export class RhythmGrammar implements IVisualGrammar {
     gridHistoryMs: number;
     gridFutureMs: number;
     noteHistoryMs: number;
+    streakHistoryMs: number;
   } {
     const horizon = this.macros.horizon;
     const tempo = rhythm.prescribedTempo;
 
-    // At max horizon: full windows
-    // At min horizon: minimal windows
-    const gridHistoryMs = MAX_HISTORY_WINDOW_MS * horizon;
-    const gridFutureMs = MAX_FUTURE_WINDOW_MS * horizon;
+    // Visible windows control what elements are shown (filtered)
+    // They do NOT affect the time-to-screen scale (that's TIME_HORIZON_*)
+
+    // Grid windows: scale linearly with horizon
+    const gridHistoryMs = MAX_GRID_HISTORY_MS * horizon;
+    const gridFutureMs = MAX_GRID_FUTURE_MS * horizon;
 
     // Note history: at min horizon, show ~1 beat; at max, show full history
     let noteHistoryMs: number;
     if (tempo !== null) {
       const beatMs = 60000 / tempo;
-      const minNoteHistoryMs = beatMs * MIN_HORIZON_NOTE_BEATS;
-      noteHistoryMs = minNoteHistoryMs + (MAX_HISTORY_WINDOW_MS - minNoteHistoryMs) * horizon;
+      const minNoteHistoryMs = beatMs * MIN_NOTE_HISTORY_BEATS;
+      noteHistoryMs = minNoteHistoryMs + (MAX_NOTE_HISTORY_MS - minNoteHistoryMs) * horizon;
     } else {
       // No tempo: use time-based windows
-      noteHistoryMs = 500 + (MAX_HISTORY_WINDOW_MS - 500) * horizon;
+      noteHistoryMs = 500 + (MAX_NOTE_HISTORY_MS - 500) * horizon;
     }
 
-    return { gridHistoryMs, gridFutureMs, noteHistoryMs };
+    // Streaks linger slightly longer than notes
+    const streakHistoryMs = noteHistoryMs * STREAK_LINGER_MULTIPLIER;
+
+    return { gridHistoryMs, gridFutureMs, noteHistoryMs, streakHistoryMs };
   }
 
   // ============================================================================
@@ -273,7 +292,7 @@ export class RhythmGrammar implements IVisualGrammar {
 
     // Generate beat lines
     for (let beatTime = firstBeat; beatTime <= futureEnd; beatTime += beatMs) {
-      const y = this.timeToY(beatTime, t, windows.gridHistoryMs, windows.gridFutureMs);
+      const y = this.timeToY(beatTime, t);
 
       // Skip if outside visible range
       if (y < 0 || y > 1) continue;
@@ -331,7 +350,7 @@ export class RhythmGrammar implements IVisualGrammar {
 
     // Generate bar lines
     for (let barTime = firstBar; barTime <= futureEnd; barTime += barMs) {
-      const y = this.timeToY(barTime, t, windows.gridHistoryMs, windows.gridFutureMs);
+      const y = this.timeToY(barTime, t);
 
       if (y < 0 || y > 1) continue;
 
@@ -372,7 +391,7 @@ export class RhythmGrammar implements IVisualGrammar {
     t: number,
     part: string,
     tier: Tier,
-    windows: { noteHistoryMs: number }
+    windows: { noteHistoryMs: number; streakHistoryMs: number }
   ): Entity[] {
     const entities: Entity[] = [];
     const note = an.note;
@@ -385,7 +404,7 @@ export class RhythmGrammar implements IVisualGrammar {
 
     // Position: x is pitch class, y is onset time (bottom of bar)
     const x = this.pitchClassToX(note.pitch.pc);
-    const onsetY = this.timeToY(note.onset, t, windows.noteHistoryMs, 0);
+    const onsetY = this.timeToY(note.onset, t);
 
     if (onsetY < 0 || onsetY > 1) return entities;
 
@@ -394,7 +413,7 @@ export class RhythmGrammar implements IVisualGrammar {
     // onset is in the past (smaller y), note end is closer to now (larger y)
     // So bar extends from onsetY (top) down to endY (bottom, closer to NOW line)
     const noteEndTime = note.onset + note.duration;
-    const endY = this.timeToY(noteEndTime, t, windows.noteHistoryMs, 0);
+    const endY = this.timeToY(noteEndTime, t);
 
     // Bar height: endY (bottom) - onsetY (top), clamped to visible area
     const clampedEndY = Math.min(1, endY); // Don't extend past bottom of screen
@@ -453,9 +472,7 @@ export class RhythmGrammar implements IVisualGrammar {
     if (driftInfo) {
       const refLineY = this.timeToY(
         note.onset - driftInfo.driftMs, // Where the beat actually was
-        t,
-        windows.noteHistoryMs,
-        0
+        t
       );
 
       if (refLineY >= 0 && refLineY <= 1) {
@@ -693,28 +710,24 @@ export class RhythmGrammar implements IVisualGrammar {
   }
 
   /**
-   * Map time to y position.
+   * Map time to y position using FIXED time horizon scale.
    * NOW is at NOW_LINE_Y.
    * Past (positive age) maps above NOW (smaller y).
    * Future (negative age) maps below NOW (larger y).
+   *
+   * IMPORTANT: This uses the fixed TIME_HORIZON_* constants, not the visible windows.
+   * Visible windows control filtering (what's shown), not positioning (where it's shown).
    */
-  private timeToY(
-    eventTime: number,
-    now: number,
-    historyWindow: number,
-    futureWindow: number
-  ): number {
+  private timeToY(eventTime: number, now: number): number {
     const age = now - eventTime; // Positive = past, negative = future
 
     if (age >= 0) {
       // Past: map to range [0, NOW_LINE_Y]
-      if (historyWindow <= 0) return NOW_LINE_Y;
-      const normalizedAge = Math.min(age / historyWindow, 1);
+      const normalizedAge = Math.min(age / TIME_HORIZON_HISTORY_MS, 1);
       return NOW_LINE_Y - normalizedAge * NOW_LINE_Y;
     } else {
       // Future: map to range [NOW_LINE_Y, 1]
-      if (futureWindow <= 0) return NOW_LINE_Y;
-      const normalizedFuture = Math.min(-age / futureWindow, 1);
+      const normalizedFuture = Math.min(-age / TIME_HORIZON_FUTURE_MS, 1);
       return NOW_LINE_Y + normalizedFuture * (1 - NOW_LINE_Y);
     }
   }

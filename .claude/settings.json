@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(GENERATE_SNAPSHOTS=1 npx turbo test:*)"
+    ]
+  }
+}
