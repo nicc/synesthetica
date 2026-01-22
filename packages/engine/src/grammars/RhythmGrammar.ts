@@ -63,8 +63,8 @@ const MAX_NOTE_HISTORY_MS = 8000;
 /** Minimum visible window for notes at min horizon (in beats) */
 const MIN_NOTE_HISTORY_BEATS = 1;
 
-/** Drift streaks linger slightly longer than notes (multiplier) */
-const STREAK_LINGER_MULTIPLIER = 1.2;
+/** Reference window (streaks + reference lines) lingers longer than notes (multiplier) */
+const REFERENCE_LINGER_MULTIPLIER = 1.5;
 
 /** Drift tolerance in ms - within this, note is considered "tight" and shows reference line */
 const TIGHT_TOLERANCE_MS = 30;
@@ -83,7 +83,7 @@ const GRID_COLORS = {
   beatLine: { h: 200, s: 0.2, v: 0.5, a: 0.4 } as ColorHSVA,
   barLine: { h: 200, s: 0.3, v: 0.6, a: 0.5 } as ColorHSVA,
   nowLine: { h: 0, s: 0, v: 0.8, a: 0.6 } as ColorHSVA,
-  referenceLine: { h: 0, s: 0, v: 0.6, a: 0.3 } as ColorHSVA,
+  referenceLine: { h: 0, s: 0, v: 0.75, a: 0.5 } as ColorHSVA,
 };
 
 // ============================================================================
@@ -227,7 +227,7 @@ export class RhythmGrammar implements IVisualGrammar {
     }
 
     // Streaks linger slightly longer than notes
-    const streakHistoryMs = noteHistoryMs * STREAK_LINGER_MULTIPLIER;
+    const streakHistoryMs = noteHistoryMs * REFERENCE_LINGER_MULTIPLIER;
 
     return { gridHistoryMs, gridFutureMs, noteHistoryMs, streakHistoryMs };
   }
@@ -420,7 +420,7 @@ export class RhythmGrammar implements IVisualGrammar {
     // These linger longer than note bars
     if (inReferenceWindow && driftInfo) {
       // Calculate opacity based on reference window
-      const refOpacity = this.distanceToOpacity(age, windows.streakHistoryMs) * 0.6;
+      const refOpacity = this.distanceToOpacity(age, windows.streakHistoryMs) * 0.8;
 
       // Add reference line showing where the beat was
       const refLineY = this.timeToY(
