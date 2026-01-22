@@ -83,7 +83,7 @@ const GRID_COLORS = {
   beatLine: { h: 200, s: 0.2, v: 0.5, a: 0.4 } as ColorHSVA,
   barLine: { h: 200, s: 0.3, v: 0.6, a: 0.5 } as ColorHSVA,
   nowLine: { h: 0, s: 0, v: 0.8, a: 0.6 } as ColorHSVA,
-  referenceLine: { h: 0, s: 0, v: 0.75, a: 0.5 } as ColorHSVA,
+  referenceLine: { h: 0, s: 0, v: 0.9, a: 0.7 } as ColorHSVA,
 };
 
 // ============================================================================

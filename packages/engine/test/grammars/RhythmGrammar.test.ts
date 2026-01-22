@@ -674,4 +674,49 @@ describe("RhythmGrammar snapshots", () => {
     expect(metrics.byType["note-bar"]).toBeGreaterThanOrEqual(2);
     expect(metrics.byType["beat-line"]).toBeGreaterThan(0);
   });
+
+  it("shows reference lines lingering after notes fade", () => {
+    // This snapshot clearly demonstrates the linger effect:
+    // - Note window at horizon=1.0 is 8000ms
+    // - Reference window is 1.5x = 12000ms
+    // - Notes >8000ms old are OUTSIDE note window (no bars)
+    // - But INSIDE reference window (<12000ms) so reference lines visible
+    // - Recent notes show both bars AND reference lines for comparison
+    grammar.setMacros({ horizon: 1.0 });
+
+    const frame = createTestFrame(13000, {
+      tempo: 120,
+      notes: [
+        // These notes are OUTSIDE note window (>8000ms old) but INSIDE reference window
+        // They should show reference lines but NO note bars
+        { id: "faded-early", pc: 0, onset: 4000, duration: 200 }, // 9000ms old - outside note window
+        { id: "faded-late", pc: 3, onset: 4500, duration: 200 }, // 8500ms old - outside note window
+        { id: "faded-tight", pc: 6, onset: 4800, duration: 200 }, // 8200ms old - outside note window
+
+        // These notes are INSIDE note window - should show both bars AND reference lines
+        { id: "visible-early", pc: 9, onset: 11500, duration: 200 }, // 1500ms old
+        { id: "visible-late", pc: 11, onset: 12500, duration: 200 }, // 500ms old
+      ],
+      onsetDrifts: [
+        { t: 4000, subdivisions: [{ label: "quarter", period: 500, drift: -60, nearest: true }] },
+        { t: 4500, subdivisions: [{ label: "quarter", period: 500, drift: 70, nearest: true }] },
+        { t: 4800, subdivisions: [{ label: "quarter", period: 500, drift: 50, nearest: true }] },
+        { t: 11500, subdivisions: [{ label: "quarter", period: 500, drift: -50, nearest: true }] },
+        { t: 12500, subdivisions: [{ label: "quarter", period: 500, drift: 80, nearest: true }] },
+      ],
+    });
+
+    const scene = grammar.update(frame, null);
+    maybeWriteSnapshot("rhythm-linger-effect", scene);
+    const metrics = extractMetrics(scene);
+
+    console.log("\nLinger Effect:\n" + formatMetrics(metrics));
+
+    // Should have 2 note bars (only visible notes inside 8000ms window)
+    expect(metrics.byType["note-bar"]).toBe(2);
+    // Should have 5 reference lines (all notes in 12000ms reference window)
+    expect(metrics.byType["reference-line"]).toBe(5);
+    // Faded notes with drift should still have streaks
+    expect(metrics.byType["streak"]).toBeGreaterThan(0);
+  });
 });
