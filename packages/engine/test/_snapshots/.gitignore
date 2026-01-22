@@ -1,0 +1,3 @@
+# SVG snapshots are generated locally for development review
+# They should not be committed
+*.svg
