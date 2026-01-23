@@ -1,10 +1,10 @@
 /**
- * Musical Visual Ruleset (RFC 006)
+ * Musical Visual Vocabulary (RFC 006)
  *
  * Annotates MusicalFrame with visual properties to produce AnnotatedMusicalFrame.
- * Implements IVisualRuleset interface.
+ * Implements IVisualVocabulary interface.
  *
- * This ruleset:
+ * This vocabulary:
  * - Assigns palettes based on pitch class (hue) and velocity (brightness)
  * - Assigns textures based on note phase
  * - Assigns motion properties based on dynamics and note phase
@@ -16,10 +16,13 @@
  * - Chord quality → Warm (major) / Cool (minor) palettes
  * - Note phase → Motion jitter and texture smoothness
  * - Dynamics → Motion pulse and flow
+ *
+ * NOTE: These mappings are provisional. See docs/vocabulary/semantic-mappings-v1.md
+ * for analysis and open questions about the complete visual vocabulary.
  */
 
 import type {
-  IVisualRuleset,
+  IVisualVocabulary,
   MusicalFrame,
   AnnotatedMusicalFrame,
   AnnotatedNote,
@@ -39,9 +42,9 @@ import type {
 import { pcToHue } from "@synesthetica/contracts";
 
 /**
- * Configuration for the MusicalVisualRuleset.
+ * Configuration for the MusicalVisualVocabulary.
  */
-export interface MusicalVisualRulesetConfig {
+export interface MusicalVisualVocabularyConfig {
   /**
    * Reference pitch class for hue mapping.
    * @default 9 (A)
@@ -61,24 +64,24 @@ export interface MusicalVisualRulesetConfig {
   hueDirection?: "cw" | "ccw";
 }
 
-const DEFAULT_CONFIG: Required<MusicalVisualRulesetConfig> = {
+const DEFAULT_CONFIG: Required<MusicalVisualVocabularyConfig> = {
   referencePc: 9, // A
   referenceHue: 0, // Red
   hueDirection: "cw",
 };
 
 /**
- * MusicalVisualRuleset: Annotates musical frames with visual properties.
+ * MusicalVisualVocabulary: Annotates musical frames with visual properties.
  *
  * This is a pure function - same input always produces same output.
  * No internal state is maintained across calls.
  */
-export class MusicalVisualRuleset implements IVisualRuleset {
+export class MusicalVisualVocabulary implements IVisualVocabulary {
   readonly id = "musical-visual";
 
-  private config: Required<MusicalVisualRulesetConfig>;
+  private config: Required<MusicalVisualVocabularyConfig>;
 
-  constructor(config: MusicalVisualRulesetConfig = {}) {
+  constructor(config: MusicalVisualVocabularyConfig = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 

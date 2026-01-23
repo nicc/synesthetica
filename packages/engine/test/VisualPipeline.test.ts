@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { VisualPipeline } from "../src/VisualPipeline";
 import { NoteTrackingStabilizer } from "../src/stabilizers/NoteTrackingStabilizer";
-import { MusicalVisualRuleset } from "../src/rulesets/MusicalVisualRuleset";
+import { MusicalVisualVocabulary } from "../src/vocabularies/MusicalVisualVocabulary";
 import { RhythmGrammar } from "../src/grammars/RhythmGrammar";
 import { IdentityCompositor } from "../src/stubs/IdentityCompositor";
 import type {
@@ -100,7 +100,7 @@ describe("VisualPipeline", () => {
 
   describe("basic operation", () => {
     it("returns empty frame when no adapters", () => {
-      pipeline.setRuleset(new MusicalVisualRuleset());
+      pipeline.setRuleset(new MusicalVisualVocabulary());
 
       const frame = pipeline.requestFrame(1000);
 
@@ -113,7 +113,7 @@ describe("VisualPipeline", () => {
       pipeline.setStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualRuleset());
+      pipeline.setRuleset(new MusicalVisualVocabulary());
       pipeline.addGrammar(new RhythmGrammar());
 
       const frame = pipeline.requestFrame(1000);
@@ -125,13 +125,13 @@ describe("VisualPipeline", () => {
       expect(noteEntities).toHaveLength(0);
     });
 
-    it("emits warning when no ruleset configured", () => {
+    it("emits warning when no vocabulary configured", () => {
       pipeline.addAdapter(adapter);
 
       const frame = pipeline.requestFrame(1000);
 
       expect(frame.diagnostics).toHaveLength(1);
-      expect(frame.diagnostics[0].id).toContain("pipeline-no-ruleset");
+      expect(frame.diagnostics[0].id).toContain("pipeline-no-vocabulary");
       expect(frame.diagnostics[0].severity).toBe("warning");
     });
   });
@@ -142,7 +142,7 @@ describe("VisualPipeline", () => {
       pipeline.setStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualRuleset());
+      pipeline.setRuleset(new MusicalVisualVocabulary());
       pipeline.addGrammar(new RhythmGrammar());
       pipeline.setCompositor(new IdentityCompositor());
     });
@@ -217,7 +217,7 @@ describe("VisualPipeline", () => {
       pipeline.setStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualRuleset());
+      pipeline.setRuleset(new MusicalVisualVocabulary());
       pipeline.addGrammar(new RhythmGrammar());
     });
 
@@ -241,7 +241,7 @@ describe("VisualPipeline", () => {
       pipeline.setStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualRuleset());
+      pipeline.setRuleset(new MusicalVisualVocabulary());
       pipeline.addGrammar(new RhythmGrammar());
 
       adapter.addNoteOn(60, 100, 1000);
@@ -257,7 +257,7 @@ describe("VisualPipeline", () => {
       pipeline.setStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualRuleset());
+      pipeline.setRuleset(new MusicalVisualVocabulary());
       pipeline.addGrammar(new RhythmGrammar());
 
       pipeline.dispose();
@@ -275,7 +275,7 @@ describe("VisualPipeline", () => {
       pipeline.setStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualRuleset());
+      pipeline.setRuleset(new MusicalVisualVocabulary());
       pipeline.addGrammar(new RhythmGrammar());
       // No compositor set
 

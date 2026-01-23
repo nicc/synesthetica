@@ -85,18 +85,19 @@ export interface IMusicalStabilizer {
 }
 
 // ============================================================================
-// Rulesets (RFC 006)
+// Visual Vocabulary (RFC 006)
 // ============================================================================
 
 /**
- * Ruleset that annotates musical frames with visual properties.
+ * Visual Vocabulary that annotates musical frames with visual properties.
+ * (Also referred to as "vocabulary" in shorthand.)
  *
- * Rulesets are pure functions that:
+ * Visual vocabularies are pure functions that:
  * - Assign palettes based on harmonic content
  * - Assign textures based on timbral qualities
  * - Assign motion properties based on rhythmic/dynamic context
  *
- * Rulesets do NOT:
+ * Visual vocabularies do NOT:
  * - Decide what shape a note should be
  * - Filter out musical elements
  * - Make rendering decisions
@@ -105,8 +106,10 @@ export interface IMusicalStabilizer {
  * musical meaning. All minor chords must share visual characteristics that
  * distinguish them from major chords. Users learn this vocabulary; grammars
  * respect it while making their own rendering choices.
+ *
+ * The metaphor: vocabulary defines words, grammars write sentences.
  */
-export interface IVisualRuleset {
+export interface IVisualVocabulary {
   id: string;
 
   /**
@@ -115,6 +118,11 @@ export interface IVisualRuleset {
    */
   annotate(frame: MusicalFrame): AnnotatedMusicalFrame;
 }
+
+/**
+ * @deprecated Use IVisualVocabulary instead. Alias retained for migration.
+ */
+export type IVisualRuleset = IVisualVocabulary;
 
 // ============================================================================
 // Grammars (RFC 006)
@@ -209,7 +217,7 @@ export interface IRenderer {
  * The central pipeline orchestrator.
  *
  * Uses a pull-based model where the renderer requests frames at target times.
- * The pipeline coordinates: Adapters → Stabilizers → Ruleset → Grammars → Compositor
+ * The pipeline coordinates: Adapters → Stabilizers → Vocabulary → Grammars → Compositor
  *
  * See SPEC_005 for frame timing and SPEC_008 for orchestration details.
  */

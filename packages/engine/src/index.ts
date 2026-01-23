@@ -4,8 +4,8 @@ export { VisualPipeline, type VisualPipelineConfig } from "./VisualPipeline";
 // Stabilizers
 export * from "./stabilizers";
 
-// Rulesets
-export * from "./rulesets";
+// Visual Vocabularies (formerly "rulesets")
+export * from "./vocabularies";
 
 // Grammars
 export * from "./grammars";

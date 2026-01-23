@@ -26,8 +26,8 @@ describe("Web App Smoke Tests", () => {
       expect(engine.NoteTrackingStabilizer).toBeDefined();
       expect(engine.ChordDetectionStabilizer).toBeDefined();
       expect(engine.BeatDetectionStabilizer).toBeDefined();
-      expect(engine.MusicalVisualRuleset).toBeDefined();
-      expect(engine.TestRhythmGrammar).toBeDefined();
+      expect(engine.MusicalVisualVocabulary).toBeDefined();
+      expect(engine.RhythmGrammar).toBeDefined();
       expect(engine.TestChordProgressionGrammar).toBeDefined();
       expect(engine.Canvas2DRenderer).toBeDefined();
     });
@@ -74,23 +74,23 @@ describe("Web App Smoke Tests", () => {
     });
 
     it("can create a ruleset", async () => {
-      const { MusicalVisualRuleset } = await import("@synesthetica/engine");
+      const { MusicalVisualVocabulary } = await import("@synesthetica/engine");
 
-      const ruleset = new MusicalVisualRuleset();
+      const ruleset = new MusicalVisualVocabulary();
       expect(ruleset).toBeDefined();
       expect(ruleset.id).toBe("musical-visual");
     });
 
     it("can create grammars", async () => {
-      const { TestRhythmGrammar, TestChordProgressionGrammar } = await import(
+      const { RhythmGrammar, TestChordProgressionGrammar } = await import(
         "@synesthetica/engine"
       );
 
-      const rhythmGrammar = new TestRhythmGrammar();
+      const rhythmGrammar = new RhythmGrammar();
       const chordGrammar = new TestChordProgressionGrammar();
 
       expect(rhythmGrammar).toBeDefined();
-      expect(rhythmGrammar.id).toBe("test-rhythm-grammar");
+      expect(rhythmGrammar.id).toBe("rhythm-grammar");
 
       expect(chordGrammar).toBeDefined();
       expect(chordGrammar.id).toBe("test-chord-progression-grammar");

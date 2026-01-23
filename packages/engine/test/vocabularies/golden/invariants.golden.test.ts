@@ -1,15 +1,15 @@
 /**
- * Ruleset Invariant Tests (RFC 006)
+ * Vocabulary Invariant Tests (RFC 006)
  *
- * Property tests for ruleset invariants. These verify that instrument invariants hold,
- * not exact output values. The ruleset interface may evolve; we test properties.
+ * Property tests for vocabulary invariants. These verify that instrument invariants hold,
+ * not exact output values. The vocabulary interface may evolve; we test properties.
  *
  * Updated for RFC 006: Tests annotate() returning AnnotatedMusicalFrame
  * instead of map() returning VisualIntentFrame.
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { MusicalVisualRuleset } from "../../../src/rulesets/MusicalVisualRuleset";
+import { MusicalVisualVocabulary } from "../../../src/vocabularies/MusicalVisualVocabulary";
 import type {
   MusicalFrame,
   Note,
@@ -74,7 +74,7 @@ function makeFrame(t: number, notes: Note[]): MusicalFrame {
 }
 
 function getAnnotatedNote(
-  ruleset: MusicalVisualRuleset,
+  ruleset: MusicalVisualVocabulary,
   frame: MusicalFrame
 ): AnnotatedNote | undefined {
   const result = ruleset.annotate(frame);
@@ -86,10 +86,10 @@ function getAnnotatedNote(
 // ============================================================================
 
 describe("Invariant: Pitch class → hue mapping", () => {
-  let ruleset: MusicalVisualRuleset;
+  let ruleset: MusicalVisualVocabulary;
 
   beforeEach(() => {
-    ruleset = new MusicalVisualRuleset();
+    ruleset = new MusicalVisualVocabulary();
   });
 
   it("A (reference pitch) maps to hue 0 (red)", () => {
@@ -132,7 +132,7 @@ describe("Invariant: Pitch class → hue mapping", () => {
   });
 
   it("counterclockwise direction inverts hue progression", () => {
-    ruleset = new MusicalVisualRuleset({ hueDirection: "ccw" });
+    ruleset = new MusicalVisualVocabulary({ hueDirection: "ccw" });
 
     // B (pc=11) is 2 semitones above A
     // CW: 0 + 2*30 = 60°
@@ -147,7 +147,7 @@ describe("Invariant: Pitch class → hue mapping", () => {
 
   it("custom reference point shifts all hues equally", () => {
     // C (pc=0) as reference at red (0°)
-    ruleset = new MusicalVisualRuleset({ referencePc: 0, referenceHue: 0 });
+    ruleset = new MusicalVisualVocabulary({ referencePc: 0, referenceHue: 0 });
 
     const frameC = makeFrame(0, [
       makeNote("n1", makePitch(0, 4), 100, "sustain"),
@@ -169,10 +169,10 @@ describe("Invariant: Pitch class → hue mapping", () => {
 // ============================================================================
 
 describe("Invariant: Velocity → brightness mapping", () => {
-  let ruleset: MusicalVisualRuleset;
+  let ruleset: MusicalVisualVocabulary;
 
   beforeEach(() => {
-    ruleset = new MusicalVisualRuleset();
+    ruleset = new MusicalVisualVocabulary();
   });
 
   it("higher velocity → higher brightness (monotonic)", () => {
@@ -228,10 +228,10 @@ describe("Invariant: Velocity → brightness mapping", () => {
 // ============================================================================
 
 describe("Invariant: Note phase → motion mapping", () => {
-  let ruleset: MusicalVisualRuleset;
+  let ruleset: MusicalVisualVocabulary;
 
   beforeEach(() => {
-    ruleset = new MusicalVisualRuleset();
+    ruleset = new MusicalVisualVocabulary();
   });
 
   it("attack phase has higher jitter than sustain", () => {
@@ -299,10 +299,10 @@ describe("Invariant: Note phase → motion mapping", () => {
 // ============================================================================
 
 describe("Invariant: Octave equivalence for hue", () => {
-  let ruleset: MusicalVisualRuleset;
+  let ruleset: MusicalVisualVocabulary;
 
   beforeEach(() => {
-    ruleset = new MusicalVisualRuleset();
+    ruleset = new MusicalVisualVocabulary();
   });
 
   it("same pitch class in different octaves produces same hue", () => {
@@ -361,8 +361,8 @@ describe("Invariant: Octave equivalence for hue", () => {
 
 describe("Invariant: Pure function - deterministic output", () => {
   it("same input produces same output", () => {
-    const ruleset1 = new MusicalVisualRuleset();
-    const ruleset2 = new MusicalVisualRuleset();
+    const ruleset1 = new MusicalVisualVocabulary();
+    const ruleset2 = new MusicalVisualVocabulary();
 
     const frame = makeFrame(0, [
       makeNote("consistent-note-id", makePitch(0, 4), 100, "sustain"),
@@ -381,7 +381,7 @@ describe("Invariant: Pure function - deterministic output", () => {
   });
 
   it("different notes produce different annotations", () => {
-    const ruleset = new MusicalVisualRuleset();
+    const ruleset = new MusicalVisualVocabulary();
 
     const frame = makeFrame(0, [
       makeNote("note-a", makePitch(0, 4), 100, "sustain"),
@@ -397,7 +397,7 @@ describe("Invariant: Pure function - deterministic output", () => {
   });
 
   it("annotations are consistent across frames for same note", () => {
-    const ruleset = new MusicalVisualRuleset();
+    const ruleset = new MusicalVisualVocabulary();
     const noteId = "stable-note";
 
     const frame1 = makeFrame(0, [

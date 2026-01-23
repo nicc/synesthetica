@@ -72,10 +72,11 @@ The fixed synesthetic operating scheme.
 **Invariant**
 A rule that always holds (e.g. pitch-class → hue).
 
-**Ruleset**
+**Visual Vocabulary** *(also: Vocabulary, Ruleset)*
 Maps MusicalFrame → AnnotatedMusicalFrame.
 Defines the *visual vocabulary* — what colors and textures mean musically.
 Does NOT decide what shapes to use or which elements to render.
+Interface: `IVisualVocabulary`.
 
 **Visual Annotation**
 Properties attached to each musical element: palette, texture, motion.
@@ -87,7 +88,7 @@ Carries the semantic meaning so grammars don't need to know musical analysis.
 
 **AnnotatedMusicalFrame**
 Musical elements (notes, chords, beats) with visual annotations attached.
-The ruleset's output and grammar's input.
+The visual vocabulary's output and grammar's input.
 
 **AnnotatedNote**
 A Note plus its visual annotation (palette, texture, motion).
@@ -125,7 +126,7 @@ Turns a scene into pixels.
 Types, pipeline, stabilizers, interfaces.
 
 **Layer 2 — Produced Primitives**
-Adapters, stabilizers, rulesets, base grammars.
+Adapters, stabilizers, visual vocabularies, base grammars.
 
 **Composite Layer**
 Presets, grammar composition, draw effects.
@@ -148,7 +149,7 @@ Authors grammars and extensions.
 Fixed operating scheme, expressive through use.
 
 **Separation of Meaning and Form**
-Rulesets define meaning (visual vocabulary); grammars define form (rendering choices).
+Visual vocabularies define meaning; grammars define form (rendering choices).
 
 **Grammar Agency (RFC 006)**
 Grammars see annotated musical elements and decide how to render them.

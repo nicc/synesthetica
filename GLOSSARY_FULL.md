@@ -107,7 +107,7 @@ Players:
 - save configurations as presets
 - describe desired outcomes in natural language
 
-Players do **not** author new grammars or rulesets.
+Players do **not** author new grammars or visual vocabularies.
 
 ---
 
@@ -147,7 +147,7 @@ Modules that *produce meaning* or *canonical form*.
 Includes:
 - source adapters
 - stabilizers
-- rulesets (instrument definitions)
+- visual vocabularies (instrument definitions)
 - reference grammars
 
 Layer 2 modules:
@@ -244,11 +244,11 @@ MusicalFrame includes:
 - **Recent context**: Progression, phrases via references (what led here)
 - No raw events (those stay in RawInputFrame)
 
-This design allows rulesets to remain pure functions while accessing temporal context like harmonic tension or phrase position.
+This design allows visual vocabularies to remain pure functions while accessing temporal context like harmonic tension or phrase position.
 
 Context uses **references, not copies** — a chord in `progression` references `chords[]` by ID.
 
-MusicalFrame is the stabilizer's output and ruleset's input.
+MusicalFrame is the stabilizer's output and visual vocabulary's input.
 
 ---
 
@@ -312,10 +312,12 @@ Invariants ensure internal coherence.
 
 ---
 
-### Ruleset
+### Visual Vocabulary
+*(Also known as: Vocabulary, Ruleset)*
+
 A pure function mapping MusicalFrame → AnnotatedMusicalFrame (RFC 006).
 
-Rulesets:
+Visual Vocabularies:
 - encode musical meaning as visual annotations
 - apply invariants (pitch-class → hue, chord quality → warm/cool palette)
 - define the *visual vocabulary* users learn
@@ -323,6 +325,8 @@ Rulesets:
 - do NOT decide what shapes to use or which elements to render
 
 > Analogy: defining what colors mean. Grammars decide how to paint with them.
+
+The interface is `IVisualVocabulary` in contracts.
 
 ---
 
@@ -484,9 +488,9 @@ The system should feel like an acoustic instrument:
 ---
 
 ### Separation of Meaning and Form
-Musical meaning is encoded in rulesets (visual vocabulary); visual form is encoded in grammars (rendering choices).
+Musical meaning is encoded in visual vocabularies; visual form is encoded in grammars (rendering choices).
 
-Rulesets define what colors mean. Grammars decide how to paint with them.
+Visual vocabularies define what colors mean. Grammars decide how to paint with them.
 
 Violating this boundary is considered an architectural error.
 

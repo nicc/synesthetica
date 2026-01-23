@@ -6,7 +6,7 @@ import {
   NoteTrackingStabilizer,
   ChordDetectionStabilizer,
   BeatDetectionStabilizer,
-  MusicalVisualRuleset,
+  MusicalVisualVocabulary,
   RhythmGrammar,
   TestChordProgressionGrammar,
   IdentityCompositor,
@@ -139,7 +139,7 @@ function startSession(midiInput: MidiInputInfo): void {
     pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
     pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
     pipeline.addStabilizerFactory(() => new BeatDetectionStabilizer({ partId }));
-    pipeline.setRuleset(new MusicalVisualRuleset());
+    pipeline.setRuleset(new MusicalVisualVocabulary());
     // Use both grammars - they'll be composited together
     pipeline.addGrammar(new RhythmGrammar());
     pipeline.addGrammar(new TestChordProgressionGrammar());

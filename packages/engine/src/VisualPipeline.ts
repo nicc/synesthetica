@@ -2,10 +2,10 @@
  * Visual Pipeline (RFC 005 / RFC 006)
  *
  * Orchestrates the frame type flow:
- * IRawSourceAdapter → IMusicalStabilizer → IVisualRuleset → IVisualGrammar → ICompositor
+ * IRawSourceAdapter → IMusicalStabilizer → IVisualVocabulary → IVisualGrammar → ICompositor
  *
  * RFC 006 changes:
- * - Ruleset.annotate() returns AnnotatedMusicalFrame instead of VisualIntentFrame
+ * - Vocabulary.annotate() returns AnnotatedMusicalFrame instead of VisualIntentFrame
  * - Grammars receive AnnotatedMusicalFrame, decide how/whether to render each element
  */
 
@@ -13,7 +13,7 @@ import type {
   IPipeline,
   IRawSourceAdapter,
   IMusicalStabilizer,
-  IVisualRuleset,
+  IVisualVocabulary,
   IVisualGrammar,
   ICompositor,
   IActivityTracker,
@@ -75,7 +75,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
   // Components
   private adapters: IRawSourceAdapter[] = [];
   private stabilizerFactories: Array<() => IMusicalStabilizer> = [];
-  private ruleset: IVisualRuleset | null = null;
+  private vocabulary: IVisualVocabulary | null = null;
   private grammars: IVisualGrammar[] = [];
   private compositor: ICompositor | null = null;
 
@@ -114,8 +114,15 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     this.stabilizerFactories.push(factory);
   }
 
-  setRuleset(ruleset: IVisualRuleset): void {
-    this.ruleset = ruleset;
+  setVocabulary(vocabulary: IVisualVocabulary): void {
+    this.vocabulary = vocabulary;
+  }
+
+  /**
+   * @deprecated Use setVocabulary instead
+   */
+  setRuleset(vocabulary: IVisualVocabulary): void {
+    this.setVocabulary(vocabulary);
   }
 
   addGrammar(grammar: IVisualGrammar): void {
@@ -199,12 +206,12 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     }
 
     // Map to intents
-    if (!this.ruleset) {
+    if (!this.vocabulary) {
       diagnostics.push({
-        id: `pipeline-no-ruleset-${targetTime}`,
+        id: `pipeline-no-vocabulary-${targetTime}`,
         category: "control",
         severity: "warning",
-        message: "No ruleset configured",
+        message: "No vocabulary configured",
         timestamp: targetTime,
         source: "pipeline",
         persistence: "transient",
@@ -212,7 +219,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       return this.mergeScenes([], targetTime, diagnostics);
     }
 
-    const annotatedFrame = this.ruleset.annotate(musicalFrame);
+    const annotatedFrame = this.vocabulary.annotate(musicalFrame);
 
     // Run grammars
     for (const grammar of this.grammars) {
@@ -301,7 +308,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     this.adapters = [];
     this.stabilizerFactories = [];
     this.grammars = [];
-    this.ruleset = null;
+    this.vocabulary = null;
     this.compositor = null;
   }
 
