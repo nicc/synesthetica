@@ -18,15 +18,15 @@ Windows control filtering (what's shown), not positioning (where it's shown). Al
 Controls visibility of beat lines and bar lines. Scales linearly with the horizon macro. At min horizon, few grid lines visible; at max horizon, full grid history shown.
 
 **Note window**
-Controls visibility of note bars. At min horizon, shows approximately 1 beat of history; at max horizon, shows full history.
+Controls visibility of note strips. At min horizon, shows approximately 1 beat of history; at max horizon, shows full history.
 
 **Reference window**
-Controls visibility of reference lines and drift streaks. Lingers longer than the note window (controlled by `referenceLinger` macro, default 1.3x), allowing these elements to remain visible after note bars have faded. This creates a trailing effect where timing feedback persists after the note itself.
+Controls visibility of reference lines and drift streaks. Lingers longer than the note window (controlled by `referenceLinger` macro, default 1.3x), allowing these elements to remain visible after note strips have faded. This creates a trailing effect where timing feedback persists after the note itself.
 
 ## Visual Elements
 
-**Note bar**
-Vertical bar representing a played note. Width varies with velocity; height extends from note onset (top) to note end or NOW line (bottom). Color derived from pitch class palette.
+**Note strip**
+Vertical strip representing a played note. Width varies with velocity; height extends from note onset (top) to note end or NOW line (bottom). Color derived from pitch class palette.
 
 **Beat line**
 Horizontal line marking beat positions in the grid. Tier 2+ only (requires tempo).
@@ -60,4 +60,4 @@ Controls field of vision. At 0, minimal history shown (tight focus on present). 
 Which subdivision to use for drift calculation. Finer subdivisions catch smaller timing deviations.
 
 **Reference linger** (default 1.3)
-Multiplier controlling how long reference lines and streaks remain visible after note bars fade. At 1.3, reference elements persist 30% longer than notes.
+Multiplier controlling how long reference lines and streaks remain visible after note strips fade. At 1.3, reference elements persist 30% longer than notes.

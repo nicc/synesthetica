@@ -72,11 +72,11 @@ const TIGHT_TOLERANCE_MS = 30;
 /** Number of streak lines per note */
 const STREAK_COUNT = 3;
 
-/** Note bar width as fraction of pitch spacing */
-const NOTE_BAR_WIDTH = 0.015;
+/** Note strip width as fraction of pitch spacing */
+const NOTE_STRIP_WIDTH = 0.015;
 
-/** Minimum note bar height in normalized coordinates */
-const MIN_NOTE_BAR_HEIGHT = 0.008;
+/** Minimum note strip height in normalized coordinates */
+const MIN_NOTE_STRIP_HEIGHT = 0.008;
 
 // Grid colors
 const GRID_COLORS = {
@@ -420,7 +420,7 @@ export class RhythmGrammar implements IVisualGrammar {
     const driftInfo = this.getDriftInfo(note.onset, rhythm, tier);
 
     // Reference window elements: reference lines and streaks
-    // These linger longer than note bars
+    // These linger longer than note strips
     if (inReferenceWindow && driftInfo) {
       // Calculate opacity based on reference window
       const refOpacity = this.distanceToOpacity(age, windows.streakHistoryMs) * 0.8;
@@ -432,7 +432,7 @@ export class RhythmGrammar implements IVisualGrammar {
       );
 
       if (refLineY >= 0 && refLineY <= 1) {
-        const barWidth = NOTE_BAR_WIDTH * (0.5 + (note.velocity / 127) * 0.5);
+        const barWidth = NOTE_STRIP_WIDTH * (0.5 + (note.velocity / 127) * 0.5);
         entities.push({
           id: this.entityId(`ref-line-${note.id}`),
           part,
@@ -442,7 +442,7 @@ export class RhythmGrammar implements IVisualGrammar {
           position: { x, y: refLineY },
           style: {
             color: GRID_COLORS.referenceLine,
-            size: barWidth * 1000 * 3, // Wider than note bar
+            size: barWidth * 1000 * 3, // Wider than note strip
             opacity: refOpacity,
           },
           data: {
@@ -454,7 +454,7 @@ export class RhythmGrammar implements IVisualGrammar {
 
       // Add streak lines if there's drift beyond tight tolerance
       if (Math.abs(driftInfo.driftMs) > TIGHT_TOLERANCE_MS) {
-        const barWidth = NOTE_BAR_WIDTH * (0.5 + (note.velocity / 127) * 0.5);
+        const barWidth = NOTE_STRIP_WIDTH * (0.5 + (note.velocity / 127) * 0.5);
         const streaks = this.createStreakLines(
           note.id,
           x,
@@ -470,7 +470,7 @@ export class RhythmGrammar implements IVisualGrammar {
       }
     }
 
-    // Note bars only render within the note window
+    // Note strips only render within the note window
     if (!inNoteWindow) return entities;
 
     // Calculate bar height from duration
@@ -485,10 +485,10 @@ export class RhythmGrammar implements IVisualGrammar {
     const endY = Math.min(rawEndY, NOW_LINE_Y);
 
     // Bar height: endY (bottom) - onsetY (top)
-    const barHeight = Math.max(endY - onsetY, MIN_NOTE_BAR_HEIGHT);
+    const barHeight = Math.max(endY - onsetY, MIN_NOTE_STRIP_HEIGHT);
 
     // Width based on velocity
-    const barWidth = NOTE_BAR_WIDTH * (0.5 + (note.velocity / 127) * 0.5);
+    const barWidth = NOTE_STRIP_WIDTH * (0.5 + (note.velocity / 127) * 0.5);
 
     // Opacity based on age and phase
     let baseOpacity: number;
@@ -505,7 +505,7 @@ export class RhythmGrammar implements IVisualGrammar {
     }
     const opacity = baseOpacity * this.distanceToOpacity(age, windows.noteHistoryMs);
 
-    // Create main note bar entity
+    // Create main note strip entity
     // Position is center of the bar, with barHeight stored in data for renderer
     // Bar extends from onsetY (top) down toward NOW line
     // Since endY is clamped to NOW_LINE_Y, the bar bottom is at min(endY, NOW_LINE_Y)
@@ -526,7 +526,7 @@ export class RhythmGrammar implements IVisualGrammar {
         opacity,
       },
       data: {
-        type: "note-bar",
+        type: "note-strip",
         noteId: note.id,
         phase: note.phase,
         pitchClass: note.pitch.pc,

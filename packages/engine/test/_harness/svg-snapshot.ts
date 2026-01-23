@@ -158,7 +158,7 @@ function renderEntity(entity: Entity, width: number, height: number, showLabels:
     return elements.join("\n    ");
   }
 
-  if (type === "note-bar") {
+  if (type === "note-strip") {
     // Note bar: vertical rectangle representing sustained note
     // Position is center of bar, barHeight is in normalized coordinates
     const barHeight = ((entity.data?.barHeight as number) ?? 0.01) * height;

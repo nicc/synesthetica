@@ -120,7 +120,7 @@ describe("VisualPipeline", () => {
 
       // RhythmGrammar always produces a NOW line even with no notes
       const noteEntities = frame.entities.filter(
-        (e) => e.data?.type === "note-bar"
+        (e) => e.data?.type === "note-strip"
       );
       expect(noteEntities).toHaveLength(0);
     });
@@ -152,7 +152,7 @@ describe("VisualPipeline", () => {
 
       const frame = pipeline.requestFrame(1000);
 
-      // RhythmGrammar creates note-bar entities for notes
+      // RhythmGrammar creates note-strip entities for notes
       expect(frame.entities.length).toBeGreaterThan(0);
       expect(frame.entities[0].part).toBe("test-part");
     });
@@ -203,7 +203,7 @@ describe("VisualPipeline", () => {
 
       // Different velocities should produce different sizes
       const sizes = frame.entities
-        .filter((e) => e.data?.type === "note-bar")
+        .filter((e) => e.data?.type === "note-strip")
         .map((e) => e.style.size);
       if (sizes.length > 1) {
         expect(new Set(sizes).size).toBeGreaterThan(1); // Not all same size

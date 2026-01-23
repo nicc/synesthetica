@@ -175,7 +175,7 @@ describe("RhythmGrammar", () => {
       });
 
       const scene = grammar.update(frame, null);
-      const notes = scene.entities.filter((e) => e.data?.type === "note-bar");
+      const notes = scene.entities.filter((e) => e.data?.type === "note-strip");
 
       expect(notes.length).toBe(3);
 
@@ -204,7 +204,7 @@ describe("RhythmGrammar", () => {
       });
 
       const scene = grammar.update(frame, null);
-      const notes = scene.entities.filter((e) => e.data?.type === "note-bar");
+      const notes = scene.entities.filter((e) => e.data?.type === "note-strip");
 
       const oldNote = notes.find((n) => n.data?.noteId === "old");
       const recentNote = notes.find((n) => n.data?.noteId === "recent");
@@ -312,7 +312,7 @@ describe("RhythmGrammar", () => {
       });
 
       const scene = grammar.update(frame, null);
-      const notes = scene.entities.filter((e) => e.data?.type === "note-bar");
+      const notes = scene.entities.filter((e) => e.data?.type === "note-strip");
 
       // Both notes should be visible
       expect(notes.length).toBe(2);
@@ -330,7 +330,7 @@ describe("RhythmGrammar", () => {
       });
 
       const scene = grammar.update(frame, null);
-      const notes = scene.entities.filter((e) => e.data?.type === "note-bar");
+      const notes = scene.entities.filter((e) => e.data?.type === "note-strip");
 
       // Only recent note should be visible
       expect(notes.length).toBe(1);
@@ -376,14 +376,14 @@ describe("RhythmGrammar", () => {
       // At 16th subdivision (default), drift should be 0
       grammar.setMacros({ subdivisionDepth: "16th" });
       const scene16 = grammar.update(frame, null);
-      const note16 = scene16.entities.find((e) => e.data?.type === "note-bar");
+      const note16 = scene16.entities.find((e) => e.data?.type === "note-strip");
       expect(note16?.data?.driftMs).toBe(0);
 
       // At quarter subdivision, drift should be 125ms
       grammar.setMacros({ subdivisionDepth: "quarter" });
       grammar.init(ctx);
       const sceneQ = grammar.update(frame, null);
-      const noteQ = sceneQ.entities.find((e) => e.data?.type === "note-bar");
+      const noteQ = sceneQ.entities.find((e) => e.data?.type === "note-strip");
       expect(noteQ?.data?.driftMs).toBe(125);
     });
   });
@@ -538,7 +538,7 @@ describe("RhythmGrammar snapshots", () => {
 
     console.log("\nDense Notes:\n" + formatMetrics(metrics));
 
-    expect(metrics.byType["note-bar"]).toBe(16);
+    expect(metrics.byType["note-strip"]).toBe(16);
   });
 
   it("renders sustained notes as bars", () => {
@@ -559,7 +559,7 @@ describe("RhythmGrammar snapshots", () => {
 
     console.log("\nSustained Notes:\n" + formatMetrics(metrics));
 
-    expect(metrics.byType["note-bar"]).toBe(4);
+    expect(metrics.byType["note-strip"]).toBe(4);
   });
 
   it("renders early and late notes with streak direction", () => {
@@ -671,7 +671,7 @@ describe("RhythmGrammar snapshots", () => {
     console.log("\nMid Horizon (0.5):\n" + formatMetrics(metrics));
 
     // Should have fewer elements than max horizon but more than min
-    expect(metrics.byType["note-bar"]).toBeGreaterThanOrEqual(2);
+    expect(metrics.byType["note-strip"]).toBeGreaterThanOrEqual(2);
     expect(metrics.byType["beat-line"]).toBeGreaterThan(0);
   });
 
@@ -713,7 +713,7 @@ describe("RhythmGrammar snapshots", () => {
     console.log("\nLinger Effect:\n" + formatMetrics(metrics));
 
     // Should have 2 note bars (only visible notes inside 8000ms window)
-    expect(metrics.byType["note-bar"]).toBe(2);
+    expect(metrics.byType["note-strip"]).toBe(2);
     // Should have 5 reference lines (all notes in 10400ms reference window)
     expect(metrics.byType["reference-line"]).toBe(5);
     // Faded notes with drift should still have streaks
