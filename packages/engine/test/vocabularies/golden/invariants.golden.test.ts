@@ -168,20 +168,20 @@ describe("Invariant: Pitch class → hue mapping", () => {
 // Invariant 2: Velocity → Brightness Mapping
 // ============================================================================
 
-describe("Invariant: Velocity → brightness mapping", () => {
+describe("Invariant I15: Octave → brightness mapping", () => {
   let ruleset: MusicalVisualVocabulary;
 
   beforeEach(() => {
     ruleset = new MusicalVisualVocabulary();
   });
 
-  it("higher velocity → higher brightness (monotonic)", () => {
-    const velocities = [0, 32, 64, 96, 127];
+  it("higher octave → higher brightness (monotonic)", () => {
+    const octaves = [1, 2, 3, 4, 5, 6, 7, 8];
     let previousBrightness = -1;
 
-    for (const velocity of velocities) {
+    for (const octave of octaves) {
       const frame = makeFrame(0, [
-        makeNote("n1", makePitch(0, 4), velocity, "sustain"),
+        makeNote("n1", makePitch(0, octave), 64, "sustain"),
       ]);
       const annotated = getAnnotatedNote(ruleset, frame);
 
@@ -190,36 +190,91 @@ describe("Invariant: Velocity → brightness mapping", () => {
     }
   });
 
-  it("velocity 127 produces brightness near 1.0", () => {
+  it("octave 8 produces brightness near 0.95 (max)", () => {
+    const frame = makeFrame(0, [
+      makeNote("n1", makePitch(0, 8), 64, "sustain"),
+    ]);
+    const annotated = getAnnotatedNote(ruleset, frame);
+
+    expect(annotated!.visual.palette.primary.v).toBeCloseTo(0.95, 2);
+  });
+
+  it("octave 1 produces brightness near 0.3 (min, visible)", () => {
+    const frame = makeFrame(0, [
+      makeNote("n1", makePitch(0, 1), 64, "sustain"),
+    ]);
+    const annotated = getAnnotatedNote(ruleset, frame);
+
+    expect(annotated!.visual.palette.primary.v).toBeCloseTo(0.3, 2);
+  });
+
+  it("brightness stays within [0.3, 0.95] range for all octaves", () => {
+    for (let oct = 0; oct <= 9; oct++) {
+      const frame = makeFrame(0, [
+        makeNote("n1", makePitch(0, oct), 64, "sustain"),
+      ]);
+      const annotated = getAnnotatedNote(ruleset, frame);
+
+      expect(annotated!.visual.palette.primary.v).toBeGreaterThanOrEqual(0.3);
+      expect(annotated!.visual.palette.primary.v).toBeLessThanOrEqual(0.95);
+    }
+  });
+});
+
+describe("Invariant I16: Velocity → size/attack mapping", () => {
+  let ruleset: MusicalVisualVocabulary;
+
+  beforeEach(() => {
+    ruleset = new MusicalVisualVocabulary();
+  });
+
+  it("higher velocity → larger size multiplier (monotonic)", () => {
+    const velocities = [0, 32, 64, 96, 127];
+    let previousSize = -1;
+
+    for (const velocity of velocities) {
+      const frame = makeFrame(0, [
+        makeNote("n1", makePitch(0, 4), velocity, "sustain"),
+      ]);
+      const annotated = getAnnotatedNote(ruleset, frame);
+
+      expect(annotated!.velocity.sizeMultiplier).toBeGreaterThan(previousSize);
+      previousSize = annotated!.velocity.sizeMultiplier;
+    }
+  });
+
+  it("velocity 127 produces size multiplier near 2.0 (max)", () => {
     const frame = makeFrame(0, [
       makeNote("n1", makePitch(0, 4), 127, "sustain"),
     ]);
     const annotated = getAnnotatedNote(ruleset, frame);
 
-    expect(annotated!.visual.palette.primary.v).toBeCloseTo(1.0, 2);
+    expect(annotated!.velocity.sizeMultiplier).toBeCloseTo(2.0, 2);
   });
 
-  it("velocity 0 produces brightness above 0 (visible)", () => {
+  it("velocity 0 produces size multiplier near 0.5 (min)", () => {
     const frame = makeFrame(0, [
       makeNote("n1", makePitch(0, 4), 0, "sustain"),
     ]);
     const annotated = getAnnotatedNote(ruleset, frame);
 
-    // Min brightness is 0.3 per implementation
-    expect(annotated!.visual.palette.primary.v).toBeGreaterThan(0);
-    expect(annotated!.visual.palette.primary.v).toBeLessThan(0.5);
+    expect(annotated!.velocity.sizeMultiplier).toBeCloseTo(0.5, 2);
   });
 
-  it("brightness stays within [0, 1] range for all velocities", () => {
-    for (let v = 0; v <= 127; v++) {
-      const frame = makeFrame(0, [
-        makeNote("n1", makePitch(0, 4), v, "sustain"),
-      ]);
-      const annotated = getAnnotatedNote(ruleset, frame);
+  it("higher velocity → shorter attack (sharper onset)", () => {
+    const frame127 = makeFrame(0, [
+      makeNote("n1", makePitch(0, 4), 127, "sustain"),
+    ]);
+    const frame0 = makeFrame(0, [
+      makeNote("n2", makePitch(0, 4), 0, "sustain"),
+    ]);
 
-      expect(annotated!.visual.palette.primary.v).toBeGreaterThanOrEqual(0);
-      expect(annotated!.visual.palette.primary.v).toBeLessThanOrEqual(1);
-    }
+    const annotated127 = getAnnotatedNote(ruleset, frame127);
+    const annotated0 = getAnnotatedNote(ruleset, frame0);
+
+    expect(annotated127!.velocity.attackMs).toBeLessThan(annotated0!.velocity.attackMs);
+    expect(annotated127!.velocity.attackMs).toBeCloseTo(0, 1); // Near instant
+    expect(annotated0!.velocity.attackMs).toBeCloseTo(50, 1); // Max fade-in
   });
 });
 

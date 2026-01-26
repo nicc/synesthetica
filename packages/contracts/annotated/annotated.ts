@@ -1,12 +1,12 @@
 /**
- * Annotated Musical Frame Types (RFC 006)
+ * Annotated Musical Frame Types (RFC 006, SPEC 010)
  *
  * Annotated frames combine musical elements with visual properties.
- * Rulesets produce these; grammars consume them and decide how to render.
+ * Visual vocabularies produce these; grammars consume them and decide how to render.
  *
- * Key insight: rulesets define vocabulary, grammars write sentences.
+ * Key insight: vocabularies define words, grammars write sentences.
  *
- * See RFC 006 for design rationale.
+ * See RFC 006 for design rationale, SPEC 010 for visual vocabulary constraints.
  */
 
 import type { Ms, Confidence } from "../core/time";
@@ -15,6 +15,7 @@ import type { ColorHSVA } from "../intents/colors";
 import type {
   Note,
   NoteId,
+  NotePhase,
   MusicalChord,
   RhythmicAnalysis,
   TimeSignature,
@@ -102,19 +103,106 @@ export interface VisualAnnotation {
 }
 
 // ============================================================================
+// Note-Level Visual Properties (SPEC 010)
+// ============================================================================
+
+// NotePhase is imported from musical.ts (already defined there)
+// Re-export for convenience
+export type { NotePhase };
+
+/**
+ * Velocity-derived visual properties.
+ * Invariant I16: Velocity affects visual prominence.
+ */
+export interface VelocityAnnotation {
+  /** Size multiplier (0.5 to 2.0, derived from velocity) */
+  sizeMultiplier: number;
+  /** Attack duration in ms (0 to 50, inverse of velocity) */
+  attackMs: number;
+}
+
+/**
+ * Phase-derived visual properties.
+ * Invariant I17: Note phase affects intensity.
+ */
+export interface PhaseAnnotation {
+  /** Current phase of the note */
+  phase: NotePhase;
+  /** Intensity (1.0 at attack, fading during release) */
+  intensity: number;
+}
+
+// ============================================================================
+// Chord Shape Geometry (SPEC 010)
+// ============================================================================
+
+/**
+ * Radius tier for chord tones based on thirds-distance from root.
+ * Invariant I18: Chord quality determines shape geometry.
+ */
+export type RadiusTier = "triadic" | "seventh" | "extension";
+
+/**
+ * A single element in the chord shape (wedge or line).
+ */
+export interface ChordShapeElement {
+  /** Angular position in degrees (0° = root at 12 o'clock) */
+  angle: number;
+  /** Radius multiplier: 1.0 (triadic), 0.618 (7th), 0.382 (extension) */
+  radius: number;
+  /** Radius category for semantic clarity */
+  tier: RadiusTier;
+  /** Rendering style: wedge (diatonic) or line (chromatic alteration) */
+  style: "wedge" | "line";
+  /** Interval from root (for debugging/labeling, e.g., "3", "♭7", "♯9") */
+  interval: string;
+}
+
+/**
+ * Margin style encoding triad quality.
+ * Applied to all wedges in a chord shape.
+ */
+export type MarginStyle =
+  | "straight" // Major
+  | "wavy" // Minor
+  | "concave" // Diminished
+  | "convex" // Augmented
+  | "dash-short" // Sus2
+  | "dash-long"; // Sus4
+
+/**
+ * Complete chord shape geometry.
+ * Invariant I18: This geometry is computed by the vocabulary, not grammars.
+ */
+export interface ChordShapeGeometry {
+  /** All elements (wedges and lines) in the shape */
+  elements: ChordShapeElement[];
+  /** Margin style for all wedges (encodes triad quality) */
+  margin: MarginStyle;
+  /** Root is always at 0° (12 o'clock) */
+  rootAngle: 0;
+}
+
+// ============================================================================
 // Annotated Musical Elements
 // ============================================================================
 
 /**
  * A note with visual annotations.
- * The note data comes from stabilizers; annotations come from ruleset.
+ * The note data comes from stabilizers; annotations come from vocabulary.
  */
 export interface AnnotatedNote {
   /** The underlying musical note */
   note: Note;
 
-  /** Visual properties assigned by ruleset */
+  /** Visual properties assigned by vocabulary */
   visual: VisualAnnotation;
+
+  /** Velocity-derived properties (Invariant I16) */
+  velocity: VelocityAnnotation;
+
+  /** Phase-derived properties (Invariant I17) */
+  phaseState: PhaseAnnotation;
 }
 
 /**
@@ -129,11 +217,14 @@ export interface AnnotatedChord {
   /** The underlying musical chord */
   chord: MusicalChord;
 
-  /** Visual properties assigned by ruleset */
+  /** Visual properties assigned by vocabulary */
   visual: VisualAnnotation;
 
   /** IDs of constituent notes (from chord detection) */
   noteIds: NoteId[];
+
+  /** Shape geometry for rendering (Invariant I18) */
+  shape: ChordShapeGeometry;
 }
 
 /**

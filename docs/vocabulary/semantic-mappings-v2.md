@@ -1,6 +1,8 @@
 # Semantic Mappings Analysis v2
 
-**Status**: Fresh analysis
+> **ARCHIVED**: This document is superseded by [SPEC_010](../../specs/SPEC_010_visual_vocabulary.md) and [RFC_010](../../specs/RFC_010_visual_vocabulary_semantic_mappings.md). Retained for historical reference only.
+
+**Status**: Archived
 **Date**: 2026-01-23
 **Approach**: Ignore prior incidental decisions; map the problem space before proposing solutions
 

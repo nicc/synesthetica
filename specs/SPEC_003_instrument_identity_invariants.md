@@ -1,8 +1,8 @@
 # SPEC 003: Instrument Identity Invariants
 
 Status: Approved
-Date: 2026-01-14
-Source: RFC 002, RFC 003, RFC 004
+Date: 2026-01-26
+Source: RFC 002, RFC 003, RFC 004, RFC 009
 
 ## Summary
 
@@ -50,12 +50,24 @@ These invariants govern how the LLM-mediated speech interface interacts with the
 | I12 | **All execution remains bounded and deterministic** | Macro ranges are clamped, parameters are schema-validated, options are enumerated. No unbounded effects. |
 | I13 | **The LLM may balance, but not violate, system constraints** | The speech interface can choose configurations and adjust parameters, but cannot bypass invariants or exceed bounds. |
 
+### Visual Vocabulary (RFC 009)
+
+These invariants define the mandatory visual mappings that encode musical meaning. See [SPEC_010](SPEC_010_visual_vocabulary.md) for full specification.
+
+| ID | Invariant | Meaning |
+|----|-----------|---------|
+| I14 | **Pitch-class to hue is inviolable** | Same pitch class always produces same hue. Grammars receive hue via `PaletteRef` and must not recompute from pitch data. Extends I2. |
+| I15 | **Octave to brightness is mandatory** | Lower octaves are darker, higher octaves are brighter. Grammars receive brightness via `PaletteRef`. |
+| I16 | **Velocity affects visual prominence** | Louder notes must be more visually salient than quieter notes. Velocity maps to size and attack sharpness. |
+| I17 | **Note phase affects intensity** | Attack phase has full intensity, sustain maintains it, release fades. Released notes must fade. |
+| I18 | **Chord quality determines shape geometry** | The radial wedge algorithm is fixed. Grammars receive `ChordShapeGeometry` and must not recompute shapes from chord interval data. |
+
 ## Invariant Categories
 
 ### Architectural Invariants (I1, I3, I10)
 Define where responsibilities live in the system.
 
-### Semantic Invariants (I2, I4, I5, I9)
+### Semantic Invariants (I2, I4, I5, I9, I14, I15)
 Ensure musical meaning is preserved and consistent.
 
 ### Isolation Invariants (I6, I7, I8)
@@ -63,6 +75,9 @@ Maintain clean boundaries between parts and modules.
 
 ### Safety Invariants (I11, I12, I13)
 Guarantee bounded, predictable execution.
+
+### Visual Vocabulary Invariants (I14, I15, I16, I17, I18)
+Define mandatory visual mappings that encode musical meaning for ear training.
 
 ## What Grammars MAY Do
 
