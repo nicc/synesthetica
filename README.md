@@ -16,7 +16,7 @@ MIDI/Audio Input → RawInputFrame → MusicalFrame → AnnotatedMusicalFrame �
 **What this means:**
 - Adapters emit protocol-level events (RawInputFrame)
 - Stabilizers produce musical abstractions with duration and phase (MusicalFrame)
-- Rulesets annotate musical elements with visual properties (AnnotatedMusicalFrame)
+- Visual vocabularies annotate musical elements with visual properties (AnnotatedMusicalFrame)
 - Grammars decide what it *looks like* and which elements to render (SceneFrame)
 - A renderer draws it (Canvas)
 
