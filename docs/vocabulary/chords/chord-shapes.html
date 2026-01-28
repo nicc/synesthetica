@@ -292,66 +292,35 @@
       }
 
       if (style === "concave") {
-        // Use cubic bezier for smooth tangent continuity at arm junctions
-        // Control points are positioned along circle tangents, then pulled inward
-        const startRad = toRadians(startAngle);
-        const endRad = toRadians(endAngle);
+        // Concave = always curves INWARD (sweep=0)
+        // Small gaps: pronounced concave dip
+        // Large gaps (150°+): flat line to avoid awkward hub bulge
+        if (arcSpan >= 150) {
+          // Just use a straight line for very large gaps
+          return ` L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+        }
 
-        // Tangent directions (clockwise along circle)
-        const startTanX = Math.sin(startRad);
-        const startTanY = Math.cos(startRad);
-        const endTanX = -Math.sin(endRad);
-        const endTanY = -Math.cos(endRad);
+        const chordLen = Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2);
+        const minR = chordLen / 2 + 1; // minimum to connect endpoints
 
-        // Handle length based on arc span
-        const arcRad = arcSpan * Math.PI / 180;
-        const handleLen = hubR * arcRad * 0.4;
+        // Scale radius up for larger gaps - gentler concave
+        const scaleFactor = 1 + arcSpan * 0.03;
+        const targetR = hubR * scaleFactor;
+        const concaveR = Math.max(targetR, minR);
 
-        // Inward pull scales with arc span - larger gaps need more pull to stay visibly concave
-        const inwardPull = 6 + arcSpan * 0.08;
-        const radialStartX = (start.x - cx) / hubR;
-        const radialStartY = (start.y - cy) / hubR;
-        const radialEndX = (end.x - cx) / hubR;
-        const radialEndY = (end.y - cy) / hubR;
-
-        // Control point 1: along start tangent, pulled toward center
-        const cp1x = start.x + startTanX * handleLen - radialStartX * inwardPull;
-        const cp1y = start.y + startTanY * handleLen - radialStartY * inwardPull;
-
-        // Control point 2: along end tangent (approaching from opposite direction)
-        const cp2x = end.x + endTanX * handleLen - radialEndX * inwardPull;
-        const cp2y = end.y + endTanY * handleLen - radialEndY * inwardPull;
-
-        return ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)} ${cp2x.toFixed(1)} ${cp2y.toFixed(1)} ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+        const largeArc = arcSpan > 180 ? 1 : 0;
+        // sweep=0 = curves INWARD (concave)
+        return ` A ${concaveR.toFixed(1)} ${concaveR.toFixed(1)} 0 ${largeArc} 0 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
       }
 
       if (style === "convex") {
-        // Use cubic bezier for smooth tangent continuity
-        const startRad = toRadians(startAngle);
-        const endRad = toRadians(endAngle);
+        // Convex = dome rising from hub
+        // Larger radius = gentler dome, smaller radius = more pronounced bulge
+        const expansionFactor = 1.5 + arcSpan * 0.008; // reduced for more visible bulge
+        const convexR = hubR * expansionFactor;
 
-        const startTanX = Math.sin(startRad);
-        const startTanY = Math.cos(startRad);
-        const endTanX = -Math.sin(endRad);
-        const endTanY = -Math.cos(endRad);
-
-        const arcRad = arcSpan * Math.PI / 180;
-        const handleLen = hubR * arcRad * 0.4;
-
-        // Outward push scales with arc span - larger gaps need more push
-        const outwardPush = 8 + arcSpan * 0.06;
-        const radialStartX = (start.x - cx) / hubR;
-        const radialStartY = (start.y - cy) / hubR;
-        const radialEndX = (end.x - cx) / hubR;
-        const radialEndY = (end.y - cy) / hubR;
-
-        const cp1x = start.x + startTanX * handleLen + radialStartX * outwardPush;
-        const cp1y = start.y + startTanY * handleLen + radialStartY * outwardPush;
-
-        const cp2x = end.x + endTanX * handleLen + radialEndX * outwardPush;
-        const cp2y = end.y + endTanY * handleLen + radialEndY * outwardPush;
-
-        return ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)} ${cp2x.toFixed(1)} ${cp2y.toFixed(1)} ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+        // sweep=1 curves outward (arc center inside/behind the shape)
+        return ` A ${convexR.toFixed(1)} ${convexR.toFixed(1)} 0 0 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
       }
 
       const largeArc = arcSpan > 180 ? 1 : 0;
