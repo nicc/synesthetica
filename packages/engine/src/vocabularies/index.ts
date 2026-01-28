@@ -3,6 +3,21 @@ export {
   type MusicalVisualVocabularyConfig,
 } from "./MusicalVisualVocabulary";
 
+// Vocabulary utilities
+export { buildChordShape } from "./utils";
+
+// Rendering utilities for grammars
+export {
+  renderChordShape,
+  colorToCSS,
+  getDashArray,
+  HUB_RADIUS,
+  ARM_LENGTH,
+  BASE_WIDTH,
+  type ChordShapeRenderOptions,
+  type ChordShapeRenderResult,
+} from "./renderChordShape";
+
 /**
  * @deprecated Use MusicalVisualVocabulary instead
  */
