@@ -155,9 +155,8 @@ export class HarmonyGrammar implements IVisualGrammar {
       });
     }
 
-    // Create tension bar entity
+    // Create tension bar entity (neutral gray - color reserved for harmony)
     if (this.config.showTensionBar) {
-      const tensionHue = 120 * (1 - Math.max(0, Math.min(1, tension)));
       entities.push({
         id: `tension-bar-${this.nextId++}`,
         part,
@@ -166,7 +165,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         updatedAt: t,
         position: { x: 0.9, y: 0.5 },
         style: {
-          color: { h: tensionHue, s: 0.7, v: 0.5, a: 1 },
+          color: { h: 0, s: 0, v: 0.5, a: 1 }, // Neutral gray
           size: 50,
           opacity: 1,
         },
@@ -256,7 +255,8 @@ export class HarmonyGrammar implements IVisualGrammar {
     svg += "  <defs>\n";
     for (let i = 0; i < wedges.length; i++) {
       const element = wedges[i];
-      svg += this.generateGradientDef(i, rootColor, element.color, element.angle, cx, cy, scale);
+      const armLength = ARM_LENGTH[element.tier];
+      svg += this.generateGradientDef(i, rootColor, element.color, element.angle, cx, cy, scale, armLength);
     }
     svg += "  </defs>\n";
 
@@ -279,7 +279,8 @@ export class HarmonyGrammar implements IVisualGrammar {
 
   /**
    * Generate SVG gradient definition for a wedge.
-   * Gradient goes from root color (center) to element color (tip).
+   * Gradient goes from hub center (root color) to element tip color.
+   * This fills the entire shape with a continuous gradient from center outward.
    */
   private generateGradientDef(
     index: number,
@@ -288,17 +289,18 @@ export class HarmonyGrammar implements IVisualGrammar {
     angle: number,
     cx: number,
     cy: number,
-    scale: number
+    scale: number,
+    armLength: number
   ): string {
-    // Linear gradient from center to tip along the arm angle
+    // Linear gradient from hub CENTER to tip along the arm angle
     const hubR = scale * HUB_RADIUS;
-    const tipR = hubR + scale * ARM_LENGTH.triadic; // Use max length for gradient
+    const tipR = hubR + scale * armLength;
 
-    // Calculate gradient line endpoints
+    // Calculate gradient line endpoints - start at center, end at tip
     const rad = ((90 - angle) * Math.PI) / 180;
-    const x1 = cx;
+    const x1 = cx; // Start at center
     const y1 = cy;
-    const x2 = cx + tipR * Math.cos(rad);
+    const x2 = cx + tipR * Math.cos(rad); // End at tip
     const y2 = cy - tipR * Math.sin(rad);
 
     const rootCSS = colorToCSS(rootColor);
@@ -386,6 +388,7 @@ export class HarmonyGrammar implements IVisualGrammar {
 
   /**
    * Render the tension bar on the right side.
+   * Uses neutral gray - no color (color is reserved for harmony).
    */
   private renderTensionBarSVG(tension: number, width: number, height: number): string {
     const barWidth = 20;
@@ -396,30 +399,19 @@ export class HarmonyGrammar implements IVisualGrammar {
     // Clamp tension to 0-1
     const clampedTension = Math.max(0, Math.min(1, tension));
 
-    // Fill height from bottom
-    const fillHeight = barHeight * clampedTension;
-    const fillY = barY + barHeight - fillHeight;
-
-    // Tension color: green (low) → yellow (mid) → red (high)
-    const tensionHue = 120 * (1 - clampedTension); // 120 = green, 0 = red
-    const tensionColor = `hsl(${tensionHue}, 70%, 50%)`;
+    // Indicator position (from bottom)
+    const indicatorY = barY + barHeight - barHeight * clampedTension;
 
     let svg = "";
 
-    // Bar background
-    svg += `  <rect x="${barX}" y="${barY}" width="${barWidth}" height="${barHeight}" fill="#333" stroke="#555" stroke-width="1" rx="3"/>\n`;
+    // Bar background (neutral gray)
+    svg += `  <rect x="${barX}" y="${barY}" width="${barWidth}" height="${barHeight}" fill="#222" stroke="#444" stroke-width="1" rx="3"/>\n`;
 
-    // Tension fill
-    if (fillHeight > 0) {
-      svg += `  <rect x="${barX}" y="${fillY.toFixed(1)}" width="${barWidth}" height="${fillHeight.toFixed(1)}" fill="${tensionColor}" rx="3"/>\n`;
-    }
-
-    // Indicator line
-    const indicatorY = fillY;
-    svg += `  <line x1="${barX - 5}" y1="${indicatorY.toFixed(1)}" x2="${barX + barWidth + 5}" y2="${indicatorY.toFixed(1)}" stroke="${tensionColor}" stroke-width="2"/>\n`;
+    // Indicator line (white)
+    svg += `  <line x1="${barX - 5}" y1="${indicatorY.toFixed(1)}" x2="${barX + barWidth + 5}" y2="${indicatorY.toFixed(1)}" stroke="#fff" stroke-width="2"/>\n`;
 
     // Label
-    svg += `  <text x="${barX + barWidth / 2}" y="${barY - 10}" text-anchor="middle" fill="#888" font-size="12">Tension</text>\n`;
+    svg += `  <text x="${barX + barWidth / 2}" y="${barY - 10}" text-anchor="middle" fill="#666" font-size="12">Tension</text>\n`;
 
     return svg;
   }

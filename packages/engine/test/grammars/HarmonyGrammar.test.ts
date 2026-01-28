@@ -288,23 +288,24 @@ describe("HarmonyGrammar", () => {
       maybeWriteSnapshot("major-9th", svg);
     });
 
-    it("renders tension bar at different levels", () => {
-      const chord = createTestChord(0, "maj", [0, 4, 7]);
-
-      // Low tension
-      const lowFrame = createTestFrame(1000, chord, 0.1);
+    it("renders tension bar at different levels with appropriate chords", () => {
+      // Low tension: C major triad (consonant)
+      const lowChord = createTestChord(0, "maj", [0, 4, 7]);
+      const lowFrame = createTestFrame(1000, lowChord, 0.1);
       const lowSvg = grammar.renderToSVG(lowFrame);
-      maybeWriteSnapshot("tension-low", lowSvg);
+      maybeWriteSnapshot("tension-low-cmaj", lowSvg);
 
-      // Medium tension
-      const midFrame = createTestFrame(1000, chord, 0.5);
+      // Medium tension: G7 dominant (contains tritone)
+      const midChord = createTestChord(7, "dom7", [0, 4, 7, 10]);
+      const midFrame = createTestFrame(1000, midChord, 0.5);
       const midSvg = grammar.renderToSVG(midFrame);
-      maybeWriteSnapshot("tension-medium", midSvg);
+      maybeWriteSnapshot("tension-mid-g7", midSvg);
 
-      // High tension
-      const highFrame = createTestFrame(1000, chord, 0.9);
+      // High tension: Cdim7 (fully diminished, two tritones)
+      const highChord = createTestChord(0, "dim7", [0, 3, 6, 9]);
+      const highFrame = createTestFrame(1000, highChord, 0.85);
       const highSvg = grammar.renderToSVG(highFrame);
-      maybeWriteSnapshot("tension-high", highSvg);
+      maybeWriteSnapshot("tension-high-cdim7", highSvg);
     });
 
     it("renders empty frame (no chord)", () => {
