@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chord Shape Validation - SPEC 010</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      padding: 2rem;
+      margin: 0;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      text-align: center;
+      color: #888;
+      margin-bottom: 2rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1.5rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .card {
+      background: #252538;
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+    }
+    .chord-name {
+      font-size: 1.2rem;
+      font-weight: bold;
+      margin-bottom: 0.25rem;
+    }
+    .chord-notes {
+      font-size: 0.8rem;
+      color: #888;
+      margin-bottom: 0.5rem;
+    }
+    .chord-quality {
+      font-size: 0.7rem;
+      color: #aaa;
+      margin-top: 0.25rem;
+    }
+    svg {
+      display: block;
+      margin: 0 auto;
+    }
+    .legend {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 1rem;
+      background: #252538;
+      border-radius: 8px;
+    }
+    .legend h3 {
+      margin-top: 0;
+    }
+    .legend-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+    }
+    .section-title {
+      grid-column: 1 / -1;
+      font-size: 1.1rem;
+      color: #888;
+      margin-top: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #333;
+    }
+  </style>
+</head>
+<body>
+  <h1>Chord Shape Validation</h1>
+  <p class="subtitle">SPEC 010 Visual Vocabulary - Hub-Styled Shape (v3.3)</p>
+
+  <div class="legend">
+    <h3>Specification Reference</h3>
+    <div class="legend-grid">
+      <div class="legend-item"><strong>Root at 12 o'clock (0°)</strong></div>
+      <div class="legend-item"><strong>30° per semitone</strong></div>
+      <div class="legend-item"><strong>Clockwise = ascending</strong></div>
+      <div class="legend-item">Triadic tones: radius 1.0</div>
+      <div class="legend-item">7th: radius 0.618</div>
+      <div class="legend-item">Extensions: radius 0.382</div>
+    </div>
+    <h4 style="margin-top: 1rem;">v3.2 Design: Unified Shape</h4>
+    <div class="legend-grid">
+      <div class="legend-item">Central hub: always filled</div>
+      <div class="legend-item">Arms radiate from hub</div>
+      <div class="legend-item">Single outline for entire shape</div>
+    </div>
+    <h4 style="margin-top: 1rem;">Hub Styles (Quality Indicator)</h4>
+    <div class="legend-grid">
+      <div class="legend-item">Major: circular hub</div>
+      <div class="legend-item">Minor: wavy hub (sine)</div>
+      <div class="legend-item">Diminished: concave hub</div>
+      <div class="legend-item">Augmented: convex hub (bulging)</div>
+      <div class="legend-item">Sus2: dashed hub (short)</div>
+      <div class="legend-item">Sus4: dashed hub (long)</div>
+    </div>
+    <p style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;">Arms always have straight edges. Quality is shown in the hub shape.</p>
+  </div>
+
+  <div class="grid" id="chord-grid">
+    <div class="section-title">Triads</div>
+  </div>
+
+  <script>
+    // SPEC 010 Constants
+    const INTERVAL_ANGLES = {
+      0: 0, 1: 30, 2: 60, 3: 90, 4: 120, 5: 150,
+      6: 180, 7: 210, 8: 240, 9: 270, 10: 300, 11: 330,
+    };
+
+    const HUB_RADIUS = 0.3;
+    const ARM_LENGTH = {
+      triadic: 0.7,
+      seventh: 0.45,
+      extension: 0.25,
+    };
+    const BASE_WIDTH = 30; // degrees
+
+    const INTERVAL_LABELS = {
+      0: "1", 1: "♭2", 2: "2", 3: "♭3", 4: "3", 5: "4",
+      6: "♭5", 7: "5", 8: "♯5", 9: "6", 10: "♭7", 11: "7",
+    };
+
+    function getTier(semitones) {
+      if ([0, 3, 4, 7, 8].includes(semitones)) return "triadic";
+      if ([10, 11].includes(semitones)) return "seventh";
+      return "extension";
+    }
+
+    function getEdgeStyle(quality) {
+      switch (quality) {
+        case "maj": case "maj7": case "dom7": return "straight";
+        case "min": case "min7": return "wavy";
+        case "dim": case "dim7": case "hdim7": return "concave";
+        case "aug": return "convex";
+        case "sus2": return "dash-short";
+        case "sus4": return "dash-long";
+        default: return "straight";
+      }
+    }
+
+    function toRadians(degrees) {
+      return ((90 - degrees) * Math.PI) / 180;
+    }
+
+    function polarToXY(cx, cy, angle, radius) {
+      const rad = toRadians(angle);
+      return {
+        x: cx + radius * Math.cos(rad),
+        y: cy - radius * Math.sin(rad)
+      };
+    }
+
+    // Generate a styled edge from start to end
+    function styledEdge(start, end, style, isLeftEdge, armAngle, hubR, tipR, baseRadius, cx, cy) {
+      const length = Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2);
+
+      if (style === "straight" || style === "dash-short" || style === "dash-long") {
+        return ` L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+      }
+
+      if (style === "wavy") {
+        // Smooth sine wave along the edge
+        const midX = (start.x + end.x) / 2;
+        const midY = (start.y + end.y) / 2;
+
+        // Perpendicular direction for wave amplitude
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const perpX = -dy / length;
+        const perpY = dx / length;
+
+        const amp = 4; // wave amplitude
+
+        // 3 control points for smooth S-curve
+        const q1x = start.x + dx * 0.25 + perpX * amp;
+        const q1y = start.y + dy * 0.25 + perpY * amp;
+        const q2x = start.x + dx * 0.5 - perpX * amp;
+        const q2y = start.y + dy * 0.5 - perpY * amp;
+        const q3x = start.x + dx * 0.75 + perpX * amp;
+        const q3y = start.y + dy * 0.75 + perpY * amp;
+
+        const m1x = start.x + dx * 0.33;
+        const m1y = start.y + dy * 0.33;
+        const m2x = start.x + dx * 0.66;
+        const m2y = start.y + dy * 0.66;
+
+        return ` Q ${q1x.toFixed(1)} ${q1y.toFixed(1)} ${m1x.toFixed(1)} ${m1y.toFixed(1)}` +
+               ` Q ${q2x.toFixed(1)} ${q2y.toFixed(1)} ${m2x.toFixed(1)} ${m2y.toFixed(1)}` +
+               ` Q ${q3x.toFixed(1)} ${q3y.toFixed(1)} ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+      }
+
+      if (style === "concave") {
+        // Deep curve inward - control point closer to center
+        const midX = (start.x + end.x) / 2;
+        const midY = (start.y + end.y) / 2;
+
+        // Direction toward center
+        const toCenterX = cx - midX;
+        const toCenterY = cy - midY;
+        const toCenterLen = Math.sqrt(toCenterX ** 2 + toCenterY ** 2);
+
+        // Move control point toward center (more exaggerated)
+        const depth = 12;
+        const ctrlX = midX + (toCenterX / toCenterLen) * depth;
+        const ctrlY = midY + (toCenterY / toCenterLen) * depth;
+
+        return ` Q ${ctrlX.toFixed(1)} ${ctrlY.toFixed(1)} ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+      }
+
+      if (style === "convex") {
+        // Curve outward - control point away from center
+        const midX = (start.x + end.x) / 2;
+        const midY = (start.y + end.y) / 2;
+
+        // Direction away from center
+        const fromCenterX = midX - cx;
+        const fromCenterY = midY - cy;
+        const fromCenterLen = Math.sqrt(fromCenterX ** 2 + fromCenterY ** 2);
+
+        const bulge = 8;
+        const ctrlX = midX + (fromCenterX / fromCenterLen) * bulge;
+        const ctrlY = midY + (fromCenterY / fromCenterLen) * bulge;
+
+        return ` Q ${ctrlX.toFixed(1)} ${ctrlY.toFixed(1)} ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+      }
+
+      return ` L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+    }
+
+    // Generate styled arc along hub between arms
+    function styledArc(startAngle, endAngle, hubR, style, cx, cy) {
+      // Calculate arc span (going clockwise)
+      let arcSpan = endAngle - startAngle;
+      if (arcSpan < 0) arcSpan += 360;
+
+      const start = polarToXY(cx, cy, startAngle, hubR);
+      const end = polarToXY(cx, cy, endAngle, hubR);
+
+      if (style === "straight" || style === "dash-short" || style === "dash-long") {
+        // Simple arc
+        const largeArc = arcSpan > 180 ? 1 : 0;
+        return ` A ${hubR.toFixed(1)} ${hubR.toFixed(1)} 0 ${largeArc} 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+      }
+
+      if (style === "wavy") {
+        // Wavy arc - smooth sine wave with more waves
+        const steps = Math.max(3, Math.floor(arcSpan / 20));
+        let path = '';
+        const amp = 4;
+
+        for (let i = 0; i < steps; i++) {
+          const t0 = i / steps;
+          const t1 = (i + 1) / steps;
+          const angle0 = startAngle + arcSpan * t0;
+          const angle1 = startAngle + arcSpan * t1;
+          const midAngle = (angle0 + angle1) / 2;
+
+          const p1 = polarToXY(cx, cy, angle1, hubR);
+
+          // Wave in/out alternating
+          const waveR = hubR + (i % 2 === 0 ? amp : -amp);
+          const ctrl = polarToXY(cx, cy, midAngle, waveR);
+
+          path += ` Q ${ctrl.x.toFixed(1)} ${ctrl.y.toFixed(1)} ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
+        }
+        return path;
+      }
+
+      if (style === "concave") {
+        // Use cubic bezier for smooth tangent continuity at arm junctions
+        // Control points are positioned along circle tangents, then pulled inward
+        const startRad = toRadians(startAngle);
+        const endRad = toRadians(endAngle);
+
+        // Tangent directions (clockwise along circle)
+        const startTanX = Math.sin(startRad);
+        const startTanY = Math.cos(startRad);
+        const endTanX = -Math.sin(endRad);
+        const endTanY = -Math.cos(endRad);
+
+        // Handle length based on arc span
+        const arcRad = arcSpan * Math.PI / 180;
+        const handleLen = hubR * arcRad * 0.4;
+
+        // Inward pull scales with arc span - larger gaps need more pull to stay visibly concave
+        const inwardPull = 6 + arcSpan * 0.08;
+        const radialStartX = (start.x - cx) / hubR;
+        const radialStartY = (start.y - cy) / hubR;
+        const radialEndX = (end.x - cx) / hubR;
+        const radialEndY = (end.y - cy) / hubR;
+
+        // Control point 1: along start tangent, pulled toward center
+        const cp1x = start.x + startTanX * handleLen - radialStartX * inwardPull;
+        const cp1y = start.y + startTanY * handleLen - radialStartY * inwardPull;
+
+        // Control point 2: along end tangent (approaching from opposite direction)
+        const cp2x = end.x + endTanX * handleLen - radialEndX * inwardPull;
+        const cp2y = end.y + endTanY * handleLen - radialEndY * inwardPull;
+
+        return ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)} ${cp2x.toFixed(1)} ${cp2y.toFixed(1)} ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+      }
+
+      if (style === "convex") {
+        // Use cubic bezier for smooth tangent continuity
+        const startRad = toRadians(startAngle);
+        const endRad = toRadians(endAngle);
+
+        const startTanX = Math.sin(startRad);
+        const startTanY = Math.cos(startRad);
+        const endTanX = -Math.sin(endRad);
+        const endTanY = -Math.cos(endRad);
+
+        const arcRad = arcSpan * Math.PI / 180;
+        const handleLen = hubR * arcRad * 0.4;
+
+        // Outward push scales with arc span - larger gaps need more push
+        const outwardPush = 8 + arcSpan * 0.06;
+        const radialStartX = (start.x - cx) / hubR;
+        const radialStartY = (start.y - cy) / hubR;
+        const radialEndX = (end.x - cx) / hubR;
+        const radialEndY = (end.y - cy) / hubR;
+
+        const cp1x = start.x + startTanX * handleLen + radialStartX * outwardPush;
+        const cp1y = start.y + startTanY * handleLen + radialStartY * outwardPush;
+
+        const cp2x = end.x + endTanX * handleLen + radialEndX * outwardPush;
+        const cp2y = end.y + endTanY * handleLen + radialEndY * outwardPush;
+
+        return ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)} ${cp2x.toFixed(1)} ${cp2y.toFixed(1)} ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+      }
+
+      const largeArc = arcSpan > 180 ? 1 : 0;
+      return ` A ${hubR.toFixed(1)} ${hubR.toFixed(1)} 0 ${largeArc} 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+    }
+
+    // Generate unified shape path
+    // Arms always have straight edges; style applies only to hub arcs
+    function generateUnifiedShape(intervals, style, baseRadius, cx, cy) {
+      const hubR = baseRadius * HUB_RADIUS;
+
+      // Sort intervals by angle
+      const sorted = intervals.map(i => ({
+        semitones: i.semitones,
+        angle: INTERVAL_ANGLES[i.semitones],
+        tier: getTier(i.semitones),
+        length: ARM_LENGTH[getTier(i.semitones)]
+      })).sort((a, b) => a.angle - b.angle);
+
+      let path = '';
+
+      for (let i = 0; i < sorted.length; i++) {
+        const curr = sorted[i];
+        const next = sorted[(i + 1) % sorted.length];
+
+        const armLeftAngle = curr.angle - BASE_WIDTH / 2;
+        const armRightAngle = curr.angle + BASE_WIDTH / 2;
+        const tipR = hubR + baseRadius * curr.length;
+
+        const baseLeft = polarToXY(cx, cy, armLeftAngle, hubR);
+        const baseRight = polarToXY(cx, cy, armRightAngle, hubR);
+        const tip = polarToXY(cx, cy, curr.angle, tipR);
+
+        if (i === 0) {
+          path += `M ${baseLeft.x.toFixed(1)} ${baseLeft.y.toFixed(1)}`;
+        }
+
+        // Left edge of arm (base to tip) - ALWAYS STRAIGHT
+        path += ` L ${tip.x.toFixed(1)} ${tip.y.toFixed(1)}`;
+
+        // Right edge of arm (tip to base) - ALWAYS STRAIGHT
+        path += ` L ${baseRight.x.toFixed(1)} ${baseRight.y.toFixed(1)}`;
+
+        // Arc along hub to next arm's left edge - STYLED (this is where quality shows)
+        const nextLeftAngle = next.angle - BASE_WIDTH / 2;
+        path += styledArc(armRightAngle, nextLeftAngle, hubR, style, cx, cy);
+      }
+
+      path += ' Z';
+      return path;
+    }
+
+    // Generate line for chromatic alterations
+    function generateLinePath(angle, tier, baseRadius, cx, cy) {
+      const hubR = baseRadius * HUB_RADIUS;
+      const outerR = hubR + baseRadius * ARM_LENGTH[tier] * 1.15;
+      const inner = polarToXY(cx, cy, angle, hubR);
+      const outer = polarToXY(cx, cy, angle, outerR);
+      return `M ${inner.x.toFixed(1)} ${inner.y.toFixed(1)} L ${outer.x.toFixed(1)} ${outer.y.toFixed(1)}`;
+    }
+
+    // Generate arm edges path (always solid stroke)
+    function generateArmEdges(intervals, baseRadius, cx, cy) {
+      const hubR = baseRadius * HUB_RADIUS;
+      const sorted = intervals.map(i => ({
+        semitones: i.semitones,
+        angle: INTERVAL_ANGLES[i.semitones],
+        tier: getTier(i.semitones),
+        length: ARM_LENGTH[getTier(i.semitones)]
+      })).sort((a, b) => a.angle - b.angle);
+
+      let paths = [];
+      for (const curr of sorted) {
+        const armLeftAngle = curr.angle - BASE_WIDTH / 2;
+        const armRightAngle = curr.angle + BASE_WIDTH / 2;
+        const tipR = hubR + baseRadius * curr.length;
+
+        const baseLeft = polarToXY(cx, cy, armLeftAngle, hubR);
+        const baseRight = polarToXY(cx, cy, armRightAngle, hubR);
+        const tip = polarToXY(cx, cy, curr.angle, tipR);
+
+        paths.push(`M ${baseLeft.x.toFixed(1)} ${baseLeft.y.toFixed(1)} L ${tip.x.toFixed(1)} ${tip.y.toFixed(1)} L ${baseRight.x.toFixed(1)} ${baseRight.y.toFixed(1)}`);
+      }
+      return paths.join(' ');
+    }
+
+    // Generate hub arcs path (styled)
+    function generateHubArcs(intervals, style, baseRadius, cx, cy) {
+      const hubR = baseRadius * HUB_RADIUS;
+      const sorted = intervals.map(i => ({
+        semitones: i.semitones,
+        angle: INTERVAL_ANGLES[i.semitones],
+        tier: getTier(i.semitones),
+        length: ARM_LENGTH[getTier(i.semitones)]
+      })).sort((a, b) => a.angle - b.angle);
+
+      let path = '';
+      for (let i = 0; i < sorted.length; i++) {
+        const curr = sorted[i];
+        const next = sorted[(i + 1) % sorted.length];
+
+        const armRightAngle = curr.angle + BASE_WIDTH / 2;
+        const nextLeftAngle = next.angle - BASE_WIDTH / 2;
+
+        const start = polarToXY(cx, cy, armRightAngle, hubR);
+        if (i === 0) {
+          path += `M ${start.x.toFixed(1)} ${start.y.toFixed(1)}`;
+        }
+        path += styledArc(armRightAngle, nextLeftAngle, hubR, style, cx, cy);
+
+        // Move to next arc start
+        const nextStart = polarToXY(cx, cy, next.angle + BASE_WIDTH / 2, hubR);
+        if (i < sorted.length - 1) {
+          path += ` M ${nextStart.x.toFixed(1)} ${nextStart.y.toFixed(1)}`;
+        }
+      }
+      return path;
+    }
+
+    // Generate SVG for a chord
+    function generateChordSVG(chord) {
+      const cx = 80, cy = 80;
+      const baseRadius = 55;
+      const hubR = baseRadius * HUB_RADIUS;
+      const edgeStyle = getEdgeStyle(chord.quality);
+
+      const armIntervals = chord.intervals.filter(i => i.style !== "line");
+      const lineIntervals = chord.intervals.filter(i => i.style === "line");
+
+      let elements = [];
+
+      const isDashed = edgeStyle.startsWith("dash");
+
+      if (isDashed) {
+        // For dashed styles: fill shape (no stroke), then separate strokes for arms (solid) and hub (dashed)
+        const shapePath = generateUnifiedShape(armIntervals, edgeStyle, baseRadius, cx, cy);
+        elements.push(`<path d="${shapePath}" fill="#4a9eff" fill-opacity="0.6" stroke="none"/>`);
+
+        // Arm edges - solid stroke
+        const armPath = generateArmEdges(armIntervals, baseRadius, cx, cy);
+        elements.push(`<path d="${armPath}" fill="none" stroke="#4a9eff" stroke-width="2" stroke-linejoin="round"/>`);
+
+        // Hub arcs - dashed stroke
+        const hubPath = generateHubArcs(armIntervals, edgeStyle, baseRadius, cx, cy);
+        const dashArray = edgeStyle === "dash-short" ? "3,3" : "6,3";
+        elements.push(`<path d="${hubPath}" fill="none" stroke="#4a9eff" stroke-width="2" stroke-dasharray="${dashArray}"/>`);
+      } else {
+        // For non-dashed styles: unified path with stroke
+        const shapePath = generateUnifiedShape(armIntervals, edgeStyle, baseRadius, cx, cy);
+        elements.push(`<path d="${shapePath}" fill="#4a9eff" fill-opacity="0.6" stroke="#4a9eff" stroke-width="2" stroke-linejoin="round"/>`);
+      }
+
+      // Lines for chromatic alterations
+      for (const interval of lineIntervals) {
+        const angle = INTERVAL_ANGLES[interval.semitones];
+        const tier = getTier(interval.semitones);
+        const linePath = generateLinePath(angle, tier, baseRadius, cx, cy);
+        elements.push(`<path d="${linePath}" fill="none" stroke="#ff6b6b" stroke-width="3" stroke-linecap="round"/>`);
+      }
+
+      // Labels
+      let labels = [];
+      for (const interval of chord.intervals) {
+        const angle = INTERVAL_ANGLES[interval.semitones];
+        const tier = getTier(interval.semitones);
+        const labelR = hubR + baseRadius * ARM_LENGTH[tier] + 12;
+        const labelPos = polarToXY(cx, cy, angle, labelR);
+        const color = interval.style === "line" ? "#ff6b6b" : "#888";
+        labels.push(`<text x="${labelPos.x.toFixed(1)}" y="${(labelPos.y + 3).toFixed(1)}" text-anchor="middle" fill="${color}" font-size="9">${INTERVAL_LABELS[interval.semitones]}</text>`);
+      }
+
+      return `<svg width="160" height="160" viewBox="0 0 160 160">
+        <circle cx="${cx}" cy="${cy}" r="${baseRadius}" fill="none" stroke="#333" stroke-width="0.5"/>
+        ${elements.join('\n        ')}
+        ${labels.join('\n        ')}
+      </svg>`;
+    }
+
+    // Chord definitions (root-independent - shapes represent interval relationships)
+    const chords = [
+      // Triads
+      { name: "Major", notes: "1-3-5", quality: "maj",
+        intervals: [{semitones: 0}, {semitones: 4}, {semitones: 7}] },
+      { name: "Minor", notes: "1-♭3-5", quality: "min",
+        intervals: [{semitones: 0}, {semitones: 3}, {semitones: 7}] },
+      { name: "Diminished", notes: "1-♭3-♭5", quality: "dim",
+        intervals: [{semitones: 0}, {semitones: 3}, {semitones: 6}] },
+      { name: "Augmented", notes: "1-3-♯5", quality: "aug",
+        intervals: [{semitones: 0}, {semitones: 4}, {semitones: 8}] },
+      { name: "Sus2", notes: "1-2-5", quality: "sus2",
+        intervals: [{semitones: 0}, {semitones: 2}, {semitones: 7}] },
+      { name: "Sus4", notes: "1-4-5", quality: "sus4",
+        intervals: [{semitones: 0}, {semitones: 5}, {semitones: 7}] },
+
+      // Seventh chords
+      { section: "Seventh Chords" },
+      { name: "Major 7th", notes: "1-3-5-7", quality: "maj7",
+        intervals: [{semitones: 0}, {semitones: 4}, {semitones: 7}, {semitones: 11}] },
+      { name: "Minor 7th", notes: "1-♭3-5-♭7", quality: "min7",
+        intervals: [{semitones: 0}, {semitones: 3}, {semitones: 7}, {semitones: 10}] },
+      { name: "Dominant 7th", notes: "1-3-5-♭7", quality: "dom7",
+        intervals: [{semitones: 0}, {semitones: 4}, {semitones: 7}, {semitones: 10}] },
+      { name: "Diminished 7th", notes: "1-♭3-♭5-𝄫7", quality: "dim7",
+        intervals: [{semitones: 0}, {semitones: 3}, {semitones: 6}, {semitones: 9}] },
+      { name: "Half-diminished", notes: "1-♭3-♭5-♭7", quality: "hdim7",
+        intervals: [{semitones: 0}, {semitones: 3}, {semitones: 6}, {semitones: 10}] },
+
+      // Extended chords
+      { section: "Extended Chords" },
+      { name: "Major 9th", notes: "1-3-5-7-9", quality: "maj7",
+        intervals: [{semitones: 0}, {semitones: 4}, {semitones: 7}, {semitones: 11}, {semitones: 2}] },
+      { name: "Dominant 7♯9", notes: "1-3-5-♭7-♯9", quality: "dom7",
+        intervals: [{semitones: 0}, {semitones: 4}, {semitones: 7}, {semitones: 10}, {semitones: 3, style: "line"}] },
+      { name: "Add9", notes: "1-3-5-9", quality: "maj",
+        intervals: [{semitones: 0}, {semitones: 4}, {semitones: 7}, {semitones: 2}] },
+    ];
+
+    // Render all chords
+    const grid = document.getElementById('chord-grid');
+    for (const chord of chords) {
+      if (chord.section) {
+        const sectionDiv = document.createElement('div');
+        sectionDiv.className = 'section-title';
+        sectionDiv.textContent = chord.section;
+        grid.appendChild(sectionDiv);
+        continue;
+      }
+
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="chord-name">${chord.name}</div>
+        <div class="chord-notes">${chord.notes}</div>
+        ${generateChordSVG(chord)}
+        <div class="chord-quality">${getEdgeStyle(chord.quality)} hub</div>
+      `;
+      grid.appendChild(card);
+    }
+  </script>
+</body>
+</html>
