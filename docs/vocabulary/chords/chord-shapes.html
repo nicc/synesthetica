@@ -89,31 +89,31 @@
   <p class="subtitle">SPEC 010 Visual Vocabulary - Hub-Styled Shape (v3.3)</p>
 
   <div class="legend">
-    <h3>Specification Reference</h3>
+    <h3>Reading Chord Shapes</h3>
     <div class="legend-grid">
-      <div class="legend-item"><strong>Root at 12 o'clock (0°)</strong></div>
-      <div class="legend-item"><strong>30° per semitone</strong></div>
-      <div class="legend-item"><strong>Clockwise = ascending</strong></div>
-      <div class="legend-item">Triadic tones: radius 1.0</div>
-      <div class="legend-item">7th: radius 0.618</div>
-      <div class="legend-item">Extensions: radius 0.382</div>
+      <div class="legend-item"><strong>Root is always at 12 o'clock</strong></div>
+      <div class="legend-item"><strong>Intervals go clockwise</strong></div>
+      <div class="legend-item"><strong>Each hour = one semitone</strong></div>
     </div>
-    <h4 style="margin-top: 1rem;">v3.2 Design: Unified Shape</h4>
+    <hr style="border: none; border-top: 1px solid #444; margin: 1rem 0;">
+    <h4 style="margin: 0 0 0.5rem 0;">Arm Length = Harmonic Role</h4>
     <div class="legend-grid">
-      <div class="legend-item">Central hub: always filled</div>
-      <div class="legend-item">Arms radiate from hub</div>
-      <div class="legend-item">Single outline for entire shape</div>
+      <div class="legend-item">Long arms: triadic tones (root, 3rd, 5th)</div>
+      <div class="legend-item">Medium arms: 7ths (harmonic color)</div>
+      <div class="legend-item">Short arms: extensions (9th, 11th, 13th)</div>
     </div>
-    <h4 style="margin-top: 1rem;">Hub Styles (Quality Indicator)</h4>
+    <hr style="border: none; border-top: 1px solid #444; margin: 1rem 0;">
+    <h4 style="margin: 0 0 0.5rem 0;">Hub Shape = Triadic Quality</h4>
     <div class="legend-grid">
-      <div class="legend-item">Major: circular hub</div>
-      <div class="legend-item">Minor: wavy hub (sine)</div>
-      <div class="legend-item">Diminished: concave hub</div>
-      <div class="legend-item">Augmented: convex hub (bulging)</div>
-      <div class="legend-item">Sus2: dashed hub (short)</div>
-      <div class="legend-item">Sus4: dashed hub (long)</div>
+      <div class="legend-item">Smooth circle: major (stable, bright)</div>
+      <div class="legend-item">Wavy edge: minor (darker, introspective)</div>
+      <div class="legend-item">Pinched inward: diminished (tense, unstable)</div>
+      <div class="legend-item">Bulging outward: augmented (expansive, unresolved)</div>
+      <div class="legend-item">Dashed edge: suspended (seeking resolution)</div>
     </div>
-    <p style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;">Arms always have straight edges. Quality is shown in the hub shape.</p>
+    <hr style="border: none; border-top: 1px solid #444; margin: 1rem 0;">
+    <h4 style="margin: 0 0 0.5rem 0;">Chromatic Alterations</h4>
+    <p style="font-size: 0.85rem; color: #aaa; margin: 0;">Chromatic tones (like ♯9) appear as red lines emerging from the hub, distinct from the filled arms.</p>
   </div>
 
   <div class="grid" id="chord-grid">
@@ -507,6 +507,37 @@
       </svg>`;
     }
 
+    // Derive musical qualities from chord structure
+    function getMusicalQualities(chord) {
+      const parts = [];
+
+      // Triadic quality
+      const triadMap = {
+        maj: "major", maj7: "major", dom7: "major",
+        min: "minor", min7: "minor",
+        dim: "diminished", dim7: "diminished", hdim7: "diminished",
+        aug: "augmented",
+        sus2: "sus2", sus4: "sus4"
+      };
+      parts.push(triadMap[chord.quality] || chord.quality);
+
+      // Check for 7th (semitones 9, 10, or 11)
+      const has7th = chord.intervals.some(i => [9, 10, 11].includes(i.semitones));
+      if (has7th) parts.push("7th");
+
+      // Check for extensions (semitones 1, 2 = 9th; 5 = 11th; 9 could also be 13th context)
+      const hasExtension = chord.intervals.some(i =>
+        [1, 2, 5].includes(i.semitones) && i.style !== "line"
+      );
+      if (hasExtension) parts.push("extensions");
+
+      // Check for chromatic alterations (lines)
+      const hasChromatic = chord.intervals.some(i => i.style === "line");
+      if (hasChromatic) parts.push("chromatic");
+
+      return parts.join(" · ");
+    }
+
     // Chord definitions (root-independent - shapes represent interval relationships)
     const chords = [
       // Triads
@@ -563,7 +594,7 @@
         <div class="chord-name">${chord.name}</div>
         <div class="chord-notes">${chord.notes}</div>
         ${generateChordSVG(chord)}
-        <div class="chord-quality">${getEdgeStyle(chord.quality)} hub</div>
+        <div class="chord-quality">${getMusicalQualities(chord)}</div>
       `;
       grid.appendChild(card);
     }
