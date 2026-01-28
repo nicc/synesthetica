@@ -39,6 +39,7 @@ import type {
   MusicalChord,
   RhythmicAnalysis,
   DynamicsState,
+  HarmonicContext,
 } from "@synesthetica/contracts";
 
 import {
@@ -95,11 +96,20 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
   }
 
   annotate(frame: MusicalFrame): AnnotatedMusicalFrame {
+    // Default harmonic context when stabilizer not in chain
+    const defaultHarmonicContext: HarmonicContext = {
+      tension: 0,
+      keyAware: false,
+      detectedKey: null,
+    };
+
     return {
       t: frame.t,
       part: frame.part,
       notes: frame.notes.map((note) => this.annotateNote(note)),
       chords: frame.chords.map((chord) => this.annotateChord(chord)),
+      progression: frame.progression ?? [],
+      harmonicContext: frame.harmonicContext ?? defaultHarmonicContext,
       rhythm: this.annotateRhythm(
         frame.rhythmicAnalysis,
         frame.prescribedTempo,

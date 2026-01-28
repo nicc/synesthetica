@@ -17,9 +17,11 @@ import type {
   NoteId,
   NotePhase,
   MusicalChord,
+  ChordId,
   RhythmicAnalysis,
   TimeSignature,
   DynamicsState,
+  HarmonicContext,
 } from "../musical/musical";
 
 // ============================================================================
@@ -327,6 +329,18 @@ export interface AnnotatedMusicalFrame {
 
   /** Annotated chords - grammars decide how/whether to render */
   chords: AnnotatedChord[];
+
+  /**
+   * Recent chord progression (IDs only, references chords array).
+   * Ordered oldest to newest. Useful for grammars showing harmonic movement.
+   */
+  progression: ChordId[];
+
+  /**
+   * Harmonic context including tension analysis.
+   * See HarmonicContext for tier 1 (key-agnostic) vs tier 2 (key-aware) behavior.
+   */
+  harmonicContext: HarmonicContext;
 
   /** Rhythmic analysis with visual annotations */
   rhythm: AnnotatedRhythm;

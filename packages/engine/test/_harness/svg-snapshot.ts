@@ -413,7 +413,7 @@ export function shouldGenerateSnapshots(): boolean {
  * @param svg - SVG content
  * @param subdir - Optional subdirectory under _snapshots/
  */
-export function writeSnapshot(name: string, svg: string, subdir = "grammars"): void {
+export function writeSnapshot(name: string, svg: string, subdir = "rhythm"): void {
   const dir = resolve(SNAPSHOTS_DIR, subdir);
 
   if (!existsSync(dir)) {
@@ -435,7 +435,7 @@ export function maybeWriteSnapshot(
   name: string,
   scene: SceneFrame,
   options: SVGOptions = {},
-  subdir = "grammars"
+  subdir = "rhythm"
 ): string {
   const svg = renderSceneToSVG(scene, options);
 

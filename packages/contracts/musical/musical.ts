@@ -176,6 +176,47 @@ export interface DynamicsState {
 }
 
 /**
+ * Harmonic context produced by HarmonicProgressionStabilizer.
+ *
+ * Provides tension analysis for grammars that visualize harmonic tension.
+ *
+ * Tension computation has two tiers:
+ * - Tier 1 (key-agnostic): Interval-based dissonance - always available
+ * - Tier 2 (key-aware): Functional tension - requires KeyDetectionStabilizer
+ *
+ * When key detection is unavailable or disabled, tier 1 is used as fallback.
+ */
+export interface HarmonicContext {
+  /**
+   * Harmonic tension (0-1).
+   *
+   * At tier 1 (key-agnostic): Based on interval dissonance in current chord.
+   * - Tritones, minor 2nds, major 7ths contribute high tension
+   * - Extensions and alterations contribute moderate tension
+   *
+   * At tier 2 (key-aware): Based on functional harmony.
+   * - Dominant function = high tension
+   * - Tonic function = low tension
+   * - Secondary dominants, borrowed chords = context-dependent
+   */
+  tension: number;
+
+  /**
+   * Whether tension is computed with key awareness.
+   * false = tier 1 (interval dissonance only)
+   * true = tier 2 (functional harmony)
+   */
+  keyAware: boolean;
+
+  /**
+   * Detected key (if key-aware).
+   * Format: pitch class (0-11) + mode ("major" | "minor")
+   * null when key detection is unavailable or ambiguous.
+   */
+  detectedKey: { root: number; mode: "major" | "minor" } | null;
+}
+
+/**
  * A musical phrase boundary detected by stabilizers.
  */
 export interface Phrase {
@@ -230,6 +271,14 @@ export interface MusicalFrame {
   // Recent context (references, not copies)
   progression?: ChordId[]; // Recent chord history
   phrases?: Phrase[]; // Phrase boundaries
+
+  // Derived signals (from derived stabilizers)
+  /**
+   * Harmonic context including tension analysis.
+   * Produced by HarmonicProgressionStabilizer.
+   * Optional - only present when that stabilizer is in the chain.
+   */
+  harmonicContext?: HarmonicContext;
 }
 
 /**
