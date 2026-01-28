@@ -156,6 +156,8 @@ export interface ChordShapeElement {
   style: "wedge" | "line";
   /** Interval from root (for debugging/labeling, e.g., "3", "♭7", "♯9") */
   interval: string;
+  /** Color for this element (computed from pitch class of root + interval) */
+  color: ColorHSVA;
 }
 
 /**

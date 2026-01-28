@@ -187,6 +187,7 @@ interface ChordShapeElement {
   tier: RadiusTier;
   style: "wedge" | "line"; // Wedge for diatonic, line for chromatic
   interval: string;        // e.g., "3", "♭7", "♯9"
+  color: ColorHSVA;        // Computed from pcToHue(root + intervalSemitones)
 }
 
 type MarginStyle =
@@ -251,6 +252,21 @@ palette.primary.h = pcToHue(chord.root, invariant);
 palette.primary.s = chordSaturation(chord.quality);  // Minor slightly desaturated
 palette.primary.v = averageOctaveBrightness(chord.voicing);
 ```
+
+### Per-Element Color in Chord Shapes
+
+Each `ChordShapeElement` has its own color computed from the pitch class of that chord tone:
+
+```ts
+// For each element in the chord shape:
+const semitones = element.intervalSemitones;
+const elementPc = (chord.root + semitones) % 12;
+element.color.h = pcToHue(elementPc, invariant);
+element.color.s = 0.8;
+element.color.v = averageOctaveBrightness(chord.voicing);
+```
+
+This allows grammars to render each arm/wedge in the color of that chord tone while respecting the pitch-class-to-hue invariant. Grammars can use `element.color` directly or compute their own colors from `chord.noteIds` if they need more control.
 
 ## Invariants
 

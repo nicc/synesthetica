@@ -34,16 +34,11 @@ import type {
   MotionAnnotation,
   VelocityAnnotation,
   PhaseAnnotation,
-  ChordShapeGeometry,
-  ChordShapeElement,
-  MarginStyle,
-  RadiusTier,
   PitchClass,
   Note,
   MusicalChord,
   RhythmicAnalysis,
   DynamicsState,
-  ChordQuality,
 } from "@synesthetica/contracts";
 
 import {
@@ -51,10 +46,9 @@ import {
   octaveToBrightness,
   velocityToSizeMultiplier,
   velocityToAttackMs,
-  RADIUS_BY_TIER,
-  INTERVAL_ANGLES,
-  INTERVAL_LABELS,
 } from "@synesthetica/contracts";
+
+import { buildChordShape } from "./utils";
 
 /**
  * Configuration for the MusicalVisualVocabulary.
@@ -206,7 +200,11 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     };
 
     // Build chord shape geometry (Invariant I18)
-    const shape = this.buildChordShape(chord);
+    const shape = buildChordShape(chord, {
+      referencePc: this.config.referencePc,
+      referenceHue: this.config.referenceHue,
+      direction: this.config.hueDirection,
+    });
 
     return {
       chord,
@@ -410,100 +408,4 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     return `${rootNames[chord.root]}${qualitySuffix}`;
   }
 
-  // ===========================================================================
-  // Chord Shape Building (Invariant I18)
-  // ===========================================================================
-
-  /**
-   * Builds chord shape geometry from a MusicalChord.
-   * Invariant I18: This algorithm is fixed; grammars cannot compute shapes.
-   */
-  private buildChordShape(chord: MusicalChord): ChordShapeGeometry {
-    const elements: ChordShapeElement[] = [];
-
-    // Get intervals from voicing relative to root
-    const intervals = this.getIntervalsFromVoicing(chord);
-
-    for (const interval of intervals) {
-      const semitones = interval % 12;
-      const angle = INTERVAL_ANGLES[semitones];
-      const tier = this.getTierForInterval(semitones);
-      const radius = RADIUS_BY_TIER[tier];
-      const label = INTERVAL_LABELS[semitones];
-
-      elements.push({
-        angle,
-        radius,
-        tier,
-        style: "wedge", // All diatonic for now; chromatic detection is future work
-        interval: label,
-      });
-    }
-
-    const margin = this.getMarginStyle(chord.quality);
-
-    return {
-      elements,
-      margin,
-      rootAngle: 0,
-    };
-  }
-
-  /**
-   * Extracts interval semitones from chord voicing.
-   */
-  private getIntervalsFromVoicing(chord: MusicalChord): number[] {
-    const intervals = new Set<number>();
-
-    for (const pitch of chord.voicing) {
-      const semitones = (pitch.pc - chord.root + 12) % 12;
-      intervals.add(semitones);
-    }
-
-    return Array.from(intervals).sort((a, b) => a - b);
-  }
-
-  /**
-   * Determines radius tier based on interval position in chord structure.
-   */
-  private getTierForInterval(semitones: number): RadiusTier {
-    // Triadic: root (0), 3rds (3,4), 5ths (7,8)
-    if (semitones === 0 || semitones === 3 || semitones === 4 ||
-        semitones === 7 || semitones === 8) {
-      return "triadic";
-    }
-    // Seventh: 7ths (10, 11)
-    if (semitones === 10 || semitones === 11) {
-      return "seventh";
-    }
-    // Extensions: 9ths (1,2), 11ths (5,6), 13ths (9)
-    return "extension";
-  }
-
-  /**
-   * Maps chord quality to margin style.
-   */
-  private getMarginStyle(quality: ChordQuality): MarginStyle {
-    switch (quality) {
-      case "maj":
-      case "maj7":
-      case "dom7":
-        return "straight";
-      case "min":
-      case "min7":
-        return "wavy";
-      case "dim":
-      case "dim7":
-      case "hdim7":
-        return "concave";
-      case "aug":
-        return "convex";
-      case "sus2":
-        return "dash-short";
-      case "sus4":
-        return "dash-long";
-      default:
-        return "straight"; // Default for unknown
-    }
-  }
 }
