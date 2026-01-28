@@ -7,6 +7,9 @@
   <!-- Reference circle -->
   <circle cx="100" cy="100" r="70" fill="none" stroke="#333" stroke-width="0.5"/>
 
+  <!-- Line for ♯9 (chromatic alteration) at 90° - starts at hubR+0.5 so round cap hides behind stroke -->
+  <line x1="121.5" y1="100" x2="138.5" y2="100" stroke="#ff6b6b" stroke-width="3" stroke-linecap="round"/>
+
   <!-- Unified shape: arms at 0° (1), 120° (3), 210° (5), 300° (♭7) with straight edges -->
   <path d="M 94.6 79.7
            L 100 30
@@ -22,12 +25,9 @@
            L 94.6 79.7 Z"
         fill="#4a9eff" fill-opacity="0.6" stroke="#4a9eff" stroke-width="2" stroke-linejoin="round"/>
 
-  <!-- Line for ♯9 (chromatic alteration) at 90° - NOT a filled arm -->
-  <line x1="121" y1="100" x2="165" y2="100" stroke="#ff6b6b" stroke-width="3" stroke-linecap="round"/>
-
   <!-- Labels -->
   <text x="100" y="18" text-anchor="middle" fill="#888" font-size="11" font-family="system-ui">1</text>
-  <text x="180" y="95" text-anchor="middle" fill="#ff6b6b" font-size="11" font-family="system-ui">♯9</text>
+  <text x="151" y="103" text-anchor="middle" fill="#ff6b6b" font-size="11" font-family="system-ui">♯9</text>
   <text x="175" y="145" text-anchor="middle" fill="#888" font-size="11" font-family="system-ui">3</text>
   <text x="50" y="175" text-anchor="middle" fill="#888" font-size="11" font-family="system-ui">5</text>
   <text x="50" y="55" text-anchor="middle" fill="#888" font-size="11" font-family="system-ui">♭7</text>

@@ -374,10 +374,16 @@
     }
 
     // Generate line for chromatic alterations
-    function generateLinePath(angle, tier, baseRadius, cx, cy) {
+    function generateLinePath(angle, baseRadius, cx, cy) {
       const hubR = baseRadius * HUB_RADIUS;
-      const outerR = hubR + baseRadius * ARM_LENGTH[tier] * 1.15;
-      const inner = polarToXY(cx, cy, angle, hubR);
+      // Match extension arm length
+      const outerR = hubR + baseRadius * ARM_LENGTH.extension;
+      // Position so round cap (1.5px for 3px stroke) is exactly hidden behind hub stroke.
+      // Stroke is 2px centered on hubR (covers hubR-1 to hubR+1).
+      // Cap extends back 1.5px from line start, so start at hubR+0.5
+      // means cap spans hubR-1 to hubR+0.5, entirely behind the stroke.
+      const innerR = hubR + 0.5;
+      const inner = polarToXY(cx, cy, angle, innerR);
       const outer = polarToXY(cx, cy, angle, outerR);
       return `M ${inner.x.toFixed(1)} ${inner.y.toFixed(1)} L ${outer.x.toFixed(1)} ${outer.y.toFixed(1)}`;
     }
@@ -452,6 +458,13 @@
 
       let elements = [];
 
+      // Lines for chromatic alterations - draw FIRST so they appear behind the shape
+      for (const interval of lineIntervals) {
+        const angle = INTERVAL_ANGLES[interval.semitones];
+        const linePath = generateLinePath(angle, baseRadius, cx, cy);
+        elements.push(`<path d="${linePath}" fill="none" stroke="#ff6b6b" stroke-width="3" stroke-linecap="round"/>`);
+      }
+
       const isDashed = edgeStyle.startsWith("dash");
 
       if (isDashed) {
@@ -473,20 +486,15 @@
         elements.push(`<path d="${shapePath}" fill="#4a9eff" fill-opacity="0.6" stroke="#4a9eff" stroke-width="2" stroke-linejoin="round"/>`);
       }
 
-      // Lines for chromatic alterations
-      for (const interval of lineIntervals) {
-        const angle = INTERVAL_ANGLES[interval.semitones];
-        const tier = getTier(interval.semitones, chord.quality);
-        const linePath = generateLinePath(angle, tier, baseRadius, cx, cy);
-        elements.push(`<path d="${linePath}" fill="none" stroke="#ff6b6b" stroke-width="3" stroke-linecap="round"/>`);
-      }
-
       // Labels
       let labels = [];
       for (const interval of chord.intervals) {
         const angle = INTERVAL_ANGLES[interval.semitones];
-        const tier = getTier(interval.semitones, chord.quality);
-        const labelR = hubR + baseRadius * ARM_LENGTH[tier] + 12;
+        // Line intervals use extension length; arms use their tier
+        const armLength = interval.style === "line"
+          ? ARM_LENGTH.extension
+          : ARM_LENGTH[getTier(interval.semitones, chord.quality)];
+        const labelR = hubR + baseRadius * armLength + 12;
         const labelPos = polarToXY(cx, cy, angle, labelR);
         const color = interval.style === "line" ? "#ff6b6b" : "#888";
         labels.push(`<text x="${labelPos.x.toFixed(1)}" y="${(labelPos.y + 3).toFixed(1)}" text-anchor="middle" fill="${color}" font-size="9">${INTERVAL_LABELS[interval.semitones]}</text>`);
