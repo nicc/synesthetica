@@ -2,7 +2,7 @@ import type { MidiInputInfo } from "@synesthetica/adapters";
 import { RawMidiAdapter, WebMidiSource } from "@synesthetica/adapters";
 import {
   VisualPipeline,
-  Canvas2DRenderer,
+  ThreeJSRenderer,
   NoteTrackingStabilizer,
   ChordDetectionStabilizer,
   BeatDetectionStabilizer,
@@ -34,7 +34,7 @@ window.addEventListener("resize", resizeCanvas);
 // App state
 let midiSource: WebMidiSource | null = null;
 let pipeline: VisualPipeline | null = null;
-let renderer: Canvas2DRenderer | null = null;
+let renderer: ThreeJSRenderer | null = null;
 let sessionStartTime: number = 0;
 let animationFrameId: number | null = null;
 
@@ -146,9 +146,8 @@ function startSession(midiInput: MidiInputInfo): void {
     pipeline.setCompositor(new IdentityCompositor());
 
     // Create renderer
-    renderer = new Canvas2DRenderer({
-      backgroundColor: "#000000",
-      clearEachFrame: true,
+    renderer = new ThreeJSRenderer({
+      backgroundColor: 0x000000,
     });
     renderer.attach(canvas);
 

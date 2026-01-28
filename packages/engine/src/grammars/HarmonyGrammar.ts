@@ -147,7 +147,7 @@ export class HarmonyGrammar implements IVisualGrammar {
           type: "chord-shape",
           chordId: chord.chord.id,
           quality: chord.chord.quality,
-          elementCount: chord.shape.elements.length,
+          elements: chord.shape.elements,
           margin: chord.shape.margin,
         },
       });
