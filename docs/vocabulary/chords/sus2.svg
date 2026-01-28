@@ -1,5 +1,5 @@
 <svg width="200" height="220" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
-  <title>Sus2 - Unified Shape (SPEC 010 v3.2)</title>
+  <title>Sus2 - Hub-Styled (SPEC 010 v3.3)</title>
 
   <!-- Background -->
   <rect width="200" height="220" fill="#1a1a2e"/>
@@ -7,26 +7,41 @@
   <!-- Reference circle -->
   <circle cx="100" cy="100" r="70" fill="none" stroke="#333" stroke-width="0.5"/>
 
-  <!-- Unified shape: arms at 0° (1), 60° (2), 210° (5) with dashed outline -->
-  <!-- Single path with short dashes -->
+  <!-- Unified shape: arms at 0° (1), 60° (2), 210° (5) -->
+  <!-- v3.3: Dashed hub arcs (separate paths), solid arm edges -->
+  <!-- 2nd has SHORT arm (extension tier) - shows "seeking resolution" -->
+
+  <!-- Fill shape (no stroke) -->
   <path d="M 94.6 79.7
            L 100 30
            L 105.4 79.7
-           A 21 21 0 0 1 118.2 88.2
-           L 160.6 65
-           L 114.8 94.6
+           A 21 21 0 0 1 114.8 85.2
+           L 133.3 80.8
+           L 120.3 94.6
            A 21 21 0 0 1 94.6 120.3
            L 65 160.6
            L 85.2 114.8
            A 21 21 0 0 1 94.6 79.7 Z"
-        fill="#4a9eff" fill-opacity="0.6" stroke="#4a9eff" stroke-width="2" stroke-dasharray="3,3" stroke-linejoin="round"/>
+        fill="#4a9eff" fill-opacity="0.6" stroke="none"/>
+
+  <!-- Arm edges (solid stroke) -->
+  <path d="M 94.6 79.7 L 100 30 L 105.4 79.7
+           M 114.8 85.2 L 133.3 80.8 L 120.3 94.6
+           M 94.6 120.3 L 65 160.6 L 85.2 114.8"
+        fill="none" stroke="#4a9eff" stroke-width="2" stroke-linejoin="round"/>
+
+  <!-- Hub arcs (dashed stroke) -->
+  <path d="M 105.4 79.7 A 21 21 0 0 1 114.8 85.2
+           M 120.3 94.6 A 21 21 0 0 1 94.6 120.3
+           M 85.2 114.8 A 21 21 0 0 1 94.6 79.7"
+        fill="none" stroke="#4a9eff" stroke-width="2" stroke-dasharray="3,3"/>
 
   <!-- Labels -->
   <text x="100" y="18" text-anchor="middle" fill="#888" font-size="11" font-family="system-ui">1</text>
-  <text x="175" y="55" text-anchor="middle" fill="#888" font-size="11" font-family="system-ui">2</text>
+  <text x="148" y="70" text-anchor="middle" fill="#888" font-size="11" font-family="system-ui">2</text>
   <text x="50" y="175" text-anchor="middle" fill="#888" font-size="11" font-family="system-ui">5</text>
 
   <!-- Chord name -->
   <text x="100" y="200" text-anchor="middle" fill="#eee" font-size="18" font-weight="bold" font-family="system-ui">Sus2</text>
-  <text x="100" y="215" text-anchor="middle" fill="#888" font-size="10" font-family="system-ui">1-2-5 | short-dash outline</text>
+  <text x="100" y="215" text-anchor="middle" fill="#888" font-size="10" font-family="system-ui">1-2-5 | dashed hub, short 2nd</text>
 </svg>

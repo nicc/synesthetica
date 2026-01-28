@@ -140,9 +140,14 @@
       6: "♭5", 7: "5", 8: "♯5", 9: "6", 10: "♭7", 11: "7",
     };
 
-    function getTier(semitones) {
+    function getTier(semitones, quality) {
+      // Core triadic tones: root, 3rds, 5ths
       if ([0, 3, 4, 7, 8].includes(semitones)) return "triadic";
+      // ♭5 is triadic when it's THE fifth (diminished chords), not when it's ♯11
+      if (semitones === 6 && ["dim", "dim7", "hdim7"].includes(quality)) return "triadic";
+      // 7ths
       if ([10, 11].includes(semitones)) return "seventh";
+      // Everything else (extensions, sus tones seeking resolution)
       return "extension";
     }
 
@@ -355,15 +360,15 @@
 
     // Generate unified shape path
     // Arms always have straight edges; style applies only to hub arcs
-    function generateUnifiedShape(intervals, style, baseRadius, cx, cy) {
+    function generateUnifiedShape(intervals, style, baseRadius, cx, cy, quality) {
       const hubR = baseRadius * HUB_RADIUS;
 
       // Sort intervals by angle
       const sorted = intervals.map(i => ({
         semitones: i.semitones,
         angle: INTERVAL_ANGLES[i.semitones],
-        tier: getTier(i.semitones),
-        length: ARM_LENGTH[getTier(i.semitones)]
+        tier: getTier(i.semitones, quality),
+        length: ARM_LENGTH[getTier(i.semitones, quality)]
       })).sort((a, b) => a.angle - b.angle);
 
       let path = '';
@@ -409,13 +414,13 @@
     }
 
     // Generate arm edges path (always solid stroke)
-    function generateArmEdges(intervals, baseRadius, cx, cy) {
+    function generateArmEdges(intervals, baseRadius, cx, cy, quality) {
       const hubR = baseRadius * HUB_RADIUS;
       const sorted = intervals.map(i => ({
         semitones: i.semitones,
         angle: INTERVAL_ANGLES[i.semitones],
-        tier: getTier(i.semitones),
-        length: ARM_LENGTH[getTier(i.semitones)]
+        tier: getTier(i.semitones, quality),
+        length: ARM_LENGTH[getTier(i.semitones, quality)]
       })).sort((a, b) => a.angle - b.angle);
 
       let paths = [];
@@ -434,13 +439,13 @@
     }
 
     // Generate hub arcs path (styled)
-    function generateHubArcs(intervals, style, baseRadius, cx, cy) {
+    function generateHubArcs(intervals, style, baseRadius, cx, cy, quality) {
       const hubR = baseRadius * HUB_RADIUS;
       const sorted = intervals.map(i => ({
         semitones: i.semitones,
         angle: INTERVAL_ANGLES[i.semitones],
-        tier: getTier(i.semitones),
-        length: ARM_LENGTH[getTier(i.semitones)]
+        tier: getTier(i.semitones, quality),
+        length: ARM_LENGTH[getTier(i.semitones, quality)]
       })).sort((a, b) => a.angle - b.angle);
 
       let path = '';
@@ -482,27 +487,27 @@
 
       if (isDashed) {
         // For dashed styles: fill shape (no stroke), then separate strokes for arms (solid) and hub (dashed)
-        const shapePath = generateUnifiedShape(armIntervals, edgeStyle, baseRadius, cx, cy);
+        const shapePath = generateUnifiedShape(armIntervals, edgeStyle, baseRadius, cx, cy, chord.quality);
         elements.push(`<path d="${shapePath}" fill="#4a9eff" fill-opacity="0.6" stroke="none"/>`);
 
         // Arm edges - solid stroke
-        const armPath = generateArmEdges(armIntervals, baseRadius, cx, cy);
+        const armPath = generateArmEdges(armIntervals, baseRadius, cx, cy, chord.quality);
         elements.push(`<path d="${armPath}" fill="none" stroke="#4a9eff" stroke-width="2" stroke-linejoin="round"/>`);
 
         // Hub arcs - dashed stroke
-        const hubPath = generateHubArcs(armIntervals, edgeStyle, baseRadius, cx, cy);
+        const hubPath = generateHubArcs(armIntervals, edgeStyle, baseRadius, cx, cy, chord.quality);
         const dashArray = edgeStyle === "dash-short" ? "3,3" : "6,3";
         elements.push(`<path d="${hubPath}" fill="none" stroke="#4a9eff" stroke-width="2" stroke-dasharray="${dashArray}"/>`);
       } else {
         // For non-dashed styles: unified path with stroke
-        const shapePath = generateUnifiedShape(armIntervals, edgeStyle, baseRadius, cx, cy);
+        const shapePath = generateUnifiedShape(armIntervals, edgeStyle, baseRadius, cx, cy, chord.quality);
         elements.push(`<path d="${shapePath}" fill="#4a9eff" fill-opacity="0.6" stroke="#4a9eff" stroke-width="2" stroke-linejoin="round"/>`);
       }
 
       // Lines for chromatic alterations
       for (const interval of lineIntervals) {
         const angle = INTERVAL_ANGLES[interval.semitones];
-        const tier = getTier(interval.semitones);
+        const tier = getTier(interval.semitones, chord.quality);
         const linePath = generateLinePath(angle, tier, baseRadius, cx, cy);
         elements.push(`<path d="${linePath}" fill="none" stroke="#ff6b6b" stroke-width="3" stroke-linecap="round"/>`);
       }
@@ -511,7 +516,7 @@
       let labels = [];
       for (const interval of chord.intervals) {
         const angle = INTERVAL_ANGLES[interval.semitones];
-        const tier = getTier(interval.semitones);
+        const tier = getTier(interval.semitones, chord.quality);
         const labelR = hubR + baseRadius * ARM_LENGTH[tier] + 12;
         const labelPos = polarToXY(cx, cy, angle, labelR);
         const color = interval.style === "line" ? "#ff6b6b" : "#888";

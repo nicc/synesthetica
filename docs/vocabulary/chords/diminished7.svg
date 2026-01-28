@@ -1,5 +1,5 @@
 <svg width="200" height="220" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
-  <title>Diminished 7th - Unified Shape (SPEC 010 v3.2)</title>
+  <title>Diminished 7th - Hub-Styled (SPEC 010 v3.3)</title>
 
   <!-- Background -->
   <rect width="200" height="220" fill="#1a1a2e"/>
@@ -7,21 +7,23 @@
   <!-- Reference circle -->
   <circle cx="100" cy="100" r="70" fill="none" stroke="#333" stroke-width="0.5"/>
 
-  <!-- Unified shape: arms at 0° (1), 90° (♭3), 180° (♭5), 270° (𝄫7) with concave edges -->
+  <!-- Unified shape: arms at 0° (1), 90° (♭3), 180° (♭5), 270° (𝄫7) -->
+  <!-- v3.3: Straight arm edges, concave hub arcs -->
   <!-- Symmetric shape - all intervals 90° apart -->
+  <!-- ♭5 is triadic in diminished (context-aware tier) -->
   <path d="M 94.6 79.7
-           Q 100 60 100 30
-           Q 100 60 105.4 79.7
-           A 21 21 0 0 1 120.3 94.6
-           Q 140 100 170 100
-           Q 140 100 120.3 105.4
-           A 21 21 0 0 1 105.4 120.3
-           Q 100 140 100 170
-           Q 100 140 94.6 120.3
-           A 21 21 0 0 1 79.7 105.4
-           Q 60 100 52 100
-           Q 60 100 79.7 94.6
-           A 21 21 0 0 1 94.6 79.7 Z"
+           L 100 30
+           L 105.4 79.7
+           C 111.1 92.4 107.6 88.9 120.3 94.6
+           L 170 100
+           L 120.3 105.4
+           C 107.6 111.1 111.1 107.6 105.4 120.3
+           L 100 170
+           L 94.6 120.3
+           C 88.9 107.6 92.4 111.1 79.7 105.4
+           L 52 100
+           L 79.7 94.6
+           C 92.4 88.9 88.9 92.4 94.6 79.7 Z"
         fill="#4a9eff" fill-opacity="0.6" stroke="#4a9eff" stroke-width="2" stroke-linejoin="round"/>
 
   <!-- Labels -->
@@ -31,6 +33,6 @@
   <text x="38" y="105" text-anchor="middle" fill="#888" font-size="11" font-family="system-ui">𝄫7</text>
 
   <!-- Chord name -->
-  <text x="100" y="200" text-anchor="middle" fill="#eee" font-size="18" font-weight="bold" font-family="system-ui">Diminished 7th</text>
-  <text x="100" y="215" text-anchor="middle" fill="#888" font-size="10" font-family="system-ui">1-♭3-♭5-𝄫7 | concave edges</text>
+  <text x="100" y="200" text-anchor="middle" fill="#eee" font-size="16" font-weight="bold" font-family="system-ui">Diminished 7th</text>
+  <text x="100" y="215" text-anchor="middle" fill="#888" font-size="10" font-family="system-ui">1-♭3-♭5-𝄫7 | concave hub</text>
 </svg>
