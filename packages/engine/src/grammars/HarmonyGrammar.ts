@@ -33,12 +33,10 @@ import type {
   SceneFrame,
   Entity,
   ChordShapeElement,
-  ColorHSVA,
 } from "@synesthetica/contracts";
 
 import {
   colorToCSS,
-  getDashArray,
   HUB_RADIUS,
   ARM_LENGTH,
   BASE_WIDTH,
@@ -224,7 +222,8 @@ export class HarmonyGrammar implements IVisualGrammar {
   }
 
   /**
-   * Render chord shape with gradient fills.
+   * Render chord shape as a unified outline with styled hub arcs.
+   * Simplified for validation testing - no gradients, just shape outline.
    */
   private renderChordShapeSVG(
     elements: ChordShapeElement[],
@@ -233,9 +232,10 @@ export class HarmonyGrammar implements IVisualGrammar {
     height: number
   ): string {
     // Chord shape is 25% of width, centered
-    const scale = width * 0.25 / 2; // radius = 25% of width / 2
+    const scale = width * 0.25 / 2;
     const cx = width / 2;
     const cy = height / 2;
+    const hubR = scale * HUB_RADIUS;
 
     // Separate wedges from lines
     const wedges = elements.filter((e) => e.style !== "line");
@@ -245,103 +245,146 @@ export class HarmonyGrammar implements IVisualGrammar {
       return "";
     }
 
-    // Find root element for center color
+    // Sort wedges by angle for proper path generation
+    const sortedWedges = [...wedges].sort((a, b) => a.angle - b.angle);
+
+    // Find root element for fill color
     const rootElement = wedges.find((e) => e.interval === "1") ?? wedges[0];
-    const rootColor = rootElement.color;
+    const fillColor = colorToCSS(rootElement.color);
 
     let svg = "";
 
-    // Generate gradient definitions
-    svg += "  <defs>\n";
-    for (let i = 0; i < wedges.length; i++) {
-      const element = wedges[i];
-      const armLength = ARM_LENGTH[element.tier];
-      svg += this.generateGradientDef(i, rootColor, element.color, element.angle, cx, cy, scale, armLength);
-    }
-    svg += "  </defs>\n";
-
-    // Render lines first (behind shape)
+    // Render chromatic lines first (behind shape)
     for (const line of lines) {
       svg += this.renderLinePath(line, scale, cx, cy);
     }
 
-    // Render each wedge with its gradient
-    for (let i = 0; i < wedges.length; i++) {
-      const element = wedges[i];
-      svg += this.renderWedgePath(i, element, margin, scale, cx, cy);
-    }
+    // Build unified outline path
+    const outlinePath = this.buildUnifiedOutline(sortedWedges, margin, scale, cx, cy, hubR);
 
-    // Render hub circle with margin style
-    svg += this.renderHub(margin, scale, cx, cy, rootColor);
+    // Render the shape: solid fill with 80% opacity, single stroke
+    const isDashed = margin === "dash-short" || margin === "dash-long";
+    const dashAttr = isDashed ? ` stroke-dasharray="${margin === "dash-short" ? "3,3" : "6,3"}"` : "";
+
+    svg += `  <path d="${outlinePath}" fill="${fillColor}" fill-opacity="0.8" stroke="${fillColor}" stroke-width="${this.config.strokeWidth}" stroke-linejoin="round"${dashAttr}/>\n`;
 
     return svg;
   }
 
   /**
-   * Generate SVG gradient definition for a wedge.
-   * Gradient goes from hub center (root color) to element tip color.
-   * This fills the entire shape with a continuous gradient from center outward.
+   * Build the unified outline path for the chord shape.
+   * One continuous path: arm edges are straight, hub arcs are styled.
    */
-  private generateGradientDef(
-    index: number,
-    rootColor: ColorHSVA,
-    tipColor: ColorHSVA,
-    angle: number,
-    cx: number,
-    cy: number,
-    scale: number,
-    armLength: number
-  ): string {
-    // Linear gradient from hub CENTER to tip along the arm angle
-    const hubR = scale * HUB_RADIUS;
-    const tipR = hubR + scale * armLength;
-
-    // Calculate gradient line endpoints - start at center, end at tip
-    const rad = ((90 - angle) * Math.PI) / 180;
-    const x1 = cx; // Start at center
-    const y1 = cy;
-    const x2 = cx + tipR * Math.cos(rad); // End at tip
-    const y2 = cy - tipR * Math.sin(rad);
-
-    const rootCSS = colorToCSS(rootColor);
-    const tipCSS = colorToCSS(tipColor);
-
-    return `    <linearGradient id="wedge-grad-${index}" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="${rootCSS}"/>
-      <stop offset="100%" stop-color="${tipCSS}"/>
-    </linearGradient>\n`;
-  }
-
-  /**
-   * Render a single wedge with gradient fill and colored outline.
-   */
-  private renderWedgePath(
-    index: number,
-    element: ChordShapeElement,
+  private buildUnifiedOutline(
+    sortedWedges: ChordShapeElement[],
     margin: string,
     scale: number,
     cx: number,
+    cy: number,
+    hubR: number
+  ): string {
+    let path = "";
+
+    for (let i = 0; i < sortedWedges.length; i++) {
+      const curr = sortedWedges[i];
+      const next = sortedWedges[(i + 1) % sortedWedges.length];
+
+      const armLength = ARM_LENGTH[curr.tier];
+      const tipR = hubR + scale * armLength;
+
+      const armLeftAngle = curr.angle - BASE_WIDTH / 2;
+      const armRightAngle = curr.angle + BASE_WIDTH / 2;
+
+      const baseLeft = this.polarToXY(cx, cy, armLeftAngle, hubR);
+      const baseRight = this.polarToXY(cx, cy, armRightAngle, hubR);
+      const tip = this.polarToXY(cx, cy, curr.angle, tipR);
+
+      if (i === 0) {
+        path += `M ${baseLeft.x.toFixed(1)} ${baseLeft.y.toFixed(1)}`;
+      }
+
+      // Straight edge to tip
+      path += ` L ${tip.x.toFixed(1)} ${tip.y.toFixed(1)}`;
+
+      // Straight edge to hub right
+      path += ` L ${baseRight.x.toFixed(1)} ${baseRight.y.toFixed(1)}`;
+
+      // Styled hub arc to next arm
+      const nextLeftAngle = next.angle - BASE_WIDTH / 2;
+      path += this.styledHubArc(armRightAngle, nextLeftAngle, hubR, margin, cx, cy);
+    }
+
+    path += " Z";
+    return path;
+  }
+
+  /**
+   * Generate styled hub arc between arms (wavy, concave, convex, or circular).
+   */
+  private styledHubArc(
+    startAngle: number,
+    endAngle: number,
+    hubR: number,
+    margin: string,
+    cx: number,
     cy: number
   ): string {
-    const hubR = scale * HUB_RADIUS;
-    const armLength = ARM_LENGTH[element.tier];
-    const tipR = hubR + scale * armLength;
+    // Calculate arc span (going clockwise)
+    let arcSpan = endAngle - startAngle;
+    if (arcSpan < 0) arcSpan += 360;
 
-    const armLeftAngle = element.angle - BASE_WIDTH / 2;
-    const armRightAngle = element.angle + BASE_WIDTH / 2;
+    const end = this.polarToXY(cx, cy, endAngle, hubR);
 
-    const baseLeft = this.polarToXY(cx, cy, armLeftAngle, hubR);
-    const baseRight = this.polarToXY(cx, cy, armRightAngle, hubR);
-    const tip = this.polarToXY(cx, cy, element.angle, tipR);
+    if (margin === "straight" || margin === "dashed") {
+      // Simple circular arc
+      const largeArc = arcSpan > 180 ? 1 : 0;
+      return ` A ${hubR.toFixed(1)} ${hubR.toFixed(1)} 0 ${largeArc} 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+    }
 
-    // Wedge path (triangle from hub to tip)
-    const path = `M ${baseLeft.x.toFixed(1)} ${baseLeft.y.toFixed(1)} L ${tip.x.toFixed(1)} ${tip.y.toFixed(1)} L ${baseRight.x.toFixed(1)} ${baseRight.y.toFixed(1)} Z`;
+    if (margin === "wavy") {
+      // Wavy arc using quadratic beziers
+      const steps = Math.max(3, Math.floor(arcSpan / 20));
+      let arcPath = "";
+      const amp = 4;
 
-    const strokeColor = colorToCSS(element.color);
-    const dashArray = getDashArray(margin as Parameters<typeof getDashArray>[0]);
-    const dashAttr = dashArray ? ` stroke-dasharray="${dashArray}"` : "";
+      for (let i = 0; i < steps; i++) {
+        const t1 = (i + 1) / steps;
+        const angle1 = startAngle + arcSpan * t1;
+        const midAngle = startAngle + arcSpan * (i + 0.5) / steps;
 
-    return `  <path d="${path}" fill="url(#wedge-grad-${index})" stroke="${strokeColor}" stroke-width="${this.config.strokeWidth}"${dashAttr}/>\n`;
+        const p1 = this.polarToXY(cx, cy, angle1, hubR);
+        const waveR = hubR + (i % 2 === 0 ? amp : -amp);
+        const ctrl = this.polarToXY(cx, cy, midAngle, waveR);
+
+        arcPath += ` Q ${ctrl.x.toFixed(1)} ${ctrl.y.toFixed(1)} ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
+      }
+      return arcPath;
+    }
+
+    if (margin === "concave") {
+      // Concave: curves inward (sweep=0)
+      if (arcSpan >= 150) {
+        return ` L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+      }
+      const start = this.polarToXY(cx, cy, startAngle, hubR);
+      const chordLen = Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2);
+      const minR = chordLen / 2 + 1;
+      const scaleFactor = 1 + arcSpan * 0.03;
+      const concaveR = Math.max(hubR * scaleFactor, minR);
+      const largeArc = arcSpan > 180 ? 1 : 0;
+      return ` A ${concaveR.toFixed(1)} ${concaveR.toFixed(1)} 0 ${largeArc} 0 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+    }
+
+    if (margin === "convex") {
+      // Convex: curves outward
+      const expansionFactor = 1.5 + arcSpan * 0.008;
+      const convexR = hubR * expansionFactor;
+      return ` A ${convexR.toFixed(1)} ${convexR.toFixed(1)} 0 0 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+    }
+
+    // Default: circular arc
+    const largeArc = arcSpan > 180 ? 1 : 0;
+    return ` A ${hubR.toFixed(1)} ${hubR.toFixed(1)} 0 ${largeArc} 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
   }
 
   /**
@@ -364,26 +407,6 @@ export class HarmonyGrammar implements IVisualGrammar {
     const color = colorToCSS(element.color);
 
     return `  <path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round"/>\n`;
-  }
-
-  /**
-   * Render the hub circle with margin style.
-   */
-  private renderHub(
-    margin: string,
-    scale: number,
-    cx: number,
-    cy: number,
-    rootColor: ColorHSVA
-  ): string {
-    const hubR = scale * HUB_RADIUS;
-    const rootCSS = colorToCSS(rootColor);
-    const dashArray = getDashArray(margin as Parameters<typeof getDashArray>[0]);
-    const dashAttr = dashArray ? ` stroke-dasharray="${dashArray}"` : "";
-
-    // For wavy/concave/convex, we'd need a more complex path
-    // For now, use a simple circle (the wedge paths already show the style)
-    return `  <circle cx="${cx}" cy="${cy}" r="${hubR.toFixed(1)}" fill="${rootCSS}" fill-opacity="0.3" stroke="${rootCSS}" stroke-width="${this.config.strokeWidth}"${dashAttr}/>\n`;
   }
 
   /**

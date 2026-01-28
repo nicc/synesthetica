@@ -227,8 +227,8 @@ describe("HarmonyGrammar", () => {
 
       expect(svg).toContain("<svg");
       expect(svg).toContain("</svg>");
-      expect(svg).toContain("linearGradient");
-      expect(svg).toContain("wedge-grad-");
+      expect(svg).toContain('fill-opacity="0.8"');
+      expect(svg).toContain("<path");
 
       maybeWriteSnapshot("major-triad", svg);
     });
