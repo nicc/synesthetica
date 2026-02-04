@@ -142,21 +142,19 @@ function styledArc(
   }
 
   if (style === "concave") {
-    // Large gaps: flat line to avoid awkward hub bulge
+    // Concave is handled specially in generateUnifiedShape for smooth tangent continuity
+    // This fallback uses a simple arc if called directly
     if (arcSpan >= 150) {
       return ` L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
     }
 
     const chordLen = Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2);
     const minR = chordLen / 2 + 1;
-
-    // Scale radius up for larger gaps - gentler concave
     const scaleFactor = 1 + arcSpan * 0.03;
     const targetR = hubR * scaleFactor;
     const concaveR = Math.max(targetR, minR);
 
     const largeArc = arcSpan > 180 ? 1 : 0;
-    // sweep=0 = curves INWARD (concave)
     return ` A ${concaveR.toFixed(1)} ${concaveR.toFixed(1)} 0 ${largeArc} 0 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
   }
 
@@ -222,13 +220,72 @@ function generateUnifiedShape(
     // Right edge of arm (tip to base) - ALWAYS STRAIGHT
     path += ` L ${baseRight.x.toFixed(1)} ${baseRight.y.toFixed(1)}`;
 
-    // Arc along hub to next arm's left edge - STYLED
+    // Hub transition to next arm
     const nextLeftAngle = next.angle - BASE_WIDTH / 2;
-    path += styledArc(armRightAngle, nextLeftAngle, hubR, margin, cx, cy);
+
+    if (margin === "concave") {
+      // Use cubic bezier for smooth tangent continuity with arm edges
+      path += smoothConcaveArc(baseRight, tip, next, nextLeftAngle, hubR, baseRadius, cx, cy);
+    } else {
+      path += styledArc(armRightAngle, nextLeftAngle, hubR, margin, cx, cy);
+    }
   }
 
   path += " Z";
   return path;
+}
+
+/**
+ * Generate a smooth concave arc using cubic bezier for tangent continuity.
+ * The curve starts tangent to the incoming arm edge and ends tangent to the outgoing arm edge.
+ */
+function smoothConcaveArc(
+  start: { x: number; y: number },
+  currTip: { x: number; y: number },
+  next: ChordShapeElement,
+  nextLeftAngle: number,
+  hubR: number,
+  baseRadius: number,
+  cx: number,
+  cy: number
+): string {
+  const end = polarToXY(cx, cy, nextLeftAngle, hubR);
+
+  // Calculate next arm's tip
+  const nextTipR = hubR + baseRadius * ARM_LENGTH[next.tier];
+  const nextTip = polarToXY(cx, cy, next.angle, nextTipR);
+
+  // Incoming tangent: direction from currTip to start (arm edge direction at hub)
+  const inDx = start.x - currTip.x;
+  const inDy = start.y - currTip.y;
+  const inLen = Math.sqrt(inDx * inDx + inDy * inDy);
+  const inDirX = inDx / inLen;
+  const inDirY = inDy / inLen;
+
+  // Outgoing tangent: direction from end to nextTip (next arm edge direction at hub)
+  const outDx = nextTip.x - end.x;
+  const outDy = nextTip.y - end.y;
+  const outLen = Math.sqrt(outDx * outDx + outDy * outDy);
+  const outDirX = outDx / outLen;
+  const outDirY = outDy / outLen;
+
+  // Chord length between start and end
+  const chordLen = Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2);
+
+  // Control point distance - larger values make the curve follow arm edges longer
+  // before bending, reducing the apparent "corner" at the junction
+  const controlDist = chordLen * 0.55;
+
+  // Control points for cubic bezier
+  // P1: along incoming tangent direction from start
+  const p1x = start.x + controlDist * inDirX;
+  const p1y = start.y + controlDist * inDirY;
+
+  // P2: along reversed outgoing tangent direction from end
+  const p2x = end.x - controlDist * outDirX;
+  const p2y = end.y - controlDist * outDirY;
+
+  return ` C ${p1x.toFixed(1)} ${p1y.toFixed(1)} ${p2x.toFixed(1)} ${p2y.toFixed(1)} ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
 }
 
 /**

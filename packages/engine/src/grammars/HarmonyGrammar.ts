@@ -33,14 +33,14 @@ import type {
   SceneFrame,
   Entity,
   ChordShapeElement,
+  MarginStyle,
 } from "@synesthetica/contracts";
 
 import {
+  ChordShapeBuilder,
   colorToCSS,
-  HUB_RADIUS,
-  ARM_LENGTH,
-  BASE_WIDTH,
-} from "../vocabularies/renderChordShape";
+  getDashArray,
+} from "../utils/ChordShapeBuilder";
 
 // ============================================================================
 // Configuration
@@ -222,191 +222,50 @@ export class HarmonyGrammar implements IVisualGrammar {
   }
 
   /**
-   * Render chord shape as a unified outline with styled hub arcs.
-   * Simplified for validation testing - no gradients, just shape outline.
+   * Render chord shape using ChordShapeBuilder.
    */
   private renderChordShapeSVG(
     elements: ChordShapeElement[],
-    margin: string,
+    margin: MarginStyle,
     width: number,
     height: number
   ): string {
     // Chord shape is 25% of width, centered
-    const scale = width * 0.25 / 2;
+    const scale = (width * 0.25) / 2;
     const cx = width / 2;
     const cy = height / 2;
-    const hubR = scale * HUB_RADIUS;
 
-    // Separate wedges from lines
-    const wedges = elements.filter((e) => e.style !== "line");
-    const lines = elements.filter((e) => e.style === "line");
+    // Build shape geometry
+    const builder = new ChordShapeBuilder(elements, margin, {
+      scale,
+      center: { x: cx, y: cy },
+      strokeWidth: this.config.strokeWidth,
+    });
 
-    if (wedges.length === 0) {
+    const fillPath = builder.toSVGPath();
+    if (!fillPath) {
       return "";
     }
 
-    // Sort wedges by angle for proper path generation
-    const sortedWedges = [...wedges].sort((a, b) => a.angle - b.angle);
-
     // Find root element for fill color
-    const rootElement = wedges.find((e) => e.interval === "1") ?? wedges[0];
-    const fillColor = colorToCSS(rootElement.color);
+    const arms = builder.getArms();
+    const rootArm = arms.find((a) => a.interval === "1") ?? arms[0];
+    const fillColor = rootArm ? colorToCSS(rootArm.color) : "#888";
 
     let svg = "";
 
     // Render chromatic lines first (behind shape)
-    for (const line of lines) {
-      svg += this.renderLinePath(line, scale, cx, cy);
+    for (const line of builder.toSVGLines()) {
+      svg += `  <path d="${line.path}" fill="none" stroke="${colorToCSS(line.color)}" stroke-width="3" stroke-linecap="round"/>\n`;
     }
 
-    // Build unified outline path
-    const outlinePath = this.buildUnifiedOutline(sortedWedges, margin, scale, cx, cy, hubR);
+    // Render the main shape
+    const dashArray = getDashArray(margin);
+    const dashAttr = dashArray ? ` stroke-dasharray="${dashArray}"` : "";
 
-    // Render the shape: solid fill with 80% opacity, single stroke
-    const isDashed = margin === "dash-short" || margin === "dash-long";
-    const dashAttr = isDashed ? ` stroke-dasharray="${margin === "dash-short" ? "3,3" : "6,3"}"` : "";
-
-    svg += `  <path d="${outlinePath}" fill="${fillColor}" fill-opacity="0.8" stroke="${fillColor}" stroke-width="${this.config.strokeWidth}" stroke-linejoin="round"${dashAttr}/>\n`;
+    svg += `  <path d="${fillPath}" fill="${fillColor}" fill-opacity="0.8" stroke="${fillColor}" stroke-width="${this.config.strokeWidth}" stroke-linejoin="round"${dashAttr}/>\n`;
 
     return svg;
-  }
-
-  /**
-   * Build the unified outline path for the chord shape.
-   * One continuous path: arm edges are straight, hub arcs are styled.
-   */
-  private buildUnifiedOutline(
-    sortedWedges: ChordShapeElement[],
-    margin: string,
-    scale: number,
-    cx: number,
-    cy: number,
-    hubR: number
-  ): string {
-    let path = "";
-
-    for (let i = 0; i < sortedWedges.length; i++) {
-      const curr = sortedWedges[i];
-      const next = sortedWedges[(i + 1) % sortedWedges.length];
-
-      const armLength = ARM_LENGTH[curr.tier];
-      const tipR = hubR + scale * armLength;
-
-      const armLeftAngle = curr.angle - BASE_WIDTH / 2;
-      const armRightAngle = curr.angle + BASE_WIDTH / 2;
-
-      const baseLeft = this.polarToXY(cx, cy, armLeftAngle, hubR);
-      const baseRight = this.polarToXY(cx, cy, armRightAngle, hubR);
-      const tip = this.polarToXY(cx, cy, curr.angle, tipR);
-
-      if (i === 0) {
-        path += `M ${baseLeft.x.toFixed(1)} ${baseLeft.y.toFixed(1)}`;
-      }
-
-      // Straight edge to tip
-      path += ` L ${tip.x.toFixed(1)} ${tip.y.toFixed(1)}`;
-
-      // Straight edge to hub right
-      path += ` L ${baseRight.x.toFixed(1)} ${baseRight.y.toFixed(1)}`;
-
-      // Styled hub arc to next arm
-      const nextLeftAngle = next.angle - BASE_WIDTH / 2;
-      path += this.styledHubArc(armRightAngle, nextLeftAngle, hubR, margin, cx, cy);
-    }
-
-    path += " Z";
-    return path;
-  }
-
-  /**
-   * Generate styled hub arc between arms (wavy, concave, convex, or circular).
-   */
-  private styledHubArc(
-    startAngle: number,
-    endAngle: number,
-    hubR: number,
-    margin: string,
-    cx: number,
-    cy: number
-  ): string {
-    // Calculate arc span (going clockwise)
-    let arcSpan = endAngle - startAngle;
-    if (arcSpan < 0) arcSpan += 360;
-
-    const end = this.polarToXY(cx, cy, endAngle, hubR);
-
-    if (margin === "straight" || margin === "dashed") {
-      // Simple circular arc
-      const largeArc = arcSpan > 180 ? 1 : 0;
-      return ` A ${hubR.toFixed(1)} ${hubR.toFixed(1)} 0 ${largeArc} 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
-    }
-
-    if (margin === "wavy") {
-      // Wavy arc using quadratic beziers
-      const steps = Math.max(3, Math.floor(arcSpan / 20));
-      let arcPath = "";
-      const amp = 4;
-
-      for (let i = 0; i < steps; i++) {
-        const t1 = (i + 1) / steps;
-        const angle1 = startAngle + arcSpan * t1;
-        const midAngle = startAngle + arcSpan * (i + 0.5) / steps;
-
-        const p1 = this.polarToXY(cx, cy, angle1, hubR);
-        const waveR = hubR + (i % 2 === 0 ? amp : -amp);
-        const ctrl = this.polarToXY(cx, cy, midAngle, waveR);
-
-        arcPath += ` Q ${ctrl.x.toFixed(1)} ${ctrl.y.toFixed(1)} ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
-      }
-      return arcPath;
-    }
-
-    if (margin === "concave") {
-      // Concave: curves inward (sweep=0)
-      if (arcSpan >= 150) {
-        return ` L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
-      }
-      const start = this.polarToXY(cx, cy, startAngle, hubR);
-      const chordLen = Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2);
-      const minR = chordLen / 2 + 1;
-      const scaleFactor = 1 + arcSpan * 0.03;
-      const concaveR = Math.max(hubR * scaleFactor, minR);
-      const largeArc = arcSpan > 180 ? 1 : 0;
-      return ` A ${concaveR.toFixed(1)} ${concaveR.toFixed(1)} 0 ${largeArc} 0 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
-    }
-
-    if (margin === "convex") {
-      // Convex: curves outward
-      const expansionFactor = 1.5 + arcSpan * 0.008;
-      const convexR = hubR * expansionFactor;
-      return ` A ${convexR.toFixed(1)} ${convexR.toFixed(1)} 0 0 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
-    }
-
-    // Default: circular arc
-    const largeArc = arcSpan > 180 ? 1 : 0;
-    return ` A ${hubR.toFixed(1)} ${hubR.toFixed(1)} 0 ${largeArc} 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
-  }
-
-  /**
-   * Render chromatic line.
-   */
-  private renderLinePath(
-    element: ChordShapeElement,
-    scale: number,
-    cx: number,
-    cy: number
-  ): string {
-    const hubR = scale * HUB_RADIUS;
-    const outerR = hubR + scale * ARM_LENGTH.extension;
-    const innerR = hubR + this.config.strokeWidth * 0.25;
-
-    const inner = this.polarToXY(cx, cy, element.angle, innerR);
-    const outer = this.polarToXY(cx, cy, element.angle, outerR);
-
-    const path = `M ${inner.x.toFixed(1)} ${inner.y.toFixed(1)} L ${outer.x.toFixed(1)} ${outer.y.toFixed(1)}`;
-    const color = colorToCSS(element.color);
-
-    return `  <path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round"/>\n`;
   }
 
   /**
@@ -437,21 +296,5 @@ export class HarmonyGrammar implements IVisualGrammar {
     svg += `  <text x="${barX + barWidth / 2}" y="${barY - 10}" text-anchor="middle" fill="#666" font-size="12">Tension</text>\n`;
 
     return svg;
-  }
-
-  /**
-   * Convert polar coordinates to XY.
-   */
-  private polarToXY(
-    cx: number,
-    cy: number,
-    angle: number,
-    radius: number
-  ): { x: number; y: number } {
-    const rad = ((90 - angle) * Math.PI) / 180;
-    return {
-      x: cx + radius * Math.cos(rad),
-      y: cy - radius * Math.sin(rad),
-    };
   }
 }

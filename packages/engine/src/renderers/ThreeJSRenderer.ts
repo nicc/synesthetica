@@ -26,18 +26,7 @@ import type {
   ChordShapeElement,
   MarginStyle,
 } from "@synesthetica/contracts";
-
-// ============================================================================
-// Chord Shape Constants (from SPEC 010)
-// ============================================================================
-
-const HUB_RADIUS = 0.3;
-const ARM_LENGTH: Record<string, number> = {
-  triadic: 0.7,
-  seventh: 0.45,
-  extension: 0.25,
-};
-const BASE_WIDTH_DEG = 30; // degrees
+import { ChordShapeBuilder } from "../utils/ChordShapeBuilder";
 
 // ============================================================================
 // Configuration
@@ -523,7 +512,7 @@ export class ThreeJSRenderer implements IRenderer {
   }
 
   /**
-   * Build Three.js group for chord shape geometry.
+   * Build Three.js group for chord shape geometry using ChordShapeBuilder.
    */
   private buildChordShapeGroup(
     elements: ChordShapeElement[],
@@ -531,27 +520,23 @@ export class ThreeJSRenderer implements IRenderer {
   ): THREE.Group {
     const group = new THREE.Group();
 
-    // Filter wedges (not lines) and sort by angle
-    const wedges = elements
-      .filter((e) => e.style !== "line")
-      .sort((a, b) => a.angle - b.angle);
-
-    if (wedges.length === 0) return group;
-
     // Base radius for the shape (in local units)
     const baseRadius = 10;
-    const hubR = baseRadius * HUB_RADIUS;
 
-    // Build the unified shape using THREE.Shape
-    const shape = new THREE.Shape();
-    this.buildChordShapePath(shape, wedges, margin, baseRadius, hubR);
+    // Use ChordShapeBuilder to compute geometry
+    const builder = new ChordShapeBuilder(elements, margin, {
+      scale: baseRadius,
+      center: { x: 0, y: 0 }, // Local coordinates, group handles positioning
+    });
 
-    // Create geometry and mesh
+    // Get the unified shape
+    const shape = builder.toThreeShape();
     const geometry = new THREE.ShapeGeometry(shape);
 
-    // Use root element color for fill
-    const rootElement = wedges.find((e) => e.interval === "1") ?? wedges[0];
-    const color = rootElement.color;
+    // Find root element for fill color
+    const arms = builder.getArms();
+    const rootArm = arms.find((a) => a.interval === "1") ?? arms[0];
+    const color = rootArm?.color ?? { h: 0, s: 0.5, v: 0.5, a: 1 };
 
     const material = new THREE.MeshBasicMaterial({
       transparent: true,
@@ -564,157 +549,21 @@ export class ThreeJSRenderer implements IRenderer {
     group.add(mesh);
 
     // Add chromatic lines
-    const lines = elements.filter((e) => e.style === "line");
-    for (const lineEl of lines) {
-      const lineMesh = this.buildChromaticLine(lineEl, baseRadius, hubR);
+    for (const lineData of builder.toThreeLines()) {
+      const lineMaterial = new THREE.LineBasicMaterial({
+        transparent: true,
+        opacity: 0.8,
+      });
+      lineMaterial.color.setHSL(
+        lineData.color.h / 360,
+        lineData.color.s,
+        lineData.color.v / 2
+      );
+      const lineMesh = new THREE.Line(lineData.geometry, lineMaterial);
       group.add(lineMesh);
     }
 
     return group;
-  }
-
-  /**
-   * Build the path for the chord shape on a THREE.Shape.
-   */
-  private buildChordShapePath(
-    shape: THREE.Shape,
-    wedges: ChordShapeElement[],
-    margin: MarginStyle,
-    baseRadius: number,
-    hubR: number
-  ): void {
-    for (let i = 0; i < wedges.length; i++) {
-      const curr = wedges[i];
-      const next = wedges[(i + 1) % wedges.length];
-
-      const armLength = ARM_LENGTH[curr.tier] ?? ARM_LENGTH.triadic;
-      const tipR = hubR + baseRadius * armLength;
-
-      const armLeftAngle = curr.angle - BASE_WIDTH_DEG / 2;
-      const armRightAngle = curr.angle + BASE_WIDTH_DEG / 2;
-
-      const baseLeft = this.polarToXY(armLeftAngle, hubR);
-      const baseRight = this.polarToXY(armRightAngle, hubR);
-      const tip = this.polarToXY(curr.angle, tipR);
-
-      if (i === 0) {
-        shape.moveTo(baseLeft.x, baseLeft.y);
-      }
-
-      // Straight edge to tip
-      shape.lineTo(tip.x, tip.y);
-
-      // Straight edge to hub right
-      shape.lineTo(baseRight.x, baseRight.y);
-
-      // Styled hub arc to next arm
-      const nextLeftAngle = next.angle - BASE_WIDTH_DEG / 2;
-      this.addStyledArc(shape, armRightAngle, nextLeftAngle, hubR, margin);
-    }
-
-    shape.closePath();
-  }
-
-  /**
-   * Add a styled arc to the shape (straight, wavy, concave, convex).
-   */
-  private addStyledArc(
-    shape: THREE.Shape,
-    startAngle: number,
-    endAngle: number,
-    hubR: number,
-    margin: MarginStyle
-  ): void {
-    // Calculate arc span (going clockwise)
-    let arcSpan = endAngle - startAngle;
-    if (arcSpan < 0) arcSpan += 360;
-
-    const end = this.polarToXY(endAngle, hubR);
-
-    // For simple margins, use arc approximation with line segments
-    if (margin === "straight" || margin === "dash-short" || margin === "dash-long") {
-      // Approximate arc with segments
-      const segments = Math.max(3, Math.ceil(arcSpan / 15));
-      for (let i = 1; i <= segments; i++) {
-        const t = i / segments;
-        const angle = startAngle + arcSpan * t;
-        const pt = this.polarToXY(angle, hubR);
-        shape.lineTo(pt.x, pt.y);
-      }
-      return;
-    }
-
-    if (margin === "wavy") {
-      // Wavy arc using quadratic curves
-      const steps = Math.max(3, Math.floor(arcSpan / 20));
-      const amp = 0.4; // Relative to hubR
-
-      for (let i = 0; i < steps; i++) {
-        const t1 = (i + 1) / steps;
-        const angle1 = startAngle + arcSpan * t1;
-        const midAngle = startAngle + arcSpan * (i + 0.5) / steps;
-
-        const p1 = this.polarToXY(angle1, hubR);
-        const waveR = hubR + (i % 2 === 0 ? amp : -amp);
-        const ctrl = this.polarToXY(midAngle, waveR);
-
-        shape.quadraticCurveTo(ctrl.x, ctrl.y, p1.x, p1.y);
-      }
-      return;
-    }
-
-    if (margin === "concave") {
-      // Concave: curves inward - use bezier curve through inner control point
-      const midAngle = startAngle + arcSpan / 2;
-      const innerR = hubR * 0.7; // Pull inward
-      const ctrl = this.polarToXY(midAngle, innerR);
-      shape.quadraticCurveTo(ctrl.x, ctrl.y, end.x, end.y);
-      return;
-    }
-
-    if (margin === "convex") {
-      // Convex: curves outward - use bezier curve through outer control point
-      const midAngle = startAngle + arcSpan / 2;
-      const outerR = hubR * 1.5; // Push outward
-      const ctrl = this.polarToXY(midAngle, outerR);
-      shape.quadraticCurveTo(ctrl.x, ctrl.y, end.x, end.y);
-      return;
-    }
-
-    // Fallback: straight line
-    shape.lineTo(end.x, end.y);
-  }
-
-  /**
-   * Build a chromatic line mesh.
-   */
-  private buildChromaticLine(
-    element: ChordShapeElement,
-    baseRadius: number,
-    hubR: number
-  ): THREE.Line {
-    const outerR = hubR + baseRadius * (ARM_LENGTH.extension ?? 0.25);
-    const innerR = hubR + 0.5;
-
-    const inner = this.polarToXY(element.angle, innerR);
-    const outer = this.polarToXY(element.angle, outerR);
-
-    const geometry = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(inner.x, inner.y, 0.1),
-      new THREE.Vector3(outer.x, outer.y, 0.1),
-    ]);
-
-    const material = new THREE.LineBasicMaterial({
-      transparent: true,
-      opacity: 0.8,
-    });
-    material.color.setHSL(
-      element.color.h / 360,
-      element.color.s,
-      element.color.v / 2
-    );
-
-    return new THREE.Line(geometry, material);
   }
 
   /**
@@ -746,18 +595,6 @@ export class ThreeJSRenderer implements IRenderer {
     const color = entity.style.color ?? { h: 120, s: 0.7, v: 0.6 };
     material.color.setHSL(color.h / 360, color.s, color.v / 2);
     material.opacity = (entity.style.opacity ?? 1) * 0.8;
-  }
-
-  /**
-   * Convert polar coordinates to XY (0° = 12 o'clock, clockwise).
-   */
-  private polarToXY(angle: number, radius: number): { x: number; y: number } {
-    // Convert from clock-based angles (0° = up) to math angles
-    const rad = ((90 - angle) * Math.PI) / 180;
-    return {
-      x: radius * Math.cos(rad),
-      y: radius * Math.sin(rad),
-    };
   }
 
   /**

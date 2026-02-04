@@ -71,7 +71,10 @@ vi.mock("three", () => {
     moveTo = vi.fn();
     lineTo = vi.fn();
     quadraticCurveTo = vi.fn();
+    bezierCurveTo = vi.fn();
     closePath = vi.fn();
+    curves: unknown[] = [];
+    getPoints = vi.fn(() => []);
   }
 
   class MockObject3D {
