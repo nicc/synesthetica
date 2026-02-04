@@ -1,41 +1,33 @@
 /**
  * Chord Detection Stabilizer
  *
- * Detects chords from active notes in the upstream MusicalFrame.
+ * Detects chords from active notes using a pitch-class decay approach.
  * Uses Tonal.js for chord identification.
  *
- * ## Design Decisions
+ * ## Pitch-Class Decay Model
  *
- * ### Onset Window
- * Notes are grouped into "simultaneous" sets using an onset window. A note joins
- * the current chord if it starts within `onsetWindowMs` of the most recent note
- * in that chord. This handles:
- * - Imperfect timing (notes meant to be simultaneous but slightly offset)
- * - Rolled/arpeggiated chords (notes played in sequence but forming one chord)
+ * Instead of tracking note events and accumulation windows, we track when each
+ * pitch class was last played. A pitch class stays "active" for `pitchDecayMs`
+ * after being played. This naturally handles:
  *
- * The window is configurable. Default is 100ms.
+ * - **Block chords**: All notes arrive together, all are in active set
+ * - **Arpeggios**: Each note refreshes its pitch class timestamp
+ * - **Brief gaps**: Pitch classes persist through short silences
+ * - **Chord changes**: Old pitch classes decay, new ones take over
  *
- * ### Chord Change Detection
- * A chord continues until:
- * - A new distinct chord is detected (different root or quality), OR
- * - Silence: all notes released for longer than `onsetWindowMs`
+ * ## Parameters
  *
- * This handles sustained chords that evolve (e.g., adding a 7th) vs. clear changes.
+ * - `pitchDecayMs`: How long a pitch class stays active (default 400ms)
+ *   - 0 = only currently-sounding notes (block chords only)
+ *   - 400ms = tolerates brief gaps (moderate arpeggios)
+ *   - 800ms+ = very forgiving (slow arpeggios)
  *
- * ### Ambiguity
- * Tonal.js may return multiple chord possibilities. We pick the highest-ranked
- * match and set confidence based on how many alternatives exist:
- * - 1 match: confidence 1.0
- * - 2 matches: confidence 0.8
- * - 3+ matches: confidence 0.6
+ * - `minPitchClasses`: Minimum unique pitch classes to detect a chord (default 2)
  *
- * ### Progression Window
- * Recent chord history is retained in `progression`. Default window is 60 seconds.
- * Gaps between chords are implicit (derived from onset/duration timestamps).
+ * - `hysteresisMs`: How long new chord must be stable before switching (default 50ms)
+ *   - Prevents flickering between ambiguous interpretations
  *
- * ### Future Work
- * - Split chord accumulation at bar boundaries (see synesthetica-3th)
- * - Integrate with phrase detection for section-aware analysis
+ * These can be combined into a "chord stability" macro at the grammar level.
  *
  * @see IMusicalStabilizer for the stabilizer contract
  */
@@ -47,7 +39,6 @@ import type {
   MusicalFrame,
   MusicalChord,
   Note,
-  NoteId,
   Pitch,
   PitchClass,
   ChordQuality,
@@ -68,11 +59,26 @@ export interface ChordDetectionConfig {
   partId: PartId;
 
   /**
-   * Window in ms for grouping notes as "simultaneous".
-   * Notes starting within this window of the most recent note join the chord.
-   * @default 100
+   * How long a pitch class stays "active" after being played (ms).
+   * - 0 = only currently-sounding notes (strict block chords)
+   * - 400 = tolerates brief gaps (moderate arpeggios)
+   * - 800+ = very forgiving (slow arpeggios)
+   * @default 400
    */
-  onsetWindowMs?: Ms;
+  pitchDecayMs?: Ms;
+
+  /**
+   * Minimum unique pitch classes required to detect a chord.
+   * @default 2
+   */
+  minPitchClasses?: number;
+
+  /**
+   * How long a new chord must be stable before switching display (ms).
+   * Prevents flickering between ambiguous interpretations.
+   * @default 50
+   */
+  hysteresisMs?: Ms;
 
   /**
    * How long to retain chord history for progression tracking.
@@ -82,22 +88,14 @@ export interface ChordDetectionConfig {
 }
 
 const DEFAULT_CONFIG: Required<Omit<ChordDetectionConfig, "partId">> = {
-  onsetWindowMs: 100,
+  pitchDecayMs: 400,
+  minPitchClasses: 2,
+  hysteresisMs: 50,
   progressionWindowMs: 60000,
 };
 
 /**
- * Internal state for tracking the current chord being formed.
- */
-interface ChordInProgress {
-  noteIds: NoteId[];
-  pitches: Pitch[];
-  onset: Ms;
-  lastNoteOnset: Ms;
-}
-
-/**
- * ChordDetectionStabilizer: Detects chords from note data.
+ * ChordDetectionStabilizer: Detects chords using pitch-class decay.
  *
  * Depends on an upstream stabilizer (e.g., NoteTrackingStabilizer) that
  * provides notes in the MusicalFrame.
@@ -109,36 +107,45 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
   private config: Required<ChordDetectionConfig>;
   private provenance: Provenance;
 
-  // Current chord being accumulated
-  private chordInProgress: ChordInProgress | null = null;
+  // When each pitch class was last played
+  private pitchClassLastSeen: Map<PitchClass, Ms> = new Map();
+
+  // Current displayed chord (after hysteresis)
+  private displayedChord: { root: PitchClass; quality: ChordQuality } | null =
+    null;
+
+  // Candidate chord waiting for hysteresis
+  private candidateChord: {
+    root: PitchClass;
+    quality: ChordQuality;
+    since: Ms;
+  } | null = null;
 
   // Recently completed chords (for progression)
   private recentChords: MusicalChord[] = [];
 
-  // Track the last detected chord to avoid duplicates
-  private lastChord: { root: PitchClass; quality: ChordQuality } | null = null;
-
-  // Track when silence started (all notes released)
-  private silenceStartTime: Ms | null = null;
+  // Track chord onset for duration calculation
+  private currentChordOnset: Ms | null = null;
 
   constructor(config: ChordDetectionConfig) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.provenance = {
       source: "stabilizer",
       stream: this.id,
-      version: "0.1.0",
+      version: "0.2.0",
     };
   }
 
   init(): void {
-    this.chordInProgress = null;
+    this.pitchClassLastSeen.clear();
+    this.displayedChord = null;
+    this.candidateChord = null;
     this.recentChords = [];
-    this.lastChord = null;
-    this.silenceStartTime = null;
+    this.currentChordOnset = null;
   }
 
   dispose(): void {
-    this.chordInProgress = null;
+    this.pitchClassLastSeen.clear();
     this.recentChords = [];
   }
 
@@ -148,36 +155,28 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
 
   apply(raw: RawInputFrame, upstream: MusicalFrame | null): MusicalFrame {
     if (!upstream) {
-      // No upstream data - return empty frame
       return this.createEmptyFrame(raw.t);
     }
 
     const t = raw.t;
-    const activeNotes = upstream.notes.filter((n) => n.phase !== "release");
+
+    // Update pitch class timestamps from active notes
+    this.updatePitchClassTimestamps(upstream.notes, t);
+
+    // Build active pitch class set (within decay window)
+    const activePitchClasses = this.getActivePitchClasses(t);
+
+    // Detect chord from active pitch classes
+    const detected = this.detectChordFromPitchClasses(activePitchClasses);
+
+    // Apply hysteresis
+    this.applyHysteresis(detected, t);
 
     // Prune old chords from progression
     this.pruneOldChords(t);
 
-    // Handle silence detection
-    if (activeNotes.length === 0) {
-      if (this.silenceStartTime === null) {
-        this.silenceStartTime = t;
-      } else if (t - this.silenceStartTime > this.config.onsetWindowMs) {
-        // Silence exceeded onset window - finalize any chord in progress
-        this.finalizeChordInProgress(t);
-        this.lastChord = null;
-      }
-    } else {
-      this.silenceStartTime = null;
-    }
-
-    // Process active notes
-    if (activeNotes.length > 0) {
-      this.processNotes(activeNotes, t);
-    }
-
     // Build current chords array
-    const chords = this.buildCurrentChords(t);
+    const chords = this.buildCurrentChords(t, activePitchClasses);
 
     // Build progression (chord IDs only)
     const progression = this.recentChords.map((c) => c.id);
@@ -190,90 +189,46 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     };
   }
 
-  private processNotes(notes: Note[], t: Ms): void {
-    // Sort notes by onset time
-    const sortedNotes = [...notes].sort((a, b) => a.onset - b.onset);
-
-    for (const note of sortedNotes) {
-      if (this.chordInProgress === null) {
-        // Start a new chord
-        this.chordInProgress = {
-          noteIds: [note.id],
-          pitches: [note.pitch],
-          onset: note.onset,
-          lastNoteOnset: note.onset,
-        };
-      } else {
-        // Check if this note falls within the onset window
-        const timeSinceLastNote = note.onset - this.chordInProgress.lastNoteOnset;
-
-        if (timeSinceLastNote <= this.config.onsetWindowMs) {
-          // Add to current chord if not already present
-          if (!this.chordInProgress.noteIds.includes(note.id)) {
-            this.chordInProgress.noteIds.push(note.id);
-            this.chordInProgress.pitches.push(note.pitch);
-            this.chordInProgress.lastNoteOnset = Math.max(
-              this.chordInProgress.lastNoteOnset,
-              note.onset
-            );
-          }
-        } else {
-          // Note is outside window - finalize current chord and start new one
-          this.finalizeChordInProgress(t);
-          this.chordInProgress = {
-            noteIds: [note.id],
-            pitches: [note.pitch],
-            onset: note.onset,
-            lastNoteOnset: note.onset,
-          };
-        }
+  /**
+   * Update pitch class timestamps from notes.
+   * Active notes refresh their pitch class timestamp.
+   */
+  private updatePitchClassTimestamps(notes: Note[], t: Ms): void {
+    for (const note of notes) {
+      // Only count notes that are currently sounding (not released)
+      if (note.phase !== "release") {
+        this.pitchClassLastSeen.set(note.pitch.pc, t);
       }
     }
   }
 
-  private finalizeChordInProgress(t: Ms): void {
-    if (!this.chordInProgress || this.chordInProgress.pitches.length < 2) {
-      // Need at least 2 notes for a chord
-      this.chordInProgress = null;
-      return;
+  /**
+   * Get pitch classes that are within the decay window.
+   */
+  private getActivePitchClasses(t: Ms): Set<PitchClass> {
+    const active = new Set<PitchClass>();
+
+    for (const [pc, lastSeen] of this.pitchClassLastSeen) {
+      if (t - lastSeen <= this.config.pitchDecayMs) {
+        active.add(pc);
+      }
     }
 
-    const detected = this.detectChord(this.chordInProgress.pitches);
-    if (!detected) {
-      this.chordInProgress = null;
-      return;
-    }
-
-    // Check if this is a new chord or continuation
-    const isNewChord =
-      !this.lastChord ||
-      this.lastChord.root !== detected.root ||
-      this.lastChord.quality !== detected.quality;
-
-    if (isNewChord) {
-      const chord = this.createChord(
-        detected,
-        this.chordInProgress,
-        t
-      );
-      this.recentChords.push(chord);
-      this.lastChord = { root: detected.root, quality: detected.quality };
-    }
-
-    this.chordInProgress = null;
+    return active;
   }
 
-  private detectChord(
-    pitches: Pitch[]
-  ): {
-    root: PitchClass;
-    quality: ChordQuality;
-    confidence: Confidence;
-  } | null {
-    if (pitches.length < 2) return null;
+  /**
+   * Detect chord from a set of pitch classes.
+   */
+  private detectChordFromPitchClasses(
+    pitchClasses: Set<PitchClass>
+  ): { root: PitchClass; quality: ChordQuality; confidence: Confidence } | null {
+    if (pitchClasses.size < this.config.minPitchClasses) {
+      return null;
+    }
 
-    // Convert pitches to note names for Tonal
-    const noteNames = pitches.map((p) => this.pitchToNoteName(p));
+    // Convert pitch classes to note names (use octave 4 as reference)
+    const noteNames = [...pitchClasses].map((pc) => this.pcToNoteName(pc));
 
     // Use Tonal to detect chord
     const detected = Tonal.Chord.detect(noteNames);
@@ -306,121 +261,141 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     return { root, quality, confidence };
   }
 
-  private createChord(
-    detected: { root: PitchClass; quality: ChordQuality; confidence: Confidence },
-    inProgress: ChordInProgress,
+  /**
+   * Apply hysteresis to prevent flickering.
+   * Only update displayed chord if new chord is stable for hysteresisMs.
+   */
+  private applyHysteresis(
+    detected: { root: PitchClass; quality: ChordQuality } | null,
     t: Ms
-  ): MusicalChord {
-    // Sort pitches low to high for voicing
-    const sortedPitches = [...inProgress.pitches].sort((a, b) => {
-      const midiA = a.octave * 12 + a.pc;
-      const midiB = b.octave * 12 + b.pc;
-      return midiA - midiB;
-    });
+  ): void {
+    const isSameAsDisplayed =
+      detected &&
+      this.displayedChord &&
+      detected.root === this.displayedChord.root &&
+      detected.quality === this.displayedChord.quality;
 
-    // Bass note is the lowest pitch
-    const bass = sortedPitches[0].pc;
+    const isSameAsCandidate =
+      detected &&
+      this.candidateChord &&
+      detected.root === this.candidateChord.root &&
+      detected.quality === this.candidateChord.quality;
 
-    // Calculate inversion
-    const inversion = this.calculateInversion(detected.root, bass, sortedPitches);
+    if (isSameAsDisplayed) {
+      // Current chord continues, clear any candidate
+      this.candidateChord = null;
+      return;
+    }
 
-    const id = createChordId(
-      this.config.partId,
-      inProgress.onset,
-      detected.root,
-      detected.quality
-    );
+    if (detected === null) {
+      // No chord detected
+      if (this.displayedChord && this.currentChordOnset !== null) {
+        // Finalize the displayed chord
+        this.finalizeChord(this.displayedChord, this.currentChordOnset, t);
+      }
+      this.displayedChord = null;
+      this.candidateChord = null;
+      this.currentChordOnset = null;
+      return;
+    }
 
-    return {
-      id,
+    if (isSameAsCandidate) {
+      // Candidate chord continues, check if hysteresis period has passed
+      if (t - this.candidateChord!.since >= this.config.hysteresisMs) {
+        // Finalize previous chord if any
+        if (this.displayedChord && this.currentChordOnset !== null) {
+          this.finalizeChord(this.displayedChord, this.currentChordOnset, t);
+        }
+        // Switch to candidate
+        this.displayedChord = {
+          root: this.candidateChord!.root,
+          quality: this.candidateChord!.quality,
+        };
+        this.currentChordOnset = t;
+        this.candidateChord = null;
+      }
+      return;
+    }
+
+    // New candidate chord
+    this.candidateChord = {
       root: detected.root,
       quality: detected.quality,
-      bass,
-      inversion,
-      voicing: sortedPitches,
-      noteIds: inProgress.noteIds,
-      onset: inProgress.onset,
-      duration: t - inProgress.onset,
-      phase: "active",
-      confidence: detected.confidence,
-      provenance: this.provenance,
+      since: t,
     };
   }
 
-  private calculateInversion(
-    root: PitchClass,
-    bass: PitchClass,
-    voicing: Pitch[]
-  ): number {
-    if (bass === root) return 0;
+  /**
+   * Finalize a chord and add to progression.
+   */
+  private finalizeChord(
+    chord: { root: PitchClass; quality: ChordQuality },
+    onset: Ms,
+    endTime: Ms
+  ): void {
+    const id = createChordId(
+      this.config.partId,
+      onset,
+      chord.root,
+      chord.quality
+    );
 
-    // Find which chord tone is in the bass
-    // For simplicity, check common inversions:
-    // 1st inversion = 3rd in bass
-    // 2nd inversion = 5th in bass
-    // This is approximate - a full implementation would need the chord's intervals
-
-    const pitchClasses = voicing.map((p) => p.pc);
-    const bassIndex = pitchClasses.indexOf(bass);
-
-    if (bassIndex === -1) return 0;
-
-    // Count how many chord tones are below the root in the voicing
-    const rootIndex = pitchClasses.indexOf(root);
-    if (rootIndex === -1) return 0;
-
-    return bassIndex; // Simplified: bass position = inversion number
+    this.recentChords.push({
+      id,
+      root: chord.root,
+      quality: chord.quality,
+      bass: chord.root, // Simplified: assume root position
+      inversion: 0,
+      voicing: [], // Not tracked in this approach
+      noteIds: [], // Not tracked in this approach
+      onset,
+      duration: endTime - onset,
+      phase: "decaying",
+      confidence: 0.8,
+      provenance: this.provenance,
+    });
   }
 
-  private buildCurrentChords(t: Ms): MusicalChord[] {
+  /**
+   * Build current chords array for output.
+   */
+  private buildCurrentChords(t: Ms, activePitchClasses: Set<PitchClass>): MusicalChord[] {
     const chords: MusicalChord[] = [];
 
-    // Check if chord in progress is substantial enough to report
-    if (this.chordInProgress && this.chordInProgress.pitches.length >= 2) {
-      const detected = this.detectChord(this.chordInProgress.pitches);
-      if (detected) {
-        const sortedPitches = [...this.chordInProgress.pitches].sort((a, b) => {
-          const midiA = a.octave * 12 + a.pc;
-          const midiB = b.octave * 12 + b.pc;
-          return midiA - midiB;
-        });
+    if (this.displayedChord && this.currentChordOnset !== null) {
+      // Build voicing from active pitch classes
+      const voicing: Pitch[] = [...activePitchClasses].map((pc) => ({
+        pc,
+        octave: 4, // Reference octave
+      }));
 
-        const bass = sortedPitches[0].pc;
-        const inversion = this.calculateInversion(detected.root, bass, sortedPitches);
+      // Sort by pitch class distance from root for better voicing representation
+      voicing.sort((a, b) => {
+        const distA = (a.pc - this.displayedChord!.root + 12) % 12;
+        const distB = (b.pc - this.displayedChord!.root + 12) % 12;
+        return distA - distB;
+      });
 
-        const id = createChordId(
-          this.config.partId,
-          this.chordInProgress.onset,
-          detected.root,
-          detected.quality
-        );
+      const id = createChordId(
+        this.config.partId,
+        this.currentChordOnset,
+        this.displayedChord.root,
+        this.displayedChord.quality
+      );
 
-        chords.push({
-          id,
-          root: detected.root,
-          quality: detected.quality,
-          bass,
-          inversion,
-          voicing: sortedPitches,
-          noteIds: this.chordInProgress.noteIds,
-          onset: this.chordInProgress.onset,
-          duration: t - this.chordInProgress.onset,
-          phase: "active",
-          confidence: detected.confidence,
-          provenance: this.provenance,
-        });
-      }
-    }
-
-    // Include recent chords that are still "active" (within decay window)
-    // For now, just include the most recent chord if it ended recently
-    const lastChord = this.recentChords[this.recentChords.length - 1];
-    if (lastChord && t - (lastChord.onset + lastChord.duration) < 500) {
-      // Mark as decaying
       chords.push({
-        ...lastChord,
-        phase: "decaying",
-        duration: t - lastChord.onset,
+        id,
+        root: this.displayedChord.root,
+        quality: this.displayedChord.quality,
+        bass: this.displayedChord.root, // Simplified
+        inversion: 0,
+        voicing,
+        noteIds: [], // Not tracked
+        onset: this.currentChordOnset,
+        duration: t - this.currentChordOnset,
+        phase: "active",
+        confidence: 0.8,
+        provenance: this.provenance,
       });
     }
 
@@ -455,46 +430,45 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
 
   // === Conversion helpers ===
 
-  private pitchToNoteName(pitch: Pitch): string {
+  private pcToNoteName(pc: PitchClass): string {
     const names = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
-    return names[pitch.pc] + pitch.octave;
+    return names[pc];
   }
 
   private noteNameToPitchClass(noteName: string): PitchClass {
     const note = Tonal.Note.get(noteName);
-    if (!note.chroma) return 0;
+    if (note.chroma === undefined) return 0;
     return note.chroma as PitchClass;
   }
 
   private mapTonalQuality(tonalQuality: string): ChordQuality {
-    // Map Tonal's quality strings to our ChordQuality type
     const mapping: Record<string, ChordQuality> = {
-      "Major": "maj",
-      "": "maj", // Empty string often means major
-      "minor": "min",
-      "Minor": "min",
-      "m": "min",
-      "diminished": "dim",
-      "Diminished": "dim",
-      "dim": "dim",
-      "augmented": "aug",
-      "Augmented": "aug",
-      "aug": "aug",
-      "sus2": "sus2",
-      "sus4": "sus4",
+      Major: "maj",
+      "": "maj",
+      minor: "min",
+      Minor: "min",
+      m: "min",
+      diminished: "dim",
+      Diminished: "dim",
+      dim: "dim",
+      augmented: "aug",
+      Augmented: "aug",
+      aug: "aug",
+      sus2: "sus2",
+      sus4: "sus4",
       "Major seventh": "maj7",
-      "Maj7": "maj7",
-      "M7": "maj7",
+      Maj7: "maj7",
+      M7: "maj7",
       "minor seventh": "min7",
       "Minor seventh": "min7",
-      "m7": "min7",
+      m7: "min7",
       "dominant seventh": "dom7",
       "Dominant seventh": "dom7",
       "7": "dom7",
       "half-diminished": "hdim7",
-      "m7b5": "hdim7",
+      m7b5: "hdim7",
       "diminished seventh": "dim7",
-      "dim7": "dim7",
+      dim7: "dim7",
     };
 
     return mapping[tonalQuality] ?? "unknown";

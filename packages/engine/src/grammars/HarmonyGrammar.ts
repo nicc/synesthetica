@@ -140,7 +140,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         position: { x: 0.5, y: 0.5 },
         style: {
           color: rootColor,
-          size: 200,
+          size: 100,
           opacity: 1,
         },
         data: {
