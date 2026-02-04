@@ -1,4 +1,5 @@
 import type { MidiInputInfo } from "@synesthetica/adapters";
+import type { SceneFrame } from "@synesthetica/contracts";
 import { RawMidiAdapter, WebMidiSource } from "@synesthetica/adapters";
 import {
   VisualPipeline,
@@ -6,9 +7,10 @@ import {
   NoteTrackingStabilizer,
   ChordDetectionStabilizer,
   BeatDetectionStabilizer,
+  HarmonicProgressionStabilizer,
   MusicalVisualVocabulary,
   RhythmGrammar,
-  TestChordProgressionGrammar,
+  HarmonyGrammar,
   IdentityCompositor,
 } from "@synesthetica/engine";
 
@@ -23,18 +25,23 @@ const beatsPerBarInput = document.getElementById("beats-per-bar") as HTMLInputEl
 const beatUnitInput = document.getElementById("beat-unit") as HTMLInputElement;
 const clearTempoBtn = document.getElementById("clear-tempo") as HTMLButtonElement;
 
-// Resize canvas to fill viewport
-function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-resizeCanvas();
-window.addEventListener("resize", resizeCanvas);
-
 // App state
 let midiSource: WebMidiSource | null = null;
 let pipeline: VisualPipeline | null = null;
 let renderer: ThreeJSRenderer | null = null;
+
+// Resize canvas to fill viewport
+function resizeCanvas() {
+  // Pass CSS pixels to Three.js - it handles devicePixelRatio internally
+  const cssWidth = window.innerWidth;
+  const cssHeight = window.innerHeight;
+
+  // Update Three.js renderer if active
+  if (renderer) {
+    renderer.resize(cssWidth, cssHeight);
+  }
+}
+window.addEventListener("resize", resizeCanvas);
 let sessionStartTime: number = 0;
 let animationFrameId: number | null = null;
 
@@ -139,10 +146,11 @@ function startSession(midiInput: MidiInputInfo): void {
     pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
     pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
     pipeline.addStabilizerFactory(() => new BeatDetectionStabilizer({ partId }));
-    pipeline.setRuleset(new MusicalVisualVocabulary());
-    // Use both grammars - they'll be composited together
+    pipeline.addStabilizerFactory(() => new HarmonicProgressionStabilizer({ partId }));
+    pipeline.setVocabulary(new MusicalVisualVocabulary());
+    // Use grammars - they'll be composited together
     pipeline.addGrammar(new RhythmGrammar());
-    pipeline.addGrammar(new TestChordProgressionGrammar());
+    pipeline.addGrammar(new HarmonyGrammar());
     pipeline.setCompositor(new IdentityCompositor());
 
     // Create renderer
@@ -197,6 +205,68 @@ function stopSession(): void {
 
 // Debug counter for throttled logging
 let debugFrameCount = 0;
+let lastSceneFrame: SceneFrame | null = null;
+
+/**
+ * Capture current frame to console as JSON (press 'c' to capture)
+ * - Outputs as single JSON log entry
+ * - Copies to clipboard for easy sharing
+ * - Includes Three.js world coordinate calculations
+ */
+function captureFrame(): void {
+  if (!lastSceneFrame) {
+    console.log("No frame captured yet");
+    return;
+  }
+
+  // Three.js world dimensions (must match ThreeJSRenderer defaults)
+  const WORLD_WIDTH = 100;
+  const WORLD_HEIGHT = 75;
+
+  const entities = lastSceneFrame.entities.map((e) => {
+    const normX = e.position?.x ?? 0.5;
+    const normY = e.position?.y ?? 0.5;
+    // Match ThreeJSRenderer coordinate transform (Y-flip, world space)
+    const worldX = normX * WORLD_WIDTH;
+    const worldY = (1 - normY) * WORLD_HEIGHT;
+
+    return {
+      id: e.id,
+      kind: e.kind,
+      position: e.position,
+      threeWorldCoords: { x: worldX.toFixed(1), y: worldY.toFixed(1) },
+      style: e.style,
+      data: e.data,
+    };
+  });
+
+  const capture = {
+    t: lastSceneFrame.t,
+    canvasCss: { width: window.innerWidth, height: window.innerHeight },
+    devicePixelRatio: window.devicePixelRatio,
+    threeWorld: { width: WORLD_WIDTH, height: WORLD_HEIGHT },
+    entityCount: entities.length,
+    entities,
+  };
+
+  const json = JSON.stringify(capture, null, 2);
+
+  // Single log entry
+  console.log("FRAME CAPTURE:\n" + json);
+
+  // Copy to clipboard
+  navigator.clipboard.writeText(json).then(
+    () => console.log("(Copied to clipboard)"),
+    (err) => console.warn("Failed to copy to clipboard:", err)
+  );
+}
+
+// Keyboard shortcut for frame capture
+document.addEventListener("keydown", (e) => {
+  if (e.key === "c" && !e.ctrlKey && !e.metaKey) {
+    captureFrame();
+  }
+});
 
 /**
  * Render loop - pull-based frame production
@@ -210,20 +280,21 @@ function startRenderLoop(): void {
 
     // Request frame from pipeline
     const sceneFrame = pipeline.requestFrame(sessionMs);
+    lastSceneFrame = sceneFrame;
 
     // Debug: log entity counts every 60 frames (~1 second)
     debugFrameCount++;
     if (debugFrameCount % 60 === 0) {
       const typeCounts = new Map<string, number>();
       for (const e of sceneFrame.entities) {
-        const type = (e.data?.type as string) || "unknown";
+        const type = (e.data?.type as string) || e.kind;
         typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
       }
       if (typeCounts.size > 0) {
-        const divTicks = typeCounts.get("division-tick") || 0;
-        const beatLines = typeCounts.get("beat-line") || 0;
-        const onsetMarkers = typeCounts.get("onset-marker") || 0;
-        console.log(`t=${Math.round(sessionMs)}ms: onset-marker:${onsetMarkers}, division-tick:${divTicks}, beat-line:${beatLines}`);
+        const parts = Array.from(typeCounts.entries())
+          .map(([type, count]) => `${type}:${count}`)
+          .join(", ");
+        console.log(`t=${Math.round(sessionMs)}ms: ${parts}`);
       }
     }
 

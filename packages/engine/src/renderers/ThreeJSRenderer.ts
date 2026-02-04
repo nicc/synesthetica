@@ -102,14 +102,19 @@ export class ThreeJSRenderer implements IRenderer {
       alpha: false,
     });
     this.renderer.setPixelRatio(window.devicePixelRatio);
-    this.renderer.setSize(canvas.width, canvas.height);
+
+    // Use CSS dimensions (clientWidth/Height), not buffer dimensions (width/height)
+    // setSize expects CSS pixels when setPixelRatio is used
+    const cssWidth = canvas.clientWidth || canvas.width;
+    const cssHeight = canvas.clientHeight || canvas.height;
+    this.renderer.setSize(cssWidth, cssHeight);
 
     // Create scene
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(this.config.backgroundColor);
 
-    // Create camera
-    const aspect = canvas.width / canvas.height;
+    // Create camera using CSS dimensions for aspect ratio
+    const aspect = cssWidth / cssHeight;
     this.camera = new THREE.PerspectiveCamera(
       this.config.fov,
       aspect,
@@ -190,10 +195,13 @@ export class ThreeJSRenderer implements IRenderer {
 
   /**
    * Resize the renderer to match canvas size.
+   * @param width CSS pixel width (not device pixels)
+   * @param height CSS pixel height (not device pixels)
    */
   resize(width: number, height: number): void {
     if (!this.renderer || !this.camera) return;
 
+    // setSize expects CSS pixels when setPixelRatio is used
     this.renderer.setSize(width, height);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
