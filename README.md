@@ -45,18 +45,18 @@ Stabilizers form a DAG based on dependencies. Independent stabilizers (note trac
 
 **What it does:** Annotates musical elements with visual properties (palette, texture, motion). Each Note gets a visual annotation; each Chord gets its own annotation. Rulesets define a consistent visual vocabulary that users learn across all grammars.
 
-**Key responsibility:** Rulesets do NOT decide what shapes to use or which elements to render. They define "major chords are warm colors, minor chords are cool colors" - the consistent visual scheme. Grammars decide *how* to render each element.
+**Key responsibility:** Rulesets do not render anything directly to output but they do provide shapes, colour values and motion for grammars use when rendering musical elements visually. They define things like the shape, colours, transparency and motion (in)stability of a chord or note. Grammars decide how to actually render these elements.
 
-**Current status:** MusicalVisualRuleset annotates notes and chords with palette, texture, and motion properties.
+**Current status:** MusicalVisualRuleset annotates notes and chords with palettes and shapes.
 
 #### 4. Grammar Stack
-**Technical:** Transforms `AnnotatedMusicalFrame` into `SceneFrame` (a collection of visual entities). Grammars see musical element *categories* (notes, chords, beats) with their visual annotations, and decide how to render them.
+**Technical:** Transforms `AnnotatedMusicalFrame` into `SceneFrame` (a collection of visual entities). Grammars see musical elements of various categories (notes, chords, beats) with visual annotation determined by the vocabulary, and decide how to render them.
 
 **What it does:** Determines the visual language. Grammars know *what kind* of musical element something is (note vs chord vs beat) but not musical analysis details (pitch class, chord quality). They use visual annotations to style their chosen representations. Grammars can filter elements (e.g., a rhythm grammar ignores chords).
 
 **Key insight:** Rulesets define vocabulary; grammars write sentences. Different grammars can render the same annotated musical content in completely different ways - one as particles, another as trails, another as background color washes.
 
-**Current status:** TestRhythmGrammar (renders beats and notes as timing markers) and TestChordProgressionGrammar (renders chords as glows with history trail) demonstrate the RFC 006 architecture.
+**Current status:** RhythmGrammar (renders beats and notes as timing markers) and HarmonyGrammar (renders chords as glows with history trail) are operational with some bugs and outstanding work.
 
 #### 5. Compositor
 **Technical:** Merges multiple `SceneFrame`s (one per part/instrument) into a single composited scene, applying layout, blending, and z-ordering.
@@ -70,13 +70,13 @@ Stabilizers form a DAG based on dependencies. Independent stabilizers (note trac
 
 **What it does:** Produces the visual output you see on screen.
 
-**Current status:** Canvas2DRenderer with circle drawing for particle entities.
+**Current status:** ThreeJSRenderer is operational and supports both existing grammars. It using the ThreeJS WebGL library.
 
 ### Key Architectural Principles
 
 1. **Meaning lives in rulesets, not grammars.** Rulesets define the visual vocabulary (what colors mean). Grammars decide how to render.
-2. **Grammars see categories, not analysis.** Grammars know "this is a note" and "this is a chord" but not pitch class or chord quality. Visual annotations carry the semantic meaning.
-3. **Notes are proper abstractions.** A Note has duration and phase - it's not a pair of on/off messages.
+2. **Grammars see categories, not analysis.** Grammars know "this is a note" and "this is a chord" but not pitch class or chord quality rules. Visual annotations convey the semantic meaning of upstream analysis.
+3. **Stabilizers produce real musical abstractions.** A Note has duration and phase - it's not a pair of on/off messages.
 4. **Grammars have creative agency.** They decide which musical elements to render, what shapes to use, and how to animate them. Different grammars can render the same content completely differently.
 5. **Every piece of data belongs to exactly one part (instrument).** Multi-instrument support is built-in from the start.
 6. **Contracts define all boundaries.** Modules communicate through types in [packages/contracts](packages/contracts/), not internal imports.
@@ -93,7 +93,6 @@ Issues are tracked using Beads.
 The repository is organised around a small, explicit set of document types:
 
 - **VISION** – What we are building and why
-- **PRD** – Product requirements and success criteria
 - **SPECS** – Technical specifications by subsystem
 - **RFC** – Proposals and ideas under discussion
 - **PRINCIPLES** – Fundamental values and constraints guiding all decisions
@@ -125,17 +124,17 @@ Synesthetica is designed for **LLM-mediated control via natural language**. User
 
 ### How Control Works
 
-**User intent:** "Make the guitar more saturated"
+**Viewer intent:** "Make the guitar harmony clearer"
 
 **LLM mediates:**
 1. Resolves "the guitar" to a specific `PartId` (deictic resolution)
-2. Translates "more saturated" to a parameter adjustment
-3. Emits a `ControlOp` (mechanical operation)
+2. Translates "clearer harmony" to a choice of grammar with parameter adjustments
+3. Emits `ControlOp`s (mechanical operations) as necessary
 4. System executes the operation
 
 **Key separation:**
 - The LLM handles semantic understanding ("the guitar", "brighter", "that chord")
-- The engine handles mechanical execution (parameter updates, preset loading)
+- The engine handles mechanical execution (parameter updates, grammar and preset loading)
 - The engine does *not* interpret natural language or musical semantics
 
 ### Annotations (Advisory Metadata)
