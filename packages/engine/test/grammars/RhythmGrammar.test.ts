@@ -45,6 +45,8 @@ function createTestFrame(
       phase?: "attack" | "sustain" | "release";
     }>;
     tempo?: number;
+    /** Detected division in ms (from beat detection). Defaults to deriving from tempo. */
+    detectedDivision?: number | null;
     meter?: { beatsPerBar: number; beatUnit: number };
     onsetDrifts?: Array<{
       t: number;
@@ -57,11 +59,12 @@ function createTestFrame(
     }>;
   }
 ): AnnotatedMusicalFrame {
+  const vel = (v: number) => v ?? 80;
   const notes: AnnotatedNote[] = (options.notes ?? []).map((n) => ({
     note: {
       id: n.id,
       pitch: { pc: n.pc, octave: n.octave ?? 4 },
-      velocity: n.velocity ?? 80,
+      velocity: vel(n.velocity ?? 80),
       onset: n.onset,
       duration: n.duration ?? (t - n.onset), // Default: still held until frame time
       release: null,
@@ -80,16 +83,31 @@ function createTestFrame(
       uncertainty: 0,
       label: `Note-${n.pc}`,
     },
+    velocity: {
+      sizeMultiplier: 0.5 + (vel(n.velocity ?? 80) / 127) * 1.5,
+      attackMs: 50 - (vel(n.velocity ?? 80) / 127) * 50,
+    },
+    phaseState: {
+      phase: n.phase ?? "sustain",
+      intensity: n.phase === "release" ? 0.5 : 1.0,
+    },
   }));
+
+  // detectedDivision: explicit option > derived from tempo > null
+  const detectedDivision = options.detectedDivision !== undefined
+    ? options.detectedDivision
+    : options.tempo ? 60000 / options.tempo : null;
 
   return {
     t,
     part: "main",
     notes,
     chords: [],
+    progression: [],
+    harmonicContext: { tension: 0, keyAware: false, detectedKey: null },
     rhythm: {
       analysis: {
-        detectedDivision: options.tempo ? 60000 / options.tempo : null,
+        detectedDivision,
         onsetDrifts: options.onsetDrifts ?? [],
         stability: 0.9,
         confidence: 0.9,
@@ -160,6 +178,102 @@ describe("RhythmGrammar", () => {
 
       const barLines = scene.entities.filter((e) => e.data?.type === "bar-line");
       expect(barLines.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("inferred tempo (detected division, no prescribed tempo)", () => {
+    it("produces beat grid lines from detected division", () => {
+      // Simulate beat detection inferring 120 BPM (500ms division)
+      // without user calling setTempo()
+      const frame = createTestFrame(2000, {
+        detectedDivision: 500, // 120 BPM detected
+        // tempo is NOT set (prescribedTempo will be null)
+      });
+
+      const scene = grammar.update(frame, null);
+
+      const beatLines = scene.entities.filter((e) => e.data?.type === "beat-line");
+      expect(beatLines.length).toBeGreaterThan(0);
+    });
+
+    it("produces bar lines from detected division with default 4/4 meter", () => {
+      // Key regression test: bar lines should appear even without prescribedTempo
+      const frame = createTestFrame(4000, {
+        detectedDivision: 500, // 120 BPM detected
+        // No tempo, no meter prescribed
+      });
+
+      const scene = grammar.update(frame, null);
+
+      const barLines = scene.entities.filter((e) => e.data?.type === "bar-line");
+      expect(barLines.length).toBeGreaterThan(0);
+
+      // Bar spacing should be 4 beats (default 4/4) = 2000ms at 120 BPM
+      const barTimes = barLines.map((e) => e.data?.barTime as number);
+      if (barTimes.length >= 2) {
+        const spacing = barTimes[1] - barTimes[0];
+        expect(spacing).toBe(2000); // 4 beats × 500ms
+      }
+    });
+
+    it("uses prescribed meter over default when tempo is inferred", () => {
+      const frame = createTestFrame(4000, {
+        detectedDivision: 500, // 120 BPM detected
+        meter: { beatsPerBar: 3, beatUnit: 4 }, // 3/4 time
+      });
+
+      const scene = grammar.update(frame, null);
+
+      const barLines = scene.entities.filter((e) => e.data?.type === "bar-line");
+      expect(barLines.length).toBeGreaterThan(0);
+
+      // Bar spacing should be 3 beats = 1500ms at 120 BPM
+      const barTimes = barLines.map((e) => e.data?.barTime as number);
+      if (barTimes.length >= 2) {
+        const spacing = barTimes[1] - barTimes[0];
+        expect(spacing).toBe(1500); // 3 beats × 500ms
+      }
+    });
+
+    it("produces no grid when neither tempo nor division is available", () => {
+      const frame = createTestFrame(2000, {
+        // No tempo, no detectedDivision
+        detectedDivision: null,
+      });
+
+      const scene = grammar.update(frame, null);
+
+      const beatLines = scene.entities.filter((e) => e.data?.type === "beat-line");
+      const barLines = scene.entities.filter((e) => e.data?.type === "bar-line");
+      expect(beatLines.length).toBe(0);
+      expect(barLines.length).toBe(0);
+
+      // NOW line should still be present
+      const nowLine = scene.entities.find((e) => e.data?.type === "now-line");
+      expect(nowLine).toBeDefined();
+    });
+
+    it("uses drift info from onset drifts with inferred tempo", () => {
+      const frame = createTestFrame(1000, {
+        detectedDivision: 500, // 120 BPM detected, no prescribed tempo
+        notes: [
+          { id: "late", pc: 0, onset: 550 }, // 50ms late
+        ],
+        onsetDrifts: [
+          {
+            t: 550,
+            subdivisions: [
+              { label: "1x", period: 500, drift: 50, nearest: true },
+            ],
+          },
+        ],
+      });
+
+      const scene = grammar.update(frame, null);
+
+      // Should have streak entities (tier 2 from inferred tempo)
+      const streaks = scene.entities.filter((e) => e.data?.type === "streak");
+      expect(streaks.length).toBeGreaterThan(0);
     });
   });
 

@@ -209,7 +209,7 @@ export class RhythmGrammar implements IVisualGrammar {
     streakHistoryMs: number;
   } {
     const horizon = this.macros.horizon;
-    const tempo = rhythm.prescribedTempo;
+    const tempo = this.getEffectiveTempo(rhythm);
 
     // Visible windows control what elements are shown (filtered)
     // They do NOT affect the time-to-screen scale (that's TIME_HORIZON_*)
@@ -236,14 +236,50 @@ export class RhythmGrammar implements IVisualGrammar {
   }
 
   // ============================================================================
+  // Effective Tempo/Meter (prescribed or inferred)
+  // ============================================================================
+
+  /**
+   * Get the effective tempo in BPM from prescribed tempo or detected division.
+   * Returns null if neither is available.
+   */
+  private getEffectiveTempo(rhythm: AnnotatedRhythm): number | null {
+    if (rhythm.prescribedTempo !== null) {
+      return rhythm.prescribedTempo;
+    }
+    if (rhythm.analysis.detectedDivision !== null) {
+      return 60000 / rhythm.analysis.detectedDivision;
+    }
+    return null;
+  }
+
+  /**
+   * Get the effective meter. Uses prescribed meter if available,
+   * defaults to 4/4 when we have an effective tempo but no prescribed meter.
+   */
+  private getEffectiveMeter(rhythm: AnnotatedRhythm): { beatsPerBar: number; beatUnit: number } | null {
+    if (rhythm.prescribedMeter !== null) {
+      return rhythm.prescribedMeter;
+    }
+    // Default to 4/4 when tempo is available (prescribed or detected)
+    if (this.getEffectiveTempo(rhythm) !== null) {
+      return { beatsPerBar: 4, beatUnit: 4 };
+    }
+    return null;
+  }
+
+  // ============================================================================
   // Tier Determination
   // ============================================================================
 
   private determineTier(rhythm: AnnotatedRhythm): Tier {
-    if (rhythm.prescribedTempo !== null && rhythm.prescribedMeter !== null) {
+    const tempo = this.getEffectiveTempo(rhythm);
+    const meter = this.getEffectiveMeter(rhythm);
+
+    if (tempo !== null && meter !== null) {
       return 3;
     }
-    if (rhythm.prescribedTempo !== null) {
+    if (tempo !== null) {
       return 2;
     }
     return 1;
@@ -283,7 +319,7 @@ export class RhythmGrammar implements IVisualGrammar {
     windows: { gridHistoryMs: number; gridFutureMs: number }
   ): Entity[] {
     const entities: Entity[] = [];
-    const tempo = rhythm.prescribedTempo;
+    const tempo = this.getEffectiveTempo(rhythm);
     if (tempo === null) return entities;
 
     const beatMs = 60000 / tempo;
@@ -339,8 +375,8 @@ export class RhythmGrammar implements IVisualGrammar {
     windows: { gridHistoryMs: number; gridFutureMs: number }
   ): Entity[] {
     const entities: Entity[] = [];
-    const tempo = rhythm.prescribedTempo;
-    const meter = rhythm.prescribedMeter;
+    const tempo = this.getEffectiveTempo(rhythm);
+    const meter = this.getEffectiveMeter(rhythm);
     if (tempo === null || meter === null) return entities;
 
     const beatMs = 60000 / tempo;
@@ -675,7 +711,7 @@ export class RhythmGrammar implements IVisualGrammar {
     }
 
     // Fall back to calculating drift from beat grid
-    const tempo = rhythm.prescribedTempo;
+    const tempo = this.getEffectiveTempo(rhythm);
     if (tempo === null) return null;
 
     const beatMs = 60000 / tempo;
