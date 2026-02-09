@@ -552,7 +552,7 @@ export class ThreeJSRenderer implements IRenderer {
     const material = new THREE.MeshBasicMaterial({
       transparent: true,
       side: THREE.DoubleSide,
-      opacity: 0.25,
+      opacity: 0.6,
     });
     material.color.setHSL(color.h / 360, color.s, color.v / 2);
 
@@ -569,7 +569,7 @@ export class ThreeJSRenderer implements IRenderer {
     if (dashParams) {
       // Dashed margin: solid arms + dashed hub arcs (ring-segment meshes)
       const hubR = builder.getHub().radius;
-      const halfWidth = baseRadius * 0.02;
+      const halfWidth = baseRadius * 0.014;
       const outlineMat = new THREE.MeshBasicMaterial({
         side: THREE.DoubleSide,
       });
@@ -585,7 +585,7 @@ export class ThreeJSRenderer implements IRenderer {
         lineGeom.setPositions(positions);
         const lineMat = new LineMaterial({
           color: outlineHex,
-          linewidth: 4,
+          linewidth: 2,
           resolution: this.resolution,
         });
         const line = new Line2(lineGeom, lineMat);
@@ -633,7 +633,7 @@ export class ThreeJSRenderer implements IRenderer {
         lineGeom.setPositions(positions);
         const lineMat = new LineMaterial({
           color: outlineHex,
-          linewidth: 4,
+          linewidth: 2,
           resolution: this.resolution,
         });
         const line = new Line2(lineGeom, lineMat);

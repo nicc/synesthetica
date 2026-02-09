@@ -220,6 +220,10 @@ export class ChordShapeBuilder {
     }
 
     if (this.margin === "convex") {
+      // Larger-radius arc creates a gentler curve than the hub circle.
+      // The hub boundary dips slightly inward between arms, giving a
+      // subtle convex appearance relative to a straight chord.
+      // Matches the HTML validation page's styledArc for convex.
       const expansionFactor = 1.5 + arcSpan * 0.008;
       const convexR = this.hubR * expansionFactor;
       return ` A ${convexR.toFixed(1)} ${convexR.toFixed(1)} 0 0 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
@@ -391,10 +395,28 @@ export class ChordShapeBuilder {
     }
 
     if (this.margin === "convex") {
-      const midAngle = startAngle + arcSpan / 2;
-      const outerR = this.hubR * 1.5;
-      const ctrl = this.polarToThree(midAngle, outerR);
-      shape.quadraticCurveTo(ctrl.x, ctrl.y, end.x, end.y);
+      // Replicate the SVG arc behavior: a larger-radius arc creates a
+      // gentler curve than the hub circle, so the hub boundary dips
+      // slightly inward between arms. Compute the arc midpoint distance
+      // from center and interpolate using a sinusoidal profile.
+      const expansionFactor = 1.5 + arcSpan * 0.008;
+      const convexR = this.hubR * expansionFactor;
+      const halfArcRad = (arcSpan / 2) * Math.PI / 180;
+      const halfChord = this.hubR * Math.sin(halfArcRad);
+      const sagitta = convexR - Math.sqrt(convexR * convexR - halfChord * halfChord);
+      const chordMidDist = this.hubR * Math.cos(halfArcRad);
+      const arcMidDist = chordMidDist + sagitta;
+
+      const segments = Math.max(8, Math.ceil(arcSpan / 3));
+      for (let i = 1; i <= segments; i++) {
+        const t = i / segments;
+        const angle = startAngle + arcSpan * t;
+        // Sinusoidal profile: hubR at endpoints, arcMidDist at midpoint
+        const profile = Math.sin(t * Math.PI);
+        const r = this.hubR + (arcMidDist - this.hubR) * profile;
+        const pt = this.polarToThree(angle, r);
+        shape.lineTo(pt.x, pt.y);
+      }
       return;
     }
 

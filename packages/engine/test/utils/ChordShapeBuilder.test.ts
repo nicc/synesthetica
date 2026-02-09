@@ -129,7 +129,7 @@ describe("ChordShapeBuilder SVG output", () => {
 
       const path = builder.toSVGPath();
 
-      // Convex uses arc (A command)
+      // Convex uses a larger-radius SVG arc for gentle hub curvature
       expect(path).toContain("A");
     });
   });
