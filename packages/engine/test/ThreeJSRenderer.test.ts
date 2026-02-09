@@ -48,13 +48,37 @@ vi.mock("three", () => {
     dispose = vi.fn();
   }
 
+  class MockVector2 {
+    x = 0; y = 0;
+    constructor(x = 0, y = 0) {
+      this.x = x; this.y = y;
+    }
+    set(x: number, y: number) {
+      this.x = x; this.y = y;
+      return this;
+    }
+  }
+
   class MockMeshBasicMaterial extends Material {}
   class MockLineBasicMaterial extends Material {}
 
   // Mock Geometry classes
   class MockBufferGeometry {
     dispose = vi.fn();
-    setFromPoints = vi.fn();
+    setFromPoints() { return this; }
+    computeLineDistances() { return this; }
+  }
+
+  class MockShapeGeometry extends MockBufferGeometry {}
+
+  class MockShape {
+    moveTo = vi.fn();
+    lineTo = vi.fn();
+    quadraticCurveTo = vi.fn();
+    bezierCurveTo = vi.fn();
+    closePath = vi.fn();
+    curves: unknown[] = [];
+    getPoints = vi.fn(() => []);
   }
 
   class MockCircleGeometry extends MockBufferGeometry {}
@@ -67,8 +91,13 @@ vi.mock("three", () => {
     position = new MockVector3();
     scale = new MockVector3(1, 1, 1);
     children: MockObject3D[] = [];
+    userData: Record<string, unknown> = {};
     getObjectByName(name: string): MockObject3D | undefined {
       return this.children.find((c) => c.name === name);
+    }
+    traverse(callback: (obj: MockObject3D) => void) {
+      callback(this);
+      this.children.forEach((c) => c.traverse(callback));
     }
   }
 
@@ -84,12 +113,13 @@ vi.mock("three", () => {
 
   class MockLine extends MockObject3D {
     geometry: MockBufferGeometry;
-    material: MockMaterial;
-    constructor(geometry?: MockBufferGeometry, material?: MockMaterial) {
+    material: Material;
+    constructor(geometry?: MockBufferGeometry, material?: Material) {
       super();
       this.geometry = geometry ?? new MockBufferGeometry();
-      this.material = material ?? new MockMaterial();
+      this.material = material ?? new MockLineBasicMaterial();
     }
+    computeLineDistances() { return this; }
   }
 
   class MockGroup extends MockObject3D {
@@ -145,10 +175,13 @@ vi.mock("three", () => {
     Scene: MockScene,
     PerspectiveCamera: MockPerspectiveCamera,
     Color: MockColor,
+    Vector2: MockVector2,
     Vector3: MockVector3,
     Mesh: MockMesh,
     Line: MockLine,
     Group: MockGroup,
+    Shape: MockShape,
+    ShapeGeometry: MockShapeGeometry,
     CircleGeometry: MockCircleGeometry,
     PlaneGeometry: MockPlaneGeometry,
     RingGeometry: MockRingGeometry,
@@ -158,6 +191,52 @@ vi.mock("three", () => {
     LineBasicMaterial: MockLineBasicMaterial,
     DoubleSide: 2,
   };
+});
+
+// Mock Three.js line addons
+vi.mock("three/examples/jsm/lines/Line2.js", () => {
+  class MockLine2 {
+    name = "";
+    position = { x: 0, y: 0, z: 0, set() { return this; } };
+    scale = { x: 1, y: 1, z: 1, set() { return this; } };
+    children: unknown[] = [];
+    userData: Record<string, unknown> = {};
+    geometry: unknown;
+    material: unknown;
+    constructor(geometry?: unknown, material?: unknown) {
+      this.geometry = geometry;
+      this.material = material;
+    }
+    computeLineDistances() { return this; }
+    traverse(cb: (obj: unknown) => void) { cb(this); }
+  }
+  return { Line2: MockLine2 };
+});
+
+vi.mock("three/examples/jsm/lines/LineMaterial.js", () => {
+  class MockLineMaterial {
+    color = 0;
+    linewidth = 1;
+    transparent = false;
+    opacity = 1;
+    dashed = false;
+    dashSize = 1;
+    gapSize = 1;
+    resolution = { x: 800, y: 600 };
+    dispose = vi.fn();
+    constructor(params?: Record<string, unknown>) {
+      if (params) Object.assign(this, params);
+    }
+  }
+  return { LineMaterial: MockLineMaterial };
+});
+
+vi.mock("three/examples/jsm/lines/LineGeometry.js", () => {
+  class MockLineGeometry {
+    dispose = vi.fn();
+    setPositions() { return this; }
+  }
+  return { LineGeometry: MockLineGeometry };
 });
 
 // Import after mocking

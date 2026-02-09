@@ -27,11 +27,59 @@ const mockWindow = {
 };
 vi.stubGlobal("window", mockWindow);
 
+// Mock Three.js line addons
+vi.mock("three/examples/jsm/lines/Line2.js", () => {
+  class MockLine2 {
+    name = "";
+    position = { x: 0, y: 0, z: 0, set() { return this; } };
+    scale = { x: 1, y: 1, z: 1, set() { return this; } };
+    children: unknown[] = [];
+    userData: Record<string, unknown> = {};
+    geometry: unknown;
+    material: unknown;
+    constructor(geometry?: unknown, material?: unknown) {
+      this.geometry = geometry;
+      this.material = material;
+    }
+    computeLineDistances() { return this; }
+    traverse(cb: (obj: unknown) => void) { cb(this); }
+  }
+  return { Line2: MockLine2 };
+});
+
+vi.mock("three/examples/jsm/lines/LineMaterial.js", () => {
+  class MockLineMaterial {
+    color = 0;
+    linewidth = 1;
+    transparent = false;
+    opacity = 1;
+    dashed = false;
+    dashSize = 1;
+    gapSize = 1;
+    resolution = { x: 800, y: 600 };
+    dispose = vi.fn();
+    constructor(params?: Record<string, unknown>) {
+      if (params) Object.assign(this, params);
+    }
+  }
+  return { LineMaterial: MockLineMaterial };
+});
+
+vi.mock("three/examples/jsm/lines/LineGeometry.js", () => {
+  class MockLineGeometry {
+    dispose = vi.fn();
+    setPositions() { return this; }
+  }
+  return { LineGeometry: MockLineGeometry };
+});
+
 // Mock Three.js module
 vi.mock("three", () => {
   class MockColor {
     r = 0; g = 0; b = 0;
     setHSL() { return this; }
+    getHex() { return 0; }
+    copy() { return this; }
   }
 
   class MockVector3 {
@@ -56,10 +104,32 @@ vi.mock("three", () => {
 
   class MockMeshBasicMaterial extends Material {}
   class MockLineBasicMaterial extends Material {}
+  class MockLineDashedMaterial extends Material {
+    dashSize = 1;
+    gapSize = 1;
+    constructor(params?: Record<string, unknown>) {
+      super();
+      if (params) {
+        Object.assign(this, params);
+      }
+    }
+  }
+
+  class MockVector2 {
+    x = 0; y = 0;
+    constructor(x = 0, y = 0) {
+      this.x = x; this.y = y;
+    }
+    set(x: number, y: number) {
+      this.x = x; this.y = y;
+      return this;
+    }
+  }
 
   class MockBufferGeometry {
     dispose = vi.fn();
-    setFromPoints = vi.fn();
+    setFromPoints() { return this; }
+    computeLineDistances() { return this; }
   }
 
   class MockShapeGeometry extends MockBufferGeometry {}
@@ -110,6 +180,7 @@ vi.mock("three", () => {
       this.geometry = geometry ?? new MockBufferGeometry();
       this.material = material ?? new MockLineBasicMaterial();
     }
+    computeLineDistances() { return this; }
   }
 
   class MockGroup extends MockObject3D {
@@ -160,8 +231,10 @@ vi.mock("three", () => {
     RingGeometry: MockRingGeometry,
     BufferGeometry: MockBufferGeometry,
     Material,
+    Vector2: MockVector2,
     MeshBasicMaterial: MockMeshBasicMaterial,
     LineBasicMaterial: MockLineBasicMaterial,
+    LineDashedMaterial: MockLineDashedMaterial,
     DoubleSide: 2,
   };
 });

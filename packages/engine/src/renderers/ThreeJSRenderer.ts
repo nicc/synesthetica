@@ -19,6 +19,9 @@
  */
 
 import * as THREE from "three";
+import { Line2 } from "three/examples/jsm/lines/Line2.js";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
+import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
 import type {
   IRenderer,
   SceneFrame,
@@ -26,7 +29,7 @@ import type {
   ChordShapeElement,
   MarginStyle,
 } from "@synesthetica/contracts";
-import { ChordShapeBuilder } from "../utils/ChordShapeBuilder";
+import { ChordShapeBuilder, getThreeDashParams } from "../utils/ChordShapeBuilder";
 
 // ============================================================================
 // Configuration
@@ -75,6 +78,9 @@ export class ThreeJSRenderer implements IRenderer {
   // Reusable geometries
   private circleGeometry: THREE.CircleGeometry | null = null;
   private planeGeometry: THREE.PlaneGeometry | null = null;
+
+  // Viewport resolution for LineMaterial (thick lines)
+  private resolution = new THREE.Vector2(800, 600);
 
   constructor(config: ThreeJSRendererConfig = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -125,6 +131,9 @@ export class ThreeJSRenderer implements IRenderer {
       this.config.worldHeight / 2,
       0
     );
+
+    // Track viewport resolution for LineMaterial
+    this.resolution.set(cssWidth, cssHeight);
 
     // Create reusable geometries
     this.circleGeometry = new THREE.CircleGeometry(1, 32);
@@ -192,6 +201,7 @@ export class ThreeJSRenderer implements IRenderer {
 
     // setSize expects CSS pixels when setPixelRatio is used
     this.renderer.setSize(width, height);
+    this.resolution.set(width, height);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
   }
@@ -473,11 +483,12 @@ export class ThreeJSRenderer implements IRenderer {
       return;
     }
 
-    // Check if we need to rebuild geometry (elements changed)
+    // Check if we need to rebuild geometry (elements or margin changed)
     let group = this.entityObjects.get(entity.id) as THREE.Group | undefined;
     const existingElementCount = group?.userData?.elementCount as number | undefined;
+    const existingMargin = group?.userData?.margin as string | undefined;
 
-    if (!group || existingElementCount !== elements.length) {
+    if (!group || existingElementCount !== elements.length || existingMargin !== margin) {
       // Remove old group if it exists
       if (group) {
         this.scene.remove(group);
@@ -486,7 +497,7 @@ export class ThreeJSRenderer implements IRenderer {
 
       // Build new geometry
       group = this.buildChordShapeGroup(elements, margin);
-      group.userData = { elementCount: elements.length };
+      group.userData = { elementCount: elements.length, margin };
       this.scene.add(group);
       this.entityObjects.set(entity.id, group);
     }
@@ -541,12 +552,95 @@ export class ThreeJSRenderer implements IRenderer {
     const material = new THREE.MeshBasicMaterial({
       transparent: true,
       side: THREE.DoubleSide,
-      opacity: 0.8,
+      opacity: 0.25,
     });
     material.color.setHSL(color.h / 360, color.s, color.v / 2);
 
     const mesh = new THREE.Mesh(geometry, material);
     group.add(mesh);
+
+    // Add outline stroke
+    const outlineColor = new THREE.Color().setHSL(
+      color.h / 360, color.s * 0.6, Math.min(color.v / 2 + 0.25, 0.9)
+    );
+    const outlineHex = outlineColor.getHex();
+    const dashParams = getThreeDashParams(margin, baseRadius);
+
+    if (dashParams) {
+      // Dashed margin: solid arms + dashed hub arcs (ring-segment meshes)
+      const hubR = builder.getHub().radius;
+      const halfWidth = baseRadius * 0.02;
+      const outlineMat = new THREE.MeshBasicMaterial({
+        side: THREE.DoubleSide,
+      });
+      outlineMat.color.copy(outlineColor);
+
+      // Solid arm edges
+      for (const armPts of builder.getThreeArmEdges()) {
+        const positions: number[] = [];
+        for (const p of armPts) {
+          positions.push(p.x, p.y, 0.5);
+        }
+        const lineGeom = new LineGeometry();
+        lineGeom.setPositions(positions);
+        const lineMat = new LineMaterial({
+          color: outlineHex,
+          linewidth: 4,
+          resolution: this.resolution,
+        });
+        const line = new Line2(lineGeom, lineMat);
+        line.computeLineDistances();
+        group.add(line);
+      }
+
+      // Dashed hub arcs as ring-segment meshes (square caps)
+      for (const arc of builder.getThreeHubArcs()) {
+        const arcLength = hubR * arc.arcSpan * Math.PI / 180;
+        const cycle = dashParams.dashSize + dashParams.gapSize;
+        let d = 0;
+        while (d < arcLength) {
+          const dashLen = Math.min(dashParams.dashSize, arcLength - d);
+          if (dashLen < cycle * 0.1) break; // Skip tiny remnants
+          const dashAngle = (dashLen / hubR) * (180 / Math.PI);
+          // Convert compass angles to Three.js RingGeometry angles
+          // compass: 0=north, CW. Math: 0=east, CCW.
+          const compassStart = arc.startAngle + (d / hubR) * (180 / Math.PI);
+          const mathStart = ((90 - compassStart - dashAngle) * Math.PI) / 180;
+          const mathLength = (dashAngle * Math.PI) / 180;
+          const segments = Math.max(4, Math.ceil(dashAngle / 5));
+          const ring = new THREE.RingGeometry(
+            hubR - halfWidth, hubR + halfWidth,
+            segments, 1,
+            mathStart, mathLength
+          );
+          const dashMesh = new THREE.Mesh(ring, outlineMat);
+          dashMesh.position.z = 0.5;
+          group.add(dashMesh);
+          d += cycle;
+        }
+      }
+    } else {
+      // Solid outline
+      const outlinePoints = shape.getPoints(64);
+      if (outlinePoints.length > 0) {
+        const positions: number[] = [];
+        for (const p of outlinePoints) {
+          positions.push(p.x, p.y, 0.5);
+        }
+        positions.push(outlinePoints[0].x, outlinePoints[0].y, 0.5);
+
+        const lineGeom = new LineGeometry();
+        lineGeom.setPositions(positions);
+        const lineMat = new LineMaterial({
+          color: outlineHex,
+          linewidth: 4,
+          resolution: this.resolution,
+        });
+        const line = new Line2(lineGeom, lineMat);
+        line.computeLineDistances();
+        group.add(line);
+      }
+    }
 
     // Add chromatic lines
     for (const lineData of builder.toThreeLines()) {

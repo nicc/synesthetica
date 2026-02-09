@@ -209,6 +209,20 @@ describe("HarmonyGrammar", () => {
       expect(tensionEntity?.data?.tension).toBe(0.5);
     });
 
+    it("passes dashed margin through entity data for sus chords", () => {
+      const sus2 = createTestChord(0, "sus2", [0, 2, 7]);
+      const frame2 = createTestFrame(1000, sus2, 0.2);
+      const scene2 = grammar.update(frame2, null);
+      const entity2 = scene2.entities.find((e) => e.data?.type === "chord-shape");
+      expect(entity2?.data?.margin).toBe("dash-short");
+
+      const sus4 = createTestChord(0, "sus4", [0, 5, 7]);
+      const frame4 = createTestFrame(1000, sus4, 0.2);
+      const scene4 = grammar.update(frame4, null);
+      const entity4 = scene4.entities.find((e) => e.data?.type === "chord-shape");
+      expect(entity4?.data?.margin).toBe("dash-long");
+    });
+
     it("handles no chords gracefully", () => {
       const frame = createTestFrame(1000, null, 0);
       const scene = grammar.update(frame, null);
@@ -269,14 +283,39 @@ describe("HarmonyGrammar", () => {
       maybeWriteSnapshot("augmented-triad", svg);
     });
 
-    it("renders sus4 chord", () => {
+    it("renders sus4 chord with long dash margin", () => {
       const chord = createTestChord(0, "sus4", [0, 5, 7]);
       const frame = createTestFrame(1000, chord, 0.25);
       const svg = grammar.renderToSVG(frame);
 
       expect(svg).toContain("<svg");
-      expect(svg).toContain("stroke-dasharray");
+      expect(svg).toContain('stroke-dasharray="6,3"');
       maybeWriteSnapshot("sus4-chord", svg);
+    });
+
+    it("renders sus2 chord with short dash margin", () => {
+      const chord = createTestChord(0, "sus2", [0, 2, 7]);
+      const frame = createTestFrame(1000, chord, 0.2);
+      const svg = grammar.renderToSVG(frame);
+
+      expect(svg).toContain("<svg");
+      expect(svg).toContain('stroke-dasharray="3,3"');
+      maybeWriteSnapshot("sus2-chord", svg);
+    });
+
+    it("does not include stroke-dasharray for non-sus chords", () => {
+      const chords = [
+        createTestChord(0, "maj", [0, 4, 7]),
+        createTestChord(0, "min", [0, 3, 7]),
+        createTestChord(0, "dim", [0, 3, 6]),
+        createTestChord(0, "aug", [0, 4, 8]),
+      ];
+
+      for (const chord of chords) {
+        const frame = createTestFrame(1000, chord, 0.3);
+        const svg = grammar.renderToSVG(frame);
+        expect(svg).not.toContain("stroke-dasharray");
+      }
     });
 
     it("renders major 9th with extensions", () => {

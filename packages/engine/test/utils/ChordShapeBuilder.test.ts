@@ -10,6 +10,7 @@ import {
   ChordShapeBuilder,
   colorToCSS,
   getDashArray,
+  getThreeDashParams,
   HUB_RADIUS,
   ARM_LENGTH,
   BASE_WIDTH,
@@ -481,5 +482,124 @@ describe("getDashArray", () => {
     expect(getDashArray("wavy")).toBeUndefined();
     expect(getDashArray("concave")).toBeUndefined();
     expect(getDashArray("convex")).toBeUndefined();
+  });
+});
+
+// ============================================================================
+// Three.js Dash Parameter Tests
+// ============================================================================
+
+describe("getThreeDashParams", () => {
+  it("returns proportional dash/gap for dash-short (sus2)", () => {
+    const params = getThreeDashParams("dash-short", 10);
+    expect(params).not.toBeNull();
+    expect(params!.dashSize).toBeCloseTo(0.5); // 10 * 0.05
+    expect(params!.gapSize).toBeCloseTo(0.5); // equal dash and gap
+  });
+
+  it("returns longer dash for dash-long (sus4)", () => {
+    const params = getThreeDashParams("dash-long", 10);
+    expect(params).not.toBeNull();
+    expect(params!.dashSize).toBeCloseTo(1.0); // 10 * 0.1
+    expect(params!.gapSize).toBeCloseTo(0.5); // 10 * 0.05
+  });
+
+  it("scales with shape radius", () => {
+    const small = getThreeDashParams("dash-short", 5);
+    const large = getThreeDashParams("dash-short", 20);
+    expect(large!.dashSize).toBe(small!.dashSize * 4);
+  });
+
+  it("returns null for non-dashed styles", () => {
+    expect(getThreeDashParams("straight", 10)).toBeNull();
+    expect(getThreeDashParams("wavy", 10)).toBeNull();
+    expect(getThreeDashParams("concave", 10)).toBeNull();
+    expect(getThreeDashParams("convex", 10)).toBeNull();
+  });
+});
+
+// ============================================================================
+// Dashed Margin SVG Regression Tests
+// ============================================================================
+
+describe("ChordShapeBuilder dashed margins", () => {
+  function createSus2(): ChordShapeElement[] {
+    return [
+      makeElement(0, "triadic", "1"),
+      makeElement(60, "triadic", "2"),   // sus2: 2nd at 60°
+      makeElement(210, "triadic", "5"),
+    ];
+  }
+
+  function createSus4(): ChordShapeElement[] {
+    return [
+      makeElement(0, "triadic", "1"),
+      makeElement(150, "triadic", "4"),  // sus4: 4th at 150°
+      makeElement(210, "triadic", "5"),
+    ];
+  }
+
+  it("dash-short SVG path matches straight geometry (same arc shape)", () => {
+    const straightBuilder = new ChordShapeBuilder(createSus2(), "straight", {
+      scale: 100,
+      center: { x: 200, y: 200 },
+    });
+
+    const dashBuilder = new ChordShapeBuilder(createSus2(), "dash-short", {
+      scale: 100,
+      center: { x: 200, y: 200 },
+    });
+
+    // Geometry is identical — dashing is a stroke attribute, not path shape
+    expect(dashBuilder.toSVGPath()).toBe(straightBuilder.toSVGPath());
+  });
+
+  it("dash-long SVG path matches straight geometry", () => {
+    const straightBuilder = new ChordShapeBuilder(createSus4(), "straight", {
+      scale: 100,
+      center: { x: 200, y: 200 },
+    });
+
+    const dashBuilder = new ChordShapeBuilder(createSus4(), "dash-long", {
+      scale: 100,
+      center: { x: 200, y: 200 },
+    });
+
+    expect(dashBuilder.toSVGPath()).toBe(straightBuilder.toSVGPath());
+  });
+
+  it("dash-short Three.js shape matches straight geometry", () => {
+    const straightBuilder = new ChordShapeBuilder(createSus2(), "straight", {
+      scale: 10,
+      center: { x: 0, y: 0 },
+    });
+
+    const dashBuilder = new ChordShapeBuilder(createSus2(), "dash-short", {
+      scale: 10,
+      center: { x: 0, y: 0 },
+    });
+
+    const straightPoints = straightBuilder.toThreeShape().getPoints(20);
+    const dashPoints = dashBuilder.toThreeShape().getPoints(20);
+
+    expect(dashPoints.length).toBe(straightPoints.length);
+    for (let i = 0; i < dashPoints.length; i++) {
+      expect(dashPoints[i].x).toBeCloseTo(straightPoints[i].x, 5);
+      expect(dashPoints[i].y).toBeCloseTo(straightPoints[i].y, 5);
+    }
+  });
+
+  it("getMargin returns the dashed style", () => {
+    const sus2Builder = new ChordShapeBuilder(createSus2(), "dash-short", {
+      scale: 100,
+      center: { x: 100, y: 100 },
+    });
+    expect(sus2Builder.getMargin()).toBe("dash-short");
+
+    const sus4Builder = new ChordShapeBuilder(createSus4(), "dash-long", {
+      scale: 100,
+      center: { x: 100, y: 100 },
+    });
+    expect(sus4Builder.getMargin()).toBe("dash-long");
   });
 });

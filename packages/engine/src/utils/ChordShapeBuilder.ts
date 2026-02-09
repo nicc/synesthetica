@@ -373,8 +373,9 @@ export class ChordShapeBuilder {
     }
 
     if (this.margin === "straight" || this.margin === "dash-short" || this.margin === "dash-long") {
-      // Approximate arc with segments
-      const segments = Math.max(3, Math.ceil(arcSpan / 15));
+      // Approximate arc with fine segments (3° each) to avoid visible
+      // miter joints when rendered with thick Line2 outlines
+      const segments = Math.max(8, Math.ceil(arcSpan / 3));
       for (let i = 1; i <= segments; i++) {
         const t = i / segments;
         const angle = startAngle + arcSpan * t;
@@ -472,6 +473,37 @@ export class ChordShapeBuilder {
   getMargin(): MarginStyle {
     return this.margin;
   }
+
+  /**
+   * Get hub arc segments in Three.js local coordinates.
+   * Each arc is the hub section between two adjacent arms.
+   * Angles are in compass degrees (0=north, clockwise).
+   */
+  getThreeHubArcs(): Array<{ startAngle: number; arcSpan: number }> {
+    const arcs: Array<{ startAngle: number; arcSpan: number }> = [];
+    for (let i = 0; i < this.arms.length; i++) {
+      const curr = this.arms[i];
+      const next = this.arms[(i + 1) % this.arms.length];
+      const startAngle = curr.angle + BASE_WIDTH / 2;
+      const endAngle = next.angle - BASE_WIDTH / 2;
+      let arcSpan = endAngle - startAngle;
+      if (arcSpan < 0) arcSpan += 360;
+      arcs.push({ startAngle, arcSpan });
+    }
+    return arcs;
+  }
+
+  /**
+   * Get arm edge paths in Three.js local coordinates.
+   * Each arm has 3 points: baseLeft → tip → baseRight.
+   */
+  getThreeArmEdges(): Array<Array<{ x: number; y: number }>> {
+    return this.arms.map((arm) => [
+      this.toThreePoint(arm.baseLeft),
+      this.toThreePoint(arm.tip),
+      this.toThreePoint(arm.baseRight),
+    ]);
+  }
 }
 
 // ============================================================================
@@ -507,10 +539,32 @@ export function colorToCSS(color: ColorHSVA): string {
 }
 
 /**
- * Get dash array for dashed margin styles.
+ * Get SVG dash array for dashed margin styles.
  */
 export function getDashArray(margin: MarginStyle): string | undefined {
   if (margin === "dash-short") return "3,3";
   if (margin === "dash-long") return "6,3";
   return undefined;
+}
+
+/**
+ * Get Three.js dash parameters for dashed margin styles.
+ * Sizes are proportional to the shape scale.
+ * Returns null for non-dashed styles.
+ */
+export function getThreeDashParams(
+  margin: MarginStyle,
+  scale: number
+): { dashSize: number; gapSize: number } | null {
+  // Dashes apply only to the hub arcs, not the full outline.
+  // Hub circumference per arc ≈ hubR * arcSpan, much smaller than
+  // total outline. Sizes are in world units. With baseRadius=10
+  // and hubR=3, a triad hub arc ≈ 4.7 units, giving ~5 and ~3 dashes.
+  if (margin === "dash-short") {
+    return { dashSize: scale * 0.05, gapSize: scale * 0.05 };
+  }
+  if (margin === "dash-long") {
+    return { dashSize: scale * 0.1, gapSize: scale * 0.05 };
+  }
+  return null;
 }

@@ -246,7 +246,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     }
 
     const root = this.noteNameToPitchClass(parsed.tonic);
-    const quality = this.mapTonalQuality(parsed.quality);
+    const quality = this.mapTonalQuality(parsed.quality, parsed.type);
 
     // Confidence based on number of alternatives
     let confidence: Confidence;
@@ -441,36 +441,40 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     return note.chroma as PitchClass;
   }
 
-  private mapTonalQuality(tonalQuality: string): ChordQuality {
-    const mapping: Record<string, ChordQuality> = {
+  private mapTonalQuality(tonalQuality: string, tonalType?: string): ChordQuality {
+    // Tonal.js's `type` field is more specific than `quality`. For example,
+    // quality="Major" for both major triads and dominant 7ths, while type
+    // distinguishes "major" from "dominant seventh". Check type first.
+    if (tonalType) {
+      const typeMapping: Record<string, ChordQuality> = {
+        major: "maj",
+        minor: "min",
+        diminished: "dim",
+        augmented: "aug",
+        "suspended second": "sus2",
+        "suspended fourth": "sus4",
+        "major seventh": "maj7",
+        "minor seventh": "min7",
+        "dominant seventh": "dom7",
+        "half-diminished": "hdim7",
+        "diminished seventh": "dim7",
+      };
+      const fromType = typeMapping[tonalType];
+      if (fromType) return fromType;
+    }
+
+    // Fall back to quality field for any types not in the mapping above
+    const qualityMapping: Record<string, ChordQuality> = {
       Major: "maj",
       "": "maj",
       minor: "min",
       Minor: "min",
-      m: "min",
       diminished: "dim",
       Diminished: "dim",
-      dim: "dim",
       augmented: "aug",
       Augmented: "aug",
-      aug: "aug",
-      sus2: "sus2",
-      sus4: "sus4",
-      "Major seventh": "maj7",
-      Maj7: "maj7",
-      M7: "maj7",
-      "minor seventh": "min7",
-      "Minor seventh": "min7",
-      m7: "min7",
-      "dominant seventh": "dom7",
-      "Dominant seventh": "dom7",
-      "7": "dom7",
-      "half-diminished": "hdim7",
-      m7b5: "hdim7",
-      "diminished seventh": "dim7",
-      dim7: "dim7",
     };
 
-    return mapping[tonalQuality] ?? "unknown";
+    return qualityMapping[tonalQuality] ?? "unknown";
   }
 }
