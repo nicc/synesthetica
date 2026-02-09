@@ -49,7 +49,7 @@ export interface NoteTrackingConfig {
 
 const DEFAULT_CONFIG: Required<Omit<NoteTrackingConfig, "partId">> = {
   attackDurationMs: 50,
-  releaseWindowMs: 500,
+  releaseWindowMs: 10000,
 };
 
 /**
@@ -195,7 +195,9 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
     const notes: Note[] = [];
 
     for (const tracked of this.activeNotes.values()) {
-      const duration = currentTime - tracked.onset;
+      const duration = tracked.releaseTime !== null
+        ? tracked.releaseTime - tracked.onset
+        : currentTime - tracked.onset;
       const phase = this.calculatePhase(tracked, currentTime);
 
       const note: Note = {

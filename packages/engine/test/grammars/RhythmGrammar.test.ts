@@ -435,18 +435,20 @@ describe("RhythmGrammar", () => {
     it("shows limited history at min horizon", () => {
       grammar.setMacros({ horizon: 0.0 });
 
-      const frame = createTestFrame(8000, {
+      // At t=10000 with 8000ms scroll horizon, notes ending before t=2000
+      // have scrolled off the top of the screen (endY < 0)
+      const frame = createTestFrame(10000, {
         tempo: 120, // 500ms per beat
         notes: [
-          { id: "old", pc: 0, onset: 1000 }, // Way too old
-          { id: "recent", pc: 3, onset: 7600 }, // Within ~1 beat
+          { id: "old", pc: 0, onset: 1000, duration: 200, phase: "release" }, // endTime=1200, off-screen
+          { id: "recent", pc: 3, onset: 9600 }, // Within ~1 beat
         ],
       });
 
       const scene = grammar.update(frame, null);
       const notes = scene.entities.filter((e) => e.data?.type === "note-strip");
 
-      // Only recent note should be visible
+      // Only recent note should be visible (old note scrolled off top of screen)
       expect(notes.length).toBe(1);
       expect(notes[0].data?.noteId).toBe("recent");
     });
@@ -802,10 +804,10 @@ describe("RhythmGrammar snapshots", () => {
       tempo: 120,
       notes: [
         // These notes are OUTSIDE note window (>8000ms old) but INSIDE reference window
-        // They should show reference lines but NO note bars
-        { id: "faded-early", pc: 0, onset: 1500, duration: 200 }, // 8500ms old - outside note window
-        { id: "faded-late", pc: 3, onset: 1700, duration: 200 }, // 8300ms old - outside note window
-        { id: "faded-tight", pc: 6, onset: 1900, duration: 200 }, // 8100ms old - outside note window
+        // They should show reference lines but NO note bars (released, not sustaining)
+        { id: "faded-early", pc: 0, onset: 1500, duration: 200, phase: "release" }, // 8500ms old
+        { id: "faded-late", pc: 3, onset: 1700, duration: 200, phase: "release" }, // 8300ms old
+        { id: "faded-tight", pc: 6, onset: 1900, duration: 200, phase: "release" }, // 8100ms old
 
         // These notes are INSIDE note window - should show both bars AND reference lines
         { id: "visible-early", pc: 9, onset: 8500, duration: 200 }, // 1500ms old
@@ -826,10 +828,12 @@ describe("RhythmGrammar snapshots", () => {
 
     console.log("\nLinger Effect:\n" + formatMetrics(metrics));
 
-    // Should have 2 note bars (only visible notes inside 8000ms window)
-    expect(metrics.byType["note-strip"]).toBe(2);
-    // Should have 5 reference lines (all notes in 10400ms reference window)
-    expect(metrics.byType["reference-line"]).toBe(5);
+    // Should have 3 note strips: 2 visible + faded-tight (endY just barely on-screen).
+    // faded-early/faded-late have endY < 0 (scrolled off top of screen).
+    expect(metrics.byType["note-strip"]).toBe(3);
+    // Reference lines only render when onsetY >= 0. The 3 faded notes have
+    // onsetY < 0 (past the 8000ms scroll horizon). Only 2 visible notes qualify.
+    expect(metrics.byType["reference-line"]).toBe(2);
     // Faded notes with drift should still have streaks
     expect(metrics.byType["streak"]).toBeGreaterThan(0);
   });

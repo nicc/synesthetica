@@ -1,5 +1,5 @@
 {
-    "chatgpt.openOnStartup": true,
+    "chatgpt.openOnStartup": false,
     "editor.codeActionsOnSave": {
         "source.fixAll.eslint": "explicit"
     }

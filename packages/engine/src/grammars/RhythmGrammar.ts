@@ -439,27 +439,31 @@ export class RhythmGrammar implements IVisualGrammar {
     const age = t - note.onset;
     if (age < 0) return entities; // Future notes not shown
 
-    // Reference window (streaks + reference lines) lingers longer than notes
-    const inReferenceWindow = age <= windows.streakHistoryMs;
-    const inNoteWindow = age <= windows.noteHistoryMs;
+    const noteEndTime = note.onset + note.duration;
 
-    // If outside both windows, nothing to render
-    if (!inReferenceWindow) return entities;
-
-    // Position: x is pitch class, y is onset time (bottom of bar)
+    // Position: x is pitch class, y is onset time (top of bar)
     const x = this.pitchClassToX(note.pitch.pc);
     const onsetY = this.timeToY(note.onset, t);
 
-    if (onsetY < 0 || onsetY > 1) return entities;
+    // Bar bottom: clamp to NOW line. During sustain, noteEndTime = currentTime
+    // so rawEndY = NOW_LINE_Y naturally. After release, duration is frozen so
+    // noteEndTime is a fixed past timestamp — rawEndY < NOW_LINE_Y, scrolling up.
+    const rawEndY = this.timeToY(noteEndTime, t);
+    const endY = Math.min(rawEndY, NOW_LINE_Y);
+
+    // Screen-based culling only: remove when entire bar is off-screen.
+    // Note strips are never killed by time windows — they scroll off naturally.
+    if (endY < 0 || onsetY > 1) return entities;
 
     // Get drift info (needed for reference lines and streaks)
     const driftInfo = this.getDriftInfo(note.onset, rhythm, tier);
 
-    // Reference window elements: reference lines and streaks
-    // These linger longer than note strips
-    if (inReferenceWindow && driftInfo) {
-      // Calculate opacity based on reference window
-      const refOpacity = this.distanceToOpacity(age, windows.streakHistoryMs) * 0.8;
+    // Reference lines and streaks use time-based fade windows
+    const fadeAge = Math.max(t - noteEndTime, 0);
+    const inReferenceWindow = fadeAge <= windows.streakHistoryMs;
+
+    if (inReferenceWindow && driftInfo && onsetY >= 0) {
+      const refOpacity = this.distanceToOpacity(fadeAge, windows.streakHistoryMs) * 0.8;
 
       // Add reference line showing where the beat was
       const refLineY = this.timeToY(
@@ -494,7 +498,7 @@ export class RhythmGrammar implements IVisualGrammar {
         const streaks = this.createStreakLines(
           note.id,
           x,
-          onsetY, // Use onset Y (bottom of bar) for streak anchor
+          onsetY, // Use onset Y (top of bar) for streak anchor
           barWidth,
           driftInfo.driftMs,
           visual.palette.primary,
@@ -506,27 +510,27 @@ export class RhythmGrammar implements IVisualGrammar {
       }
     }
 
-    // Note strips only render within the note window
-    if (!inNoteWindow) return entities;
+    // Note strip rendering — only gated by screen position, not time windows
 
-    // Calculate bar height from duration
-    // In our coordinate system: smaller y = higher on screen = further in past
-    // onset is in the past (smaller y), note end is closer to now (larger y)
-    // So bar extends from onsetY (top) down to endY (bottom, closer to NOW line)
-    // BUT: the bar should never extend past the NOW line into the future
-    const noteEndTime = note.onset + note.duration;
-    const rawEndY = this.timeToY(noteEndTime, t);
+    // Clamp onsetY to screen top so the bar rectangle starts at the visible edge
+    const clampedOnsetY = Math.max(onsetY, 0);
 
-    // Clamp endY to NOW line - we don't render notes into the future
-    const endY = Math.min(rawEndY, NOW_LINE_Y);
-
-    // Bar height: endY (bottom) - onsetY (top)
-    const barHeight = Math.max(endY - onsetY, MIN_NOTE_STRIP_HEIGHT);
+    // Bar height: endY (bottom) - clampedOnsetY (top, clamped to screen)
+    // When expanding to minimum height, grow upward (move top up) not downward
+    const rawBarHeight = endY - clampedOnsetY;
+    let barHeight: number;
+    let barTop = clampedOnsetY;
+    if (rawBarHeight >= MIN_NOTE_STRIP_HEIGHT) {
+      barHeight = rawBarHeight;
+    } else {
+      barHeight = MIN_NOTE_STRIP_HEIGHT;
+      barTop = Math.max(endY - MIN_NOTE_STRIP_HEIGHT, 0);
+    }
 
     // Width based on velocity
     const barWidth = NOTE_STRIP_WIDTH * (0.5 + (note.velocity / 127) * 0.5);
 
-    // Opacity based on age and phase
+    // Phase-based base opacity
     let baseOpacity: number;
     switch (note.phase) {
       case "attack":
@@ -539,27 +543,29 @@ export class RhythmGrammar implements IVisualGrammar {
         baseOpacity = 0.6;
         break;
     }
-    const opacity = baseOpacity * this.distanceToOpacity(age, windows.noteHistoryMs);
+
+    // Gradient opacity based on screen position: fades to transparent near
+    // the top of the screen (horizon), fully opaque at the NOW line.
+    // This works for both sustain (top fades, bottom bright at NOW)
+    // and release (whole bar fades as it scrolls toward the top).
+    const topOpacity = baseOpacity * Math.min(barTop / NOW_LINE_Y, 1);
+    const bottomOpacity = baseOpacity * Math.min(endY / NOW_LINE_Y, 1);
 
     // Create main note strip entity
-    // Position is center of the bar, with barHeight stored in data for renderer
-    // Bar extends from onsetY (top) down toward NOW line
-    // Since endY is clamped to NOW_LINE_Y, the bar bottom is at min(endY, NOW_LINE_Y)
-    // Center = top + height/2 = onsetY + barHeight/2
-    // But we need to ensure the bar doesn't visually extend past NOW line
-    // So we position center such that bottom edge is at endY (which is clamped)
-    const barCenterY = endY - barHeight / 2;
+    // Position at barTop (top of visible bar) so it scrolls in sync with
+    // streaks and grid lines. When onset scrolls off-screen, the bar is clipped
+    // to start at the top edge.
     entities.push({
       id: this.entityId(`note-${note.id}`),
       part,
       kind: "particle",
       createdAt: note.onset,
       updatedAt: t,
-      position: { x, y: barCenterY },
+      position: { x, y: barTop },
       style: {
         color: visual.palette.primary,
         size: barWidth * 1000, // Scale for renderer (will be divided by 1000)
-        opacity,
+        opacity: bottomOpacity, // Overall opacity for non-shader renderers
       },
       data: {
         type: "note-strip",
@@ -569,7 +575,9 @@ export class RhythmGrammar implements IVisualGrammar {
         driftMs: driftInfo?.driftMs,
         subdivisionLabel: driftInfo?.label,
         barHeight, // Normalized height for renderer
-        onsetY, // Bottom of bar (for streak positioning)
+        endY, // Bottom of bar (clamped to NOW line)
+        topOpacity, // Opacity at top edge (onset/horizon)
+        bottomOpacity, // Opacity at bottom edge (near NOW)
       },
     });
 
@@ -783,8 +791,10 @@ export class RhythmGrammar implements IVisualGrammar {
     const age = now - eventTime; // Positive = past, negative = future
 
     if (age >= 0) {
-      // Past: map to range [0, NOW_LINE_Y]
-      const normalizedAge = Math.min(age / TIME_HORIZON_HISTORY_MS, 1);
+      // Past: Y decreases linearly with age. Notes older than
+      // TIME_HORIZON_HISTORY_MS go past the top of the screen (Y < 0)
+      // and are culled by screen-based checks (endY < 0).
+      const normalizedAge = age / TIME_HORIZON_HISTORY_MS;
       return NOW_LINE_Y - normalizedAge * NOW_LINE_Y;
     } else {
       // Future: map to range [NOW_LINE_Y, 1]

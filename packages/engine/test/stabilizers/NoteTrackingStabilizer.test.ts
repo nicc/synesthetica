@@ -64,6 +64,21 @@ describe("NoteTrackingStabilizer", () => {
       expect(result.notes[0].duration).toBe(100);
     });
 
+    it("freezes duration at release time", () => {
+      // Note on at t=100
+      stabilizer.apply(makeFrame(100, [noteOn(60, 100, 100)]), null);
+
+      // Note off at t=500 (duration should freeze at 400)
+      stabilizer.apply(makeFrame(500, [noteOff(60, 500)]), null);
+
+      // Later frame at t=800 - duration should still be 400, not 700
+      const result = stabilizer.apply(makeFrame(800, []), null);
+
+      expect(result.notes).toHaveLength(1);
+      expect(result.notes[0].duration).toBe(400);
+      expect(result.notes[0].release).toBe(500);
+    });
+
     it("tracks release time on note_off", () => {
       // Note on
       stabilizer.apply(makeFrame(100, [noteOn(60, 100, 100)]), null);

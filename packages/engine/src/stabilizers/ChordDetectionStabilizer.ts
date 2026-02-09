@@ -219,6 +219,12 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
 
   /**
    * Detect chord from a set of pitch classes.
+   *
+   * Tries the full note set AND all (n-1) subsets (dropping one note at a
+   * time). Each candidate is scored by how many input pitch classes match
+   * the MAPPED quality's expected intervals. This prefers simpler, more
+   * recognizable chords: Cmaj7 (4/5 match) beats EmMaj7b6 (3/5 after
+   * mapping to "min").
    */
   private detectChordFromPitchClasses(
     pitchClasses: Set<PitchClass>
@@ -227,38 +233,79 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
       return null;
     }
 
-    // Convert pitch classes to note names (use octave 4 as reference)
-    const noteNames = [...pitchClasses].map((pc) => this.pcToNoteName(pc));
+    const pcArray = [...pitchClasses];
+    const noteNames = pcArray.map((pc) => this.pcToNoteName(pc));
 
-    // Use Tonal to detect chord
-    const detected = Tonal.Chord.detect(noteNames);
+    // Collect candidate detections from full set and (n-1) subsets
+    type Candidate = { root: PitchClass; quality: ChordQuality; coverage: number };
+    const candidates: Candidate[] = [];
 
-    if (detected.length === 0) {
+    // Helper: run detection on a set of note names and score results
+    const tryDetect = (names: string[]): void => {
+      const detected = Tonal.Chord.detect(names);
+      for (const name of detected) {
+        const chord = Tonal.Chord.get(name);
+        if (!chord.tonic) continue;
+
+        const root = this.noteNameToPitchClass(chord.tonic);
+        const quality = this.mapTonalQuality(chord.quality, chord.type);
+        const expected = this.getExpectedSemitones(quality);
+        if (!expected) continue; // Skip unknown qualities
+
+        // Count how many input PCs match this chord's expected intervals
+        let coverage = 0;
+        for (const pc of pitchClasses) {
+          const semitones = (pc - root + 12) % 12;
+          if (expected.includes(semitones)) coverage++;
+        }
+        candidates.push({ root, quality, coverage });
+      }
+    };
+
+    // Try the full note set
+    tryDetect(noteNames);
+
+    // Try (n-1) subsets — dropping each note once
+    if (noteNames.length > this.config.minPitchClasses) {
+      for (let i = 0; i < noteNames.length; i++) {
+        const subset = noteNames.filter((_, j) => j !== i);
+        tryDetect(subset);
+      }
+    }
+
+    if (candidates.length === 0) {
       return null;
     }
 
-    // Parse the first (best) match
-    const chordName = detected[0];
-    const parsed = Tonal.Chord.get(chordName);
+    // Pick the candidate with the best mapped coverage
+    candidates.sort((a, b) => b.coverage - a.coverage);
+    const best = candidates[0];
 
-    if (!parsed.tonic) {
-      return null;
-    }
+    // Confidence: higher coverage = higher confidence
+    const confidence = Math.min(1, best.coverage / pitchClasses.size) as Confidence;
 
-    const root = this.noteNameToPitchClass(parsed.tonic);
-    const quality = this.mapTonalQuality(parsed.quality, parsed.type);
+    return { root: best.root, quality: best.quality, confidence };
+  }
 
-    // Confidence based on number of alternatives
-    let confidence: Confidence;
-    if (detected.length === 1) {
-      confidence = 1.0;
-    } else if (detected.length === 2) {
-      confidence = 0.8;
-    } else {
-      confidence = 0.6;
-    }
-
-    return { root, quality, confidence };
+  /**
+   * Expected interval semitones for each chord quality.
+   * Used for scoring: how many input notes are explained by a detected chord.
+   */
+  private getExpectedSemitones(quality: ChordQuality): number[] | null {
+    const map: Partial<Record<ChordQuality, number[]>> = {
+      maj: [0, 4, 7],
+      min: [0, 3, 7],
+      dim: [0, 3, 6],
+      aug: [0, 4, 8],
+      sus2: [0, 2, 7],
+      sus4: [0, 5, 7],
+      maj7: [0, 4, 7, 11],
+      min7: [0, 3, 7, 10],
+      dom7: [0, 4, 7, 10],
+      hdim7: [0, 3, 6, 10],
+      dim7: [0, 3, 6, 9],
+    };
+    return map[quality] ?? null;
   }
 
   /**

@@ -256,7 +256,7 @@ export class HarmonyGrammar implements IVisualGrammar {
 
     // Render chromatic lines first (behind shape)
     for (const line of builder.toSVGLines()) {
-      svg += `  <path d="${line.path}" fill="none" stroke="${colorToCSS(line.color)}" stroke-width="3" stroke-linecap="round"/>\n`;
+      svg += `  <path d="${line.path}" fill="none" stroke="${colorToCSS(line.color)}" stroke-width="${this.config.strokeWidth}" stroke-linecap="round"/>\n`;
     }
 
     // Render the main shape

@@ -132,8 +132,9 @@ export class ThreeJSRenderer implements IRenderer {
       0
     );
 
-    // Track viewport resolution for LineMaterial
-    this.resolution.set(cssWidth, cssHeight);
+    // LineMaterial needs device pixel resolution for crisp rendering
+    const dpr = window.devicePixelRatio || 1;
+    this.resolution.set(cssWidth * dpr, cssHeight * dpr);
 
     // Create reusable geometries
     this.circleGeometry = new THREE.CircleGeometry(1, 32);
@@ -201,9 +202,28 @@ export class ThreeJSRenderer implements IRenderer {
 
     // setSize expects CSS pixels when setPixelRatio is used
     this.renderer.setSize(width, height);
-    this.resolution.set(width, height);
+    const dpr = this.renderer.getPixelRatio?.() ?? 1;
+    this.resolution.set(width * dpr, height * dpr);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+
+    // Update resolution on all cached LineMaterial instances so line widths
+    // stay correct after resize (LineMaterial copies resolution at creation time)
+    this.updateLineMaterialResolutions();
+  }
+
+  /**
+   * Propagate current resolution to all LineMaterial instances in cached entity objects.
+   */
+  private updateLineMaterialResolutions(): void {
+    for (const obj of this.entityObjects.values()) {
+      obj.traverse((child) => {
+        if (child instanceof Line2) {
+          const mat = child.material as LineMaterial;
+          mat.resolution.copy(this.resolution);
+        }
+      });
+    }
   }
 
   // ==========================================================================
@@ -235,6 +255,12 @@ export class ThreeJSRenderer implements IRenderer {
    */
   private updateParticle(entity: Entity): void {
     if (!this.scene || !this.circleGeometry) return;
+
+    // Note strips render as rectangles, not circles
+    if (entity.data?.type === "note-strip") {
+      this.updateNoteStrip(entity);
+      return;
+    }
 
     let mesh = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
 
@@ -272,6 +298,72 @@ export class ThreeJSRenderer implements IRenderer {
       opacity *= Math.max(0, lifeRatio);
     }
     material.opacity = opacity * (color.a ?? 1);
+  }
+
+  /**
+   * Render a note strip as a rectangle spanning from onset to end time.
+   * Position is at onsetY (top of bar); rectangle extends downward by barHeight.
+   * Uses a gradient shader: top edge (onset/horizon) fades, bottom edge (NOW) stays bright.
+   */
+  private updateNoteStrip(entity: Entity): void {
+    if (!this.scene || !this.planeGeometry) return;
+
+    let mesh = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
+
+    if (!mesh) {
+      const material = new THREE.ShaderMaterial({
+        transparent: true,
+        side: THREE.DoubleSide,
+        uniforms: {
+          color: { value: new THREE.Color() },
+          topOpacity: { value: 1.0 },
+          bottomOpacity: { value: 1.0 },
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 color;
+          uniform float topOpacity;
+          uniform float bottomOpacity;
+          varying vec2 vUv;
+          void main() {
+            float opacity = mix(bottomOpacity, topOpacity, vUv.y);
+            gl_FragColor = vec4(color, opacity);
+          }
+        `,
+      });
+      mesh = new THREE.Mesh(this.planeGeometry, material);
+      this.scene.add(mesh);
+      this.entityObjects.set(entity.id, mesh);
+    }
+
+    // Position at onsetY (top of bar)
+    const x = (entity.position?.x ?? 0) * this.config.worldWidth;
+    const topY = (1 - (entity.position?.y ?? 0)) * this.config.worldHeight;
+
+    // Bar dimensions in world coordinates
+    const barWidth = (entity.style.size ?? 10) / 1000 * this.config.worldWidth;
+    const barHeight = ((entity.data?.barHeight as number) ?? 0.01) * this.config.worldHeight;
+
+    // Shift down by half bar height so top edge aligns with onsetY
+    mesh.position.set(x, topY - barHeight / 2, 0);
+    mesh.scale.set(barWidth, barHeight, 1);
+
+    // Update shader uniforms
+    const material = mesh.material as THREE.ShaderMaterial;
+    const color = entity.style.color ?? { h: 0, s: 1, v: 1 };
+    (material.uniforms.color.value as THREE.Color).setHSL(
+      color.h / 360, color.s, color.v / 2
+    );
+    material.uniforms.topOpacity.value =
+      (entity.data?.topOpacity as number) ?? (entity.style.opacity ?? 1);
+    material.uniforms.bottomOpacity.value =
+      (entity.data?.bottomOpacity as number) ?? (entity.style.opacity ?? 1);
   }
 
   /**
@@ -542,7 +634,8 @@ export class ThreeJSRenderer implements IRenderer {
 
     // Get the unified shape
     const shape = builder.toThreeShape();
-    const geometry = new THREE.ShapeGeometry(shape);
+    // High curve segments for smooth bezier/quadratic arcs (default 12 is blocky)
+    const geometry = new THREE.ShapeGeometry(shape, 64);
 
     // Find root element for fill color
     const arms = builder.getArms();
@@ -642,19 +735,31 @@ export class ThreeJSRenderer implements IRenderer {
       }
     }
 
-    // Add chromatic lines
+    // Add chromatic lines (same width as chord outline)
     for (const lineData of builder.toThreeLines()) {
-      const lineMaterial = new THREE.LineBasicMaterial({
-        transparent: true,
-        opacity: 0.8,
-      });
-      lineMaterial.color.setHSL(
+      const lineColor = new THREE.Color().setHSL(
         lineData.color.h / 360,
         lineData.color.s,
         lineData.color.v / 2
       );
-      const lineMesh = new THREE.Line(lineData.geometry, lineMaterial);
-      group.add(lineMesh);
+      // Extract positions from BufferGeometry
+      const posAttr = lineData.geometry.getAttribute("position");
+      const positions: number[] = [];
+      for (let i = 0; i < posAttr.count; i++) {
+        positions.push(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+      }
+      lineData.geometry.dispose();
+
+      const lineGeom = new LineGeometry();
+      lineGeom.setPositions(positions);
+      const lineMat = new LineMaterial({
+        color: lineColor.getHex(),
+        linewidth: 2,
+        resolution: this.resolution,
+      });
+      const line = new Line2(lineGeom, lineMat);
+      line.computeLineDistances();
+      group.add(line);
     }
 
     return group;

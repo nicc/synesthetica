@@ -40,6 +40,7 @@ import type {
   RhythmicAnalysis,
   DynamicsState,
   HarmonicContext,
+  Ms,
 } from "@synesthetica/contracts";
 
 import {
@@ -106,7 +107,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     return {
       t: frame.t,
       part: frame.part,
-      notes: frame.notes.map((note) => this.annotateNote(note)),
+      notes: frame.notes.map((note) => this.annotateNote(note, frame.t)),
       chords: frame.chords.map((chord) => this.annotateChord(chord)),
       progression: frame.progression ?? [],
       harmonicContext: frame.harmonicContext ?? defaultHarmonicContext,
@@ -125,7 +126,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
   // Note Annotation
   // ===========================================================================
 
-  private annotateNote(note: Note): AnnotatedNote {
+  private annotateNote(note: Note, t: Ms): AnnotatedNote {
     const hue = pcToHue(note.pitch.pc, {
       referencePc: this.config.referencePc,
       referenceHue: this.config.referenceHue,
@@ -137,7 +138,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
 
     // Phase → alpha (release phase fades out)
     const alpha =
-      note.phase === "release" ? this.calculateReleaseAlpha(note) : 1;
+      note.phase === "release" ? this.calculateReleaseAlpha(note, t) : 1;
 
     const palette: PaletteRef = {
       id: `note-${note.id}`,
@@ -369,15 +370,12 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     }
   }
 
-  private calculateReleaseAlpha(note: Note): number {
+  private calculateReleaseAlpha(note: Note, t: Ms): number {
     if (note.release === null) return 1;
 
-    // Calculate how far into release we are
-    const timeSinceRelease = note.duration - (note.release - note.onset);
-    // Assume a 500ms release window
+    const timeSinceRelease = t - note.release;
     const releaseProgress = Math.min(timeSinceRelease / 500, 1);
 
-    // Fade from 1 to 0
     return 1 - releaseProgress;
   }
 
