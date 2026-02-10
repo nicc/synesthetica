@@ -128,16 +128,11 @@ export class RhythmGrammar implements IVisualGrammar {
     referenceLinger: DEFAULT_REFERENCE_LINGER_MULTIPLIER,
   };
 
-  /** Seeded RNG for consistent streak randomness */
-  private rng: () => number = Math.random;
-
   init(ctx: GrammarContext): void {
     this.state = {
       nextId: 0,
       ctx,
     };
-    // Initialize seeded RNG
-    this.rng = this.createSeededRng(ctx.rngSeed);
   }
 
   dispose(): void {
@@ -463,7 +458,7 @@ export class RhythmGrammar implements IVisualGrammar {
     const inReferenceWindow = fadeAge <= windows.streakHistoryMs;
 
     if (inReferenceWindow && driftInfo && onsetY >= 0) {
-      const refOpacity = this.distanceToOpacity(fadeAge, windows.streakHistoryMs) * 0.8;
+      const refOpacity = this.distanceToOpacity(fadeAge, windows.streakHistoryMs);
 
       // Add reference line showing where the beat was
       const refLineY = this.timeToY(
@@ -504,7 +499,8 @@ export class RhythmGrammar implements IVisualGrammar {
           visual.palette.primary,
           refOpacity, // Use reference window opacity
           part,
-          t
+          t,
+          note.onset
         );
         entities.push(...streaks);
       }
@@ -537,10 +533,10 @@ export class RhythmGrammar implements IVisualGrammar {
         baseOpacity = 1.0;
         break;
       case "sustain":
-        baseOpacity = 0.9;
+        baseOpacity = 1.0;
         break;
       case "release":
-        baseOpacity = 0.6;
+        baseOpacity = 0.8;
         break;
     }
 
@@ -606,9 +602,14 @@ export class RhythmGrammar implements IVisualGrammar {
     color: ColorHSVA,
     opacity: number,
     part: string,
-    t: number
+    t: number,
+    noteOnset: number
   ): Entity[] {
     const entities: Entity[] = [];
+
+    // Per-note RNG seeded from onset time so streak shapes are stable across
+    // frames regardless of how many other notes exist or their render order.
+    const rng = this.createSeededRng(noteOnset);
 
     // Direction: point toward where the beat was
     // Late (positive drift) = beat was before onset = streaks point down (larger y)
@@ -624,22 +625,22 @@ export class RhythmGrammar implements IVisualGrammar {
     // Generate streaks with comic-book style variation
     for (let i = 0; i < STREAK_COUNT; i++) {
       // Asymmetric spread: not perfectly centered, feels more natural
-      const asymmetry = (this.rng() - 0.5) * 0.15;
+      const asymmetry = (rng() - 0.5) * 0.15;
       const spreadFactor = (i - (STREAK_COUNT - 1) / 2) / ((STREAK_COUNT - 1) / 2 || 1) + asymmetry;
 
       // Start position: at the bar's edge, with slight vertical offset for variety
       const xSpread = barWidth * 0.8 * spreadFactor;
       const startX = noteX + xSpread;
-      const startY = onsetY + (this.rng() - 0.5) * 0.005; // Slight vertical wobble
+      const startY = onsetY + (rng() - 0.5) * 0.005; // Slight vertical wobble
 
       // Each streak has its own length (comic style: outer ones often shorter)
-      const lengthVariation = 0.6 + this.rng() * 0.8; // 60-140% of base
+      const lengthVariation = 0.6 + rng() * 0.8; // 60-140% of base
       const outerFalloff = 1 - Math.abs(spreadFactor) * 0.3; // Outer streaks shorter
       const thisLength = baseStreakLength * lengthVariation * outerFalloff;
 
       // Fan angle: outer streaks angle outward, with hand-drawn wobble
       const baseFanAngle = spreadFactor * 0.5; // Radians, ~28° at edges
-      const angleWobble = (this.rng() - 0.5) * 0.15;
+      const angleWobble = (rng() - 0.5) * 0.15;
       const fanAngle = baseFanAngle + angleWobble;
 
       // End point
@@ -647,7 +648,7 @@ export class RhythmGrammar implements IVisualGrammar {
       const endY = startY + dirY * Math.cos(fanAngle) * thisLength;
 
       // Opacity: center streak brightest, outer ones fade
-      const streakOpacity = opacity * (0.4 + 0.35 * (1 - Math.abs(spreadFactor)));
+      const streakOpacity = opacity * (0.5 + 0.45 * (1 - Math.abs(spreadFactor)));
 
       // Width: tapers toward outer streaks
       const streakWidth = barWidth * 0.4 * (1 - Math.abs(spreadFactor) * 0.4);
