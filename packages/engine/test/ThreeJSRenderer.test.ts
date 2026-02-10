@@ -18,6 +18,11 @@ vi.mock("three", () => {
     setHSL(_h: number, _s: number, _l: number) {
       return this;
     }
+    copy(other: MockColor) {
+      this.r = other.r; this.g = other.g; this.b = other.b;
+      return this;
+    }
+    getHex() { return 0; }
   }
 
   // Mock Vector3 class
@@ -59,6 +64,21 @@ vi.mock("three", () => {
     }
   }
 
+  class MockShaderMaterial extends Material {
+    uniforms: Record<string, { value: unknown }> = {};
+    vertexShader = "";
+    fragmentShader = "";
+    constructor(params?: Record<string, unknown>) {
+      super();
+      if (params) {
+        if (params.uniforms) this.uniforms = params.uniforms as Record<string, { value: unknown }>;
+        if (params.vertexShader) this.vertexShader = params.vertexShader as string;
+        if (params.fragmentShader) this.fragmentShader = params.fragmentShader as string;
+        if (params.transparent !== undefined) this.transparent = params.transparent as boolean;
+        if (params.side !== undefined) this.side = params.side as number;
+      }
+    }
+  }
   class MockMeshBasicMaterial extends Material {}
   class MockLineBasicMaterial extends Material {}
 
@@ -188,6 +208,7 @@ vi.mock("three", () => {
     BufferGeometry: MockBufferGeometry,
     Material,
     MeshBasicMaterial: MockMeshBasicMaterial,
+    ShaderMaterial: MockShaderMaterial,
     LineBasicMaterial: MockLineBasicMaterial,
     DoubleSide: 2,
   };

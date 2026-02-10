@@ -289,7 +289,7 @@ export class ThreeJSRenderer implements IRenderer {
     // Update material
     const material = mesh.material as THREE.MeshBasicMaterial;
     const color = entity.style.color ?? { h: 0, s: 1, v: 1 };
-    material.color.setHSL(color.h / 360, color.s, color.v / 2); // HSV to HSL approximation
+    material.color.copy(this.hsvToThreeColor(color));
 
     // Calculate opacity with life decay
     let opacity = entity.style.opacity ?? 1;
@@ -357,9 +357,7 @@ export class ThreeJSRenderer implements IRenderer {
     // Update shader uniforms
     const material = mesh.material as THREE.ShaderMaterial;
     const color = entity.style.color ?? { h: 0, s: 1, v: 1 };
-    (material.uniforms.color.value as THREE.Color).setHSL(
-      color.h / 360, color.s, color.v / 2
-    );
+    (material.uniforms.color.value as THREE.Color).copy(this.hsvToThreeColor(color));
     material.uniforms.topOpacity.value =
       (entity.data?.topOpacity as number) ?? (entity.style.opacity ?? 1);
     material.uniforms.bottomOpacity.value =
@@ -415,7 +413,7 @@ export class ThreeJSRenderer implements IRenderer {
     // Update material
     const material = line.material as THREE.LineBasicMaterial;
     const color = entity.style.color ?? { h: 0, s: 0, v: 0.5 };
-    material.color.setHSL(color.h / 360, color.s, color.v / 2);
+    material.color.copy(this.hsvToThreeColor(color));
     material.opacity = entity.style.opacity ?? 0.3;
     material.linewidth = entity.style.size ?? 1;
   }
@@ -452,7 +450,7 @@ export class ThreeJSRenderer implements IRenderer {
     const material = (ring as unknown as THREE.Mesh)
       .material as THREE.MeshBasicMaterial;
     const color = entity.style.color ?? { h: 120, s: 0.7, v: 0.8 };
-    material.color.setHSL(color.h / 360, color.s, color.v / 2);
+    material.color.copy(this.hsvToThreeColor(color));
     material.opacity = entity.style.opacity ?? 0.6;
   }
 
@@ -488,7 +486,7 @@ export class ThreeJSRenderer implements IRenderer {
     // Material
     const material = mesh.material as THREE.MeshBasicMaterial;
     const color = entity.style.color ?? { h: 0, s: 0, v: 1 };
-    material.color.setHSL(color.h / 360, color.s, color.v / 2);
+    material.color.copy(this.hsvToThreeColor(color));
 
     let opacity = entity.style.opacity ?? 0.5;
     if (entity.life) {
@@ -529,7 +527,7 @@ export class ThreeJSRenderer implements IRenderer {
     // Material
     const material = line.material as THREE.LineBasicMaterial;
     const color = entity.style.color ?? { h: 0, s: 1, v: 1 };
-    material.color.setHSL(color.h / 360, color.s, color.v / 2);
+    material.color.copy(this.hsvToThreeColor(color));
 
     let opacity = entity.style.opacity ?? 0.8;
     if (entity.life) {
@@ -604,12 +602,16 @@ export class ThreeJSRenderer implements IRenderer {
     const scale = size / 100; // Normalized scale
     group.scale.set(scale, scale, 1);
 
-    // Update material opacity
+    // Update material opacity (gradient fill uses ShaderMaterial, others use MeshBasicMaterial)
     const opacity = (entity.style.opacity ?? 1) * 0.8;
     group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
-        const mat = child.material as THREE.MeshBasicMaterial;
-        mat.opacity = opacity;
+        const mat = child.material;
+        if (mat instanceof THREE.ShaderMaterial && mat.uniforms.opacity) {
+          mat.uniforms.opacity.value = opacity;
+        } else if (mat instanceof THREE.MeshBasicMaterial) {
+          mat.opacity = opacity;
+        }
       }
     });
   }
@@ -637,25 +639,136 @@ export class ThreeJSRenderer implements IRenderer {
     // High curve segments for smooth bezier/quadratic arcs (default 12 is blocky)
     const geometry = new THREE.ShapeGeometry(shape, 64);
 
-    // Find root element for fill color
+    // Find root element for fill color and build per-arm colour data
     const arms = builder.getArms();
     const rootArm = arms.find((a) => a.interval === "1") ?? arms[0];
-    const color = rootArm?.color ?? { h: 0, s: 0.5, v: 0.5, a: 1 };
+    const rootColor = rootArm?.color ?? { h: 0, s: 0.5, v: 0.5, a: 1 };
 
-    const material = new THREE.MeshBasicMaterial({
+    // Build gradient shader material for radial+angular chord fill
+    const MAX_ARMS = 8;
+    const centerColorRGB = this.hsvToThreeColor(rootColor);
+    const armColorsArray = new Float32Array(MAX_ARMS * 3);
+    const armAnglesArray = new Float32Array(MAX_ARMS);
+
+    // Sort arms by angle for correct angular interpolation
+    const sortedArms = [...arms].sort((a, b) => a.angle - b.angle);
+    for (let i = 0; i < MAX_ARMS; i++) {
+      if (i < sortedArms.length) {
+        const arm = sortedArms[i];
+        const rgb = this.hsvToThreeColor(arm.color);
+        armColorsArray[i * 3] = rgb.r;
+        armColorsArray[i * 3 + 1] = rgb.g;
+        armColorsArray[i * 3 + 2] = rgb.b;
+        // Convert compass angle (0=north, CW) to math angle (0=east, CCW) in radians
+        armAnglesArray[i] = ((90 - arm.angle) * Math.PI) / 180;
+      } else {
+        // Pad unused slots with center color
+        armColorsArray[i * 3] = centerColorRGB.r;
+        armColorsArray[i * 3 + 1] = centerColorRGB.g;
+        armColorsArray[i * 3 + 2] = centerColorRGB.b;
+        armAnglesArray[i] = 0.0;
+      }
+    }
+
+    const hubR = builder.getHub().radius;
+    // Max tip distance: hub + longest arm (triadic)
+    const maxTipR = hubR + baseRadius * 0.7;
+
+    const material = new THREE.ShaderMaterial({
       transparent: true,
       side: THREE.DoubleSide,
-      opacity: 0.6,
+      uniforms: {
+        centerColor: { value: centerColorRGB },
+        armColors: { value: armColorsArray },
+        armAngles: { value: armAnglesArray },
+        armCount: { value: sortedArms.length },
+        hubRadius: { value: hubR },
+        maxRadius: { value: maxTipR },
+        opacity: { value: 0.8 },
+      },
+      vertexShader: `
+        varying vec2 vLocalPos;
+        void main() {
+          vLocalPos = position.xy;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 centerColor;
+        uniform float armColors[${MAX_ARMS * 3}];
+        uniform float armAngles[${MAX_ARMS}];
+        uniform int armCount;
+        uniform float hubRadius;
+        uniform float maxRadius;
+        uniform float opacity;
+        varying vec2 vLocalPos;
+
+        // Normalize angle to [-PI, PI]
+        float normAngle(float a) {
+          return a - 6.28318530718 * floor((a + 3.14159265359) / 6.28318530718);
+        }
+
+        // Signed angular distance from a to b, normalized to [-PI, PI]
+        float angleDist(float a, float b) {
+          return normAngle(b - a);
+        }
+
+        void main() {
+          float r = length(vLocalPos);
+          float angle = atan(vLocalPos.y, vLocalPos.x);
+
+          if (armCount < 1) {
+            gl_FragColor = vec4(centerColor, opacity);
+            return;
+          }
+
+          // Find the two flanking arms for angular interpolation
+          // Arms are sorted by math-angle order
+          int leftIdx = 0;
+          int rightIdx = 0;
+          float minLeftDist = 6.3;
+          float minRightDist = 6.3;
+
+          for (int i = 0; i < ${MAX_ARMS}; i++) {
+            if (i >= armCount) break;
+            float dist = angleDist(armAngles[i], angle);
+            // dist > 0 means arm is to our left (CW in math coords)
+            if (dist >= 0.0 && dist < minLeftDist) {
+              minLeftDist = dist;
+              leftIdx = i;
+            }
+            // dist < 0 means arm is to our right (CCW)
+            float distR = angleDist(angle, armAngles[i]);
+            if (distR >= 0.0 && distR < minRightDist) {
+              minRightDist = distR;
+              rightIdx = i;
+            }
+          }
+
+          // Get flanking arm colours
+          vec3 leftColor = vec3(armColors[leftIdx*3], armColors[leftIdx*3+1], armColors[leftIdx*3+2]);
+          vec3 rightColor = vec3(armColors[rightIdx*3], armColors[rightIdx*3+1], armColors[rightIdx*3+2]);
+
+          // Angular blend between flanking arms (hermite for smooth transition)
+          float totalSpan = minLeftDist + minRightDist;
+          float angularT = totalSpan > 0.001 ? minLeftDist / totalSpan : 0.5;
+          float smooth_t = angularT * angularT * (3.0 - 2.0 * angularT);
+          vec3 angularBlend = mix(leftColor, rightColor, smooth_t);
+
+          // Radial blend: center colour at hub, arm colour at tips
+          float radialT = smoothstep(0.0, maxRadius, r);
+          vec3 finalColor = mix(centerColor, angularBlend, radialT);
+
+          gl_FragColor = vec4(finalColor, opacity);
+        }
+      `,
     });
-    material.color.setHSL(color.h / 360, color.s, color.v / 2);
 
     const mesh = new THREE.Mesh(geometry, material);
     group.add(mesh);
 
-    // Add outline stroke
-    const outlineColor = new THREE.Color().setHSL(
-      color.h / 360, color.s * 0.6, Math.min(color.v / 2 + 0.25, 0.9)
-    );
+    // Add outline stroke — root note's pitch-class colour (no desaturation)
+    const outlineColor = this.hsvToThreeColor(rootColor);
     const outlineHex = outlineColor.getHex();
     const dashParams = getThreeDashParams(margin, baseRadius);
 
@@ -737,11 +850,7 @@ export class ThreeJSRenderer implements IRenderer {
 
     // Add chromatic lines (same width as chord outline)
     for (const lineData of builder.toThreeLines()) {
-      const lineColor = new THREE.Color().setHSL(
-        lineData.color.h / 360,
-        lineData.color.s,
-        lineData.color.v / 2
-      );
+      const lineColor = this.hsvToThreeColor(lineData.color);
       // Extract positions from BufferGeometry
       const posAttr = lineData.geometry.getAttribute("position");
       const positions: number[] = [];
@@ -792,7 +901,7 @@ export class ThreeJSRenderer implements IRenderer {
 
     const material = mesh.material as THREE.MeshBasicMaterial;
     const color = entity.style.color ?? { h: 120, s: 0.7, v: 0.6 };
-    material.color.setHSL(color.h / 360, color.s, color.v / 2);
+    material.color.copy(this.hsvToThreeColor(color));
     material.opacity = (entity.style.opacity ?? 1) * 0.8;
   }
 
@@ -849,6 +958,26 @@ export class ThreeJSRenderer implements IRenderer {
   // ==========================================================================
   // Utilities
   // ==========================================================================
+
+  /**
+   * Convert ColorHSVA to THREE.Color via correct HSV→RGB conversion.
+   * The previous approach (setHSL with v/2) was an incorrect approximation
+   * that made everything too dark and over-saturated.
+   */
+  private hsvToThreeColor(hsv: { h: number; s: number; v: number }): THREE.Color {
+    const { h, s, v } = hsv;
+    const c = v * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = v - c;
+    let r = 0, g = 0, b = 0;
+    if (h < 60)       { r = c; g = x; }
+    else if (h < 120) { r = x; g = c; }
+    else if (h < 180) { g = c; b = x; }
+    else if (h < 240) { g = x; b = c; }
+    else if (h < 300) { r = x; b = c; }
+    else              { r = c; b = x; }
+    return new THREE.Color(r + m, g + m, b + m);
+  }
 
   private disposeObject(obj: THREE.Object3D): void {
     if (obj instanceof THREE.Mesh) {

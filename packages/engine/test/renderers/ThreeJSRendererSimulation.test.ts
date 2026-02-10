@@ -102,6 +102,21 @@ vi.mock("three", () => {
     dispose = vi.fn();
   }
 
+  class MockShaderMaterial extends Material {
+    uniforms: Record<string, { value: unknown }> = {};
+    vertexShader = "";
+    fragmentShader = "";
+    constructor(params?: Record<string, unknown>) {
+      super();
+      if (params) {
+        if (params.uniforms) this.uniforms = params.uniforms as Record<string, { value: unknown }>;
+        if (params.vertexShader) this.vertexShader = params.vertexShader as string;
+        if (params.fragmentShader) this.fragmentShader = params.fragmentShader as string;
+        if (params.transparent !== undefined) this.transparent = params.transparent as boolean;
+        if (params.side !== undefined) this.side = params.side as number;
+      }
+    }
+  }
   class MockMeshBasicMaterial extends Material {}
   class MockLineBasicMaterial extends Material {}
   class MockLineDashedMaterial extends Material {
@@ -233,6 +248,7 @@ vi.mock("three", () => {
     Material,
     Vector2: MockVector2,
     MeshBasicMaterial: MockMeshBasicMaterial,
+    ShaderMaterial: MockShaderMaterial,
     LineBasicMaterial: MockLineBasicMaterial,
     LineDashedMaterial: MockLineDashedMaterial,
     DoubleSide: 2,
