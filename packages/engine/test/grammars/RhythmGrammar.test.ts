@@ -413,6 +413,95 @@ describe("RhythmGrammar", () => {
     });
   });
 
+  describe("drift cache (referential transparency)", () => {
+    it("freezes drift once computed, even when analysis changes", () => {
+      // Frame 1: note with prescribed tempo → drift computed from onsetDrifts
+      const frame1 = createTestFrame(1000, {
+        tempo: 120,
+        notes: [{ id: "n1", pc: 0, onset: 550 }],
+        onsetDrifts: [
+          { t: 550, subdivisions: [{ label: "quarter", period: 500, drift: 50, nearest: true }] },
+        ],
+      });
+
+      const scene1 = grammar.update(frame1, null);
+      const note1 = scene1.entities.find((e) => e.data?.type === "note-strip");
+      expect(note1?.data?.driftMs).toBe(50);
+
+      // Frame 2: same note but onsetDrift data is gone (aged out of stabilizer window)
+      // and detected division has shifted. Drift should still be 50 (from cache).
+      const frame2 = createTestFrame(1100, {
+        tempo: 120,
+        notes: [{ id: "n1", pc: 0, onset: 550 }],
+        onsetDrifts: [], // Drift data aged out
+      });
+
+      const scene2 = grammar.update(frame2, null);
+      const note2 = scene2.entities.find((e) => e.data?.type === "note-strip");
+      expect(note2?.data?.driftMs).toBe(50); // Cached, not recomputed
+    });
+
+    it("preserves drift when tier drops from 2 to 1", () => {
+      // Frame 1: tier 2 (has tempo) → drift computed
+      const frame1 = createTestFrame(1000, {
+        tempo: 120,
+        notes: [{ id: "n1", pc: 0, onset: 550 }],
+        onsetDrifts: [
+          { t: 550, subdivisions: [{ label: "quarter", period: 500, drift: 50, nearest: true }] },
+        ],
+      });
+
+      const scene1 = grammar.update(frame1, null);
+      const streaks1 = scene1.entities.filter((e) => e.data?.type === "streak");
+      expect(streaks1.length).toBeGreaterThan(0);
+
+      // Frame 2: tier drops to 1 (no tempo). Without cache, getDriftInfo returns null
+      // and streaks would vanish. With cache, drift is preserved.
+      const frame2 = createTestFrame(1100, {
+        detectedDivision: null, // No tempo, no detection → tier 1
+        notes: [{ id: "n1", pc: 0, onset: 550 }],
+        onsetDrifts: [],
+      });
+
+      const scene2 = grammar.update(frame2, null);
+      const streaks2 = scene2.entities.filter((e) => e.data?.type === "streak");
+      expect(streaks2.length).toBeGreaterThan(0); // Still has streaks from cache
+    });
+
+    it("prunes cache when note leaves the frame", () => {
+      // Frame 1: note present, drift cached
+      const frame1 = createTestFrame(1000, {
+        tempo: 120,
+        notes: [{ id: "n1", pc: 0, onset: 550 }],
+        onsetDrifts: [
+          { t: 550, subdivisions: [{ label: "quarter", period: 500, drift: 50, nearest: true }] },
+        ],
+      });
+      grammar.update(frame1, null);
+
+      // Frame 2: note gone (pruned by stabilizer)
+      const frame2 = createTestFrame(2000, {
+        tempo: 120,
+        notes: [],
+      });
+      grammar.update(frame2, null);
+
+      // Frame 3: same note ID reappears with different drift (e.g. new note reusing ID)
+      // Should get the NEW drift, not the old cached one.
+      const frame3 = createTestFrame(3000, {
+        tempo: 120,
+        notes: [{ id: "n1", pc: 0, onset: 2550 }],
+        onsetDrifts: [
+          { t: 2550, subdivisions: [{ label: "quarter", period: 500, drift: -30, nearest: true }] },
+        ],
+      });
+
+      const scene3 = grammar.update(frame3, null);
+      const note3 = scene3.entities.find((e) => e.data?.type === "note-strip");
+      expect(note3?.data?.driftMs).toBe(-30); // New drift, not old cached 50
+    });
+  });
+
   describe("horizon macro", () => {
     it("shows full history at max horizon", () => {
       grammar.setMacros({ horizon: 1.0 });

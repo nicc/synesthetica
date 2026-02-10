@@ -90,6 +90,12 @@ const GRID_COLORS = {
 // Types
 // ============================================================================
 
+/** Cached drift info for a note, frozen at first computation. */
+interface CachedDrift {
+  driftMs: number;
+  label: string;
+}
+
 interface RhythmGrammarState {
   nextId: number;
   ctx: GrammarContext | null;
@@ -128,15 +134,22 @@ export class RhythmGrammar implements IVisualGrammar {
     referenceLinger: DEFAULT_REFERENCE_LINGER_MULTIPLIER,
   };
 
+  /** Drift frozen at first computation per note. Ensures referential transparency:
+   *  same note always produces the same visual elements regardless of how
+   *  rhythmic analysis evolves on subsequent frames. */
+  private driftCache: Map<string, CachedDrift> = new Map();
+
   init(ctx: GrammarContext): void {
     this.state = {
       nextId: 0,
       ctx,
     };
+    this.driftCache.clear();
   }
 
   dispose(): void {
     this.state.ctx = null;
+    this.driftCache.clear();
   }
 
   /** Set macro values (for exploration/testing) */
@@ -174,7 +187,9 @@ export class RhythmGrammar implements IVisualGrammar {
     }
 
     // Render notes with streak lines
+    const activeNoteIds = new Set<string>();
     for (const annotatedNote of input.notes) {
+      activeNoteIds.add(annotatedNote.note.id);
       const noteEntities = this.createNoteWithStreaks(
         annotatedNote,
         rhythm,
@@ -184,6 +199,13 @@ export class RhythmGrammar implements IVisualGrammar {
         windows
       );
       entities.push(...noteEntities);
+    }
+
+    // Prune drift cache for notes no longer in the frame
+    for (const cachedId of this.driftCache.keys()) {
+      if (!activeNoteIds.has(cachedId)) {
+        this.driftCache.delete(cachedId);
+      }
     }
 
     return {
@@ -450,8 +472,16 @@ export class RhythmGrammar implements IVisualGrammar {
     // Note strips are never killed by time windows — they scroll off naturally.
     if (endY < 0 || onsetY > 1) return entities;
 
-    // Get drift info (needed for reference lines and streaks)
-    const driftInfo = this.getDriftInfo(note.onset, rhythm, tier);
+    // Get drift info — frozen at first computation so visual elements don't
+    // shift as rhythmic analysis evolves on subsequent frames.
+    let driftInfo = this.driftCache.get(note.id) ?? null;
+    if (driftInfo === null) {
+      const computed = this.getDriftInfo(note.onset, rhythm, tier);
+      if (computed) {
+        driftInfo = computed;
+        this.driftCache.set(note.id, computed);
+      }
+    }
 
     // Reference lines and streaks use time-based fade windows
     const fadeAge = Math.max(t - noteEndTime, 0);
@@ -468,13 +498,17 @@ export class RhythmGrammar implements IVisualGrammar {
 
       if (refLineY >= 0 && refLineY <= 1) {
         const barWidth = NOTE_STRIP_WIDTH * (0.5 + (note.velocity / 127) * 0.5);
+        // Reference line is a horizontal trail centered on the note.
+        // velocity gives it visible width (trail renders from pos to pos+vel).
+        const refHalfWidth = barWidth * 1.5;
         entities.push({
           id: this.entityId(`ref-line-${note.id}`),
           part,
           kind: "trail",
           createdAt: note.onset,
           updatedAt: t,
-          position: { x, y: refLineY },
+          position: { x: x - refHalfWidth, y: refLineY },
+          velocity: { x: refHalfWidth * 2, y: 0 },
           style: {
             color: GRID_COLORS.referenceLine,
             size: barWidth * 1000 * 3, // Wider than note strip
@@ -607,9 +641,11 @@ export class RhythmGrammar implements IVisualGrammar {
   ): Entity[] {
     const entities: Entity[] = [];
 
-    // Per-note RNG seeded from onset time so streak shapes are stable across
-    // frames regardless of how many other notes exist or their render order.
-    const rng = this.createSeededRng(noteOnset);
+    // Per-note RNG seeded from onset time + frame time. The onset component
+    // makes each note's streaks independent of other notes. The time component
+    // makes them shift each frame (hand-drawn animation effect). Floor to 50ms
+    // intervals for ~20fps animation rate.
+    const rng = this.createSeededRng(noteOnset * 7919 + Math.floor(t / 50));
 
     // Direction: point toward where the beat was
     // Late (positive drift) = beat was before onset = streaks point down (larger y)
