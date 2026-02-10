@@ -618,39 +618,33 @@ export class ThreeJSRenderer implements IRenderer {
 
   /**
    * Build Three.js group for chord shape geometry using ChordShapeBuilder.
+   * Arm edges use per-arm pitch-class colours, hub arcs use root colour,
+   * fill uses radial+angular gradient with midpoint blend radius.
    */
   private buildChordShapeGroup(
     elements: ChordShapeElement[],
     margin: MarginStyle
   ): THREE.Group {
     const group = new THREE.Group();
-
-    // Base radius for the shape (in local units)
     const baseRadius = 10;
 
-    // Use ChordShapeBuilder to compute geometry
     const builder = new ChordShapeBuilder(elements, margin, {
       scale: baseRadius,
-      center: { x: 0, y: 0 }, // Local coordinates, group handles positioning
+      center: { x: 0, y: 0 },
     });
 
-    // Get the unified shape
     const shape = builder.toThreeShape();
-    // High curve segments for smooth bezier/quadratic arcs (default 12 is blocky)
     const geometry = new THREE.ShapeGeometry(shape, 64);
 
-    // Find root element for fill color and build per-arm colour data
     const arms = builder.getArms();
     const rootArm = arms.find((a) => a.interval === "1") ?? arms[0];
     const rootColor = rootArm?.color ?? { h: 0, s: 0.5, v: 0.5, a: 1 };
 
-    // Build gradient shader material for radial+angular chord fill
     const MAX_ARMS = 8;
     const centerColorRGB = this.hsvToThreeColor(rootColor);
     const armColorsArray = new Float32Array(MAX_ARMS * 3);
     const armAnglesArray = new Float32Array(MAX_ARMS);
 
-    // Sort arms by angle for correct angular interpolation
     const sortedArms = [...arms].sort((a, b) => a.angle - b.angle);
     for (let i = 0; i < MAX_ARMS; i++) {
       if (i < sortedArms.length) {
@@ -659,10 +653,8 @@ export class ThreeJSRenderer implements IRenderer {
         armColorsArray[i * 3] = rgb.r;
         armColorsArray[i * 3 + 1] = rgb.g;
         armColorsArray[i * 3 + 2] = rgb.b;
-        // Convert compass angle (0=north, CW) to math angle (0=east, CCW) in radians
         armAnglesArray[i] = ((90 - arm.angle) * Math.PI) / 180;
       } else {
-        // Pad unused slots with center color
         armColorsArray[i * 3] = centerColorRGB.r;
         armColorsArray[i * 3 + 1] = centerColorRGB.g;
         armColorsArray[i * 3 + 2] = centerColorRGB.b;
@@ -671,8 +663,10 @@ export class ThreeJSRenderer implements IRenderer {
     }
 
     const hubR = builder.getHub().radius;
-    // Max tip distance: hub + longest arm (triadic)
     const maxTipR = hubR + baseRadius * 0.7;
+    // Radial gradient reach: 0 = arm colours at hub edge, 1 = arm colours at tip
+    const GRADIENT_REACH = 0.45;
+    const blendRadius = hubR + (maxTipR - hubR) * GRADIENT_REACH;
 
     const material = new THREE.ShaderMaterial({
       transparent: true,
@@ -683,7 +677,7 @@ export class ThreeJSRenderer implements IRenderer {
         armAngles: { value: armAnglesArray },
         armCount: { value: sortedArms.length },
         hubRadius: { value: hubR },
-        maxRadius: { value: maxTipR },
+        maxRadius: { value: blendRadius },
         opacity: { value: 0.8 },
       },
       vertexShader: `
@@ -703,12 +697,10 @@ export class ThreeJSRenderer implements IRenderer {
         uniform float opacity;
         varying vec2 vLocalPos;
 
-        // Normalize angle to [-PI, PI]
         float normAngle(float a) {
           return a - 6.28318530718 * floor((a + 3.14159265359) / 6.28318530718);
         }
 
-        // Signed angular distance from a to b, normalized to [-PI, PI]
         float angleDist(float a, float b) {
           return normAngle(b - a);
         }
@@ -722,8 +714,6 @@ export class ThreeJSRenderer implements IRenderer {
             return;
           }
 
-          // Find the two flanking arms for angular interpolation
-          // Arms are sorted by math-angle order
           int leftIdx = 0;
           int rightIdx = 0;
           float minLeftDist = 6.3;
@@ -732,12 +722,10 @@ export class ThreeJSRenderer implements IRenderer {
           for (int i = 0; i < ${MAX_ARMS}; i++) {
             if (i >= armCount) break;
             float dist = angleDist(armAngles[i], angle);
-            // dist > 0 means arm is to our left (CW in math coords)
             if (dist >= 0.0 && dist < minLeftDist) {
               minLeftDist = dist;
               leftIdx = i;
             }
-            // dist < 0 means arm is to our right (CCW)
             float distR = angleDist(angle, armAngles[i]);
             if (distR >= 0.0 && distR < minRightDist) {
               minRightDist = distR;
@@ -745,17 +733,14 @@ export class ThreeJSRenderer implements IRenderer {
             }
           }
 
-          // Get flanking arm colours
           vec3 leftColor = vec3(armColors[leftIdx*3], armColors[leftIdx*3+1], armColors[leftIdx*3+2]);
           vec3 rightColor = vec3(armColors[rightIdx*3], armColors[rightIdx*3+1], armColors[rightIdx*3+2]);
 
-          // Angular blend between flanking arms (hermite for smooth transition)
           float totalSpan = minLeftDist + minRightDist;
           float angularT = totalSpan > 0.001 ? minLeftDist / totalSpan : 0.5;
           float smooth_t = angularT * angularT * (3.0 - 2.0 * angularT);
           vec3 angularBlend = mix(leftColor, rightColor, smooth_t);
 
-          // Radial blend: center colour at hub, arm colour at tips
           float radialT = smoothstep(0.0, maxRadius, r);
           vec3 finalColor = mix(centerColor, angularBlend, radialT);
 
@@ -767,91 +752,66 @@ export class ThreeJSRenderer implements IRenderer {
     const mesh = new THREE.Mesh(geometry, material);
     group.add(mesh);
 
-    // Add outline stroke — root note's pitch-class colour (no desaturation)
-    const outlineColor = this.hsvToThreeColor(rootColor);
-    const outlineHex = outlineColor.getHex();
+    // Outline: arm edges use per-arm pitch-class colours, hub paths gradient between neighbours
+    const armEdges = builder.getThreeArmEdges();
     const dashParams = getThreeDashParams(margin, baseRadius);
 
-    if (dashParams) {
-      // Dashed margin: solid arms + dashed hub arcs (ring-segment meshes)
-      const hubR = builder.getHub().radius;
-      const halfWidth = baseRadius * 0.014;
-      const outlineMat = new THREE.MeshBasicMaterial({
-        side: THREE.DoubleSide,
+    // Per-arm coloured wedge edges
+    for (let i = 0; i < armEdges.length; i++) {
+      const armColor = this.hsvToThreeColor(sortedArms[i]?.color ?? rootColor);
+      const positions: number[] = [];
+      for (const p of armEdges[i]) {
+        positions.push(p.x, p.y, 0.5);
+      }
+      const lineGeom = new LineGeometry();
+      lineGeom.setPositions(positions);
+      const lineMat = new LineMaterial({
+        color: armColor.getHex(),
+        linewidth: 2,
+        resolution: this.resolution,
       });
-      outlineMat.color.copy(outlineColor);
-
-      // Solid arm edges
-      for (const armPts of builder.getThreeArmEdges()) {
-        const positions: number[] = [];
-        for (const p of armPts) {
-          positions.push(p.x, p.y, 0.5);
-        }
-        const lineGeom = new LineGeometry();
-        lineGeom.setPositions(positions);
-        const lineMat = new LineMaterial({
-          color: outlineHex,
-          linewidth: 2,
-          resolution: this.resolution,
-        });
-        const line = new Line2(lineGeom, lineMat);
-        line.computeLineDistances();
-        group.add(line);
-      }
-
-      // Dashed hub arcs as ring-segment meshes (square caps)
-      for (const arc of builder.getThreeHubArcs()) {
-        const arcLength = hubR * arc.arcSpan * Math.PI / 180;
-        const cycle = dashParams.dashSize + dashParams.gapSize;
-        let d = 0;
-        while (d < arcLength) {
-          const dashLen = Math.min(dashParams.dashSize, arcLength - d);
-          if (dashLen < cycle * 0.1) break; // Skip tiny remnants
-          const dashAngle = (dashLen / hubR) * (180 / Math.PI);
-          // Convert compass angles to Three.js RingGeometry angles
-          // compass: 0=north, CW. Math: 0=east, CCW.
-          const compassStart = arc.startAngle + (d / hubR) * (180 / Math.PI);
-          const mathStart = ((90 - compassStart - dashAngle) * Math.PI) / 180;
-          const mathLength = (dashAngle * Math.PI) / 180;
-          const segments = Math.max(4, Math.ceil(dashAngle / 5));
-          const ring = new THREE.RingGeometry(
-            hubR - halfWidth, hubR + halfWidth,
-            segments, 1,
-            mathStart, mathLength
-          );
-          const dashMesh = new THREE.Mesh(ring, outlineMat);
-          dashMesh.position.z = 0.5;
-          group.add(dashMesh);
-          d += cycle;
-        }
-      }
-    } else {
-      // Solid outline
-      const outlinePoints = shape.getPoints(64);
-      if (outlinePoints.length > 0) {
-        const positions: number[] = [];
-        for (const p of outlinePoints) {
-          positions.push(p.x, p.y, 0.5);
-        }
-        positions.push(outlinePoints[0].x, outlinePoints[0].y, 0.5);
-
-        const lineGeom = new LineGeometry();
-        lineGeom.setPositions(positions);
-        const lineMat = new LineMaterial({
-          color: outlineHex,
-          linewidth: 2,
-          resolution: this.resolution,
-        });
-        const line = new Line2(lineGeom, lineMat);
-        line.computeLineDistances();
-        group.add(line);
-      }
+      const line = new Line2(lineGeom, lineMat);
+      line.computeLineDistances();
+      group.add(line);
     }
 
-    // Add chromatic lines (same width as chord outline)
+    // Hub paths — gradient between adjacent wedge colours, follows margin shape
+    const hubPaths = builder.getThreeHubPaths();
+    for (let i = 0; i < hubPaths.length; i++) {
+      const hubPoints = hubPaths[i];
+      const colorStart = this.hsvToThreeColor(sortedArms[i]?.color ?? rootColor);
+      const colorEnd = this.hsvToThreeColor(sortedArms[(i + 1) % sortedArms.length]?.color ?? rootColor);
+
+      const positions: number[] = [];
+      const colors: number[] = [];
+      for (let j = 0; j < hubPoints.length; j++) {
+        const p = hubPoints[j];
+        positions.push(p.x, p.y, 0.5);
+        const t = hubPoints.length > 1 ? j / (hubPoints.length - 1) : 0.5;
+        colors.push(
+          colorStart.r + (colorEnd.r - colorStart.r) * t,
+          colorStart.g + (colorEnd.g - colorStart.g) * t,
+          colorStart.b + (colorEnd.b - colorStart.b) * t,
+        );
+      }
+      const lineGeom = new LineGeometry();
+      lineGeom.setPositions(positions);
+      lineGeom.setColors(colors);
+      const lineMat = new LineMaterial({
+        color: 0xffffff,
+        vertexColors: true,
+        linewidth: 2,
+        resolution: this.resolution,
+        ...(dashParams ? { dashed: true, dashSize: dashParams.dashSize, gapSize: dashParams.gapSize, dashScale: 1 } : {}),
+      });
+      const line = new Line2(lineGeom, lineMat);
+      line.computeLineDistances();
+      group.add(line);
+    }
+
+    // Chromatic lines (same width as chord outline)
     for (const lineData of builder.toThreeLines()) {
       const lineColor = this.hsvToThreeColor(lineData.color);
-      // Extract positions from BufferGeometry
       const posAttr = lineData.geometry.getAttribute("position");
       const positions: number[] = [];
       for (let i = 0; i < posAttr.count; i++) {

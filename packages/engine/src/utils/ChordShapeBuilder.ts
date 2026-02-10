@@ -526,6 +526,108 @@ export class ChordShapeBuilder {
       this.toThreePoint(arm.baseRight),
     ]);
   }
+
+  /**
+   * Get hub path segments in Three.js local coordinates.
+   * Each path follows the actual margin shape (concave, convex, wavy, circular).
+   * Returns one point array per hub segment (between adjacent arms).
+   */
+  getThreeHubPaths(): Array<Array<{ x: number; y: number }>> {
+    const paths: Array<Array<{ x: number; y: number }>> = [];
+
+    for (let i = 0; i < this.arms.length; i++) {
+      const curr = this.arms[i];
+      const next = this.arms[(i + 1) % this.arms.length];
+      const startAngle = curr.angle + BASE_WIDTH / 2;
+      const endAngle = next.angle - BASE_WIDTH / 2;
+      let arcSpan = endAngle - startAngle;
+      if (arcSpan < 0) arcSpan += 360;
+
+      const start = this.toThreePoint(curr.baseRight);
+      const end = this.toThreePoint(next.baseLeft);
+      const points: Array<{ x: number; y: number }> = [start];
+
+      if (this.margin === "concave") {
+        // Sample the cubic bezier at fine intervals
+        const currTip = this.toThreePoint(curr.tip);
+        const nextTip = this.toThreePoint(next.tip);
+        const inDx = start.x - currTip.x;
+        const inDy = start.y - currTip.y;
+        const inLen = Math.sqrt(inDx * inDx + inDy * inDy);
+        const outDx = nextTip.x - end.x;
+        const outDy = nextTip.y - end.y;
+        const outLen = Math.sqrt(outDx * outDx + outDy * outDy);
+        const chordLen = Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2);
+        const controlDist = chordLen * 0.55;
+        const cp1x = start.x + controlDist * (inDx / inLen);
+        const cp1y = start.y + controlDist * (inDy / inLen);
+        const cp2x = end.x - controlDist * (outDx / outLen);
+        const cp2y = end.y - controlDist * (outDy / outLen);
+
+        const segments = 16;
+        for (let s = 1; s <= segments; s++) {
+          const t = s / segments;
+          const u = 1 - t;
+          points.push({
+            x: u * u * u * start.x + 3 * u * u * t * cp1x + 3 * u * t * t * cp2x + t * t * t * end.x,
+            y: u * u * u * start.y + 3 * u * u * t * cp1y + 3 * u * t * t * cp2y + t * t * t * end.y,
+          });
+        }
+      } else if (this.margin === "wavy") {
+        const steps = Math.max(3, Math.floor(arcSpan / 20));
+        const amp = 0.4;
+        let prev = start;
+        for (let s = 0; s < steps; s++) {
+          const t1 = (s + 1) / steps;
+          const angle1 = startAngle + arcSpan * t1;
+          const midAngle = startAngle + arcSpan * (s + 0.5) / steps;
+          const p1 = this.polarToThree(angle1, this.hubR);
+          const waveR = this.hubR + (s % 2 === 0 ? amp : -amp);
+          const ctrl = this.polarToThree(midAngle, waveR);
+          // Sample quadratic bezier
+          const subSegs = 4;
+          for (let q = 1; q <= subSegs; q++) {
+            const t = q / subSegs;
+            const u = 1 - t;
+            points.push({
+              x: u * u * prev.x + 2 * u * t * ctrl.x + t * t * p1.x,
+              y: u * u * prev.y + 2 * u * t * ctrl.y + t * t * p1.y,
+            });
+          }
+          prev = p1;
+        }
+      } else if (this.margin === "convex") {
+        const expansionFactor = 1.5 + arcSpan * 0.008;
+        const convexR = this.hubR * expansionFactor;
+        const halfArcRad = (arcSpan / 2) * Math.PI / 180;
+        const halfChord = this.hubR * Math.sin(halfArcRad);
+        const sagitta = convexR - Math.sqrt(convexR * convexR - halfChord * halfChord);
+        const chordMidDist = this.hubR * Math.cos(halfArcRad);
+        const arcMidDist = chordMidDist + sagitta;
+
+        const segments = Math.max(8, Math.ceil(arcSpan / 3));
+        for (let s = 1; s <= segments; s++) {
+          const t = s / segments;
+          const angle = startAngle + arcSpan * t;
+          const profile = Math.sin(t * Math.PI);
+          const r = this.hubR + (arcMidDist - this.hubR) * profile;
+          points.push(this.polarToThree(angle, r));
+        }
+      } else {
+        // straight / dash-short / dash-long: circular arc
+        const segments = Math.max(8, Math.ceil(arcSpan / 3));
+        for (let s = 1; s <= segments; s++) {
+          const t = s / segments;
+          const angle = startAngle + arcSpan * t;
+          points.push(this.polarToThree(angle, this.hubR));
+        }
+      }
+
+      paths.push(points);
+    }
+
+    return paths;
+  }
 }
 
 // ============================================================================
