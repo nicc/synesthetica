@@ -155,10 +155,15 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
     const id = createNoteId(this.config.partId, t, pitch);
     const key = this.noteKey(midiNote, channel);
 
-    // If note is already active, release it and move to a release-tracking key
+    // If note is already tracked under this key, move it to a release-tracking key.
+    // Only force-release if it hasn't been released yet (re-trigger without note_off).
+    // Already-released notes keep their original releaseTime — overwriting it would
+    // corrupt their frozen duration and cause the strip to snap to this onset position.
     if (this.activeNotes.has(key)) {
       const existing = this.activeNotes.get(key)!;
-      existing.releaseTime = t;
+      if (existing.releaseTime === null) {
+        existing.releaseTime = t;
+      }
       // Move to a unique release key so it can continue its release phase
       const releaseKey = `release-${releaseCounter++}`;
       this.activeNotes.set(releaseKey, existing);

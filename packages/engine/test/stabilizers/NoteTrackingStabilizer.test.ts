@@ -176,7 +176,7 @@ describe("NoteTrackingStabilizer", () => {
   });
 
   describe("note re-triggering", () => {
-    it("handles re-triggering same note", () => {
+    it("handles re-triggering same note without note_off", () => {
       // First C4
       stabilizer.apply(makeFrame(100, [noteOn(60, 100, 100)]), null);
 
@@ -187,6 +187,34 @@ describe("NoteTrackingStabilizer", () => {
       expect(result.notes).toHaveLength(2);
       const phases = result.notes.map(n => n.phase).sort();
       expect(phases).toEqual(["attack", "release"]);
+    });
+
+    it("preserves original releaseTime when replaying a released note", () => {
+      // Play C4 at t=100
+      stabilizer.apply(makeFrame(100, [noteOn(60, 100, 100)]), null);
+
+      // Release C4 at t=300 (duration freezes at 200)
+      stabilizer.apply(makeFrame(300, [noteOff(60, 300)]), null);
+
+      // Play C4 again at t=500 — old note still in system (within 500ms window)
+      stabilizer.apply(makeFrame(500, [noteOn(60, 90, 500)]), null);
+
+      // At t=550: both notes exist (old note 250ms since release, within 500ms window)
+      const result = stabilizer.apply(makeFrame(550, []), null);
+
+      expect(result.notes).toHaveLength(2);
+
+      // Old note: duration should still be 200 (releaseTime=300, not overwritten to 500)
+      const oldNote = result.notes.find(n => n.onset === 100);
+      expect(oldNote).toBeDefined();
+      expect(oldNote!.duration).toBe(200);
+      expect(oldNote!.release).toBe(300);
+
+      // New note: actively playing
+      const newNote = result.notes.find(n => n.onset === 500);
+      expect(newNote).toBeDefined();
+      expect(newNote!.duration).toBe(50);
+      expect(newNote!.phase).toBe("sustain");
     });
   });
 
