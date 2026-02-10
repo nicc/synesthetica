@@ -97,7 +97,6 @@ interface CachedDrift {
 }
 
 interface RhythmGrammarState {
-  nextId: number;
   ctx: GrammarContext | null;
 }
 
@@ -124,7 +123,6 @@ export class RhythmGrammar implements IVisualGrammar {
   readonly id = "rhythm-grammar";
 
   private state: RhythmGrammarState = {
-    nextId: 0,
     ctx: null,
   };
 
@@ -140,10 +138,7 @@ export class RhythmGrammar implements IVisualGrammar {
   private driftCache: Map<string, CachedDrift> = new Map();
 
   init(ctx: GrammarContext): void {
-    this.state = {
-      nextId: 0,
-      ctx,
-    };
+    this.state = { ctx };
     this.driftCache.clear();
   }
 
@@ -859,7 +854,7 @@ export class RhythmGrammar implements IVisualGrammar {
   // ============================================================================
 
   private entityId(base: string): EntityId {
-    return `${this.id}:${base}:${this.state.nextId++}`;
+    return `${this.id}:${base}`;
   }
 
   /**

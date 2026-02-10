@@ -54,8 +54,6 @@ interface ChordProgressionState {
   /** How long chords stay in history (ms) */
   historyWindowMs: Ms;
 
-  /** Entity ID counter */
-  nextId: number;
 }
 
 export class TestChordProgressionGrammar implements IVisualGrammar {
@@ -65,7 +63,6 @@ export class TestChordProgressionGrammar implements IVisualGrammar {
     chordHistory: [],
     maxHistory: 8,
     historyWindowMs: 10000, // 10 seconds of history
-    nextId: 0,
   };
 
   init(_ctx: GrammarContext): void {
@@ -73,7 +70,6 @@ export class TestChordProgressionGrammar implements IVisualGrammar {
       chordHistory: [],
       maxHistory: 8,
       historyWindowMs: 10000,
-      nextId: 0,
     };
   }
 
@@ -322,6 +318,6 @@ export class TestChordProgressionGrammar implements IVisualGrammar {
   }
 
   private entityId(base: string): EntityId {
-    return `${this.id}:${base}:${this.state.nextId++}`;
+    return `${this.id}:${base}`;
   }
 }

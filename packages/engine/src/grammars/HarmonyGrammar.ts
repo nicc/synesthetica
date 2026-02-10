@@ -95,7 +95,6 @@ export class HarmonyGrammar implements IVisualGrammar {
 
   private config: Required<HarmonyGrammarConfig>;
   private ctx: GrammarContext | null = null;
-  private nextId = 0;
 
   constructor(config: HarmonyGrammarConfig = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -103,7 +102,6 @@ export class HarmonyGrammar implements IVisualGrammar {
 
   init(ctx: GrammarContext): void {
     this.ctx = ctx;
-    this.nextId = 0;
   }
 
   dispose(): void {
@@ -132,7 +130,7 @@ export class HarmonyGrammar implements IVisualGrammar {
       const rootColor = rootElement?.color ?? { h: 0, s: 0, v: 0.8, a: 1 };
 
       entities.push({
-        id: `chord-shape-${this.nextId++}`,
+        id: `${this.id}:chord-shape-${chord.chord.id}`,
         part,
         kind: "glyph",
         createdAt: t,
@@ -156,7 +154,7 @@ export class HarmonyGrammar implements IVisualGrammar {
     // Create tension bar entity (neutral gray - color reserved for harmony)
     if (this.config.showTensionBar) {
       entities.push({
-        id: `tension-bar-${this.nextId++}`,
+        id: `${this.id}:tension-bar`,
         part,
         kind: "glyph",
         createdAt: t,

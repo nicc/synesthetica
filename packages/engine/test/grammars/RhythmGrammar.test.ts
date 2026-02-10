@@ -502,6 +502,63 @@ describe("RhythmGrammar", () => {
     });
   });
 
+  describe("entity ID stability across frames", () => {
+    it("produces identical entity IDs for the same note in consecutive frames", () => {
+      const frame1 = createTestFrame(1000, {
+        tempo: 120,
+        notes: [{ id: "n1", pc: 0, onset: 800 }],
+        onsetDrifts: [
+          { t: 800, subdivisions: [{ label: "quarter", period: 500, drift: 50, nearest: true }] },
+        ],
+      });
+
+      const scene1 = grammar.update(frame1, null);
+
+      // Frame 2: same note, slightly later — entity IDs must be identical
+      const frame2 = createTestFrame(1050, {
+        tempo: 120,
+        notes: [{ id: "n1", pc: 0, onset: 800 }],
+        onsetDrifts: [
+          { t: 800, subdivisions: [{ label: "quarter", period: 500, drift: 50, nearest: true }] },
+        ],
+      });
+
+      const scene2 = grammar.update(frame2, null);
+
+      // Every entity present in both frames should have the same ID
+      // Filter to note-related entities (beat lines shift with time)
+      const noteIds1 = scene1.entities
+        .filter((e) => e.data?.type === "note-strip" || e.data?.type === "streak" || e.data?.type === "reference-line")
+        .map((e) => e.id)
+        .sort();
+      const noteIds2 = scene2.entities
+        .filter((e) => e.data?.type === "note-strip" || e.data?.type === "streak" || e.data?.type === "reference-line")
+        .map((e) => e.id)
+        .sort();
+
+      expect(noteIds1.length).toBeGreaterThan(0);
+      expect(noteIds1).toEqual(noteIds2);
+    });
+
+    it("does not include frame-unique counters in entity IDs", () => {
+      const frame = createTestFrame(1000, {
+        tempo: 120,
+        notes: [{ id: "n1", pc: 0, onset: 800 }],
+      });
+
+      const scene = grammar.update(frame, null);
+
+      // Entity IDs should not end with incrementing counters
+      for (const entity of scene.entities) {
+        // IDs should follow pattern "grammar-id:descriptive-base"
+        // not "grammar-id:descriptive-base:0", "grammar-id:descriptive-base:1", etc.
+        const parts = entity.id.split(":");
+        const lastPart = parts[parts.length - 1];
+        expect(lastPart).not.toMatch(/^\d+$/);
+      }
+    });
+  });
+
   describe("horizon macro", () => {
     it("shows full history at max horizon", () => {
       grammar.setMacros({ horizon: 1.0 });
