@@ -117,12 +117,40 @@ export interface Pitch {
   pc: PitchClass;
   octave: number;
 }
+
+/** A single velocity observation at a point in time. */
+export interface DynamicsEvent {
+  t: Ms;
+  intensity: number; // 0–1 normalized (MIDI velocity/127, audio amplitude, etc.)
+}
+
+/** A single point on the smoothed dynamics contour. */
+export interface DynamicsContourPoint {
+  t: Ms;
+  level: number; // 0–1
+}
+
+/** Dynamic range summary over the contour window. */
+export interface DynamicsRange {
+  min: number;      // 0–1
+  max: number;      // 0–1
+  variance: number; // relative to full 0–1 range
+}
+
+export interface DynamicsState {
+  events: DynamicsEvent[];           // Constituent velocity observations
+  level: number;                     // Smoothed current level (EMA)
+  trend: "rising" | "falling" | "stable";  // Direction from linear regression
+  contour: DynamicsContourPoint[];   // Smoothed level history over window
+  range: DynamicsRange;              // Dynamic range summary
+}
 ```
 
 **Key properties:**
 - Notes have duration, not on/off pairs
 - Notes have phase (attack → sustain → release)
-- Includes derived state (dynamics)
+- Includes derived state (dynamics with contour history, trend, and range)
+- DynamicsState separates constituents (events) from aggregates (level, trend, contour, range)
 - Rhythmic analysis is purely descriptive (not tempo inference)
 - Tempo/meter are user-prescribed, not stabilizer-inferred
 

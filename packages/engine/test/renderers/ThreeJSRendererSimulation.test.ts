@@ -69,6 +69,7 @@ vi.mock("three/examples/jsm/lines/LineGeometry.js", () => {
   class MockLineGeometry {
     dispose = vi.fn();
     setPositions() { return this; }
+    setColors() { return this; }
   }
   return { LineGeometry: MockLineGeometry };
 });

@@ -168,11 +168,60 @@ export interface RhythmicAnalysis {
 }
 
 /**
- * Current dynamics state.
+ * A single velocity observation at a point in time.
+ * Input-agnostic: normalized from MIDI velocity, audio amplitude, etc.
+ */
+export interface DynamicsEvent {
+  t: Ms;
+  /** Normalized intensity 0–1 (e.g. MIDI velocity / 127) */
+  intensity: number;
+}
+
+/**
+ * A single point on the smoothed dynamics contour.
+ * One point per note onset, smoothed via EMA.
+ */
+export interface DynamicsContourPoint {
+  t: Ms;
+  level: number; // 0–1
+}
+
+/**
+ * Dynamic range summary over the contour window.
+ */
+export interface DynamicsRange {
+  /** Lowest intensity in window, 0–1 */
+  min: number;
+  /** Highest intensity in window, 0–1 */
+  max: number;
+  /** Variance relative to full 0–1 range (not observed range) */
+  variance: number;
+}
+
+/**
+ * Dynamics state produced by DynamicsStabilizer.
+ *
+ * Separates constituents (raw observations) from aggregates (derived summaries).
+ * Constituents are the individual velocity events; aggregates are smoothed level,
+ * trend, contour history, and dynamic range.
+ *
+ * The phrasing stabiliser downstream can consume both constituents and aggregates
+ * to segment dynamics by phrase boundaries.
  */
 export interface DynamicsState {
-  level: number; // 0-1 current loudness
+  // --- Constituents: raw observations ---
+  /** Windowed velocity observations, oldest first */
+  events: DynamicsEvent[];
+
+  // --- Aggregates: derived from events ---
+  /** Current smoothed dynamics level, 0–1 */
+  level: number;
+  /** Current trend direction over recent window */
   trend: "rising" | "falling" | "stable";
+  /** Smoothed level history, oldest first. One point per onset + decay points. */
+  contour: DynamicsContourPoint[];
+  /** Dynamic range within the contour window */
+  range: DynamicsRange;
 }
 
 /**

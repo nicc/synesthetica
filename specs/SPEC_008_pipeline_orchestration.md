@@ -94,12 +94,12 @@ These process RawInputFrame directly:
 
 - **NoteTrackingStabilizer** — Correlates note_on/note_off into Notes with duration
 - **BeatDetectionStabilizer** — Detects beats from onset patterns
-- **DynamicsStabilizer** — Analyzes velocity patterns
 
 ### Derived Stabilizers
 
 These require output from upstream stabilizers:
 
+- **DynamicsStabilizer** — Analyzes velocity patterns from Note[] (depends on note-tracking)
 - **ChordDetectionStabilizer** — Needs active notes from NoteTrackingStabilizer
 - **PhraseDetectionStabilizer** — Needs beats and note density patterns
 - **ProgressionStabilizer** — Needs chords over time

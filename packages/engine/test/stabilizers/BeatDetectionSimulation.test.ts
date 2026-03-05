@@ -47,7 +47,7 @@ function makeUpstreamFrame(t: number): MusicalFrame {
       stability: 0,
       confidence: 0,
     },
-    dynamics: { level: 0, trend: "stable" },
+    dynamics: { events: [], level: 0, trend: "stable", contour: [], range: { min: 0, max: 0, variance: 0 } },
     prescribedTempo: null,
     prescribedMeter: null,
   };

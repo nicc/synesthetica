@@ -178,7 +178,13 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
       notes: [],
       chords: [],
       rhythmicAnalysis,
-      dynamics: { level: 0, trend: "stable" },
+      dynamics: {
+        events: [],
+        level: 0,
+        trend: "stable",
+        contour: [],
+        range: { min: 0, max: 0, variance: 0 },
+      },
       prescribedTempo: null,
       prescribedMeter: null,
     };

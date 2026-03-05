@@ -7,3 +7,4 @@ export {
   type DissonanceAlgorithm,
   defaultDissonanceAlgorithm,
 } from "./HarmonicProgressionStabilizer";
+export { DynamicsStabilizer, type DynamicsStabilizerConfig } from "./DynamicsStabilizer";

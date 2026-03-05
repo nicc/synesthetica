@@ -352,8 +352,11 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
         confidence: 0,
       },
       dynamics: {
+        events: [],
         level: 0,
         trend: "stable",
+        contour: [],
+        range: { min: 0, max: 0, variance: 0 },
       },
       prescribedTempo: this.prescribedTempo,
       prescribedMeter: this.prescribedMeter,
@@ -524,13 +527,19 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       stability: 0,
       confidence: 0,
     };
-    let dynamics: MusicalFrame["dynamics"] = { level: 0, trend: "stable" };
+    let dynamics: MusicalFrame["dynamics"] = {
+      events: [],
+      level: 0,
+      trend: "stable",
+      contour: [],
+      range: { min: 0, max: 0, variance: 0 },
+    };
 
     for (const frame of frames) {
       if (frame.rhythmicAnalysis.detectedDivision !== null) {
         rhythmicAnalysis = frame.rhythmicAnalysis;
       }
-      if (frame.dynamics.level > 0) dynamics = frame.dynamics;
+      if (frame.dynamics.events.length > 0) dynamics = frame.dynamics;
     }
 
     // prescribedTempo and prescribedMeter come from pipeline (user setting), not from stabilizers

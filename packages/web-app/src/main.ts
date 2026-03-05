@@ -11,6 +11,8 @@ import {
   MusicalVisualVocabulary,
   RhythmGrammar,
   HarmonyGrammar,
+  DynamicsGrammar,
+  DynamicsStabilizer,
   IdentityCompositor,
 } from "@synesthetica/engine";
 
@@ -144,6 +146,7 @@ function startSession(midiInput: MidiInputInfo): void {
     // Wire up components
     pipeline.addAdapter(adapter);
     pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+    pipeline.addStabilizerFactory(() => new DynamicsStabilizer({ partId }));
     pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
     pipeline.addStabilizerFactory(() => new BeatDetectionStabilizer({ partId }));
     pipeline.addStabilizerFactory(() => new HarmonicProgressionStabilizer({ partId }));
@@ -151,6 +154,7 @@ function startSession(midiInput: MidiInputInfo): void {
     // Use grammars - they'll be composited together
     pipeline.addGrammar(new RhythmGrammar());
     pipeline.addGrammar(new HarmonyGrammar());
+    pipeline.addGrammar(new DynamicsGrammar());
     pipeline.setCompositor(new IdentityCompositor());
 
     // Create renderer

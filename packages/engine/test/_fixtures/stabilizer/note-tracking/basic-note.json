@@ -36,8 +36,11 @@
       "confidence": 0
     },
     "dynamics": {
-      "level": 0.7874015748031497,
-      "trend": "stable"
+      "events": [],
+      "level": 0,
+      "trend": "stable",
+      "contour": [],
+      "range": { "min": 0, "max": 0, "variance": 0 }
     },
     "prescribedTempo": null,
     "prescribedMeter": null

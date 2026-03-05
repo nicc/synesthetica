@@ -72,8 +72,9 @@ function compareOutput(actual: MusicalFrame, expected: ExpectedOutput): void {
     }
   }
 
-  // Check dynamics
-  expectFrameEquals(actual.dynamics, expected.dynamics, { floatTolerance: 1e-10 });
+  // Dynamics computation moved to DynamicsStabilizer — NoteTrackingStabilizer returns empty
+  expect(actual.dynamics.level).toBe(0);
+  expect(actual.dynamics.events).toEqual([]);
 }
 
 describe("NoteTrackingStabilizer golden tests", () => {

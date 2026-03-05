@@ -255,34 +255,11 @@ describe("NoteTrackingStabilizer", () => {
   });
 
   describe("dynamics", () => {
-    it("calculates dynamics level from velocity", () => {
+    it("returns empty dynamics (computation moved to DynamicsStabilizer)", () => {
       const result = stabilizer.apply(makeFrame(100, [noteOn(60, 127, 100)]), null);
-      expect(result.dynamics.level).toBeCloseTo(1.0, 1);
-    });
-
-    it("returns 0 dynamics when no notes", () => {
-      const result = stabilizer.apply(makeFrame(100, []), null);
       expect(result.dynamics.level).toBe(0);
-    });
-
-    it("averages velocity for multiple notes", () => {
-      const result = stabilizer.apply(makeFrame(100, [
-        noteOn(60, 100, 100),
-        noteOn(64, 50, 100),
-      ]), null);
-
-      // Average velocity 75, normalized: 75/127 ≈ 0.59
-      expect(result.dynamics.level).toBeCloseTo(0.59, 1);
-    });
-
-    it("attenuates dynamics for release-only notes", () => {
-      stabilizer.apply(makeFrame(100, [noteOn(60, 127, 100)]), null);
-      stabilizer.apply(makeFrame(200, [noteOff(60, 200)]), null);
-
-      const result = stabilizer.apply(makeFrame(300, []), null);
-
-      // Should be attenuated (max * 0.3)
-      expect(result.dynamics.level).toBeCloseTo(0.3, 1);
+      expect(result.dynamics.events).toEqual([]);
+      expect(result.dynamics.contour).toEqual([]);
     });
   });
 

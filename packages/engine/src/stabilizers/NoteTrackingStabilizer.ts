@@ -137,8 +137,11 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
         confidence: 0,
       },
       dynamics: {
-        level: this.calculateDynamicsLevel(notes),
+        events: [],
+        level: 0,
         trend: "stable",
+        contour: [],
+        range: { min: 0, max: 0, variance: 0 },
       },
       prescribedTempo: null,
       prescribedMeter: null,
@@ -249,23 +252,6 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
         }
       }
     }
-  }
-
-  private calculateDynamicsLevel(notes: Note[]): number {
-    if (notes.length === 0) return 0;
-
-    // Use average velocity of currently sounding (non-release) notes
-    const activeNotes = notes.filter((n) => n.phase !== "release");
-    if (activeNotes.length === 0) {
-      // If only release notes, use their average but attenuated
-      const avgVelocity =
-        notes.reduce((sum, n) => sum + n.velocity, 0) / notes.length;
-      return (avgVelocity / 127) * 0.3; // Attenuated for release
-    }
-
-    const avgVelocity =
-      activeNotes.reduce((sum, n) => sum + n.velocity, 0) / activeNotes.length;
-    return avgVelocity / 127;
   }
 
   private noteKey(midiNote: MidiNoteNumber, channel: number): string {

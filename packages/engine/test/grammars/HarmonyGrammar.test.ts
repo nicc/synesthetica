@@ -119,7 +119,7 @@ function createTestFrame(
     bars: [],
     phrases: [],
     dynamics: {
-      dynamics: { level: 0.5, trend: "stable" },
+      dynamics: { events: [], level: 0.5, trend: "stable", contour: [], range: { min: 0, max: 0, variance: 0 } },
       visual: {
         palette: { id: "dynamics", primary: { h: 0, s: 0, v: 0.5, a: 1 } },
         texture: { id: "dynamics", grain: 0.1, smoothness: 0.8, density: 0.5 },
