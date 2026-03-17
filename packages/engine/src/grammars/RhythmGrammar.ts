@@ -41,11 +41,14 @@ import type {
 /** NOW line vertical position (0 = top, 1 = bottom). 0.85 = 15% from bottom */
 const NOW_LINE_Y = 0.85;
 
-/** Left margin — leaves room for dynamics bar */
-const PITCH_MARGIN_LEFT = 0.08;
-
-/** Right margin — leaves room for future bar grammars */
-const PITCH_MARGIN_RIGHT = 0.08;
+/**
+ * Rhythm grammar occupies the central 2/3 of the world width.
+ * The remaining 1/6 on each side is reserved for bar grammars
+ * (dynamics on the left, future grammars on the right).
+ */
+const RHYTHM_FRACTION = 2 / 3;
+const PITCH_MARGIN_LEFT = (1 - RHYTHM_FRACTION) / 2;   // 1/6
+const PITCH_MARGIN_RIGHT = (1 - RHYTHM_FRACTION) / 2;  // 1/6
 
 /**
  * Time horizon scale (fixed mapping from time to screen position).

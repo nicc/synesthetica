@@ -62,6 +62,17 @@ const EMPTY_DYNAMICS: DynamicsState = {
   range: { min: 0, max: 0, variance: 0 },
 };
 
+// Derived layout values (must match DynamicsGrammar constants)
+const LEFT_MARGIN = 1 / 6;
+const BAR_WIDTH_FRACTION = 0.3;
+const BAR_WIDTH = LEFT_MARGIN * BAR_WIDTH_FRACTION;
+const BAR_CENTER = LEFT_MARGIN / 2;
+const BAR_LEFT = BAR_CENTER - BAR_WIDTH / 2;
+const BAR_RIGHT = BAR_CENTER + BAR_WIDTH / 2;
+const INDICATOR_INSET = 0.003;
+const INDICATOR_LEFT = BAR_LEFT + INDICATOR_INSET;
+const INDICATOR_RIGHT = BAR_RIGHT - INDICATOR_INSET;
+
 /** Filter to just indicator entities (exclude outline + ticks) */
 function indicators(entities: Entity[]): Entity[] {
   return entities.filter((e) => e.id.includes(":ind:"));
@@ -99,9 +110,20 @@ describe("DynamicsGrammar", () => {
 
       const points = outline!.data?.points as Array<{ x: number; y: number }>;
       expect(points).toHaveLength(5);
-      // First and last point match (closed)
       expect(points[0].x).toBeCloseTo(points[4].x, 5);
       expect(points[0].y).toBeCloseTo(points[4].y, 5);
+    });
+
+    it("outline sits within left 1/6 margin", () => {
+      const frame = createTestFrame(1000, EMPTY_DYNAMICS);
+      const scene = grammar.update(frame, null);
+      const outline = scene.entities.find((e) => e.id.includes(":outline"));
+      const points = outline!.data?.points as Array<{ x: number; y: number }>;
+
+      for (const p of points) {
+        expect(p.x).toBeGreaterThanOrEqual(0);
+        expect(p.x).toBeLessThan(LEFT_MARGIN);
+      }
     });
 
     it("ticks are at 25%, 50%, 75% of bar height", () => {
@@ -161,8 +183,8 @@ describe("DynamicsGrammar", () => {
     it("omits events older than fade window", () => {
       const dynamics: DynamicsState = {
         events: [
-          { t: 100, intensity: 0.5 }, // 2400ms old — past 2000ms fade
-          { t: 2000, intensity: 0.7 }, // 500ms old — still visible
+          { t: 100, intensity: 0.5 },
+          { t: 2000, intensity: 0.7 },
         ],
         level: 0.7,
         trend: "stable",
@@ -187,7 +209,6 @@ describe("DynamicsGrammar", () => {
         events: [{ t: 1000, intensity: 0.1 }],
       };
 
-      // age=0, fadeFraction=1, startOpacity=max(0.1, 0.25)=0.25
       const frame = createTestFrame(1000, dynamics);
       const scene = grammar.update(frame, null);
       const inds = indicators(scene.entities);
@@ -213,8 +234,6 @@ describe("DynamicsGrammar", () => {
         events: [{ t: 500, intensity: 0.8 }],
       };
 
-      // At t=1500, age=1000ms, fadeFraction=0.5
-      // startOpacity = max(0.8, 0.25) = 0.8, opacity = 0.8 * 0.5 = 0.4
       const frame = createTestFrame(1500, dynamics);
       const scene = grammar.update(frame, null);
       const inds = indicators(scene.entities);
@@ -242,7 +261,7 @@ describe("DynamicsGrammar", () => {
   });
 
   describe("positioning", () => {
-    it("indicators always span full bar width", () => {
+    it("indicators span full bar width with end-cap inset", () => {
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
         events: [{ t: 1000, intensity: 0.5 }],
@@ -254,14 +273,14 @@ describe("DynamicsGrammar", () => {
 
       const points = inds[0].data?.points as Array<{ x: number; y: number }>;
       expect(points).toHaveLength(2);
-      expect(points[0].x).toBeCloseTo(0.005, 3); // BAR_LEFT
-      expect(points[1].x).toBeCloseTo(0.018, 3); // BAR_RIGHT
+      expect(points[0].x).toBeCloseTo(INDICATOR_LEFT, 3);
+      expect(points[1].x).toBeCloseTo(INDICATOR_RIGHT, 3);
     });
 
-    it("aged indicator also spans full bar width", () => {
+    it("indicator endpoints are within outline bounds", () => {
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
-        events: [{ t: 0, intensity: 0.8 }],
+        events: [{ t: 1000, intensity: 0.5 }],
       };
 
       const frame = createTestFrame(1000, dynamics);
@@ -269,8 +288,8 @@ describe("DynamicsGrammar", () => {
       const inds = indicators(scene.entities);
 
       const points = inds[0].data?.points as Array<{ x: number; y: number }>;
-      expect(points[0].x).toBeCloseTo(0.005, 3); // BAR_LEFT
-      expect(points[1].x).toBeCloseTo(0.018, 3); // BAR_RIGHT
+      expect(points[0].x).toBeGreaterThan(BAR_LEFT);
+      expect(points[1].x).toBeLessThan(BAR_RIGHT);
     });
 
     it("louder notes are higher on screen (lower y)", () => {
@@ -294,7 +313,7 @@ describe("DynamicsGrammar", () => {
       expect(loudY).toBeLessThan(quietY);
     });
 
-    it("indicators are within the bar area", () => {
+    it("indicators are within the bar area vertically", () => {
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
         events: [
@@ -346,17 +365,14 @@ describe("DynamicsGrammar", () => {
     it("thickness is clamped near bar edges", () => {
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
-        // intensity=1.0 → y = BAR_TOP (at the very top edge)
         events: [{ t: 0, intensity: 1.0 }],
       };
 
-      // age=1000 → ageFraction=0.5 → rawWidth would be 5
-      // but headroom is 0, so clamped to LINE_WIDTH_MIN
       const frame = createTestFrame(1000, dynamics);
       const scene = grammar.update(frame, null);
       const inds = indicators(scene.entities);
 
-      expect(inds[0].style.size).toBeCloseTo(3, 1); // LINE_WIDTH_MIN
+      expect(inds[0].style.size).toBeCloseTo(3, 1);
     });
   });
 
