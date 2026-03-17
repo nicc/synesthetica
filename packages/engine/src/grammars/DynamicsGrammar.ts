@@ -63,6 +63,9 @@ const INDICATOR_THICKNESS_MAX = 0.012;
 /** Minimum starting opacity so quiet notes are still visible */
 const MIN_OPACITY = 0.25;
 
+/** Minimum playable MIDI intensity (velocity 1/127) — maps to bar bottom */
+const MIN_INTENSITY = 1 / 127;
+
 /** Tick length as fraction of bar width (ruler marks at 25% intervals) */
 const TICK_LENGTH = 0.25;
 
@@ -215,10 +218,12 @@ export class DynamicsGrammar implements IVisualGrammar {
   }
 
   /**
-   * Map intensity (0–1) to y position within the bar.
-   * Higher intensity = higher on screen (lower y value).
+   * Map intensity to y position within the bar.
+   * The minimum playable MIDI velocity (1/127) maps to BAR_BOTTOM,
+   * maximum (1.0) maps to BAR_TOP, filling the full bar height.
    */
   private intensityToY(intensity: number): number {
-    return BAR_BOTTOM - intensity * BAR_HEIGHT;
+    const normalized = (intensity - MIN_INTENSITY) / (1 - MIN_INTENSITY);
+    return BAR_BOTTOM - Math.max(0, Math.min(1, normalized)) * BAR_HEIGHT;
   }
 }
