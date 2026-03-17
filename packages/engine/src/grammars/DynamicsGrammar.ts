@@ -66,6 +66,9 @@ const MIN_OPACITY = 0.25;
 /** Tick length as fraction of bar width (ruler marks at 25% intervals) */
 const TICK_LENGTH = 0.25;
 
+/** Inset ticks from outline edges to avoid opacity stacking */
+const TICK_INSET = 0.002;
+
 /** Outline/tick visual style */
 const OUTLINE_COLOR: ColorHSVA = { h: 200, s: 0.2, v: 0.4, a: 1.0 };
 const OUTLINE_OPACITY = 0.4;
@@ -119,7 +122,10 @@ export class DynamicsGrammar implements IVisualGrammar {
     });
 
     // --- Ruler ticks at 25%, 50%, 75% ---
+    // Inset from outline edges to avoid opacity stacking at intersections
     const tickLen = BAR_WIDTH * TICK_LENGTH;
+    const tickLeftStart = BAR_LEFT + TICK_INSET;
+    const tickRightEnd = BAR_RIGHT - TICK_INSET;
     for (const frac of [0.25, 0.5, 0.75]) {
       const y = BAR_BOTTOM - frac * BAR_HEIGHT;
       entities.push({
@@ -132,8 +138,8 @@ export class DynamicsGrammar implements IVisualGrammar {
         data: {
           type: "dynamics-contour",
           points: [
-            { x: BAR_LEFT, y },
-            { x: BAR_LEFT + tickLen, y },
+            { x: tickLeftStart, y },
+            { x: tickLeftStart + tickLen, y },
           ],
         },
       });
@@ -147,8 +153,8 @@ export class DynamicsGrammar implements IVisualGrammar {
         data: {
           type: "dynamics-contour",
           points: [
-            { x: BAR_RIGHT - tickLen, y },
-            { x: BAR_RIGHT, y },
+            { x: tickRightEnd - tickLen, y },
+            { x: tickRightEnd, y },
           ],
         },
       });
@@ -169,14 +175,17 @@ export class DynamicsGrammar implements IVisualGrammar {
 
       const centerY = this.intensityToY(event.intensity);
 
-      // Thickness grows as the indicator ages (blocky diffusion),
-      // clamped so the rect stays within BAR_TOP..BAR_BOTTOM.
+      // Thickness grows as the indicator ages (blocky diffusion).
+      // Clamp top/bottom independently so notes at the edges still
+      // render — the rect extends inward from the edge rather than
+      // being symmetrically squashed to zero.
       const ageFraction = age / FADE_MS;
-      const rawThickness =
-        INDICATOR_THICKNESS_MIN +
-        (INDICATOR_THICKNESS_MAX - INDICATOR_THICKNESS_MIN) * ageFraction;
-      const headroom = Math.min(centerY - BAR_TOP, BAR_BOTTOM - centerY);
-      const halfH = Math.min(rawThickness / 2, headroom);
+      const rawHalfH =
+        (INDICATOR_THICKNESS_MIN +
+          (INDICATOR_THICKNESS_MAX - INDICATOR_THICKNESS_MIN) * ageFraction) /
+        2;
+      const top = Math.max(centerY - rawHalfH, BAR_TOP);
+      const bottom = Math.min(centerY + rawHalfH, BAR_BOTTOM);
 
       entities.push({
         id: `${this.id}:ind:${i}`,
@@ -191,9 +200,9 @@ export class DynamicsGrammar implements IVisualGrammar {
         data: {
           type: "dynamics-indicator",
           x: BAR_LEFT,
-          y: centerY - halfH,
+          y: top,
           w: BAR_WIDTH,
-          h: halfH * 2,
+          h: bottom - top,
         },
       });
     }
