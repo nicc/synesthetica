@@ -69,13 +69,14 @@ const MIN_INTENSITY = 1 / 127;
 /** Tick length as fraction of bar width (ruler marks at 25% intervals) */
 const TICK_LENGTH = 0.25;
 
-/** Inset ticks from outline edges to avoid opacity stacking */
-const TICK_INSET = 0.002;
 
 /** Outline/tick visual style */
 const OUTLINE_COLOR: ColorHSVA = { h: 200, s: 0.2, v: 0.4, a: 1.0 };
 const OUTLINE_OPACITY = 0.4;
 const TICK_OPACITY = 0.25;
+
+/** Outline stroke thickness in normalized coords */
+const OUTLINE_THICKNESS = 0.001;
 
 // ============================================================================
 // Colors
@@ -104,62 +105,49 @@ export class DynamicsGrammar implements IVisualGrammar {
     const part = input.part;
     const events = input.dynamics.dynamics.events;
 
-    // --- Outline (closed rectangle) ---
+    // --- Outline (four rect edges — no corner overlap) ---
+    const outlineStyle = { color: OUTLINE_COLOR, opacity: OUTLINE_OPACITY };
+    const ot = OUTLINE_THICKNESS;
+    // Top edge
     entities.push({
-      id: `${this.id}:outline`,
-      part,
-      kind: "glyph",
-      createdAt: t,
-      updatedAt: t,
-      style: { color: OUTLINE_COLOR, opacity: OUTLINE_OPACITY, size: 1 },
-      data: {
-        type: "dynamics-contour",
-        points: [
-          { x: BAR_LEFT, y: BAR_TOP },
-          { x: BAR_RIGHT, y: BAR_TOP },
-          { x: BAR_RIGHT, y: BAR_BOTTOM },
-          { x: BAR_LEFT, y: BAR_BOTTOM },
-          { x: BAR_LEFT, y: BAR_TOP },
-        ],
-      },
+      id: `${this.id}:outline-t`, part, kind: "glyph", createdAt: t, updatedAt: t,
+      style: outlineStyle,
+      data: { type: "dynamics-indicator", x: BAR_LEFT, y: BAR_TOP, w: BAR_WIDTH, h: ot },
+    });
+    // Bottom edge
+    entities.push({
+      id: `${this.id}:outline-b`, part, kind: "glyph", createdAt: t, updatedAt: t,
+      style: outlineStyle,
+      data: { type: "dynamics-indicator", x: BAR_LEFT, y: BAR_BOTTOM - ot, w: BAR_WIDTH, h: ot },
+    });
+    // Left edge (between top and bottom edges)
+    entities.push({
+      id: `${this.id}:outline-l`, part, kind: "glyph", createdAt: t, updatedAt: t,
+      style: outlineStyle,
+      data: { type: "dynamics-indicator", x: BAR_LEFT, y: BAR_TOP + ot, w: ot, h: BAR_HEIGHT - 2 * ot },
+    });
+    // Right edge (between top and bottom edges)
+    entities.push({
+      id: `${this.id}:outline-r`, part, kind: "glyph", createdAt: t, updatedAt: t,
+      style: outlineStyle,
+      data: { type: "dynamics-indicator", x: BAR_RIGHT - ot, y: BAR_TOP + ot, w: ot, h: BAR_HEIGHT - 2 * ot },
     });
 
     // --- Ruler ticks at 25%, 50%, 75% ---
-    // Inset from outline edges to avoid opacity stacking at intersections
+    // Inset from outline edges; rendered as rects to avoid line overlap
     const tickLen = BAR_WIDTH * TICK_LENGTH;
-    const tickLeftStart = BAR_LEFT + TICK_INSET;
-    const tickRightEnd = BAR_RIGHT - TICK_INSET;
+    const tickStyle = { color: OUTLINE_COLOR, opacity: TICK_OPACITY };
     for (const frac of [0.25, 0.5, 0.75]) {
-      const y = BAR_BOTTOM - frac * BAR_HEIGHT;
+      const y = BAR_BOTTOM - frac * BAR_HEIGHT - ot / 2;
       entities.push({
-        id: `${this.id}:tick:${frac}`,
-        part,
-        kind: "glyph",
-        createdAt: t,
-        updatedAt: t,
-        style: { color: OUTLINE_COLOR, opacity: TICK_OPACITY, size: 1 },
-        data: {
-          type: "dynamics-contour",
-          points: [
-            { x: tickLeftStart, y },
-            { x: tickLeftStart + tickLen, y },
-          ],
-        },
+        id: `${this.id}:tick:${frac}`, part, kind: "glyph", createdAt: t, updatedAt: t,
+        style: tickStyle,
+        data: { type: "dynamics-indicator", x: BAR_LEFT + ot, y, w: tickLen, h: ot },
       });
       entities.push({
-        id: `${this.id}:tick-r:${frac}`,
-        part,
-        kind: "glyph",
-        createdAt: t,
-        updatedAt: t,
-        style: { color: OUTLINE_COLOR, opacity: TICK_OPACITY, size: 1 },
-        data: {
-          type: "dynamics-contour",
-          points: [
-            { x: tickRightEnd - tickLen, y },
-            { x: tickRightEnd, y },
-          ],
-        },
+        id: `${this.id}:tick-r:${frac}`, part, kind: "glyph", createdAt: t, updatedAt: t,
+        style: tickStyle,
+        data: { type: "dynamics-indicator", x: BAR_RIGHT - ot - tickLen, y, w: tickLen, h: ot },
       });
     }
 

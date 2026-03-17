@@ -98,30 +98,31 @@ describe("DynamicsGrammar", () => {
       const scene = grammar.update(frame, null);
       const chromeEnts = chrome(scene.entities);
 
-      // 1 outline + 6 ticks (left + right at 25%, 50%, 75%)
-      expect(chromeEnts).toHaveLength(7);
+      // 4 outline edges + 6 ticks (left + right at 25%, 50%, 75%)
+      expect(chromeEnts).toHaveLength(10);
     });
 
-    it("outline forms a closed rectangle", () => {
+    it("outline is four rect edges using dynamics-indicator type", () => {
       const frame = createTestFrame(1000, EMPTY_DYNAMICS);
       const scene = grammar.update(frame, null);
-      const outline = scene.entities.find((e) => e.id.includes(":outline"));
+      const outlines = scene.entities.filter((e) => e.id.includes(":outline-"));
 
-      const points = outline!.data?.points as Array<{ x: number; y: number }>;
-      expect(points).toHaveLength(5);
-      expect(points[0].x).toBeCloseTo(points[4].x, 5);
-      expect(points[0].y).toBeCloseTo(points[4].y, 5);
+      expect(outlines).toHaveLength(4);
+      for (const o of outlines) {
+        expect(o.data?.type).toBe("dynamics-indicator");
+      }
     });
 
     it("outline sits within left 1/6 margin", () => {
       const frame = createTestFrame(1000, EMPTY_DYNAMICS);
       const scene = grammar.update(frame, null);
-      const outline = scene.entities.find((e) => e.id.includes(":outline"));
-      const points = outline!.data?.points as Array<{ x: number; y: number }>;
+      const outlines = scene.entities.filter((e) => e.id.includes(":outline-"));
 
-      for (const p of points) {
-        expect(p.x).toBeGreaterThanOrEqual(0);
-        expect(p.x).toBeLessThan(LEFT_MARGIN);
+      for (const o of outlines) {
+        const x = o.data?.x as number;
+        const w = o.data?.w as number;
+        expect(x).toBeGreaterThanOrEqual(0);
+        expect(x + w).toBeLessThan(LEFT_MARGIN);
       }
     });
 
@@ -132,16 +133,13 @@ describe("DynamicsGrammar", () => {
 
       expect(ticks).toHaveLength(3);
 
+      const OT = 0.001; // OUTLINE_THICKNESS
       const expectedYs = [0.25, 0.5, 0.75].map(
-        (f) => BAR_BOTTOM - f * BAR_HEIGHT,
+        (f) => BAR_BOTTOM - f * BAR_HEIGHT - OT / 2,
       );
 
       for (let i = 0; i < ticks.length; i++) {
-        const points = ticks[i].data?.points as Array<{
-          x: number;
-          y: number;
-        }>;
-        const tickY = points[0].y;
+        const tickY = ticks[i].data?.y as number;
         expect(expectedYs).toContainEqual(expect.closeTo(tickY, 3));
       }
     });
