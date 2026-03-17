@@ -322,6 +322,8 @@ export class RhythmGrammar implements IVisualGrammar {
       },
       data: {
         type: "now-line",
+        xLeft: PITCH_MARGIN_LEFT,
+        xRight: 1 - PITCH_MARGIN_RIGHT,
       },
     };
   }
@@ -375,6 +377,8 @@ export class RhythmGrammar implements IVisualGrammar {
         data: {
           type: "beat-line",
           beatTime,
+          xLeft: PITCH_MARGIN_LEFT,
+          xRight: 1 - PITCH_MARGIN_RIGHT,
         },
       });
     }
@@ -431,6 +435,8 @@ export class RhythmGrammar implements IVisualGrammar {
         data: {
           type: "bar-line",
           barTime,
+          xLeft: PITCH_MARGIN_LEFT,
+          xRight: 1 - PITCH_MARGIN_RIGHT,
         },
       });
     }

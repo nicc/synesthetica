@@ -64,14 +64,11 @@ const EMPTY_DYNAMICS: DynamicsState = {
 
 // Derived layout values (must match DynamicsGrammar constants)
 const LEFT_MARGIN = 1 / 6;
-const BAR_WIDTH_FRACTION = 0.3;
+const BAR_WIDTH_FRACTION = 0.24;
 const BAR_WIDTH = LEFT_MARGIN * BAR_WIDTH_FRACTION;
 const BAR_CENTER = LEFT_MARGIN / 2;
 const BAR_LEFT = BAR_CENTER - BAR_WIDTH / 2;
 const BAR_RIGHT = BAR_CENTER + BAR_WIDTH / 2;
-const INDICATOR_INSET = 0.003;
-const INDICATOR_LEFT = BAR_LEFT + INDICATOR_INSET;
-const INDICATOR_RIGHT = BAR_RIGHT - INDICATOR_INSET;
 
 /** Filter to just indicator entities (exclude outline + ticks) */
 function indicators(entities: Entity[]): Entity[] {
@@ -261,7 +258,7 @@ describe("DynamicsGrammar", () => {
   });
 
   describe("positioning", () => {
-    it("indicators span full bar width with end-cap inset", () => {
+    it("indicators span full bar width", () => {
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
         events: [{ t: 1000, intensity: 0.5 }],
@@ -273,23 +270,24 @@ describe("DynamicsGrammar", () => {
 
       const points = inds[0].data?.points as Array<{ x: number; y: number }>;
       expect(points).toHaveLength(2);
-      expect(points[0].x).toBeCloseTo(INDICATOR_LEFT, 3);
-      expect(points[1].x).toBeCloseTo(INDICATOR_RIGHT, 3);
+      expect(points[0].x).toBeCloseTo(BAR_LEFT, 3);
+      expect(points[1].x).toBeCloseTo(BAR_RIGHT, 3);
     });
 
-    it("indicator endpoints are within outline bounds", () => {
+    it("aged indicator stays at full bar width", () => {
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
-        events: [{ t: 1000, intensity: 0.5 }],
+        events: [{ t: 0, intensity: 0.8 }],
       };
 
+      // age=1000 → still full width, no growth
       const frame = createTestFrame(1000, dynamics);
       const scene = grammar.update(frame, null);
       const inds = indicators(scene.entities);
 
       const points = inds[0].data?.points as Array<{ x: number; y: number }>;
-      expect(points[0].x).toBeGreaterThan(BAR_LEFT);
-      expect(points[1].x).toBeLessThan(BAR_RIGHT);
+      expect(points[0].x).toBeCloseTo(BAR_LEFT, 3);
+      expect(points[1].x).toBeCloseTo(BAR_RIGHT, 3);
     });
 
     it("louder notes are higher on screen (lower y)", () => {

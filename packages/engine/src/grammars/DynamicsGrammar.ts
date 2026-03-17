@@ -33,20 +33,13 @@ import type {
  * horizontally in that margin.
  */
 const LEFT_MARGIN = 1 / 6;                     // matches RhythmGrammar
-const BAR_WIDTH_FRACTION = 0.3;                 // bar takes 30% of the margin
+const BAR_WIDTH_FRACTION = 0.24;                // bar takes 24% of the margin
 const BAR_WIDTH = LEFT_MARGIN * BAR_WIDTH_FRACTION;
 const BAR_CENTER = LEFT_MARGIN / 2;
 const BAR_LEFT = BAR_CENTER - BAR_WIDTH / 2;
 const BAR_RIGHT = BAR_CENTER + BAR_WIDTH / 2;
 
-/**
- * Indicator line endpoints are inset slightly from the outline so that
- * Line2 square end-caps (which extend half the linewidth beyond each
- * endpoint) don't overflow the bar's horizontal edges.
- */
-const INDICATOR_INSET = 0.003;
-const INDICATOR_LEFT = BAR_LEFT + INDICATOR_INSET;
-const INDICATOR_RIGHT = BAR_RIGHT - INDICATOR_INSET;
+/** Indicator lines span the full bar width (BAR_LEFT to BAR_RIGHT) */
 
 /** Top of the bar (1/6 from top — centred in 2/3 of screen height) */
 const BAR_TOP = 1 / 6;
@@ -207,8 +200,8 @@ export class DynamicsGrammar implements IVisualGrammar {
         data: {
           type: "dynamics-contour",
           points: [
-            { x: INDICATOR_LEFT, y },
-            { x: INDICATOR_RIGHT, y },
+            { x: BAR_LEFT, y },
+            { x: BAR_RIGHT, y },
           ],
         },
       });

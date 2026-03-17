@@ -402,11 +402,13 @@ export class ThreeJSRenderer implements IRenderer {
       this.entityObjects.set(entity.id, line);
     }
 
-    // Line spans full width at y position
+    // Line spans from xLeft to xRight (normalized 0–1) at y position
     const y = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
+    const xLeft = ((entity.data?.xLeft as number) ?? 0) * this.config.worldWidth;
+    const xRight = ((entity.data?.xRight as number) ?? 1) * this.config.worldWidth;
     const points = [
-      new THREE.Vector3(0, y, 0),
-      new THREE.Vector3(this.config.worldWidth, y, 0),
+      new THREE.Vector3(xLeft, y, 0),
+      new THREE.Vector3(xRight, y, 0),
     ];
     (line.geometry as THREE.BufferGeometry).setFromPoints(points);
 
