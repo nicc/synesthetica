@@ -196,10 +196,13 @@ describe("HarmonyGrammar", () => {
       expect(chordEntity?.data?.quality).toBe("maj");
     });
 
-    it("creates tension bar entity", () => {
+    it("creates tension bar entity when enabled", () => {
+      const g = new HarmonyGrammar({ showTensionBar: true });
+      g.init(ctx);
+
       const chord = createTestChord(0, "maj", [0, 4, 7]);
       const frame = createTestFrame(1000, chord, 0.5);
-      const scene = grammar.update(frame, null);
+      const scene = g.update(frame, null);
 
       const tensionEntity = scene.entities.find(
         (e) => e.data?.type === "tension-bar"
@@ -227,9 +230,8 @@ describe("HarmonyGrammar", () => {
       const frame = createTestFrame(1000, null, 0);
       const scene = grammar.update(frame, null);
 
-      // Should still have tension bar, but no chord shape
-      expect(scene.entities.length).toBe(1);
-      expect(scene.entities[0].data?.type).toBe("tension-bar");
+      // No chord shape, no tension bar (disabled by default)
+      expect(scene.entities.length).toBe(0);
     });
   });
 
@@ -358,8 +360,8 @@ describe("HarmonyGrammar", () => {
   });
 
   describe("tension bar visibility", () => {
-    it("can hide tension bar", () => {
-      const g = new HarmonyGrammar({ showTensionBar: false });
+    it("tension bar is hidden by default", () => {
+      const g = new HarmonyGrammar();
       g.init(ctx);
 
       const chord = createTestChord(0, "maj", [0, 4, 7]);

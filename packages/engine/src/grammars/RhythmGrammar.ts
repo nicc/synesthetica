@@ -41,8 +41,11 @@ import type {
 /** NOW line vertical position (0 = top, 1 = bottom). 0.85 = 15% from bottom */
 const NOW_LINE_Y = 0.85;
 
-/** Margins on left/right for pitch class positioning */
-const PITCH_MARGIN = 0.05;
+/** Left margin — leaves room for dynamics bar */
+const PITCH_MARGIN_LEFT = 0.08;
+
+/** Right margin — leaves room for future bar grammars */
+const PITCH_MARGIN_RIGHT = 0.08;
 
 /**
  * Time horizon scale (fixed mapping from time to screen position).
@@ -806,8 +809,8 @@ export class RhythmGrammar implements IVisualGrammar {
    * C (0) at left margin, B (11) at right margin.
    */
   private pitchClassToX(pc: PitchClass): number {
-    const usableWidth = 1 - 2 * PITCH_MARGIN;
-    return PITCH_MARGIN + (pc / 11) * usableWidth;
+    const usableWidth = 1 - PITCH_MARGIN_LEFT - PITCH_MARGIN_RIGHT;
+    return PITCH_MARGIN_LEFT + (pc / 11) * usableWidth;
   }
 
   /**

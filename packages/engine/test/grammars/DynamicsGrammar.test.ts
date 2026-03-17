@@ -109,7 +109,6 @@ describe("DynamicsGrammar", () => {
       const scene = grammar.update(frame, null);
       const ticks = scene.entities.filter((e) => e.id.includes(":tick:"));
 
-      // 3 left-side ticks
       expect(ticks).toHaveLength(3);
 
       const BAR_TOP = 1 / 6;
@@ -182,23 +181,21 @@ describe("DynamicsGrammar", () => {
   });
 
   describe("opacity", () => {
-    it("opacity is intensity * fade fraction", () => {
+    it("opacity uses min floor for quiet notes", () => {
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
-        events: [{ t: 500, intensity: 0.8 }],
+        events: [{ t: 1000, intensity: 0.1 }],
       };
 
-      // At t=1500, age=1000ms, fadeFraction=0.5
-      // opacity = 0.8 * 0.5 = 0.4
-      const frame = createTestFrame(1500, dynamics);
+      // age=0, fadeFraction=1, startOpacity=max(0.1, 0.25)=0.25
+      const frame = createTestFrame(1000, dynamics);
       const scene = grammar.update(frame, null);
       const inds = indicators(scene.entities);
 
-      expect(inds).toHaveLength(1);
-      expect(inds[0].style.opacity).toBeCloseTo(0.4, 2);
+      expect(inds[0].style.opacity).toBeCloseTo(0.25, 2);
     });
 
-    it("fresh event has opacity equal to intensity", () => {
+    it("loud notes use their actual intensity as opacity", () => {
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
         events: [{ t: 1000, intensity: 0.9 }],
@@ -208,6 +205,22 @@ describe("DynamicsGrammar", () => {
       const scene = grammar.update(frame, null);
 
       expect(indicators(scene.entities)[0].style.opacity).toBeCloseTo(0.9, 2);
+    });
+
+    it("opacity fades over time", () => {
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        events: [{ t: 500, intensity: 0.8 }],
+      };
+
+      // At t=1500, age=1000ms, fadeFraction=0.5
+      // startOpacity = max(0.8, 0.25) = 0.8, opacity = 0.8 * 0.5 = 0.4
+      const frame = createTestFrame(1500, dynamics);
+      const scene = grammar.update(frame, null);
+      const inds = indicators(scene.entities);
+
+      expect(inds).toHaveLength(1);
+      expect(inds[0].style.opacity).toBeCloseTo(0.4, 2);
     });
 
     it("louder notes are more opaque than quieter notes at same age", () => {
@@ -229,42 +242,35 @@ describe("DynamicsGrammar", () => {
   });
 
   describe("positioning", () => {
-    it("fresh indicator is inset from outline edges", () => {
+    it("indicators always span full bar width", () => {
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
         events: [{ t: 1000, intensity: 0.5 }],
       };
 
-      // age=0 → full inset
       const frame = createTestFrame(1000, dynamics);
       const scene = grammar.update(frame, null);
       const inds = indicators(scene.entities);
 
       const points = inds[0].data?.points as Array<{ x: number; y: number }>;
       expect(points).toHaveLength(2);
-      // INDICATOR_LEFT = 0.005 + 0.02 * 0.15 = 0.008
-      // INDICATOR_RIGHT = 0.025 - 0.02 * 0.15 = 0.022
-      expect(points[0].x).toBeCloseTo(0.008, 3);
-      expect(points[1].x).toBeCloseTo(0.022, 3);
+      expect(points[0].x).toBeCloseTo(0.005, 3); // BAR_LEFT
+      expect(points[1].x).toBeCloseTo(0.018, 3); // BAR_RIGHT
     });
 
-    it("aged indicator grows wider toward outline but never beyond", () => {
+    it("aged indicator also spans full bar width", () => {
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
         events: [{ t: 0, intensity: 0.8 }],
       };
 
-      // age=1000 → ageFraction=0.5, inset shrinks to half
       const frame = createTestFrame(1000, dynamics);
       const scene = grammar.update(frame, null);
       const inds = indicators(scene.entities);
 
       const points = inds[0].data?.points as Array<{ x: number; y: number }>;
-      // Wider than fresh but within BAR_LEFT..BAR_RIGHT
-      expect(points[0].x).toBeLessThan(0.008);
-      expect(points[0].x).toBeGreaterThanOrEqual(0.005);
-      expect(points[1].x).toBeGreaterThan(0.022);
-      expect(points[1].x).toBeLessThanOrEqual(0.025);
+      expect(points[0].x).toBeCloseTo(0.005, 3); // BAR_LEFT
+      expect(points[1].x).toBeCloseTo(0.018, 3); // BAR_RIGHT
     });
 
     it("louder notes are higher on screen (lower y)", () => {
@@ -306,8 +312,6 @@ describe("DynamicsGrammar", () => {
         for (const p of points) {
           expect(p.y).toBeGreaterThanOrEqual(1 / 6 - 0.001);
           expect(p.y).toBeLessThanOrEqual(5 / 6 + 0.001);
-          expect(p.x).toBeGreaterThanOrEqual(0.005 - 0.001);
-          expect(p.x).toBeLessThanOrEqual(0.025 + 0.001);
         }
       }
     });
@@ -329,14 +333,30 @@ describe("DynamicsGrammar", () => {
     it("aged indicator has larger line width", () => {
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
-        events: [{ t: 0, intensity: 0.8 }],
+        events: [{ t: 0, intensity: 0.5 }],
       };
 
-      // age=1000 → half fade → lineWidth = 3 + (5-3)*0.5 = 4
+      // age=1000 → half fade → lineWidth = 3 + (7-3)*0.5 = 5
       const frame = createTestFrame(1000, dynamics);
       const scene = grammar.update(frame, null);
 
-      expect(indicators(scene.entities)[0].style.size).toBeCloseTo(4, 1);
+      expect(indicators(scene.entities)[0].style.size).toBeCloseTo(5, 1);
+    });
+
+    it("thickness is clamped near bar edges", () => {
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        // intensity=1.0 → y = BAR_TOP (at the very top edge)
+        events: [{ t: 0, intensity: 1.0 }],
+      };
+
+      // age=1000 → ageFraction=0.5 → rawWidth would be 5
+      // but headroom is 0, so clamped to LINE_WIDTH_MIN
+      const frame = createTestFrame(1000, dynamics);
+      const scene = grammar.update(frame, null);
+      const inds = indicators(scene.entities);
+
+      expect(inds[0].style.size).toBeCloseTo(3, 1); // LINE_WIDTH_MIN
     });
   });
 

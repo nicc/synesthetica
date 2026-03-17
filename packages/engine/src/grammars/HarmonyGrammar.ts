@@ -82,7 +82,7 @@ const DEFAULT_CONFIG: Required<HarmonyGrammarConfig> = {
   width: 800,
   height: 600,
   backgroundColor: "#1a1a2e",
-  showTensionBar: true,
+  showTensionBar: false,
   strokeWidth: 2,
 };
 

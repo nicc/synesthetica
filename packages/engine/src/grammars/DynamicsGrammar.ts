@@ -27,17 +27,14 @@ import type {
 // Layout Constants
 // ============================================================================
 
-/** Left edge of the dynamics bar (in its own strip, left of PITCH_MARGIN) */
+/** Left edge of the dynamics bar */
 const BAR_LEFT = 0.005;
 
-/** Right edge of the dynamics bar */
-const BAR_RIGHT = 0.025;
+/** Right edge of the dynamics bar (clear gap to rhythm grammar at ~0.0425) */
+const BAR_RIGHT = 0.018;
 
 /** Bar width */
 const BAR_WIDTH = BAR_RIGHT - BAR_LEFT;
-
-/** Indicator inset from outline edges at birth (fraction of BAR_WIDTH) */
-const INDICATOR_INSET = 0.15;
 
 /** Top of the bar (1/6 from top — centred in 2/3 of screen height) */
 const BAR_TOP = 1 / 6;
@@ -55,7 +52,10 @@ const FADE_MS = 2000;
 const LINE_WIDTH_MIN = 3;
 
 /** Line width in pixels at full fade */
-const LINE_WIDTH_MAX = 5;
+const LINE_WIDTH_MAX = 7;
+
+/** Minimum starting opacity so quiet notes are still visible */
+const MIN_OPACITY = 0.25;
 
 /** Tick length as fraction of bar width (ruler marks at 25% intervals) */
 const TICK_LENGTH = 0.25;
@@ -156,18 +156,30 @@ export class DynamicsGrammar implements IVisualGrammar {
       if (age >= FADE_MS) continue;
 
       const fadeFraction = 1 - age / FADE_MS;
-      const opacity = event.intensity * fadeFraction;
+      const startOpacity = Math.max(event.intensity, MIN_OPACITY);
+      const opacity = startOpacity * fadeFraction;
 
       if (opacity < 0.01) continue;
 
       const y = this.intensityToY(event.intensity);
 
-      // Lines grow wider and thicker as they fade, clamped to outline
+      // Lines are always full bar width; they grow thicker (vertically)
+      // as they fade, but thickness is clamped so the line stays within
+      // the bar's top/bottom edges.
       const ageFraction = age / FADE_MS;
-      const insetNow = INDICATOR_INSET * (1 - ageFraction);
-      const left = BAR_LEFT + BAR_WIDTH * insetNow;
-      const right = BAR_RIGHT - BAR_WIDTH * insetNow;
-      const lineWidth = LINE_WIDTH_MIN + (LINE_WIDTH_MAX - LINE_WIDTH_MIN) * ageFraction;
+      const rawWidth = LINE_WIDTH_MIN + (LINE_WIDTH_MAX - LINE_WIDTH_MIN) * ageFraction;
+
+      // Clamp: half the line extends above and below y. Ensure it
+      // doesn't exceed BAR_TOP or BAR_BOTTOM in normalized coords.
+      // We approximate pixel→normalized: 1px ≈ 1/worldHeightPx, but
+      // since the renderer handles actual pixel sizing, we just cap the
+      // growth near edges proportionally.
+      const headroom = Math.min(y - BAR_TOP, BAR_BOTTOM - y);
+      const maxWidthForHeadroom =
+        headroom < 0.02
+          ? LINE_WIDTH_MIN + (rawWidth - LINE_WIDTH_MIN) * (headroom / 0.02)
+          : rawWidth;
+      const lineWidth = Math.max(LINE_WIDTH_MIN, maxWidthForHeadroom);
 
       entities.push({
         id: `${this.id}:ind:${i}`,
@@ -183,8 +195,8 @@ export class DynamicsGrammar implements IVisualGrammar {
         data: {
           type: "dynamics-contour",
           points: [
-            { x: left, y },
-            { x: right, y },
+            { x: BAR_LEFT, y },
+            { x: BAR_RIGHT, y },
           ],
         },
       });
