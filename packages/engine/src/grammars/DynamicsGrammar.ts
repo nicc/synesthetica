@@ -56,7 +56,10 @@ const DEFAULT_GAP_MS = 4000;
 // ============================================================================
 
 const CONTOUR_COLOR: ColorHSVA = { h: 200, s: 0.5, v: 0.8, a: 0.9 };
-const WHISKER_COLOR: ColorHSVA = { h: 200, s: 0.5, v: 0.8, a: 0.5 };
+const MIN_TICK_COLOR: ColorHSVA = { h: 35, s: 0.6, v: 0.8, a: 0.6 };
+
+/** Half-width of the min tick in normalized x coordinates */
+const MIN_TICK_HALF_WIDTH = 0.005;
 
 // ============================================================================
 // Grammar Implementation
@@ -90,9 +93,9 @@ export class DynamicsGrammar implements IVisualGrammar {
         }
       }
 
-      // Whisker lines for chords (where min < level)
-      const whiskers = this.createWhiskerEntities(dynamics.contour, t, part);
-      entities.push(...whiskers);
+      // Min-intensity ticks for chords (where min < level)
+      const minTicks = this.createMinTickEntities(dynamics.contour, t, part);
+      entities.push(...minTicks);
     }
 
     return {
@@ -196,10 +199,10 @@ export class DynamicsGrammar implements IVisualGrammar {
   }
 
   /**
-   * Create vertical whisker line entities for contour points where min < level.
-   * Each whisker hangs from the max (level) down to the min.
+   * Create small horizontal tick marks at the min intensity for chord onsets.
+   * Positioned directly below the contour point at the same x.
    */
-  private createWhiskerEntities(
+  private createMinTickEntities(
     contour: DynamicsContourPoint[],
     t: number,
     part: string,
@@ -213,21 +216,23 @@ export class DynamicsGrammar implements IVisualGrammar {
       const x = this.timeToX(point.t, t);
       if (x < LEFT_X) continue;
 
+      const y = this.levelToY(point.min);
+
       entities.push({
-        id: `${this.id}:whisker:${i}`,
+        id: `${this.id}:mintick:${i}`,
         part,
         kind: "glyph",
         createdAt: t,
         updatedAt: t,
         style: {
-          color: WHISKER_COLOR,
-          opacity: WHISKER_COLOR.a,
+          color: MIN_TICK_COLOR,
+          opacity: MIN_TICK_COLOR.a,
         },
         data: {
           type: "dynamics-contour",
           points: [
-            { x, y: this.levelToY(point.level) },
-            { x, y: this.levelToY(point.min) },
+            { x: x - MIN_TICK_HALF_WIDTH, y },
+            { x: x + MIN_TICK_HALF_WIDTH, y },
           ],
         },
       });

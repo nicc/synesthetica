@@ -237,8 +237,8 @@ describe("DynamicsGrammar", () => {
     });
   });
 
-  describe("whisker lines for chords", () => {
-    it("emits whisker for contour points with min < level", () => {
+  describe("min-intensity ticks for chords", () => {
+    it("emits tick for contour points with min < level", () => {
       const dynamics: DynamicsState = {
         events: [
           { t: 500, intensity: 0.9 },
@@ -258,21 +258,21 @@ describe("DynamicsGrammar", () => {
       const frame = createTestFrame(1000, dynamics);
       const scene = grammar.update(frame, null);
 
-      const whiskers = scene.entities.filter(
-        (e) => e.id.includes("whisker"),
+      const ticks = scene.entities.filter(
+        (e) => e.id.includes("mintick"),
       );
-      expect(whiskers).toHaveLength(2);
+      expect(ticks).toHaveLength(2);
 
-      // Each whisker has exactly 2 points (top and bottom)
-      for (const w of whiskers) {
-        const points = w.data?.points as Array<{ x: number; y: number }>;
+      // Each tick is a horizontal line (2 points at same y, different x)
+      for (const tick of ticks) {
+        const points = tick.data?.points as Array<{ x: number; y: number }>;
         expect(points).toHaveLength(2);
-        // Top point (max) should have lower y than bottom point (min)
-        expect(points[0].y).toBeLessThan(points[1].y);
+        expect(points[0].y).toBeCloseTo(points[1].y, 5);
+        expect(points[0].x).toBeLessThan(points[1].x);
       }
     });
 
-    it("does not emit whisker for single notes (no min)", () => {
+    it("does not emit tick for single notes (no min)", () => {
       const dynamics: DynamicsState = {
         events: [
           { t: 500, intensity: 0.5 },
@@ -290,13 +290,13 @@ describe("DynamicsGrammar", () => {
       const frame = createTestFrame(1000, dynamics);
       const scene = grammar.update(frame, null);
 
-      const whiskers = scene.entities.filter(
-        (e) => e.id.includes("whisker"),
+      const ticks = scene.entities.filter(
+        (e) => e.id.includes("mintick"),
       );
-      expect(whiskers).toHaveLength(0);
+      expect(ticks).toHaveLength(0);
     });
 
-    it("whisker has 50% opacity", () => {
+    it("tick is amber-coloured (distinct from contour)", () => {
       const dynamics: DynamicsState = {
         events: [
           { t: 500, intensity: 0.9 },
@@ -315,8 +315,9 @@ describe("DynamicsGrammar", () => {
       const frame = createTestFrame(1000, dynamics);
       const scene = grammar.update(frame, null);
 
-      const whisker = scene.entities.find((e) => e.id.includes("whisker"));
-      expect(whisker!.style.opacity).toBeCloseTo(0.5, 2);
+      const tick = scene.entities.find((e) => e.id.includes("mintick"));
+      // Amber hue (~35), distinct from contour blue (~200)
+      expect(tick!.style.color!.h).toBeCloseTo(35, 0);
     });
   });
 
