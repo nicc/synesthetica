@@ -89,6 +89,27 @@ Example: Testing beat detection with simulated MIDI sequences (subdivisions, rub
 
 Apply this principle whenever the system's behavior is experiential—where seeing it operate reveals more than describing it.
 
+### 9. Observation Over Synthesis
+
+**Show what happened; let perception find the pattern.**
+
+When a musical property can be represented directly — each note's velocity as a position, each onset as a mark — prefer that over computed summaries like averages, trend lines, or smoothed curves. The human visual system is remarkably good at extracting pattern, range, consistency, and motion from raw observations. A system that computes these properties will always be an approximation of what the viewer would have perceived on their own, and risks asserting structure that isn't there.
+
+This is a default, not an absolute. Computed analysis earns its place when:
+- The pattern genuinely can't be perceived from direct observation (e.g. key centre detection from pitch class distributions over time)
+- The time scale exceeds what visual memory can hold (e.g. long-range harmonic progression)
+- The relationship is cross-domain and non-obvious (e.g. rhythmic stability derived from onset drift relative to a beat grid)
+
+**Examples:**
+
+The dynamics grammar shows each note onset as a positioned indicator that fades over time. The viewer perceives range (indicators span the bar), consistency (they cluster), crescendo (they drift upward), and rhythmic character (even spacing vs. bursts) — none of which the system computes or asserts.
+
+A side-scrolling contour with EMA smoothing, trend arrows, and range bands was replaced by this approach. The contour computed summaries that lagged behind the input, misrepresented chord dynamics by averaging individual notes, and obscured the temporal texture of the playing.
+
+**Counterexample:**
+
+Chord detection is a valid use of synthesis. The viewer cannot perceive "this is a dominant seventh chord" from individual pitch-class hue assignments — that requires recognising an interval pattern across simultaneous notes. The system must do that work and present the result.
+
 ## Anti-Principles
 - Magic without explanation
 - Configuration without mental models
