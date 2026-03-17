@@ -6,8 +6,10 @@
  *
  * Entity types:
  * - dynamics-contour: glyph with contour point data for renderer to draw as line
- * - dynamics-level: particle showing current level at NOW position
- * - dynamics-range: field showing min/max band behind contour
+ *
+ * Gap handling: If consecutive contour points are separated by more than one bar
+ * (when BPM is prescribed) or 4 seconds (no BPM), the line breaks and a new
+ * segment begins. Each segment becomes a separate entity.
  *
  * Consumes: frame.dynamics (DynamicsState from DynamicsStabilizer)
  *
@@ -32,7 +34,7 @@ import type {
 const STRIP_TOP = 0.0;
 
 /** Bottom of dynamics strip */
-const STRIP_BOTTOM = 0.12;
+const STRIP_BOTTOM = 0.24;
 
 /** Strip height */
 const STRIP_HEIGHT = STRIP_BOTTOM - STRIP_TOP;
@@ -46,13 +48,14 @@ const LEFT_X = 0.05;
 /** Time window to display (matches stabiliser default) */
 const DISPLAY_WINDOW_MS = 8000;
 
+/** Default gap threshold when no BPM is prescribed */
+const DEFAULT_GAP_MS = 4000;
+
 // ============================================================================
 // Colors
 // ============================================================================
 
 const CONTOUR_COLOR: ColorHSVA = { h: 200, s: 0.5, v: 0.8, a: 0.9 };
-const LEVEL_MARKER_COLOR: ColorHSVA = { h: 50, s: 0.7, v: 0.9, a: 1.0 };
-const RANGE_BAND_COLOR: ColorHSVA = { h: 200, s: 0.2, v: 0.4, a: 0.15 };
 
 // ============================================================================
 // Grammar Implementation
@@ -75,17 +78,16 @@ export class DynamicsGrammar implements IVisualGrammar {
     const part = input.part;
     const dynamics = input.dynamics.dynamics;
 
-    // Contour line
     if (dynamics.contour.length > 0) {
-      entities.push(this.createContourEntity(dynamics.contour, t, part));
-    }
+      const gapMs = this.computeGapThreshold(input);
+      const segments = this.segmentContour(dynamics.contour, gapMs);
 
-    // Current level marker
-    entities.push(this.createLevelMarker(dynamics.level, t, part));
-
-    // Range band
-    if (dynamics.events.length > 0) {
-      entities.push(this.createRangeBand(dynamics.range.min, dynamics.range.max, t, part));
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        if (segment.length >= 2) {
+          entities.push(this.createContourEntity(segment, t, part, i));
+        }
+      }
     }
 
     return {
@@ -93,6 +95,48 @@ export class DynamicsGrammar implements IVisualGrammar {
       entities,
       diagnostics: [],
     };
+  }
+
+  /**
+   * Compute the gap threshold for line breaking.
+   * One bar when BPM is prescribed, 4 seconds otherwise.
+   */
+  private computeGapThreshold(input: AnnotatedMusicalFrame): number {
+    const tempo = input.rhythm.prescribedTempo;
+    const meter = input.rhythm.prescribedMeter;
+
+    if (tempo && tempo > 0) {
+      const beatMs = 60000 / tempo;
+      const beatsPerBar = meter?.beatsPerBar ?? 4;
+      return beatMs * beatsPerBar;
+    }
+
+    return DEFAULT_GAP_MS;
+  }
+
+  /**
+   * Split contour into segments wherever consecutive points exceed gapMs.
+   */
+  private segmentContour(
+    contour: DynamicsContourPoint[],
+    gapMs: number,
+  ): DynamicsContourPoint[][] {
+    const segments: DynamicsContourPoint[][] = [];
+    let current: DynamicsContourPoint[] = [contour[0]];
+
+    for (let i = 1; i < contour.length; i++) {
+      if (contour[i].t - contour[i - 1].t > gapMs) {
+        segments.push(current);
+        current = [];
+      }
+      current.push(contour[i]);
+    }
+
+    if (current.length > 0) {
+      segments.push(current);
+    }
+
+    return segments;
   }
 
   /**
@@ -117,8 +161,8 @@ export class DynamicsGrammar implements IVisualGrammar {
     contour: DynamicsContourPoint[],
     t: number,
     part: string,
+    segmentIndex: number,
   ): Entity {
-    // Convert contour points to normalized screen coordinates
     const points: Array<{ x: number; y: number }> = [];
 
     for (const point of contour) {
@@ -130,7 +174,7 @@ export class DynamicsGrammar implements IVisualGrammar {
     }
 
     return {
-      id: `${this.id}:contour`,
+      id: `${this.id}:contour:${segmentIndex}`,
       part,
       kind: "glyph",
       createdAt: t,
@@ -142,62 +186,6 @@ export class DynamicsGrammar implements IVisualGrammar {
       data: {
         type: "dynamics-contour",
         points,
-      },
-    };
-  }
-
-  private createLevelMarker(
-    level: number,
-    t: number,
-    part: string,
-  ): Entity {
-    return {
-      id: `${this.id}:level`,
-      part,
-      kind: "particle",
-      createdAt: t,
-      updatedAt: t,
-      position: {
-        x: NOW_X,
-        y: this.levelToY(level),
-      },
-      style: {
-        color: LEVEL_MARKER_COLOR,
-        size: 4,
-        opacity: 1.0,
-      },
-      data: {
-        type: "dynamics-level",
-      },
-    };
-  }
-
-  private createRangeBand(
-    min: number,
-    max: number,
-    t: number,
-    part: string,
-  ): Entity {
-    return {
-      id: `${this.id}:range`,
-      part,
-      kind: "field",
-      createdAt: t,
-      updatedAt: t,
-      position: {
-        x: LEFT_X,
-        y: this.levelToY(max),
-      },
-      style: {
-        color: RANGE_BAND_COLOR,
-        opacity: RANGE_BAND_COLOR.a,
-      },
-      data: {
-        type: "dynamics-range",
-        width: NOW_X - LEFT_X,
-        height: (max - min) * STRIP_HEIGHT,
-        yBottom: this.levelToY(min),
-        yTop: this.levelToY(max),
       },
     };
   }

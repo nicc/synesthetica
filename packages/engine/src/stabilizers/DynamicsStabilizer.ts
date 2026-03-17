@@ -6,7 +6,7 @@
  *
  * Outputs:
  * - Constituent events (per-onset velocity observations)
- * - Smoothed level contour (EMA over onsets + silence decay)
+ * - Smoothed level contour (EMA over onsets, no decay during silence)
  * - Trend (rising/falling/stable via linear regression)
  * - Dynamic range (min, max, variance over window)
  *
@@ -38,9 +38,6 @@ export interface DynamicsStabilizerConfig {
   /** EMA smoothing factor (0–1). Higher = more responsive. @default 0.3 */
   smoothingAlpha?: number;
 
-  /** Level halving time in ms during silence. @default 500 */
-  silenceDecayRate?: Ms;
-
   /** Window for trend linear regression. @default 1000 */
   trendWindowMs?: Ms;
 
@@ -51,7 +48,6 @@ export interface DynamicsStabilizerConfig {
 const DEFAULT_CONFIG = {
   windowMs: 8000,
   smoothingAlpha: 0.3,
-  silenceDecayRate: 500,
   trendWindowMs: 1000,
   trendDeadZone: 0.1,
 } as const;
@@ -98,9 +94,6 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
     // Process new note onsets from upstream
     this.processNotes(upstream.notes, t);
 
-    // Apply silence decay
-    this.applyDecay(t);
-
     // Prune old data outside window
     this.prune(t);
 
@@ -144,30 +137,6 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
         // Add contour point at this onset
         this.contour.push({ t: note.onset, level: this.smoothedLevel });
       }
-    }
-  }
-
-  private applyDecay(t: Ms): void {
-    if (this.lastEventTime === null || this.smoothedLevel <= 0) return;
-
-    const dt = t - this.lastEventTime;
-    if (dt <= 0) return;
-
-    // Exponential decay: level *= 0.5 ^ (dt / halfLife)
-    const decayFactor = Math.pow(0.5, dt / this.config.silenceDecayRate);
-    const decayedLevel = this.smoothedLevel * decayFactor;
-
-    // Only add a decay contour point if level has changed meaningfully
-    if (this.smoothedLevel - decayedLevel > 0.001) {
-      this.smoothedLevel = decayedLevel;
-
-      // Clamp near-zero to zero
-      if (this.smoothedLevel < 0.001) {
-        this.smoothedLevel = 0;
-      }
-
-      // Add decay contour point (distinct from onset points)
-      this.contour.push({ t, level: this.smoothedLevel });
     }
   }
 

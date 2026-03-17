@@ -380,8 +380,6 @@ export class ThreeJSRenderer implements IRenderer {
       this.updateLine(entity);
     } else if (fieldType === "drift-ring") {
       this.updateRing(entity);
-    } else if (fieldType === "dynamics-range") {
-      this.updateDynamicsRange(entity);
     } else {
       // Default field: glowing area
       this.updateGlowField(entity);
@@ -975,45 +973,6 @@ export class ThreeJSRenderer implements IRenderer {
     material.opacity = entity.style.opacity ?? 0.9;
   }
 
-  /**
-   * Render the dynamics range band as a semi-transparent rectangle.
-   */
-  private updateDynamicsRange(entity: Entity): void {
-    if (!this.scene) return;
-
-    const yTop = entity.data?.yTop as number | undefined;
-    const yBottom = entity.data?.yBottom as number | undefined;
-    const width = entity.data?.width as number | undefined;
-
-    if (yTop === undefined || yBottom === undefined || width === undefined) return;
-
-    let mesh = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
-
-    if (!mesh) {
-      const geometry = new THREE.PlaneGeometry(1, 1);
-      const material = new THREE.MeshBasicMaterial({
-        transparent: true,
-        side: THREE.DoubleSide,
-      });
-      mesh = new THREE.Mesh(geometry, material);
-      this.scene.add(mesh);
-      this.entityObjects.set(entity.id, mesh);
-    }
-
-    // Position and scale the band
-    const worldWidth = width * this.config.worldWidth;
-    const worldHeight = Math.abs(yBottom - yTop) * this.config.worldHeight;
-    const centerX = ((entity.position?.x ?? 0) + width / 2) * this.config.worldWidth;
-    const centerY = (1 - (yTop + yBottom) / 2) * this.config.worldHeight;
-
-    mesh.position.set(centerX, centerY, 0.5);
-    mesh.scale.set(worldWidth, Math.max(worldHeight, 1), 1);
-
-    const material = mesh.material as THREE.MeshBasicMaterial;
-    const color = entity.style.color ?? { h: 200, s: 0.2, v: 0.4 };
-    material.color.copy(this.hsvToThreeColor(color));
-    material.opacity = entity.style.opacity ?? 0.15;
-  }
 
   // ==========================================================================
   // Utilities

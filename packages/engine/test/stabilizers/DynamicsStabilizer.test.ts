@@ -36,7 +36,6 @@ describe("DynamicsStabilizer", () => {
       partId: "test-part",
       windowMs: 8000,
       smoothingAlpha: 0.3,
-      silenceDecayRate: 500,
       trendWindowMs: 1000,
       trendDeadZone: 0.1,
     });
@@ -98,6 +97,15 @@ describe("DynamicsStabilizer", () => {
       // level = 0.3 * (64/127) + 0.7 * 1.0 ≈ 0.3 * 0.504 + 0.7 = 0.851
       expect(result.dynamics.level).toBeCloseTo(0.851, 2);
     });
+
+    it("holds level steady during silence (no decay)", () => {
+      applyBoth(makeFrame(100, [noteOn(60, 127, 100)]));
+      // level = 1.0 (seeded)
+
+      // Much later — level should remain at 1.0
+      const result = applyBoth(makeFrame(5000, []));
+      expect(result.dynamics.level).toBeCloseTo(1.0, 2);
+    });
   });
 
   describe("contour", () => {
@@ -118,24 +126,13 @@ describe("DynamicsStabilizer", () => {
       // 0.3 * (64/127) + 0.7 * 1.0 ≈ 0.851
       expect(r2.dynamics.contour[1].level).toBeCloseTo(0.851, 2);
     });
-  });
 
-  describe("silence decay", () => {
-    it("decays level during silence", () => {
+    it("does not add contour points during silence", () => {
       applyBoth(makeFrame(100, [noteOn(60, 127, 100)]));
-      // level = 1.0 (seeded)
+      const result = applyBoth(makeFrame(5000, []));
 
-      // 500ms later (one half-life)
-      const result = applyBoth(makeFrame(600, []));
-      expect(result.dynamics.level).toBeCloseTo(0.5, 2);
-    });
-
-    it("decays to near zero after several half-lives", () => {
-      applyBoth(makeFrame(100, [noteOn(60, 127, 100)]));
-
-      // 3000ms = 6 half-lives → level ≈ 1.0 * 0.5^6 ≈ 0.016
-      const result = applyBoth(makeFrame(3100, []));
-      expect(result.dynamics.level).toBeLessThan(0.02);
+      // Only the one onset point — no decay points
+      expect(result.dynamics.contour).toHaveLength(1);
     });
   });
 
