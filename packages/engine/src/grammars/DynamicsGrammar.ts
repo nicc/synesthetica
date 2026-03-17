@@ -31,13 +31,13 @@ import type {
 const BAR_LEFT = 0.005;
 
 /** Right edge of the dynamics bar */
-const BAR_RIGHT = 0.035;
+const BAR_RIGHT = 0.025;
 
-/** Bar width at birth */
+/** Bar width */
 const BAR_WIDTH = BAR_RIGHT - BAR_LEFT;
 
-/** Extra width growth as line fully fades (fraction of BAR_WIDTH) */
-const WIDTH_GROWTH = 0.4;
+/** Indicator inset from outline edges at birth (fraction of BAR_WIDTH) */
+const INDICATOR_INSET = 0.15;
 
 /** Top of the bar (1/6 from top — centred in 2/3 of screen height) */
 const BAR_TOP = 1 / 6;
@@ -56,6 +56,14 @@ const LINE_WIDTH_MIN = 3;
 
 /** Line width in pixels at full fade */
 const LINE_WIDTH_MAX = 5;
+
+/** Tick length as fraction of bar width (ruler marks at 25% intervals) */
+const TICK_LENGTH = 0.25;
+
+/** Outline/tick visual style */
+const OUTLINE_COLOR: ColorHSVA = { h: 200, s: 0.2, v: 0.4, a: 1.0 };
+const OUTLINE_OPACITY = 0.4;
+const TICK_OPACITY = 0.25;
 
 // ============================================================================
 // Colors
@@ -84,26 +92,81 @@ export class DynamicsGrammar implements IVisualGrammar {
     const part = input.part;
     const events = input.dynamics.dynamics.events;
 
+    // --- Outline (closed rectangle) ---
+    entities.push({
+      id: `${this.id}:outline`,
+      part,
+      kind: "glyph",
+      createdAt: t,
+      updatedAt: t,
+      style: { color: OUTLINE_COLOR, opacity: OUTLINE_OPACITY, size: 1 },
+      data: {
+        type: "dynamics-contour",
+        points: [
+          { x: BAR_LEFT, y: BAR_TOP },
+          { x: BAR_RIGHT, y: BAR_TOP },
+          { x: BAR_RIGHT, y: BAR_BOTTOM },
+          { x: BAR_LEFT, y: BAR_BOTTOM },
+          { x: BAR_LEFT, y: BAR_TOP },
+        ],
+      },
+    });
+
+    // --- Ruler ticks at 25%, 50%, 75% ---
+    const tickLen = BAR_WIDTH * TICK_LENGTH;
+    for (const frac of [0.25, 0.5, 0.75]) {
+      const y = BAR_BOTTOM - frac * BAR_HEIGHT;
+      entities.push({
+        id: `${this.id}:tick:${frac}`,
+        part,
+        kind: "glyph",
+        createdAt: t,
+        updatedAt: t,
+        style: { color: OUTLINE_COLOR, opacity: TICK_OPACITY, size: 1 },
+        data: {
+          type: "dynamics-contour",
+          points: [
+            { x: BAR_LEFT, y },
+            { x: BAR_LEFT + tickLen, y },
+          ],
+        },
+      });
+      entities.push({
+        id: `${this.id}:tick-r:${frac}`,
+        part,
+        kind: "glyph",
+        createdAt: t,
+        updatedAt: t,
+        style: { color: OUTLINE_COLOR, opacity: TICK_OPACITY, size: 1 },
+        data: {
+          type: "dynamics-contour",
+          points: [
+            { x: BAR_RIGHT - tickLen, y },
+            { x: BAR_RIGHT, y },
+          ],
+        },
+      });
+    }
+
+    // --- Indicator lines ---
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
       const age = t - event.t;
 
-      // Skip fully faded indicators
       if (age >= FADE_MS) continue;
 
       const fadeFraction = 1 - age / FADE_MS;
       const opacity = event.intensity * fadeFraction;
 
-      // Skip near-invisible indicators
       if (opacity < 0.01) continue;
 
       const y = this.intensityToY(event.intensity);
 
-      // Lines grow slightly wider and thicker as they fade
+      // Lines grow wider and thicker as they fade, clamped to outline
       const ageFraction = age / FADE_MS;
-      const extraWidth = BAR_WIDTH * WIDTH_GROWTH * ageFraction;
-      const left = BAR_LEFT - extraWidth / 2;
-      const right = BAR_RIGHT + extraWidth / 2;
+      const insetNow = INDICATOR_INSET * (1 - ageFraction);
+      const left = BAR_LEFT + BAR_WIDTH * insetNow;
+      const right = BAR_RIGHT - BAR_WIDTH * insetNow;
       const lineWidth = LINE_WIDTH_MIN + (LINE_WIDTH_MAX - LINE_WIDTH_MIN) * ageFraction;
 
       entities.push({
