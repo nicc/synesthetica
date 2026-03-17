@@ -33,13 +33,11 @@ import type {
  * horizontally in that margin.
  */
 const LEFT_MARGIN = 1 / 6;                     // matches RhythmGrammar
-const BAR_WIDTH_FRACTION = 0.24;                // bar takes 24% of the margin
+const BAR_WIDTH_FRACTION = 0.19;                // bar takes 19% of the margin
 const BAR_WIDTH = LEFT_MARGIN * BAR_WIDTH_FRACTION;
 const BAR_CENTER = LEFT_MARGIN / 2;
 const BAR_LEFT = BAR_CENTER - BAR_WIDTH / 2;
 const BAR_RIGHT = BAR_CENTER + BAR_WIDTH / 2;
-
-/** Indicator lines span the full bar width (BAR_LEFT to BAR_RIGHT) */
 
 /** Top of the bar (1/6 from top — centred in 2/3 of screen height) */
 const BAR_TOP = 1 / 6;
@@ -53,11 +51,14 @@ const BAR_HEIGHT = BAR_BOTTOM - BAR_TOP;
 /** How long indicator lines take to fully fade (ms) */
 const FADE_MS = 2000;
 
-/** Line width in pixels at birth */
-const LINE_WIDTH_MIN = 3;
-
-/** Line width in pixels at full fade */
-const LINE_WIDTH_MAX = 7;
+/**
+ * Indicator thickness in normalized coords (fraction of BAR_HEIGHT).
+ * Grows from MIN to MAX as the indicator ages, giving the blocky
+ * diffusion effect. Expressed in normalized coords so the rect
+ * can be clamped precisely to BAR_TOP/BAR_BOTTOM.
+ */
+const INDICATOR_THICKNESS_MIN = 0.003;
+const INDICATOR_THICKNESS_MAX = 0.012;
 
 /** Minimum starting opacity so quiet notes are still visible */
 const MIN_OPACITY = 0.25;
@@ -153,7 +154,7 @@ export class DynamicsGrammar implements IVisualGrammar {
       });
     }
 
-    // --- Indicator lines ---
+    // --- Indicator rectangles ---
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
       const age = t - event.t;
@@ -166,25 +167,16 @@ export class DynamicsGrammar implements IVisualGrammar {
 
       if (opacity < 0.01) continue;
 
-      const y = this.intensityToY(event.intensity);
+      const centerY = this.intensityToY(event.intensity);
 
-      // Lines are always full bar width; they grow thicker (vertically)
-      // as they fade, but thickness is clamped so the line stays within
-      // the bar's top/bottom edges.
+      // Thickness grows as the indicator ages (blocky diffusion),
+      // clamped so the rect stays within BAR_TOP..BAR_BOTTOM.
       const ageFraction = age / FADE_MS;
-      const rawWidth = LINE_WIDTH_MIN + (LINE_WIDTH_MAX - LINE_WIDTH_MIN) * ageFraction;
-
-      // Clamp: half the line extends above and below y. Ensure it
-      // doesn't exceed BAR_TOP or BAR_BOTTOM in normalized coords.
-      // We approximate pixel→normalized: 1px ≈ 1/worldHeightPx, but
-      // since the renderer handles actual pixel sizing, we just cap the
-      // growth near edges proportionally.
-      const headroom = Math.min(y - BAR_TOP, BAR_BOTTOM - y);
-      const maxWidthForHeadroom =
-        headroom < 0.02
-          ? LINE_WIDTH_MIN + (rawWidth - LINE_WIDTH_MIN) * (headroom / 0.02)
-          : rawWidth;
-      const lineWidth = Math.max(LINE_WIDTH_MIN, maxWidthForHeadroom);
+      const rawThickness =
+        INDICATOR_THICKNESS_MIN +
+        (INDICATOR_THICKNESS_MAX - INDICATOR_THICKNESS_MIN) * ageFraction;
+      const headroom = Math.min(centerY - BAR_TOP, BAR_BOTTOM - centerY);
+      const halfH = Math.min(rawThickness / 2, headroom);
 
       entities.push({
         id: `${this.id}:ind:${i}`,
@@ -195,14 +187,13 @@ export class DynamicsGrammar implements IVisualGrammar {
         style: {
           color: INDICATOR_COLOR,
           opacity,
-          size: lineWidth,
         },
         data: {
-          type: "dynamics-contour",
-          points: [
-            { x: BAR_LEFT, y },
-            { x: BAR_RIGHT, y },
-          ],
+          type: "dynamics-indicator",
+          x: BAR_LEFT,
+          y: centerY - halfH,
+          w: BAR_WIDTH,
+          h: halfH * 2,
         },
       });
     }

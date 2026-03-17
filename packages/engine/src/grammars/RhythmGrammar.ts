@@ -322,8 +322,8 @@ export class RhythmGrammar implements IVisualGrammar {
       },
       data: {
         type: "now-line",
-        xLeft: PITCH_MARGIN_LEFT,
-        xRight: 1 - PITCH_MARGIN_RIGHT,
+        xLeft: PITCH_MARGIN_LEFT - NOTE_STRIP_WIDTH / 2,
+        xRight: 1 - PITCH_MARGIN_RIGHT + NOTE_STRIP_WIDTH / 2,
       },
     };
   }

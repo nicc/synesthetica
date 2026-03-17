@@ -555,6 +555,8 @@ export class ThreeJSRenderer implements IRenderer {
       this.updateTensionBar(entity);
     } else if (glyphType === "dynamics-contour") {
       this.updateDynamicsContour(entity);
+    } else if (glyphType === "dynamics-indicator") {
+      this.updateDynamicsIndicator(entity);
     } else {
       // Default glyph: circle
       this.updateParticle(entity);
@@ -981,6 +983,47 @@ export class ThreeJSRenderer implements IRenderer {
       this.scene.add(line);
       this.entityObjects.set(entity.id, line);
     }
+  }
+
+  /**
+   * Render a dynamics indicator as a PlaneGeometry rectangle.
+   * Entity data: { x, y, w, h } in normalized coords (0–1).
+   * Sharp quad edges — no end-cap overflow.
+   */
+  private updateDynamicsIndicator(entity: Entity): void {
+    if (!this.scene) return;
+
+    const nx = entity.data?.x as number | undefined;
+    const ny = entity.data?.y as number | undefined;
+    const nw = entity.data?.w as number | undefined;
+    const nh = entity.data?.h as number | undefined;
+
+    if (nx == null || ny == null || nw == null || nh == null) return;
+
+    const worldW = nw * this.config.worldWidth;
+    const worldH = nh * this.config.worldHeight;
+
+    let mesh = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
+
+    if (!mesh) {
+      const geometry = new THREE.PlaneGeometry(1, 1);
+      const material = new THREE.MeshBasicMaterial({ transparent: true });
+      mesh = new THREE.Mesh(geometry, material);
+      this.scene.add(mesh);
+      this.entityObjects.set(entity.id, mesh);
+    }
+
+    // Position: center of the rect in world coords
+    // Normalized y is top-down, Three.js y is bottom-up
+    const cx = (nx + nw / 2) * this.config.worldWidth;
+    const cy = (1 - (ny + nh / 2)) * this.config.worldHeight;
+    mesh.position.set(cx, cy, 1);
+    mesh.scale.set(worldW, worldH, 1);
+
+    const material = mesh.material as THREE.MeshBasicMaterial;
+    const color = entity.style.color ?? { h: 200, s: 0.5, v: 0.9 };
+    material.color.copy(this.hsvToThreeColor(color));
+    material.opacity = entity.style.opacity ?? 0.8;
   }
 
 

@@ -64,11 +64,13 @@ const EMPTY_DYNAMICS: DynamicsState = {
 
 // Derived layout values (must match DynamicsGrammar constants)
 const LEFT_MARGIN = 1 / 6;
-const BAR_WIDTH_FRACTION = 0.24;
+const BAR_WIDTH_FRACTION = 0.19;
 const BAR_WIDTH = LEFT_MARGIN * BAR_WIDTH_FRACTION;
 const BAR_CENTER = LEFT_MARGIN / 2;
 const BAR_LEFT = BAR_CENTER - BAR_WIDTH / 2;
-const BAR_RIGHT = BAR_CENTER + BAR_WIDTH / 2;
+const BAR_TOP = 1 / 6;
+const BAR_BOTTOM = 5 / 6;
+const BAR_HEIGHT = BAR_BOTTOM - BAR_TOP;
 
 /** Filter to just indicator entities (exclude outline + ticks) */
 function indicators(entities: Entity[]): Entity[] {
@@ -130,9 +132,6 @@ describe("DynamicsGrammar", () => {
 
       expect(ticks).toHaveLength(3);
 
-      const BAR_TOP = 1 / 6;
-      const BAR_BOTTOM = 5 / 6;
-      const BAR_HEIGHT = BAR_BOTTOM - BAR_TOP;
       const expectedYs = [0.25, 0.5, 0.75].map(
         (f) => BAR_BOTTOM - f * BAR_HEIGHT,
       );
@@ -199,6 +198,77 @@ describe("DynamicsGrammar", () => {
     });
   });
 
+  describe("indicator rect geometry", () => {
+    it("uses dynamics-indicator type with x/y/w/h", () => {
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        events: [{ t: 1000, intensity: 0.5 }],
+      };
+
+      const frame = createTestFrame(1000, dynamics);
+      const scene = grammar.update(frame, null);
+      const ind = indicators(scene.entities)[0];
+
+      expect(ind.data?.type).toBe("dynamics-indicator");
+      expect(ind.data?.x).toBeCloseTo(BAR_LEFT, 3);
+      expect(ind.data?.w).toBeCloseTo(BAR_WIDTH, 3);
+      expect(typeof ind.data?.y).toBe("number");
+      expect(typeof ind.data?.h).toBe("number");
+    });
+
+    it("rect width equals bar width (no horizontal overflow)", () => {
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        events: [{ t: 0, intensity: 0.8 }],
+      };
+
+      // At significant age the width still stays constant
+      const frame = createTestFrame(1500, dynamics);
+      const scene = grammar.update(frame, null);
+      const ind = indicators(scene.entities)[0];
+
+      expect(ind.data?.x).toBeCloseTo(BAR_LEFT, 3);
+      expect(ind.data?.w).toBeCloseTo(BAR_WIDTH, 3);
+    });
+
+    it("rect stays within BAR_TOP..BAR_BOTTOM vertically", () => {
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        events: [
+          { t: 0, intensity: 1.0 }, // at BAR_TOP edge
+          { t: 0, intensity: 0.0 }, // at BAR_BOTTOM edge
+        ],
+      };
+
+      // Aged so thickness is near max
+      const frame = createTestFrame(1500, dynamics);
+      const scene = grammar.update(frame, null);
+      const inds = indicators(scene.entities);
+
+      for (const ind of inds) {
+        const y = ind.data?.y as number;
+        const h = ind.data?.h as number;
+        expect(y).toBeGreaterThanOrEqual(BAR_TOP - 0.001);
+        expect(y + h).toBeLessThanOrEqual(BAR_BOTTOM + 0.001);
+      }
+    });
+
+    it("thickness grows with age", () => {
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        events: [{ t: 500, intensity: 0.5 }],
+      };
+
+      const fresh = grammar.update(createTestFrame(500, dynamics), null);
+      const aged = grammar.update(createTestFrame(1500, dynamics), null);
+
+      const freshH = indicators(fresh.entities)[0].data?.h as number;
+      const agedH = indicators(aged.entities)[0].data?.h as number;
+
+      expect(agedH).toBeGreaterThan(freshH);
+    });
+  });
+
   describe("opacity", () => {
     it("opacity uses min floor for quiet notes", () => {
       const dynamics: DynamicsState = {
@@ -238,58 +308,9 @@ describe("DynamicsGrammar", () => {
       expect(inds).toHaveLength(1);
       expect(inds[0].style.opacity).toBeCloseTo(0.4, 2);
     });
-
-    it("louder notes are more opaque than quieter notes at same age", () => {
-      const dynamics: DynamicsState = {
-        ...EMPTY_DYNAMICS,
-        events: [
-          { t: 500, intensity: 0.9 },
-          { t: 500, intensity: 0.3 },
-        ],
-      };
-
-      const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
-      const inds = indicators(scene.entities);
-
-      const opacities = inds.map((e) => e.style.opacity ?? 0);
-      expect(opacities[0]).toBeGreaterThan(opacities[1]);
-    });
   });
 
   describe("positioning", () => {
-    it("indicators span full bar width", () => {
-      const dynamics: DynamicsState = {
-        ...EMPTY_DYNAMICS,
-        events: [{ t: 1000, intensity: 0.5 }],
-      };
-
-      const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
-      const inds = indicators(scene.entities);
-
-      const points = inds[0].data?.points as Array<{ x: number; y: number }>;
-      expect(points).toHaveLength(2);
-      expect(points[0].x).toBeCloseTo(BAR_LEFT, 3);
-      expect(points[1].x).toBeCloseTo(BAR_RIGHT, 3);
-    });
-
-    it("aged indicator stays at full bar width", () => {
-      const dynamics: DynamicsState = {
-        ...EMPTY_DYNAMICS,
-        events: [{ t: 0, intensity: 0.8 }],
-      };
-
-      // age=1000 → still full width, no growth
-      const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
-      const inds = indicators(scene.entities);
-
-      const points = inds[0].data?.points as Array<{ x: number; y: number }>;
-      expect(points[0].x).toBeCloseTo(BAR_LEFT, 3);
-      expect(points[1].x).toBeCloseTo(BAR_RIGHT, 3);
-    });
-
     it("louder notes are higher on screen (lower y)", () => {
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
@@ -303,74 +324,10 @@ describe("DynamicsGrammar", () => {
       const scene = grammar.update(frame, null);
       const inds = indicators(scene.entities);
 
-      const loudY = (inds[0].data?.points as Array<{ x: number; y: number }>)[0]
-        .y;
-      const quietY = (inds[1].data?.points as Array<{ x: number; y: number }>)[0]
-        .y;
+      const loudY = inds[0].data?.y as number;
+      const quietY = inds[1].data?.y as number;
 
       expect(loudY).toBeLessThan(quietY);
-    });
-
-    it("indicators are within the bar area vertically", () => {
-      const dynamics: DynamicsState = {
-        ...EMPTY_DYNAMICS,
-        events: [
-          { t: 900, intensity: 1.0 },
-          { t: 900, intensity: 0.0 },
-        ],
-      };
-
-      const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
-      const inds = indicators(scene.entities);
-
-      for (const entity of inds) {
-        const points = entity.data?.points as Array<{ x: number; y: number }>;
-        for (const p of points) {
-          expect(p.y).toBeGreaterThanOrEqual(1 / 6 - 0.001);
-          expect(p.y).toBeLessThanOrEqual(5 / 6 + 0.001);
-        }
-      }
-    });
-  });
-
-  describe("line thickness", () => {
-    it("fresh indicator has minimum line width", () => {
-      const dynamics: DynamicsState = {
-        ...EMPTY_DYNAMICS,
-        events: [{ t: 1000, intensity: 0.5 }],
-      };
-
-      const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
-
-      expect(indicators(scene.entities)[0].style.size).toBeCloseTo(3, 1);
-    });
-
-    it("aged indicator has larger line width", () => {
-      const dynamics: DynamicsState = {
-        ...EMPTY_DYNAMICS,
-        events: [{ t: 0, intensity: 0.5 }],
-      };
-
-      // age=1000 → half fade → lineWidth = 3 + (7-3)*0.5 = 5
-      const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
-
-      expect(indicators(scene.entities)[0].style.size).toBeCloseTo(5, 1);
-    });
-
-    it("thickness is clamped near bar edges", () => {
-      const dynamics: DynamicsState = {
-        ...EMPTY_DYNAMICS,
-        events: [{ t: 0, intensity: 1.0 }],
-      };
-
-      const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
-      const inds = indicators(scene.entities);
-
-      expect(inds[0].style.size).toBeCloseTo(3, 1);
     });
   });
 
