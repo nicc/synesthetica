@@ -105,7 +105,7 @@ Stabilizers produce MusicalFrame containing:
 | `rhythmicAnalysis: RhythmicAnalysis` | Descriptive analysis of note timing patterns | IOI clustering |
 | `prescribedTempo: number \| null` | User-set tempo in BPM (not inferred) | Control op |
 | `prescribedMeter: { beatsPerBar, beatUnit } \| null` | User-set meter (not inferred) | Control op |
-| `dynamics: DynamicsState` | Velocity observations, smoothed level contour, trend, and dynamic range | DynamicsStabilizer (EMA smoothing, linear regression trend) |
+| `dynamics: DynamicsState` | Velocity observations, raw level contour, trend, and dynamic range | DynamicsStabilizer (max intensity per onset, linear regression trend) |
 
 ## MusicalFrame as Snapshot with Context
 

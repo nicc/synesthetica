@@ -15,7 +15,6 @@ const ctx: GrammarContext = {
 function createTestFrame(
   t: number,
   dynamics: DynamicsState,
-  opts?: { prescribedTempo?: number | null; prescribedMeter?: { beatsPerBar: number; beatUnit: number } | null },
 ): AnnotatedMusicalFrame {
   return {
     t,
@@ -37,8 +36,8 @@ function createTestFrame(
         motion: { jitter: 0, pulse: 0, flow: 0 },
         uncertainty: 0,
       },
-      prescribedTempo: opts?.prescribedTempo ?? null,
-      prescribedMeter: opts?.prescribedMeter ?? null,
+      prescribedTempo: null,
+      prescribedMeter: null,
     },
     bars: [],
     phrases: [],
@@ -70,7 +69,7 @@ describe("DynamicsGrammar", () => {
     grammar.init(ctx);
   });
 
-  describe("entity production", () => {
+  describe("indicator production", () => {
     it("produces no entities with empty dynamics", () => {
       const frame = createTestFrame(1000, EMPTY_DYNAMICS);
       const scene = grammar.update(frame, null);
@@ -78,304 +77,168 @@ describe("DynamicsGrammar", () => {
       expect(scene.entities).toHaveLength(0);
     });
 
-    it("does not produce contour with fewer than 2 points", () => {
-      const dynamics: DynamicsState = {
-        ...EMPTY_DYNAMICS,
-        contour: [{ t: 500, level: 0.5 }],
-      };
-      const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
-
-      expect(scene.entities).toHaveLength(0);
-    });
-
-    it("produces contour entity when contour data exists", () => {
+    it("produces one indicator per recent event", () => {
       const dynamics: DynamicsState = {
         events: [
-          { t: 500, intensity: 0.5 },
-          { t: 800, intensity: 0.7 },
-        ],
-        level: 0.6,
-        trend: "rising",
-        contour: [
-          { t: 500, level: 0.5 },
-          { t: 800, level: 0.6 },
-        ],
-        range: { min: 0.5, max: 0.7, variance: 0.01 },
-      };
-
-      const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
-
-      const contourEntity = scene.entities.find(
-        (e) => e.data?.type === "dynamics-contour",
-      );
-      expect(contourEntity).toBeDefined();
-      expect(contourEntity!.kind).toBe("glyph");
-
-      const points = contourEntity!.data?.points as Array<{
-        x: number;
-        y: number;
-      }>;
-      expect(points.length).toBeGreaterThanOrEqual(2);
-    });
-  });
-
-  describe("gap-based line breaking", () => {
-    it("breaks into separate segments when gap exceeds 4s (no BPM)", () => {
-      const dynamics: DynamicsState = {
-        events: [
-          { t: 100, intensity: 0.5 },
-          { t: 200, intensity: 0.6 },
-          { t: 5000, intensity: 0.7 },
-          { t: 5100, intensity: 0.8 },
-        ],
-        level: 0.8,
-        trend: "rising",
-        contour: [
-          { t: 100, level: 0.5 },
-          { t: 200, level: 0.55 },
-          // gap > 4000ms
-          { t: 5000, level: 0.7 },
-          { t: 5100, level: 0.75 },
-        ],
-        range: { min: 0.5, max: 0.8, variance: 0.01 },
-      };
-
-      const frame = createTestFrame(6000, dynamics);
-      const scene = grammar.update(frame, null);
-
-      const contourEntities = scene.entities.filter(
-        (e) => e.id.includes("contour:"),
-      );
-      expect(contourEntities).toHaveLength(2);
-    });
-
-    it("keeps contiguous line when gap is under threshold", () => {
-      const dynamics: DynamicsState = {
-        events: [
-          { t: 100, intensity: 0.5 },
-          { t: 1000, intensity: 0.6 },
-          { t: 2000, intensity: 0.7 },
+          { t: 800, intensity: 0.5 },
+          { t: 900, intensity: 0.7 },
         ],
         level: 0.7,
-        trend: "rising",
+        trend: "stable",
         contour: [
-          { t: 100, level: 0.5 },
-          { t: 1000, level: 0.55 },
-          { t: 2000, level: 0.65 },
+          { t: 800, level: 0.5 },
+          { t: 900, level: 0.7 },
         ],
         range: { min: 0.5, max: 0.7, variance: 0.01 },
       };
 
-      const frame = createTestFrame(3000, dynamics);
+      const frame = createTestFrame(1000, dynamics);
       const scene = grammar.update(frame, null);
 
-      const contourEntities = scene.entities.filter(
-        (e) => e.data?.type === "dynamics-contour",
-      );
-      expect(contourEntities).toHaveLength(1);
+      expect(scene.entities).toHaveLength(2);
     });
 
-    it("uses bar duration as gap threshold when BPM is prescribed", () => {
-      // 120 BPM, 4/4 → one bar = 2000ms
+    it("omits events older than fade window", () => {
       const dynamics: DynamicsState = {
         events: [
-          { t: 100, intensity: 0.5 },
-          { t: 200, intensity: 0.6 },
-          { t: 3000, intensity: 0.7 },
-          { t: 3100, intensity: 0.8 },
+          { t: 100, intensity: 0.5 },    // 2400ms old — past 2000ms fade
+          { t: 2000, intensity: 0.7 },   // 500ms old — still visible
         ],
-        level: 0.8,
-        trend: "rising",
+        level: 0.7,
+        trend: "stable",
         contour: [
           { t: 100, level: 0.5 },
-          { t: 200, level: 0.55 },
-          // gap = 2800ms > 2000ms (one bar at 120 BPM 4/4)
-          { t: 3000, level: 0.7 },
-          { t: 3100, level: 0.75 },
+          { t: 2000, level: 0.7 },
         ],
-        range: { min: 0.5, max: 0.8, variance: 0.01 },
+        range: { min: 0.5, max: 0.7, variance: 0.01 },
       };
 
-      const frame = createTestFrame(4000, dynamics, {
-        prescribedTempo: 120,
-        prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
-      });
+      const frame = createTestFrame(2500, dynamics);
       const scene = grammar.update(frame, null);
 
-      const contourEntities = scene.entities.filter(
-        (e) => e.data?.type === "dynamics-contour",
-      );
-      expect(contourEntities).toHaveLength(2);
+      expect(scene.entities).toHaveLength(1);
     });
   });
 
-  describe("entity ID stability", () => {
-    it("produces stable segment IDs across frames", () => {
+  describe("opacity", () => {
+    it("opacity is intensity * fade fraction", () => {
       const dynamics: DynamicsState = {
-        events: [{ t: 500, intensity: 0.5 }],
-        level: 0.5,
-        trend: "stable",
-        contour: [
-          { t: 500, level: 0.5 },
-          { t: 600, level: 0.5 },
-        ],
-        range: { min: 0.5, max: 0.5, variance: 0 },
+        ...EMPTY_DYNAMICS,
+        events: [{ t: 500, intensity: 0.8 }],
       };
 
-      const frame1 = createTestFrame(1000, dynamics);
-      const scene1 = grammar.update(frame1, null);
+      // At t=1500, age=1000ms, fadeFraction=0.5
+      // opacity = 0.8 * 0.5 = 0.4
+      const frame = createTestFrame(1500, dynamics);
+      const scene = grammar.update(frame, null);
 
-      const frame2 = createTestFrame(1100, dynamics);
-      const scene2 = grammar.update(frame2, scene1);
+      expect(scene.entities).toHaveLength(1);
+      expect(scene.entities[0].style.opacity).toBeCloseTo(0.4, 2);
+    });
+
+    it("fresh event has opacity equal to intensity", () => {
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        events: [{ t: 1000, intensity: 0.9 }],
+      };
+
+      const frame = createTestFrame(1000, dynamics);
+      const scene = grammar.update(frame, null);
+
+      expect(scene.entities[0].style.opacity).toBeCloseTo(0.9, 2);
+    });
+
+    it("louder notes are more opaque than quieter notes at same age", () => {
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        events: [
+          { t: 500, intensity: 0.9 },
+          { t: 500, intensity: 0.3 },
+        ],
+      };
+
+      const frame = createTestFrame(1000, dynamics);
+      const scene = grammar.update(frame, null);
+
+      const opacities = scene.entities.map((e) => e.style.opacity ?? 0);
+      expect(opacities[0]).toBeGreaterThan(opacities[1]);
+    });
+  });
+
+  describe("positioning", () => {
+    it("indicators span the bar width", () => {
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        events: [{ t: 900, intensity: 0.5 }],
+      };
+
+      const frame = createTestFrame(1000, dynamics);
+      const scene = grammar.update(frame, null);
+
+      const points = scene.entities[0].data?.points as Array<{ x: number; y: number }>;
+      expect(points).toHaveLength(2);
+      expect(points[0].x).toBeCloseTo(0.03, 2);  // BAR_LEFT
+      expect(points[1].x).toBeCloseTo(0.055, 2); // BAR_RIGHT
+    });
+
+    it("louder notes are higher on screen (lower y)", () => {
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        events: [
+          { t: 900, intensity: 0.9 },
+          { t: 900, intensity: 0.1 },
+        ],
+      };
+
+      const frame = createTestFrame(1000, dynamics);
+      const scene = grammar.update(frame, null);
+
+      const loudY = (scene.entities[0].data?.points as Array<{ x: number; y: number }>)[0].y;
+      const quietY = (scene.entities[1].data?.points as Array<{ x: number; y: number }>)[0].y;
+
+      expect(loudY).toBeLessThan(quietY);
+    });
+
+    it("indicators are within the bar area", () => {
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        events: [
+          { t: 900, intensity: 1.0 },
+          { t: 900, intensity: 0.0 },
+        ],
+      };
+
+      const frame = createTestFrame(1000, dynamics);
+      const scene = grammar.update(frame, null);
+
+      for (const entity of scene.entities) {
+        const points = entity.data?.points as Array<{ x: number; y: number }>;
+        for (const p of points) {
+          // BAR_TOP = 1/6 ≈ 0.167, BAR_BOTTOM = 5/6 ≈ 0.833
+          expect(p.y).toBeGreaterThanOrEqual(1 / 6 - 0.001);
+          expect(p.y).toBeLessThanOrEqual(5 / 6 + 0.001);
+        }
+      }
+    });
+  });
+
+  describe("entity IDs", () => {
+    it("IDs are index-based and stable for same event set", () => {
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        events: [
+          { t: 800, intensity: 0.5 },
+          { t: 900, intensity: 0.7 },
+        ],
+      };
+
+      const scene1 = grammar.update(createTestFrame(1000, dynamics), null);
+      const scene2 = grammar.update(createTestFrame(1100, dynamics), scene1);
 
       const ids1 = scene1.entities.map((e) => e.id).sort();
       const ids2 = scene2.entities.map((e) => e.id).sort();
 
       expect(ids1).toEqual(ids2);
-    });
-  });
-
-  describe("min-intensity ticks for chords", () => {
-    it("emits tick for contour points with min < level", () => {
-      const dynamics: DynamicsState = {
-        events: [
-          { t: 500, intensity: 0.9 },
-          { t: 500, intensity: 0.3 },
-          { t: 800, intensity: 0.7 },
-          { t: 800, intensity: 0.4 },
-        ],
-        level: 0.7,
-        trend: "stable",
-        contour: [
-          { t: 500, level: 0.9, min: 0.3 },
-          { t: 800, level: 0.7, min: 0.4 },
-        ],
-        range: { min: 0.3, max: 0.9, variance: 0.05 },
-      };
-
-      const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
-
-      const ticks = scene.entities.filter(
-        (e) => e.id.includes("mintick"),
-      );
-      expect(ticks).toHaveLength(2);
-
-      // Each tick is a horizontal line (2 points at same y, different x)
-      for (const tick of ticks) {
-        const points = tick.data?.points as Array<{ x: number; y: number }>;
-        expect(points).toHaveLength(2);
-        expect(points[0].y).toBeCloseTo(points[1].y, 5);
-        expect(points[0].x).toBeLessThan(points[1].x);
-      }
-    });
-
-    it("does not emit tick for single notes (no min)", () => {
-      const dynamics: DynamicsState = {
-        events: [
-          { t: 500, intensity: 0.5 },
-          { t: 800, intensity: 0.7 },
-        ],
-        level: 0.7,
-        trend: "stable",
-        contour: [
-          { t: 500, level: 0.5 },
-          { t: 800, level: 0.7 },
-        ],
-        range: { min: 0.5, max: 0.7, variance: 0.01 },
-      };
-
-      const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
-
-      const ticks = scene.entities.filter(
-        (e) => e.id.includes("mintick"),
-      );
-      expect(ticks).toHaveLength(0);
-    });
-
-    it("tick is amber-coloured (distinct from contour)", () => {
-      const dynamics: DynamicsState = {
-        events: [
-          { t: 500, intensity: 0.9 },
-          { t: 500, intensity: 0.3 },
-          { t: 800, intensity: 0.5 },
-        ],
-        level: 0.5,
-        trend: "stable",
-        contour: [
-          { t: 500, level: 0.9, min: 0.3 },
-          { t: 800, level: 0.5 },
-        ],
-        range: { min: 0.3, max: 0.9, variance: 0.05 },
-      };
-
-      const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
-
-      const tick = scene.entities.find((e) => e.id.includes("mintick"));
-      // Amber hue (~35), distinct from contour blue (~200)
-      expect(tick!.style.color!.h).toBeCloseTo(35, 0);
-    });
-  });
-
-  describe("positioning", () => {
-    it("contour points are within the strip area (y: 0.0 to 0.24)", () => {
-      const dynamics: DynamicsState = {
-        events: [
-          { t: 500, intensity: 1.0 },
-          { t: 600, intensity: 0.0 },
-        ],
-        level: 0.5,
-        trend: "stable",
-        contour: [
-          { t: 500, level: 1.0 },
-          { t: 600, level: 0.0 },
-        ],
-        range: { min: 0.0, max: 1.0, variance: 0.1 },
-      };
-
-      const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
-
-      const contourEntity = scene.entities.find(
-        (e) => e.data?.type === "dynamics-contour",
-      );
-      const points = contourEntity!.data?.points as Array<{ x: number; y: number }>;
-
-      for (const p of points) {
-        expect(p.y).toBeGreaterThanOrEqual(0.0);
-        expect(p.y).toBeLessThanOrEqual(0.24);
-      }
-    });
-
-    it("louder levels produce lower y values (higher on screen)", () => {
-      const dynamics: DynamicsState = {
-        events: [
-          { t: 500, intensity: 0.9 },
-          { t: 600, intensity: 0.1 },
-        ],
-        level: 0.5,
-        trend: "stable",
-        contour: [
-          { t: 500, level: 0.9 },
-          { t: 600, level: 0.1 },
-        ],
-        range: { min: 0.1, max: 0.9, variance: 0.1 },
-      };
-
-      const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
-
-      const contourEntity = scene.entities.find(
-        (e) => e.data?.type === "dynamics-contour",
-      );
-      const points = contourEntity!.data?.points as Array<{ x: number; y: number }>;
-
-      // First point (loud, level=0.9) should have lower y than second (quiet, level=0.1)
-      expect(points[0].y).toBeLessThan(points[1].y);
     });
   });
 });

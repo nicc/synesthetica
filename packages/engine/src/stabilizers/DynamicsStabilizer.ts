@@ -57,7 +57,6 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
   private events: DynamicsEvent[] = [];
   private contour: DynamicsContourPoint[] = [];
   private currentLevel = 0;
-  private lastEventTime: Ms | null = null;
   /** Track which note onsets we've already processed (by NoteId) */
   private processedOnsets: Set<string> = new Set();
 
@@ -69,7 +68,6 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
     this.events = [];
     this.contour = [];
     this.currentLevel = 0;
-    this.lastEventTime = null;
     this.processedOnsets.clear();
   }
 
@@ -155,7 +153,6 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
       this.contour.push(point);
 
       this.currentLevel = max;
-      this.lastEventTime = onset;
     }
   }
 
