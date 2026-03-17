@@ -27,11 +27,17 @@ import type {
 // Layout Constants
 // ============================================================================
 
-/** Left edge of the dynamics bar */
-const BAR_LEFT = 0.03;
+/** Left edge of the dynamics bar (in its own strip, left of PITCH_MARGIN) */
+const BAR_LEFT = 0.005;
 
 /** Right edge of the dynamics bar */
-const BAR_RIGHT = 0.055;
+const BAR_RIGHT = 0.035;
+
+/** Bar width at birth */
+const BAR_WIDTH = BAR_RIGHT - BAR_LEFT;
+
+/** Extra width growth as line fully fades (fraction of BAR_WIDTH) */
+const WIDTH_GROWTH = 0.4;
 
 /** Top of the bar (1/6 from top — centred in 2/3 of screen height) */
 const BAR_TOP = 1 / 6;
@@ -44,6 +50,12 @@ const BAR_HEIGHT = BAR_BOTTOM - BAR_TOP;
 
 /** How long indicator lines take to fully fade (ms) */
 const FADE_MS = 2000;
+
+/** Line width in pixels at birth */
+const LINE_WIDTH_MIN = 3;
+
+/** Line width in pixels at full fade */
+const LINE_WIDTH_MAX = 5;
 
 // ============================================================================
 // Colors
@@ -87,6 +99,13 @@ export class DynamicsGrammar implements IVisualGrammar {
 
       const y = this.intensityToY(event.intensity);
 
+      // Lines grow slightly wider and thicker as they fade
+      const ageFraction = age / FADE_MS;
+      const extraWidth = BAR_WIDTH * WIDTH_GROWTH * ageFraction;
+      const left = BAR_LEFT - extraWidth / 2;
+      const right = BAR_RIGHT + extraWidth / 2;
+      const lineWidth = LINE_WIDTH_MIN + (LINE_WIDTH_MAX - LINE_WIDTH_MIN) * ageFraction;
+
       entities.push({
         id: `${this.id}:ind:${i}`,
         part,
@@ -96,12 +115,13 @@ export class DynamicsGrammar implements IVisualGrammar {
         style: {
           color: INDICATOR_COLOR,
           opacity,
+          size: lineWidth,
         },
         data: {
           type: "dynamics-contour",
           points: [
-            { x: BAR_LEFT, y },
-            { x: BAR_RIGHT, y },
+            { x: left, y },
+            { x: right, y },
           ],
         },
       });

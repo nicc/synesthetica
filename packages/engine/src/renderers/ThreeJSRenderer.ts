@@ -922,55 +922,63 @@ export class ThreeJSRenderer implements IRenderer {
   // ==========================================================================
 
   /**
-   * Render a dynamics contour as a connected line from point data.
+   * Render a dynamics contour as a thick line using Line2/LineMaterial.
    */
   private updateDynamicsContour(entity: Entity): void {
     if (!this.scene) return;
 
     const points = entity.data?.points as Array<{ x: number; y: number }> | undefined;
     if (!points || points.length < 2) {
-      // Remove existing if no data
       const existing = this.entityObjects.get(entity.id);
       if (existing) {
         this.scene.remove(existing);
+        this.disposeObject(existing);
         this.entityObjects.delete(entity.id);
       }
       return;
     }
 
-    // Remove and recreate each frame (point count changes)
-    let line = this.entityObjects.get(entity.id) as THREE.Line | undefined;
-    if (line) {
-      line.geometry.dispose();
+    // Build flat position array for LineGeometry [x, y, z, x, y, z, ...]
+    const positions: number[] = [];
+    for (const p of points) {
+      positions.push(
+        p.x * this.config.worldWidth,
+        (1 - p.y) * this.config.worldHeight,
+        1,
+      );
     }
 
-    const threePoints = points.map(
-      (p) =>
-        new THREE.Vector3(
-          p.x * this.config.worldWidth,
-          (1 - p.y) * this.config.worldHeight,
-          1,
-        ),
-    );
-
-    const geometry = new THREE.BufferGeometry().setFromPoints(threePoints);
     const color = entity.style.color ?? { h: 200, s: 0.5, v: 0.8 };
+    const threeColor = this.hsvToThreeColor(color);
+    const linewidth = entity.style.size ?? 3;
+    const opacity = entity.style.opacity ?? 0.9;
 
-    if (!line) {
-      const material = new THREE.LineBasicMaterial({
+    let line = this.entityObjects.get(entity.id) as Line2 | undefined;
+    if (line) {
+      // Reuse — update geometry positions
+      const geom = line.geometry as LineGeometry;
+      geom.setPositions(positions);
+      const mat = line.material as LineMaterial;
+      mat.color.copy(threeColor);
+      mat.opacity = opacity;
+      mat.linewidth = linewidth;
+      mat.resolution.set(this.resolution.x, this.resolution.y);
+    } else {
+      const geometry = new LineGeometry();
+      geometry.setPositions(positions);
+
+      const material = new LineMaterial({
+        color: threeColor.getHex(),
+        linewidth,
         transparent: true,
-        linewidth: 2,
+        opacity,
+        resolution: new THREE.Vector2(this.resolution.x, this.resolution.y),
       });
-      line = new THREE.Line(geometry, material);
+
+      line = new Line2(geometry, material);
       this.scene.add(line);
       this.entityObjects.set(entity.id, line);
-    } else {
-      line.geometry = geometry;
     }
-
-    const material = line.material as THREE.LineBasicMaterial;
-    material.color.copy(this.hsvToThreeColor(color));
-    material.opacity = entity.style.opacity ?? 0.9;
   }
 
 

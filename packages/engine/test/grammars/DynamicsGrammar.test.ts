@@ -166,19 +166,36 @@ describe("DynamicsGrammar", () => {
   });
 
   describe("positioning", () => {
-    it("indicators span the bar width", () => {
+    it("fresh indicator spans the bar width", () => {
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
-        events: [{ t: 900, intensity: 0.5 }],
+        events: [{ t: 1000, intensity: 0.5 }],
       };
 
+      // age=0 → no width growth
       const frame = createTestFrame(1000, dynamics);
       const scene = grammar.update(frame, null);
 
       const points = scene.entities[0].data?.points as Array<{ x: number; y: number }>;
       expect(points).toHaveLength(2);
-      expect(points[0].x).toBeCloseTo(0.03, 2);  // BAR_LEFT
-      expect(points[1].x).toBeCloseTo(0.055, 2); // BAR_RIGHT
+      expect(points[0].x).toBeCloseTo(0.005, 3);  // BAR_LEFT
+      expect(points[1].x).toBeCloseTo(0.035, 3);  // BAR_RIGHT
+    });
+
+    it("aged indicator grows wider", () => {
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        events: [{ t: 0, intensity: 0.8 }],
+      };
+
+      // age=1000 → half of FADE_MS → ageFraction=0.5
+      const frame = createTestFrame(1000, dynamics);
+      const scene = grammar.update(frame, null);
+
+      const points = scene.entities[0].data?.points as Array<{ x: number; y: number }>;
+      // Should be wider than BAR_LEFT/BAR_RIGHT
+      expect(points[0].x).toBeLessThan(0.005);
+      expect(points[1].x).toBeGreaterThan(0.035);
     });
 
     it("louder notes are higher on screen (lower y)", () => {
@@ -219,6 +236,33 @@ describe("DynamicsGrammar", () => {
           expect(p.y).toBeLessThanOrEqual(5 / 6 + 0.001);
         }
       }
+    });
+  });
+
+  describe("line thickness", () => {
+    it("fresh indicator has minimum line width", () => {
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        events: [{ t: 1000, intensity: 0.5 }],
+      };
+
+      const frame = createTestFrame(1000, dynamics);
+      const scene = grammar.update(frame, null);
+
+      expect(scene.entities[0].style.size).toBeCloseTo(3, 1); // LINE_WIDTH_MIN
+    });
+
+    it("aged indicator has larger line width", () => {
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        events: [{ t: 0, intensity: 0.8 }],
+      };
+
+      // age=1000 → half fade → lineWidth = 3 + (5-3)*0.5 = 4
+      const frame = createTestFrame(1000, dynamics);
+      const scene = grammar.update(frame, null);
+
+      expect(scene.entities[0].style.size).toBeCloseTo(4, 1);
     });
   });
 
