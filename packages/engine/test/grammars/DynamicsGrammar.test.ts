@@ -146,7 +146,7 @@ describe("DynamicsGrammar", () => {
       const scene = grammar.update(frame, null);
 
       const contourEntities = scene.entities.filter(
-        (e) => e.data?.type === "dynamics-contour",
+        (e) => e.id.includes("contour:"),
       );
       expect(contourEntities).toHaveLength(2);
     });
@@ -234,6 +234,89 @@ describe("DynamicsGrammar", () => {
       const ids2 = scene2.entities.map((e) => e.id).sort();
 
       expect(ids1).toEqual(ids2);
+    });
+  });
+
+  describe("whisker lines for chords", () => {
+    it("emits whisker for contour points with min < level", () => {
+      const dynamics: DynamicsState = {
+        events: [
+          { t: 500, intensity: 0.9 },
+          { t: 500, intensity: 0.3 },
+          { t: 800, intensity: 0.7 },
+          { t: 800, intensity: 0.4 },
+        ],
+        level: 0.7,
+        trend: "stable",
+        contour: [
+          { t: 500, level: 0.9, min: 0.3 },
+          { t: 800, level: 0.7, min: 0.4 },
+        ],
+        range: { min: 0.3, max: 0.9, variance: 0.05 },
+      };
+
+      const frame = createTestFrame(1000, dynamics);
+      const scene = grammar.update(frame, null);
+
+      const whiskers = scene.entities.filter(
+        (e) => e.id.includes("whisker"),
+      );
+      expect(whiskers).toHaveLength(2);
+
+      // Each whisker has exactly 2 points (top and bottom)
+      for (const w of whiskers) {
+        const points = w.data?.points as Array<{ x: number; y: number }>;
+        expect(points).toHaveLength(2);
+        // Top point (max) should have lower y than bottom point (min)
+        expect(points[0].y).toBeLessThan(points[1].y);
+      }
+    });
+
+    it("does not emit whisker for single notes (no min)", () => {
+      const dynamics: DynamicsState = {
+        events: [
+          { t: 500, intensity: 0.5 },
+          { t: 800, intensity: 0.7 },
+        ],
+        level: 0.7,
+        trend: "stable",
+        contour: [
+          { t: 500, level: 0.5 },
+          { t: 800, level: 0.7 },
+        ],
+        range: { min: 0.5, max: 0.7, variance: 0.01 },
+      };
+
+      const frame = createTestFrame(1000, dynamics);
+      const scene = grammar.update(frame, null);
+
+      const whiskers = scene.entities.filter(
+        (e) => e.id.includes("whisker"),
+      );
+      expect(whiskers).toHaveLength(0);
+    });
+
+    it("whisker has 50% opacity", () => {
+      const dynamics: DynamicsState = {
+        events: [
+          { t: 500, intensity: 0.9 },
+          { t: 500, intensity: 0.3 },
+          { t: 800, intensity: 0.5 },
+        ],
+        level: 0.5,
+        trend: "stable",
+        contour: [
+          { t: 500, level: 0.9, min: 0.3 },
+          { t: 800, level: 0.5 },
+        ],
+        range: { min: 0.3, max: 0.9, variance: 0.05 },
+      };
+
+      const frame = createTestFrame(1000, dynamics);
+      const scene = grammar.update(frame, null);
+
+      const whisker = scene.entities.find((e) => e.id.includes("whisker"));
+      expect(whisker!.style.opacity).toBeCloseTo(0.5, 2);
     });
   });
 

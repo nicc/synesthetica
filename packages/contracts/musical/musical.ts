@@ -178,12 +178,14 @@ export interface DynamicsEvent {
 }
 
 /**
- * A single point on the smoothed dynamics contour.
- * One point per note onset, smoothed via EMA.
+ * A single point on the dynamics contour.
+ * One point per distinct onset time. Level is max intensity across
+ * simultaneous notes; min is the lowest (present only for chords).
  */
 export interface DynamicsContourPoint {
   t: Ms;
-  level: number; // 0–1
+  level: number; // 0–1 (max intensity at this onset)
+  min?: number;  // 0–1 (lowest intensity; omitted when single note)
 }
 
 /**
@@ -214,11 +216,11 @@ export interface DynamicsState {
   events: DynamicsEvent[];
 
   // --- Aggregates: derived from events ---
-  /** Current smoothed dynamics level, 0–1 */
+  /** Current dynamics level (max intensity of most recent onset), 0–1 */
   level: number;
   /** Current trend direction over recent window */
   trend: "rising" | "falling" | "stable";
-  /** Smoothed level history, oldest first. One point per onset + decay points. */
+  /** Level history, oldest first. One point per distinct onset time. */
   contour: DynamicsContourPoint[];
   /** Dynamic range within the contour window */
   range: DynamicsRange;

@@ -56,6 +56,7 @@ const DEFAULT_GAP_MS = 4000;
 // ============================================================================
 
 const CONTOUR_COLOR: ColorHSVA = { h: 200, s: 0.5, v: 0.8, a: 0.9 };
+const WHISKER_COLOR: ColorHSVA = { h: 200, s: 0.5, v: 0.8, a: 0.5 };
 
 // ============================================================================
 // Grammar Implementation
@@ -88,6 +89,10 @@ export class DynamicsGrammar implements IVisualGrammar {
           entities.push(this.createContourEntity(segment, t, part, i));
         }
       }
+
+      // Whisker lines for chords (where min < level)
+      const whiskers = this.createWhiskerEntities(dynamics.contour, t, part);
+      entities.push(...whiskers);
     }
 
     return {
@@ -188,5 +193,46 @@ export class DynamicsGrammar implements IVisualGrammar {
         points,
       },
     };
+  }
+
+  /**
+   * Create vertical whisker line entities for contour points where min < level.
+   * Each whisker hangs from the max (level) down to the min.
+   */
+  private createWhiskerEntities(
+    contour: DynamicsContourPoint[],
+    t: number,
+    part: string,
+  ): Entity[] {
+    const entities: Entity[] = [];
+
+    for (let i = 0; i < contour.length; i++) {
+      const point = contour[i];
+      if (point.min === undefined || point.min >= point.level) continue;
+
+      const x = this.timeToX(point.t, t);
+      if (x < LEFT_X) continue;
+
+      entities.push({
+        id: `${this.id}:whisker:${i}`,
+        part,
+        kind: "glyph",
+        createdAt: t,
+        updatedAt: t,
+        style: {
+          color: WHISKER_COLOR,
+          opacity: WHISKER_COLOR.a,
+        },
+        data: {
+          type: "dynamics-contour",
+          points: [
+            { x, y: this.levelToY(point.level) },
+            { x, y: this.levelToY(point.min) },
+          ],
+        },
+      });
+    }
+
+    return entities;
   }
 }

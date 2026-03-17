@@ -6,7 +6,8 @@
  *
  * Outputs:
  * - Constituent events (per-onset velocity observations)
- * - Smoothed level contour (EMA over onsets, no decay during silence)
+ * - Level contour (max intensity per onset, no smoothing)
+ * - Per-onset velocity range (min for chords with spread voicing)
  * - Trend (rising/falling/stable via linear regression)
  * - Dynamic range (min, max, variance over window)
  *
@@ -35,9 +36,6 @@ export interface DynamicsStabilizerConfig {
   /** Window duration for event and contour history. @default 8000 */
   windowMs?: Ms;
 
-  /** EMA smoothing factor (0–1). Higher = more responsive. @default 0.3 */
-  smoothingAlpha?: number;
-
   /** Window for trend linear regression. @default 1000 */
   trendWindowMs?: Ms;
 
@@ -47,7 +45,6 @@ export interface DynamicsStabilizerConfig {
 
 const DEFAULT_CONFIG = {
   windowMs: 8000,
-  smoothingAlpha: 0.3,
   trendWindowMs: 1000,
   trendDeadZone: 0.1,
 } as const;
@@ -59,7 +56,7 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
   private config: Required<DynamicsStabilizerConfig>;
   private events: DynamicsEvent[] = [];
   private contour: DynamicsContourPoint[] = [];
-  private smoothedLevel = 0;
+  private currentLevel = 0;
   private lastEventTime: Ms | null = null;
   /** Track which note onsets we've already processed (by NoteId) */
   private processedOnsets: Set<string> = new Set();
@@ -71,7 +68,7 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
   init(): void {
     this.events = [];
     this.contour = [];
-    this.smoothedLevel = 0;
+    this.currentLevel = 0;
     this.lastEventTime = null;
     this.processedOnsets.clear();
   }
@@ -92,7 +89,7 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
     }
 
     // Process new note onsets from upstream
-    this.processNotes(upstream.notes, t);
+    this.processNotes(upstream.notes);
 
     // Prune old data outside window
     this.prune(t);
@@ -103,7 +100,7 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
 
     const dynamics: DynamicsState = {
       events: [...this.events],
-      level: this.smoothedLevel,
+      level: this.currentLevel,
       trend,
       contour: [...this.contour],
       range,
@@ -115,28 +112,50 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
     };
   }
 
-  private processNotes(notes: Note[], _t: Ms): void {
-    // Find notes in attack phase that we haven't processed yet
+  private processNotes(notes: Note[]): void {
+    // Collect new attack-phase notes we haven't seen
+    const newOnsets: Note[] = [];
     for (const note of notes) {
       if (note.phase === "attack" && !this.processedOnsets.has(note.id)) {
         this.processedOnsets.add(note.id);
-
-        const intensity = note.velocity / 127;
-        const event: DynamicsEvent = { t: note.onset, intensity };
-        this.events.push(event);
-
-        // Update EMA (seed with first event to avoid false "rising" from zero)
-        if (this.lastEventTime === null) {
-          this.smoothedLevel = intensity;
-        } else {
-          const alpha = this.config.smoothingAlpha;
-          this.smoothedLevel = alpha * intensity + (1 - alpha) * this.smoothedLevel;
-        }
-        this.lastEventTime = note.onset;
-
-        // Add contour point at this onset
-        this.contour.push({ t: note.onset, level: this.smoothedLevel });
+        newOnsets.push(note);
       }
+    }
+
+    if (newOnsets.length === 0) return;
+
+    // Group by onset time (simultaneous notes in a chord share onset)
+    const byOnset = new Map<Ms, Note[]>();
+    for (const note of newOnsets) {
+      const group = byOnset.get(note.onset);
+      if (group) {
+        group.push(note);
+      } else {
+        byOnset.set(note.onset, [note]);
+      }
+    }
+
+    // Process each onset group
+    for (const [onset, group] of byOnset) {
+      // Record individual events
+      for (const note of group) {
+        const intensity = note.velocity / 127;
+        this.events.push({ t: onset, intensity });
+      }
+
+      // Contour point: max intensity, with min if spread
+      const intensities = group.map((n) => n.velocity / 127);
+      const max = Math.max(...intensities);
+      const min = Math.min(...intensities);
+
+      const point: DynamicsContourPoint = { t: onset, level: max };
+      if (min < max) {
+        point.min = min;
+      }
+      this.contour.push(point);
+
+      this.currentLevel = max;
+      this.lastEventTime = onset;
     }
   }
 
@@ -153,13 +172,9 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
       this.contour.shift();
     }
 
-    // Prune processed onset IDs — remove any older than window
-    // (we can't check timestamps directly, so we bound the set size)
+    // Prune processed onset IDs — bound the set size
     if (this.processedOnsets.size > 200) {
-      // Keep only recent ones by clearing and re-adding from events
       this.processedOnsets.clear();
-      // We don't have note IDs in events, so just let it grow bounded
-      // The set will naturally be bounded by the rate of note onsets
     }
   }
 

@@ -35,7 +35,6 @@ describe("DynamicsStabilizer", () => {
     dynamics = new DynamicsStabilizer({
       partId: "test-part",
       windowMs: 8000,
-      smoothingAlpha: 0.3,
       trendWindowMs: 1000,
       trendDeadZone: 0.1,
     });
@@ -82,57 +81,94 @@ describe("DynamicsStabilizer", () => {
     });
   });
 
-  describe("EMA smoothing", () => {
-    it("seeds EMA with first note intensity", () => {
+  describe("level (max intensity, no smoothing)", () => {
+    it("level equals intensity of single note", () => {
       const result = applyBoth(makeFrame(100, [noteOn(60, 127, 100)]));
-
-      // First note seeds the EMA directly (no smoothing from zero)
       expect(result.dynamics.level).toBeCloseTo(1.0, 2);
     });
 
-    it("smooths across subsequent notes", () => {
+    it("level jumps immediately to new note intensity", () => {
       applyBoth(makeFrame(100, [noteOn(60, 127, 100)]));
-      // level = 1.0 (seeded)
       const result = applyBoth(makeFrame(200, [noteOn(64, 64, 200)]));
-      // level = 0.3 * (64/127) + 0.7 * 1.0 ≈ 0.3 * 0.504 + 0.7 = 0.851
-      expect(result.dynamics.level).toBeCloseTo(0.851, 2);
+      // No smoothing — level is exactly the new note's intensity
+      expect(result.dynamics.level).toBeCloseTo(64 / 127, 2);
+    });
+
+    it("level is max intensity of simultaneous notes (chord)", () => {
+      const result = applyBoth(makeFrame(100, [
+        noteOn(60, 40, 100),
+        noteOn(64, 100, 100),
+        noteOn(67, 80, 100),
+      ]));
+      expect(result.dynamics.level).toBeCloseTo(100 / 127, 2);
     });
 
     it("holds level steady during silence (no decay)", () => {
       applyBoth(makeFrame(100, [noteOn(60, 127, 100)]));
-      // level = 1.0 (seeded)
-
-      // Much later — level should remain at 1.0
       const result = applyBoth(makeFrame(5000, []));
       expect(result.dynamics.level).toBeCloseTo(1.0, 2);
     });
   });
 
   describe("contour", () => {
-    it("adds a contour point per onset", () => {
+    it("adds one contour point per distinct onset time", () => {
       applyBoth(makeFrame(100, [noteOn(60, 100, 100)]));
       const result = applyBoth(makeFrame(200, [noteOn(64, 50, 200)]));
 
-      expect(result.dynamics.contour.length).toBeGreaterThanOrEqual(2);
+      expect(result.dynamics.contour).toHaveLength(2);
       expect(result.dynamics.contour[0].t).toBe(100);
       expect(result.dynamics.contour[1].t).toBe(200);
     });
 
-    it("contour levels reflect EMA smoothing", () => {
-      const r1 = applyBoth(makeFrame(100, [noteOn(60, 127, 100)]));
-      expect(r1.dynamics.contour[0].level).toBeCloseTo(1.0, 2); // seeded
+    it("contour level is raw max intensity (no smoothing)", () => {
+      applyBoth(makeFrame(100, [noteOn(60, 127, 100)]));
+      const result = applyBoth(makeFrame(200, [noteOn(64, 64, 200)]));
 
-      const r2 = applyBoth(makeFrame(200, [noteOn(64, 64, 200)]));
-      // 0.3 * (64/127) + 0.7 * 1.0 ≈ 0.851
-      expect(r2.dynamics.contour[1].level).toBeCloseTo(0.851, 2);
+      expect(result.dynamics.contour[0].level).toBeCloseTo(1.0, 2);
+      expect(result.dynamics.contour[1].level).toBeCloseTo(64 / 127, 2);
     });
 
     it("does not add contour points during silence", () => {
       applyBoth(makeFrame(100, [noteOn(60, 127, 100)]));
       const result = applyBoth(makeFrame(5000, []));
 
-      // Only the one onset point — no decay points
       expect(result.dynamics.contour).toHaveLength(1);
+    });
+
+    it("groups simultaneous notes into one contour point", () => {
+      const result = applyBoth(makeFrame(100, [
+        noteOn(60, 40, 100),
+        noteOn(64, 100, 100),
+        noteOn(67, 80, 100),
+      ]));
+
+      // One contour point for the chord, not three
+      expect(result.dynamics.contour).toHaveLength(1);
+      expect(result.dynamics.contour[0].level).toBeCloseTo(100 / 127, 2);
+    });
+
+    it("includes min for chords with velocity spread", () => {
+      const result = applyBoth(makeFrame(100, [
+        noteOn(60, 40, 100),
+        noteOn(64, 100, 100),
+      ]));
+
+      expect(result.dynamics.contour[0].min).toBeCloseTo(40 / 127, 2);
+    });
+
+    it("omits min for single notes", () => {
+      const result = applyBoth(makeFrame(100, [noteOn(60, 100, 100)]));
+
+      expect(result.dynamics.contour[0].min).toBeUndefined();
+    });
+
+    it("omits min when all notes have same velocity", () => {
+      const result = applyBoth(makeFrame(100, [
+        noteOn(60, 80, 100),
+        noteOn(64, 80, 100),
+      ]));
+
+      expect(result.dynamics.contour[0].min).toBeUndefined();
     });
   });
 
@@ -143,7 +179,6 @@ describe("DynamicsStabilizer", () => {
     });
 
     it("detects rising dynamics", () => {
-      // Play increasingly louder notes
       applyBoth(makeFrame(100, [noteOn(60, 30, 100)]));
       applyBoth(makeFrame(300, [noteOn(62, 60, 300)]));
       applyBoth(makeFrame(500, [noteOn(64, 90, 500)]));
@@ -153,7 +188,6 @@ describe("DynamicsStabilizer", () => {
     });
 
     it("detects falling dynamics", () => {
-      // Play increasingly softer notes
       applyBoth(makeFrame(100, [noteOn(60, 127, 100)]));
       applyBoth(makeFrame(300, [noteOn(62, 90, 300)]));
       applyBoth(makeFrame(500, [noteOn(64, 50, 500)]));
@@ -163,7 +197,6 @@ describe("DynamicsStabilizer", () => {
     });
 
     it("reports stable for consistent dynamics", () => {
-      // Play notes at same velocity
       applyBoth(makeFrame(100, [noteOn(60, 80, 100)]));
       applyBoth(makeFrame(300, [noteOn(62, 80, 300)]));
       applyBoth(makeFrame(500, [noteOn(64, 80, 500)]));
@@ -186,7 +219,6 @@ describe("DynamicsStabilizer", () => {
       applyBoth(makeFrame(100, [noteOn(60, 50, 100)]));
       const result = applyBoth(makeFrame(200, [noteOn(64, 100, 200)]));
 
-      // Variance should be > 0 since intensities differ
       expect(result.dynamics.range.variance).toBeGreaterThan(0);
       expect(result.dynamics.range.variance).toBeLessThanOrEqual(1);
     });
@@ -206,10 +238,8 @@ describe("DynamicsStabilizer", () => {
     it("prunes events older than window", () => {
       applyBoth(makeFrame(100, [noteOn(60, 100, 100)]));
 
-      // 9000ms later — past 8000ms window
       const result = applyBoth(makeFrame(9100, [noteOn(64, 80, 9100)]));
 
-      // Old event should be pruned; only the new one remains
       expect(result.dynamics.events).toHaveLength(1);
       expect(result.dynamics.events[0].t).toBe(9100);
     });
