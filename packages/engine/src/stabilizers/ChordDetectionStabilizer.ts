@@ -477,6 +477,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
       },
       prescribedTempo: null,
       prescribedMeter: null,
+      prescribedKey: null,
       progression: this.recentChords.map((c) => c.id),
     };
   }

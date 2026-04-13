@@ -76,7 +76,9 @@ export interface MusicalFrame {
   rhythmicAnalysis: RhythmicAnalysis;
   prescribedTempo: number | null;  // User-set BPM (not inferred)
   prescribedMeter: { beatsPerBar: number; beatUnit: number } | null;
+  prescribedKey: PrescribedKey | null;  // User-set key+mode (not inferred)
   dynamics: DynamicsState;
+  harmonicContext?: HarmonicContext;     // Tension + functional analysis
 }
 
 export interface RhythmicAnalysis {

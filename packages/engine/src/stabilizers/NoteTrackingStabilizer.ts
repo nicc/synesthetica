@@ -145,6 +145,7 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
       },
       prescribedTempo: null,
       prescribedMeter: null,
+      prescribedKey: null,
     };
   }
 

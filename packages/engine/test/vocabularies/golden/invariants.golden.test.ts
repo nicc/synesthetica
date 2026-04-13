@@ -70,6 +70,7 @@ function makeFrame(t: number, notes: Note[]): MusicalFrame {
     },
     prescribedTempo: null,
     prescribedMeter: null,
+    prescribedKey: null,
   };
 }
 

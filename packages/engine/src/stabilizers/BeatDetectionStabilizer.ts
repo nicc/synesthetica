@@ -187,6 +187,7 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
       },
       prescribedTempo: null,
       prescribedMeter: null,
+      prescribedKey: null,
     };
   }
 

@@ -23,7 +23,7 @@ function createTestFrame(
     notes: [],
     chords: [],
     progression: [],
-    harmonicContext: { tension: 0, keyAware: false, detectedKey: null },
+    harmonicContext: { tension: 0, keyAware: false, currentFunction: null, functionalProgression: [] },
     rhythm: {
       analysis: {
         detectedDivision: null,
@@ -39,6 +39,7 @@ function createTestFrame(
       },
       prescribedTempo: null,
       prescribedMeter: null,
+      prescribedKey: null,
     },
     bars: [],
     phrases: [],

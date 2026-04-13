@@ -7,7 +7,7 @@ import {
   NoteTrackingStabilizer,
   ChordDetectionStabilizer,
   BeatDetectionStabilizer,
-  HarmonicProgressionStabilizer,
+  HarmonyStabilizer,
   MusicalVisualVocabulary,
   RhythmGrammar,
   HarmonyGrammar,
@@ -149,7 +149,7 @@ function startSession(midiInput: MidiInputInfo): void {
     pipeline.addStabilizerFactory(() => new DynamicsStabilizer({ partId }));
     pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
     pipeline.addStabilizerFactory(() => new BeatDetectionStabilizer({ partId }));
-    pipeline.addStabilizerFactory(() => new HarmonicProgressionStabilizer({ partId }));
+    pipeline.addStabilizerFactory(() => new HarmonyStabilizer({ partId }));
     pipeline.setVocabulary(new MusicalVisualVocabulary());
     // Use grammars - they'll be composited together
     pipeline.addGrammar(new RhythmGrammar());

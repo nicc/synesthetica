@@ -2,9 +2,9 @@ export { NoteTrackingStabilizer, type NoteTrackingConfig } from "./NoteTrackingS
 export { ChordDetectionStabilizer, type ChordDetectionConfig } from "./ChordDetectionStabilizer";
 export { BeatDetectionStabilizer, type BeatDetectionConfig } from "./BeatDetectionStabilizer";
 export {
-  HarmonicProgressionStabilizer,
-  type HarmonicProgressionConfig,
+  HarmonyStabilizer,
+  type HarmonyStabilizerConfig,
   type DissonanceAlgorithm,
   defaultDissonanceAlgorithm,
-} from "./HarmonicProgressionStabilizer";
+} from "./HarmonyStabilizer";
 export { DynamicsStabilizer, type DynamicsStabilizerConfig } from "./DynamicsStabilizer";

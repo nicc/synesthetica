@@ -227,44 +227,102 @@ export interface DynamicsState {
 }
 
 /**
- * Harmonic context produced by HarmonicProgressionStabilizer.
+ * Supported musical modes.
  *
- * Provides tension analysis for grammars that visualize harmonic tension.
+ * The seven church modes plus harmonic and melodic minor.
+ * Common names in parentheses where applicable.
+ */
+export type ModeId =
+  | "ionian"          // (major)
+  | "dorian"
+  | "phrygian"
+  | "lydian"
+  | "mixolydian"
+  | "aeolian"         // (natural minor)
+  | "locrian"
+  | "harmonic-minor"
+  | "melodic-minor";
+
+/**
+ * Human-readable labels for modes.
+ */
+export const MODE_LABELS: Record<ModeId, string> = {
+  "ionian":         "Ionian (major)",
+  "dorian":         "Dorian",
+  "phrygian":       "Phrygian",
+  "lydian":         "Lydian",
+  "mixolydian":     "Mixolydian",
+  "aeolian":        "Aeolian (natural minor)",
+  "locrian":        "Locrian",
+  "harmonic-minor": "Harmonic minor",
+  "melodic-minor":  "Melodic minor",
+};
+
+/**
+ * User-prescribed key.
+ * Set via control op, not inferred by stabilizers.
+ * When present, enables functional harmony analysis (Roman numerals).
+ */
+export interface PrescribedKey {
+  /** Tonic pitch class */
+  root: PitchClass;
+  /** Mode — defaults to ionian (major) if omitted */
+  mode: ModeId;
+}
+
+/**
+ * A chord analyzed in functional harmony terms relative to a prescribed key.
+ */
+export interface FunctionalChord {
+  /** Scale degree of the chord root (1–7) */
+  degree: number;
+  /** Roman numeral string (e.g. "I", "ii", "V7", "♭VI") */
+  roman: string;
+  /** Chord quality from detection */
+  quality: ChordQuality;
+  /** True if the chord root is not diatonic to the prescribed key/mode */
+  borrowed: boolean;
+  /** Reference to the source detected chord */
+  chordId: ChordId;
+  /** Onset time of the chord */
+  onset: Ms;
+}
+
+/**
+ * Harmonic context produced by HarmonyStabilizer.
  *
- * Tension computation has two tiers:
- * - Tier 1 (key-agnostic): Interval-based dissonance - always available
- * - Tier 2 (key-aware): Functional tension - requires KeyDetectionStabilizer
+ * Always provides tension. When a key is prescribed, also provides
+ * functional analysis (Roman numerals, progression history).
  *
- * When key detection is unavailable or disabled, tier 1 is used as fallback.
+ * Tension tiers:
+ * - Tier 1 (key-agnostic): Interval-based dissonance — always available
+ * - Tier 2 (key-aware): Functional tension — when prescribedKey is set
  */
 export interface HarmonicContext {
   /**
-   * Harmonic tension (0-1).
+   * Harmonic tension (0–1).
    *
-   * At tier 1 (key-agnostic): Based on interval dissonance in current chord.
-   * - Tritones, minor 2nds, major 7ths contribute high tension
-   * - Extensions and alterations contribute moderate tension
-   *
-   * At tier 2 (key-aware): Based on functional harmony.
-   * - Dominant function = high tension
-   * - Tonic function = low tension
-   * - Secondary dominants, borrowed chords = context-dependent
+   * Tier 1 (key-agnostic): interval dissonance in current chord.
+   * Tier 2 (key-aware): functional tension (dominant=high, tonic=low).
    */
   tension: number;
 
   /**
-   * Whether tension is computed with key awareness.
-   * false = tier 1 (interval dissonance only)
-   * true = tier 2 (functional harmony)
+   * Whether tension includes key-aware analysis.
    */
   keyAware: boolean;
 
   /**
-   * Detected key (if key-aware).
-   * Format: pitch class (0-11) + mode ("major" | "minor")
-   * null when key detection is unavailable or ambiguous.
+   * Current chord in functional terms. Null when no chord is active
+   * or no key is prescribed.
    */
-  detectedKey: { root: number; mode: "major" | "minor" } | null;
+  currentFunction: FunctionalChord | null;
+
+  /**
+   * Recent chord progression in functional terms.
+   * Only populated when a key is prescribed.
+   */
+  functionalProgression: FunctionalChord[];
 }
 
 /**
@@ -319,15 +377,22 @@ export interface MusicalFrame {
    */
   prescribedMeter: TimeSignature | null;
 
+  /**
+   * User-prescribed key (tonic + mode).
+   * Set via control op. Null means no explicit key.
+   * When null, functional harmony analysis is disabled.
+   */
+  prescribedKey: PrescribedKey | null;
+
   // Recent context (references, not copies)
   progression?: ChordId[]; // Recent chord history
   phrases?: Phrase[]; // Phrase boundaries
 
   // Derived signals (from derived stabilizers)
   /**
-   * Harmonic context including tension analysis.
-   * Produced by HarmonicProgressionStabilizer.
-   * Optional - only present when that stabilizer is in the chain.
+   * Harmonic context including tension and functional analysis.
+   * Produced by HarmonyStabilizer.
+   * Optional — only present when that stabilizer is in the chain.
    */
   harmonicContext?: HarmonicContext;
 }

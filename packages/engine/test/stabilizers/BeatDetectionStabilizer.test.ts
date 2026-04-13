@@ -33,6 +33,7 @@ function makeUpstreamFrame(t: number, prescribedTempo: number | null = null): Mu
     dynamics: { events: [], level: 0, trend: "stable", contour: [], range: { min: 0, max: 0, variance: 0 } },
     prescribedTempo,
     prescribedMeter: null,
+    prescribedKey: null,
   };
 }
 
@@ -101,6 +102,7 @@ describe("BeatDetectionStabilizer (RFC 007)", () => {
         dynamics: { events: [], level: 0.8, trend: "rising", contour: [], range: { min: 0, max: 0, variance: 0 } },
         prescribedTempo: null,
         prescribedMeter: null,
+        prescribedKey: null,
       };
 
       const result = stabilizer.apply(frame, upstream);

@@ -57,6 +57,7 @@ function createUpstreamFrame(t: number, notes: Note[]): MusicalFrame {
     dynamics: { events: [], level: 0.5, trend: "stable", contour: [], range: { min: 0, max: 0, variance: 0 } },
     prescribedTempo: null,
     prescribedMeter: null,
+    prescribedKey: null,
     progression: [],
   };
 }

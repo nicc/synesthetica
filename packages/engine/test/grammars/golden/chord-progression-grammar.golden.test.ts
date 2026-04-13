@@ -367,6 +367,7 @@ function createMinimalFrame(
       },
       prescribedTempo: options.hasPrescribedTempo ? 120 : null,
       prescribedMeter: options.hasPrescribedTempo ? { beatsPerBar: 4, beatUnit: 4 } : null,
+      prescribedKey: null,
     },
     bars: [],
     phrases: [],

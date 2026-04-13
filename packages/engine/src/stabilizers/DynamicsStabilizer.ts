@@ -256,6 +256,7 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
       },
       prescribedTempo: null,
       prescribedMeter: null,
+      prescribedKey: null,
     };
   }
 }

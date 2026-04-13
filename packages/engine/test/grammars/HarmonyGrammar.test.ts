@@ -98,7 +98,7 @@ function createTestFrame(
     harmonicContext: {
       tension,
       keyAware: false,
-      detectedKey: null,
+      currentFunction: null, functionalProgression: [],
     },
     rhythm: {
       analysis: {
@@ -115,6 +115,7 @@ function createTestFrame(
       },
       prescribedTempo: null,
       prescribedMeter: null,
+      prescribedKey: null,
     },
     bars: [],
     phrases: [],

@@ -104,7 +104,7 @@ function createTestFrame(
     notes,
     chords: [],
     progression: [],
-    harmonicContext: { tension: 0, keyAware: false, detectedKey: null },
+    harmonicContext: { tension: 0, keyAware: false, currentFunction: null, functionalProgression: [] },
     rhythm: {
       analysis: {
         detectedDivision,
@@ -120,6 +120,7 @@ function createTestFrame(
       },
       prescribedTempo: options.tempo ?? null,
       prescribedMeter: options.meter ?? null,
+      prescribedKey: null,
     },
     bars: [],
     phrases: [],

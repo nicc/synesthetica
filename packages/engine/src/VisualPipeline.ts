@@ -25,6 +25,7 @@ import type {
   SessionMs,
   Ms,
   Diagnostic,
+  PrescribedKey,
 } from "@synesthetica/contracts";
 
 /**
@@ -84,9 +85,10 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
   private activityLog: Array<{ part: PartId; t: SessionMs; count: number }> = [];
   private currentTime: SessionMs = 0;
 
-  // Prescribed tempo/meter (user-set, not inferred)
+  // Prescribed tempo/meter/key (user-set, not inferred)
   private prescribedTempo: number | null = null;
   private prescribedMeter: { beatsPerBar: number; beatUnit: number } | null = null;
+  private prescribedKey: PrescribedKey | null = null;
 
   constructor(config: VisualPipelineConfig) {
     this.config = config;
@@ -360,6 +362,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       },
       prescribedTempo: this.prescribedTempo,
       prescribedMeter: this.prescribedMeter,
+      prescribedKey: this.prescribedKey,
     };
   }
 
@@ -552,6 +555,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       dynamics,
       prescribedTempo: this.prescribedTempo,
       prescribedMeter: this.prescribedMeter,
+      prescribedKey: this.prescribedKey,
       progression: progressionSet.size > 0 ? Array.from(progressionSet) : undefined,
     };
   }

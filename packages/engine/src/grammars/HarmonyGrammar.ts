@@ -14,7 +14,7 @@
  * **Tension Bar (right side)**
  * - Vertical gauge showing harmonic tension (0-1)
  * - Higher position = more tension
- * - Derived from HarmonicProgressionStabilizer (tier 1: interval dissonance)
+ * - Derived from HarmonyStabilizer (tier 1: interval dissonance)
  *
  * ## Implementation Notes
  *
@@ -23,7 +23,7 @@
  * - Snaps instantly between chord changes (no animation)
  *
  * @see SPEC_010 for chord shape design
- * @see HarmonicProgressionStabilizer for tension computation
+ * @see HarmonyStabilizer for tension computation
  */
 
 import type {

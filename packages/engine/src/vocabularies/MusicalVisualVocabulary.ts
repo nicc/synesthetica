@@ -101,7 +101,8 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     const defaultHarmonicContext: HarmonicContext = {
       tension: 0,
       keyAware: false,
-      detectedKey: null,
+      currentFunction: null,
+      functionalProgression: [],
     };
 
     return {
