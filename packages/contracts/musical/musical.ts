@@ -437,3 +437,53 @@ function pitchClassName(pc: PitchClass): string {
   ];
   return names[pc];
 }
+
+// ============================================================================
+// Shared Defaults
+// ============================================================================
+
+/** Empty rhythmic analysis — no detected patterns. */
+export const EMPTY_RHYTHMIC_ANALYSIS: Readonly<RhythmicAnalysis> = Object.freeze({
+  detectedDivision: null,
+  onsetDrifts: [],
+  stability: 0,
+  confidence: 0,
+});
+
+/** Empty dynamics state — silence. */
+export const EMPTY_DYNAMICS: Readonly<DynamicsState> = Object.freeze({
+  events: [],
+  level: 0,
+  trend: "stable" as const,
+  contour: [],
+  range: Object.freeze({ min: 0, max: 0, variance: 0 }),
+});
+
+/** Empty harmonic context — no tension, no functional analysis. */
+export const EMPTY_HARMONIC_CONTEXT: Readonly<HarmonicContext> = Object.freeze({
+  tension: 0,
+  keyAware: false,
+  currentFunction: null,
+  functionalProgression: [],
+});
+
+/**
+ * Create a MusicalFrame with all fields at their empty/null defaults.
+ * Callers can spread overrides: `{ ...createEmptyMusicalFrame(t, part), notes }`.
+ */
+export function createEmptyMusicalFrame(t: Ms, part: PartId): MusicalFrame {
+  return {
+    t,
+    part,
+    notes: [],
+    chords: [],
+    rhythmicAnalysis: { ...EMPTY_RHYTHMIC_ANALYSIS },
+    dynamics: {
+      ...EMPTY_DYNAMICS,
+      range: { ...EMPTY_DYNAMICS.range },
+    },
+    prescribedTempo: null,
+    prescribedMeter: null,
+    prescribedKey: null,
+  };
+}

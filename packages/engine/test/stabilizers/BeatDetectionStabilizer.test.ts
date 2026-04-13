@@ -1,40 +1,18 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { BeatDetectionStabilizer } from "../../src/stabilizers/BeatDetectionStabilizer";
-import type { RawInputFrame, MidiNoteOn, MusicalFrame } from "@synesthetica/contracts";
+import type { MidiNoteOn, MusicalFrame } from "@synesthetica/contracts";
+import { createTestRawFrame, createTestMusicalFrame } from "../_harness/frames";
 
-function makeFrame(t: number, inputs: MidiNoteOn[]): RawInputFrame {
-  return {
-    t,
-    source: "midi",
-    stream: "test",
-    inputs,
-  };
+function makeFrame(t: number, inputs: MidiNoteOn[]) {
+  return createTestRawFrame(t, inputs);
 }
 
 function noteOn(note: number, velocity: number, t: number, channel = 0): MidiNoteOn {
   return { type: "midi_note_on", note, velocity, t, channel };
 }
 
-/**
- * Create a minimal upstream MusicalFrame for testing.
- */
-function makeUpstreamFrame(t: number, prescribedTempo: number | null = null): MusicalFrame {
-  return {
-    t,
-    part: "test-part",
-    notes: [],
-    chords: [],
-    rhythmicAnalysis: {
-      detectedDivision: null,
-      onsetDrifts: [],
-      stability: 0,
-      confidence: 0,
-    },
-    dynamics: { events: [], level: 0, trend: "stable", contour: [], range: { min: 0, max: 0, variance: 0 } },
-    prescribedTempo,
-    prescribedMeter: null,
-    prescribedKey: null,
-  };
+function makeUpstreamFrame(t: number, prescribedTempo: number | null = null) {
+  return createTestMusicalFrame(t, "test-part", { prescribedTempo });
 }
 
 /** Helper to extract onset timestamps from onsetDrifts */
@@ -76,9 +54,7 @@ describe("BeatDetectionStabilizer (RFC 007)", () => {
 
     it("preserves upstream frame data", () => {
       const frame = makeFrame(100, []);
-      const upstream: MusicalFrame = {
-        t: 100,
-        part: "test-part",
+      const upstream = createTestMusicalFrame(100, "test-part", {
         notes: [
           {
             id: "test-note",
@@ -92,18 +68,8 @@ describe("BeatDetectionStabilizer (RFC 007)", () => {
             provenance: { source: "test", stream: "test", version: "1.0" },
           },
         ],
-        chords: [],
-        rhythmicAnalysis: {
-          detectedDivision: null,
-          onsetDrifts: [],
-          stability: 0,
-          confidence: 0,
-        },
         dynamics: { events: [], level: 0.8, trend: "rising", contour: [], range: { min: 0, max: 0, variance: 0 } },
-        prescribedTempo: null,
-        prescribedMeter: null,
-        prescribedKey: null,
-      };
+      });
 
       const result = stabilizer.apply(frame, upstream);
 

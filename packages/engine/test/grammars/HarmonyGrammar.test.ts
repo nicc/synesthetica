@@ -10,12 +10,12 @@ import { HarmonyGrammar } from "../../src/grammars/HarmonyGrammar";
 import { buildChordShape } from "../../src/vocabularies/utils";
 import type {
   GrammarContext,
-  AnnotatedMusicalFrame,
   AnnotatedChord,
   PitchClass,
   MusicalChord,
   PitchHueInvariant,
 } from "@synesthetica/contracts";
+import { createTestAnnotatedFrame } from "../_harness/frames";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { resolve } from "path";
 
@@ -88,47 +88,16 @@ function createTestFrame(
   t: number,
   chord: AnnotatedChord | null,
   tension: number
-): AnnotatedMusicalFrame {
-  return {
-    t,
-    part: "main",
-    notes: [],
+) {
+  return createTestAnnotatedFrame(t, "main", {
     chords: chord ? [chord] : [],
-    progression: [],
     harmonicContext: {
       tension,
       keyAware: false,
-      currentFunction: null, functionalProgression: [],
+      currentFunction: null,
+      functionalProgression: [],
     },
-    rhythm: {
-      analysis: {
-        detectedDivision: null,
-        onsetDrifts: [],
-        stability: 0.9,
-        confidence: 0.9,
-      },
-      visual: {
-        palette: { id: "rhythm", primary: { h: 200, s: 0.3, v: 0.7, a: 1 } },
-        texture: { id: "rhythm", grain: 0.1, smoothness: 0.9, density: 0.5 },
-        motion: { jitter: 0, pulse: 0.6, flow: 0 },
-        uncertainty: 0.1,
-      },
-      prescribedTempo: null,
-      prescribedMeter: null,
-      prescribedKey: null,
-    },
-    bars: [],
-    phrases: [],
-    dynamics: {
-      dynamics: { events: [], level: 0.5, trend: "stable", contour: [], range: { min: 0, max: 0, variance: 0 } },
-      visual: {
-        palette: { id: "dynamics", primary: { h: 0, s: 0, v: 0.5, a: 1 } },
-        texture: { id: "dynamics", grain: 0.1, smoothness: 0.8, density: 0.5 },
-        motion: { jitter: 0.05, pulse: 0.5, flow: 0 },
-        uncertainty: 0.1,
-      },
-    },
-  };
+  });
 }
 
 // ============================================================================

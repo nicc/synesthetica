@@ -39,11 +39,11 @@ import type {
   MusicalChord,
   RhythmicAnalysis,
   DynamicsState,
-  HarmonicContext,
   Ms,
 } from "@synesthetica/contracts";
 
 import {
+  EMPTY_HARMONIC_CONTEXT,
   pcToHue,
   octaveToBrightness,
   velocityToSizeMultiplier,
@@ -98,12 +98,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
 
   annotate(frame: MusicalFrame): AnnotatedMusicalFrame {
     // Default harmonic context when stabilizer not in chain
-    const defaultHarmonicContext: HarmonicContext = {
-      tension: 0,
-      keyAware: false,
-      currentFunction: null,
-      functionalProgression: [],
-    };
+    const defaultHarmonicContext = { ...EMPTY_HARMONIC_CONTEXT };
 
     return {
       t: frame.t,

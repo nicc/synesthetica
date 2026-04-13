@@ -16,42 +16,23 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { BeatDetectionStabilizer } from "../../src/stabilizers/BeatDetectionStabilizer";
-import type { RawInputFrame, MidiNoteOn, MusicalFrame } from "@synesthetica/contracts";
+import type { MidiNoteOn, MusicalFrame } from "@synesthetica/contracts";
+import { createTestRawFrame, createTestMusicalFrame } from "../_harness/frames";
 
 // ============================================================================
 // Simulation Helpers
 // ============================================================================
 
-function makeFrame(t: number, inputs: MidiNoteOn[]): RawInputFrame {
-  return {
-    t,
-    source: "midi",
-    stream: "test",
-    inputs,
-  };
+function makeFrame(t: number, inputs: MidiNoteOn[]) {
+  return createTestRawFrame(t, inputs);
 }
 
 function noteOn(note: number, velocity: number, t: number, channel = 0): MidiNoteOn {
   return { type: "midi_note_on", note, velocity, t, channel };
 }
 
-function makeUpstreamFrame(t: number): MusicalFrame {
-  return {
-    t,
-    part: "test-part",
-    notes: [],
-    chords: [],
-    rhythmicAnalysis: {
-      detectedDivision: null,
-      onsetDrifts: [],
-      stability: 0,
-      confidence: 0,
-    },
-    dynamics: { events: [], level: 0, trend: "stable", contour: [], range: { min: 0, max: 0, variance: 0 } },
-    prescribedTempo: null,
-    prescribedMeter: null,
-    prescribedKey: null,
-  };
+function makeUpstreamFrame(t: number) {
+  return createTestMusicalFrame(t, "test-part");
 }
 
 /**

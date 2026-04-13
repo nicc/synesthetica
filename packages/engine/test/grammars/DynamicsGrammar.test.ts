@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { DynamicsGrammar } from "../../src/grammars/DynamicsGrammar";
 import type {
-  AnnotatedMusicalFrame,
   GrammarContext,
   DynamicsState,
   Entity,
 } from "@synesthetica/contracts";
+import { createTestAnnotatedFrame } from "../_harness/frames";
 
 const ctx: GrammarContext = {
   canvasSize: { width: 800, height: 600 },
@@ -13,46 +13,8 @@ const ctx: GrammarContext = {
   part: "main",
 };
 
-function createTestFrame(
-  t: number,
-  dynamics: DynamicsState,
-): AnnotatedMusicalFrame {
-  return {
-    t,
-    part: "main",
-    notes: [],
-    chords: [],
-    progression: [],
-    harmonicContext: { tension: 0, keyAware: false, currentFunction: null, functionalProgression: [] },
-    rhythm: {
-      analysis: {
-        detectedDivision: null,
-        onsetDrifts: [],
-        stability: 0,
-        confidence: 0,
-      },
-      visual: {
-        palette: { id: "rhythm", primary: { h: 0, s: 0, v: 0.5, a: 1 } },
-        texture: { id: "rhythm", grain: 0, smoothness: 1, density: 0 },
-        motion: { jitter: 0, pulse: 0, flow: 0 },
-        uncertainty: 0,
-      },
-      prescribedTempo: null,
-      prescribedMeter: null,
-      prescribedKey: null,
-    },
-    bars: [],
-    phrases: [],
-    dynamics: {
-      dynamics,
-      visual: {
-        palette: { id: "dynamics", primary: { h: 0, s: 0, v: 0.5, a: 1 } },
-        texture: { id: "dynamics", grain: 0.1, smoothness: 0.8, density: 0.5 },
-        motion: { jitter: 0.05, pulse: 0.5, flow: 0 },
-        uncertainty: 0.1,
-      },
-    },
-  };
+function createTestFrame(t: number, dynamics: DynamicsState) {
+  return createTestAnnotatedFrame(t, "main", { dynamics });
 }
 
 const EMPTY_DYNAMICS: DynamicsState = {

@@ -14,10 +14,10 @@ import {
 } from "../_harness/svg-snapshot";
 import type {
   GrammarContext,
-  AnnotatedMusicalFrame,
   AnnotatedNote,
   PitchClass,
 } from "@synesthetica/contracts";
+import { createTestAnnotatedFrame } from "../_harness/frames";
 
 // ============================================================================
 // Test Fixtures
@@ -58,7 +58,7 @@ function createTestFrame(
       }>;
     }>;
   }
-): AnnotatedMusicalFrame {
+) {
   const vel = (v: number) => v ?? 80;
   const notes: AnnotatedNote[] = (options.notes ?? []).map((n) => ({
     note: {
@@ -98,42 +98,17 @@ function createTestFrame(
     ? options.detectedDivision
     : options.tempo ? 60000 / options.tempo : null;
 
-  return {
-    t,
-    part: "main",
+  return createTestAnnotatedFrame(t, "main", {
     notes,
-    chords: [],
-    progression: [],
-    harmonicContext: { tension: 0, keyAware: false, currentFunction: null, functionalProgression: [] },
-    rhythm: {
-      analysis: {
-        detectedDivision,
-        onsetDrifts: options.onsetDrifts ?? [],
-        stability: 0.9,
-        confidence: 0.9,
-      },
-      visual: {
-        palette: { id: "rhythm", primary: { h: 200, s: 0.3, v: 0.7, a: 1 } },
-        texture: { id: "rhythm", grain: 0.1, smoothness: 0.9, density: 0.5 },
-        motion: { jitter: 0, pulse: 0.6, flow: 0 },
-        uncertainty: 0.1,
-      },
-      prescribedTempo: options.tempo ?? null,
-      prescribedMeter: options.meter ?? null,
-      prescribedKey: null,
+    rhythmicAnalysis: {
+      detectedDivision,
+      onsetDrifts: options.onsetDrifts ?? [],
+      stability: 0.9,
+      confidence: 0.9,
     },
-    bars: [],
-    phrases: [],
-    dynamics: {
-      dynamics: { events: [], level: 0.7, trend: "stable", contour: [], range: { min: 0, max: 0, variance: 0 } },
-      visual: {
-        palette: { id: "dynamics", primary: { h: 0, s: 0, v: 0.7, a: 1 } },
-        texture: { id: "dynamics", grain: 0.1, smoothness: 0.8, density: 0.7 },
-        motion: { jitter: 0.05, pulse: 0.7, flow: 0 },
-        uncertainty: 0.1,
-      },
-    },
-  };
+    prescribedTempo: options.tempo ?? null,
+    prescribedMeter: options.meter ?? null,
+  });
 }
 
 // ============================================================================

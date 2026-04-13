@@ -30,6 +30,7 @@ import type {
   PartId,
   Ms,
 } from "@synesthetica/contracts";
+import { createEmptyMusicalFrame } from "@synesthetica/contracts";
 
 /**
  * Configuration for the BeatDetectionStabilizer.
@@ -173,21 +174,8 @@ export class BeatDetectionStabilizer implements IMusicalStabilizer {
     }
 
     return {
-      t,
-      part: this.config.partId,
-      notes: [],
-      chords: [],
+      ...createEmptyMusicalFrame(t, this.config.partId),
       rhythmicAnalysis,
-      dynamics: {
-        events: [],
-        level: 0,
-        trend: "stable",
-        contour: [],
-        range: { min: 0, max: 0, variance: 0 },
-      },
-      prescribedTempo: null,
-      prescribedMeter: null,
-      prescribedKey: null,
     };
   }
 

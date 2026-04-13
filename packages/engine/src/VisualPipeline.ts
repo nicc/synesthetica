@@ -27,6 +27,7 @@ import type {
   Diagnostic,
   PrescribedKey,
 } from "@synesthetica/contracts";
+import { createEmptyMusicalFrame as contractsCreateEmptyMusicalFrame } from "@synesthetica/contracts";
 
 /**
  * Configuration for the visual pipeline.
@@ -199,7 +200,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       musicalFrame = this.applyStabilizers(partState, mergedRaw, targetTime, partId);
     } else {
       // No stabilizers - create empty musical frame
-      musicalFrame = this.createEmptyMusicalFrame(targetTime, partId);
+      musicalFrame = this.createEmptyMusicalFrameWithPrescribed(targetTime, partId);
     }
 
     // Record activity based on note count
@@ -341,25 +342,9 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     };
   }
 
-  private createEmptyMusicalFrame(t: SessionMs, partId: PartId): MusicalFrame {
+  private createEmptyMusicalFrameWithPrescribed(t: SessionMs, partId: PartId): MusicalFrame {
     return {
-      t,
-      part: partId,
-      notes: [],
-      chords: [],
-      rhythmicAnalysis: {
-        detectedDivision: null,
-        onsetDrifts: [],
-        stability: 0,
-        confidence: 0,
-      },
-      dynamics: {
-        events: [],
-        level: 0,
-        trend: "stable",
-        contour: [],
-        range: { min: 0, max: 0, variance: 0 },
-      },
+      ...contractsCreateEmptyMusicalFrame(t, partId),
       prescribedTempo: this.prescribedTempo,
       prescribedMeter: this.prescribedMeter,
       prescribedKey: this.prescribedKey,
@@ -401,7 +386,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     partId: PartId
   ): MusicalFrame {
     // Start with empty frame
-    let mergedFrame: MusicalFrame = this.createEmptyMusicalFrame(t, partId);
+    let mergedFrame: MusicalFrame = this.createEmptyMusicalFrameWithPrescribed(t, partId);
 
     // Build a map of stabilizer outputs for dependency resolution
     const outputs = new Map<string, MusicalFrame>();
@@ -490,7 +475,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     partId: PartId
   ): MusicalFrame {
     if (frames.length === 0) {
-      return this.createEmptyMusicalFrame(t, partId);
+      return this.createEmptyMusicalFrameWithPrescribed(t, partId);
     }
 
     if (frames.length === 1) {

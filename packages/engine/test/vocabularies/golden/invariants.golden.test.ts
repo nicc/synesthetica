@@ -11,13 +11,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { MusicalVisualVocabulary } from "../../../src/vocabularies/MusicalVisualVocabulary";
 import type {
-  MusicalFrame,
   Note,
   Pitch,
   PitchClass,
   AnnotatedNote,
+  MusicalFrame,
 } from "@synesthetica/contracts";
 import { pcToHue } from "@synesthetica/contracts";
+import { createTestMusicalFrame } from "../../_harness/frames";
 
 // ============================================================================
 // Test Helpers
@@ -50,28 +51,7 @@ function makeNote(
 }
 
 function makeFrame(t: number, notes: Note[]): MusicalFrame {
-  return {
-    t,
-    part: "test-part",
-    notes,
-    chords: [],
-    rhythmicAnalysis: {
-      detectedDivision: null,
-      onsetDrifts: [],
-      stability: 0,
-      confidence: 0,
-    },
-    dynamics: {
-      level:
-        notes.length > 0
-          ? notes.reduce((sum, n) => sum + n.velocity, 0) / notes.length / 127
-          : 0,
-      trend: "stable",
-    },
-    prescribedTempo: null,
-    prescribedMeter: null,
-    prescribedKey: null,
-  };
+  return createTestMusicalFrame(t, "test-part", { notes });
 }
 
 function getAnnotatedNote(

@@ -8,24 +8,15 @@ import {
   defaultDissonanceAlgorithm,
 } from "../../src/stabilizers/HarmonyStabilizer";
 import type {
-  RawInputFrame,
-  MusicalFrame,
   MusicalChord,
   PitchClass,
   PrescribedKey,
 } from "@synesthetica/contracts";
+import { createTestRawFrame, createTestMusicalFrame } from "../_harness/frames";
 
 // ============================================================================
 // Test Helpers
 // ============================================================================
-
-function createRawFrame(t: number): RawInputFrame {
-  return {
-    t,
-    events: [],
-    provenance: { source: "test", stream: "test" },
-  };
-}
 
 function createChord(
   root: PitchClass,
@@ -53,30 +44,8 @@ function createUpstreamFrame(
   t: number,
   chords: MusicalChord[],
   key: PrescribedKey | null = null,
-): MusicalFrame {
-  return {
-    t,
-    part: "main",
-    notes: [],
-    chords,
-    rhythmicAnalysis: {
-      detectedDivision: null,
-      onsetDrifts: [],
-      stability: 0,
-      confidence: 0,
-    },
-    dynamics: {
-      events: [],
-      level: 0.5,
-      trend: "stable",
-      contour: [],
-      range: { min: 0, max: 0, variance: 0 },
-    },
-    prescribedTempo: null,
-    prescribedMeter: null,
-    prescribedKey: key,
-    progression: [],
-  };
+) {
+  return createTestMusicalFrame(t, "main", { chords, prescribedKey: key, progression: [] });
 }
 
 // ============================================================================
@@ -98,7 +67,7 @@ describe("HarmonyStabilizer", () => {
     });
 
     it("returns empty frame with no upstream", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const result = stabilizer.apply(raw, null);
 
       expect(result.t).toBe(1000);
@@ -107,7 +76,7 @@ describe("HarmonyStabilizer", () => {
     });
 
     it("returns zero tension with no chords", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const upstream = createUpstreamFrame(1000, []);
       const result = stabilizer.apply(raw, upstream);
 
@@ -118,7 +87,7 @@ describe("HarmonyStabilizer", () => {
 
   describe("tension (key-agnostic)", () => {
     it("computes low tension for major triad", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const chord = createChord(0, "maj", [
         { pc: 0, octave: 4 },
         { pc: 4, octave: 4 },
@@ -131,7 +100,7 @@ describe("HarmonyStabilizer", () => {
     });
 
     it("computes moderate tension for dominant 7th", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const chord = createChord(7, "dom7", [
         { pc: 7, octave: 3 },
         { pc: 11, octave: 3 },
@@ -146,7 +115,7 @@ describe("HarmonyStabilizer", () => {
     });
 
     it("computes high tension for diminished 7th", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const chord = createChord(0, "dim7", [
         { pc: 0, octave: 4 },
         { pc: 3, octave: 4 },
@@ -160,7 +129,7 @@ describe("HarmonyStabilizer", () => {
     });
 
     it("uses active chord over decaying", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const activeChord = createChord(0, "dim7", [
         { pc: 0, octave: 4 },
         { pc: 3, octave: 4 },
@@ -185,7 +154,7 @@ describe("HarmonyStabilizer", () => {
     const cMajor: PrescribedKey = { root: 0, mode: "ionian" };
 
     it("is not key-aware when no key is prescribed", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const chord = createChord(0, "maj", [
         { pc: 0, octave: 4 },
         { pc: 4, octave: 4 },
@@ -200,7 +169,7 @@ describe("HarmonyStabilizer", () => {
     });
 
     it("identifies I in C major", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const chord = createChord(0, "maj", [
         { pc: 0, octave: 4 },
         { pc: 4, octave: 4 },
@@ -216,7 +185,7 @@ describe("HarmonyStabilizer", () => {
     });
 
     it("identifies ii in C major (Dm)", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const chord = createChord(2 as PitchClass, "min", [
         { pc: 2 as PitchClass, octave: 4 },
         { pc: 5 as PitchClass, octave: 4 },
@@ -231,7 +200,7 @@ describe("HarmonyStabilizer", () => {
     });
 
     it("identifies V in C major (G)", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const chord = createChord(7 as PitchClass, "maj", [
         { pc: 7 as PitchClass, octave: 3 },
         { pc: 11 as PitchClass, octave: 3 },
@@ -246,7 +215,7 @@ describe("HarmonyStabilizer", () => {
     });
 
     it("identifies V7 in C major (G7)", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const chord = createChord(7 as PitchClass, "dom7", [
         { pc: 7 as PitchClass, octave: 3 },
         { pc: 11 as PitchClass, octave: 3 },
@@ -261,7 +230,7 @@ describe("HarmonyStabilizer", () => {
     });
 
     it("identifies vii° in C major (Bdim)", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const chord = createChord(11 as PitchClass, "dim", [
         { pc: 11 as PitchClass, octave: 3 },
         { pc: 2 as PitchClass, octave: 4 },
@@ -276,7 +245,7 @@ describe("HarmonyStabilizer", () => {
     });
 
     it("marks non-diatonic chord as borrowed", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       // Eb major in C major → ♭III (borrowed from parallel minor)
       const chord = createChord(3 as PitchClass, "maj", [
         { pc: 3 as PitchClass, octave: 4 },
@@ -293,7 +262,7 @@ describe("HarmonyStabilizer", () => {
 
   describe("modes", () => {
     it("identifies i in D dorian (Dm)", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const dDorian: PrescribedKey = { root: 2 as PitchClass, mode: "dorian" };
       const chord = createChord(2 as PitchClass, "min", [
         { pc: 2 as PitchClass, octave: 4 },
@@ -309,7 +278,7 @@ describe("HarmonyStabilizer", () => {
     });
 
     it("identifies IV in D dorian (G major — diatonic)", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const dDorian: PrescribedKey = { root: 2 as PitchClass, mode: "dorian" };
       // G major: G-B-D (pc 7, 11, 2)
       const chord = createChord(7 as PitchClass, "maj", [
@@ -326,7 +295,7 @@ describe("HarmonyStabilizer", () => {
     });
 
     it("identifies V in A harmonic minor (E major)", () => {
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const aHarmonicMinor: PrescribedKey = {
         root: 9 as PitchClass,
         mode: "harmonic-minor",
@@ -357,7 +326,7 @@ describe("HarmonyStabilizer", () => {
         { pc: 7, octave: 4 },
       ], 1000);
       let upstream = createUpstreamFrame(1000, [chord1], cMajor);
-      let result = stabilizer.apply(createRawFrame(1000), upstream);
+      let result = stabilizer.apply(createTestRawFrame(1000), upstream);
       expect(result.harmonicContext?.functionalProgression).toHaveLength(1);
 
       // IV
@@ -367,7 +336,7 @@ describe("HarmonyStabilizer", () => {
         { pc: 0, octave: 5 },
       ], 2000);
       upstream = createUpstreamFrame(2000, [chord2], cMajor);
-      result = stabilizer.apply(createRawFrame(2000), upstream);
+      result = stabilizer.apply(createTestRawFrame(2000), upstream);
       expect(result.harmonicContext?.functionalProgression).toHaveLength(2);
       expect(result.harmonicContext?.functionalProgression[0].roman).toBe("I");
       expect(result.harmonicContext?.functionalProgression[1].roman).toBe("IV");
@@ -382,8 +351,8 @@ describe("HarmonyStabilizer", () => {
       ], 1000);
 
       const upstream = createUpstreamFrame(1000, [chord], cMajor);
-      stabilizer.apply(createRawFrame(1000), upstream);
-      const result = stabilizer.apply(createRawFrame(1500), upstream);
+      stabilizer.apply(createTestRawFrame(1000), upstream);
+      const result = stabilizer.apply(createTestRawFrame(1500), upstream);
 
       expect(result.harmonicContext?.functionalProgression).toHaveLength(1);
     });
@@ -404,7 +373,7 @@ describe("HarmonyStabilizer", () => {
         { pc: 7, octave: 4 },
       ], 1000);
       shortWindow.apply(
-        createRawFrame(1000),
+        createTestRawFrame(1000),
         createUpstreamFrame(1000, [chord1], cMajor),
       );
 
@@ -415,7 +384,7 @@ describe("HarmonyStabilizer", () => {
         { pc: 2 as PitchClass, octave: 4 },
       ], 7000);
       const result = shortWindow.apply(
-        createRawFrame(7000),
+        createTestRawFrame(7000),
         createUpstreamFrame(7000, [chord2], cMajor),
       );
 
@@ -433,13 +402,13 @@ describe("HarmonyStabilizer", () => {
       ], 1000);
 
       stabilizer.apply(
-        createRawFrame(1000),
+        createTestRawFrame(1000),
         createUpstreamFrame(1000, [chord], cMajor),
       );
       stabilizer.reset();
 
       const result = stabilizer.apply(
-        createRawFrame(2000),
+        createTestRawFrame(2000),
         createUpstreamFrame(2000, [], cMajor),
       );
 
@@ -455,7 +424,7 @@ describe("HarmonyStabilizer", () => {
       });
       customStabilizer.init();
 
-      const raw = createRawFrame(1000);
+      const raw = createTestRawFrame(1000);
       const chord = createChord(0, "maj", [
         { pc: 0, octave: 4 },
         { pc: 4, octave: 4 },

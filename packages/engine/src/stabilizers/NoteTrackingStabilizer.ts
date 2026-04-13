@@ -23,7 +23,7 @@ import type {
   MidiNoteNumber,
 } from "@synesthetica/contracts";
 
-import { createNoteId } from "@synesthetica/contracts";
+import { createNoteId, createEmptyMusicalFrame } from "@synesthetica/contracts";
 
 /**
  * Configuration for the NoteTrackingStabilizer.
@@ -126,26 +126,8 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
     const notes = this.buildNoteList(t);
 
     return {
-      t,
-      part: this.config.partId,
+      ...createEmptyMusicalFrame(t, this.config.partId),
       notes,
-      chords: [],
-      rhythmicAnalysis: {
-        detectedDivision: null,
-        onsetDrifts: [],
-        stability: 0,
-        confidence: 0,
-      },
-      dynamics: {
-        events: [],
-        level: 0,
-        trend: "stable",
-        contour: [],
-        range: { min: 0, max: 0, variance: 0 },
-      },
-      prescribedTempo: null,
-      prescribedMeter: null,
-      prescribedKey: null,
     };
   }
 

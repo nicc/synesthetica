@@ -9,24 +9,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { ChordDetectionStabilizer } from "../../src/stabilizers/ChordDetectionStabilizer";
 import type {
-  RawInputFrame,
-  MusicalFrame,
   Note,
   PitchClass,
   NotePhase,
 } from "@synesthetica/contracts";
+import { createTestRawFrame, createTestMusicalFrame } from "../_harness/frames";
 
 // ============================================================================
 // Test Helpers
 // ============================================================================
-
-function createRawFrame(t: number): RawInputFrame {
-  return {
-    t,
-    events: [],
-    provenance: { source: "test", stream: "test" },
-  };
-}
 
 function makeNote(pc: PitchClass, octave: number, t: number): Note {
   return {
@@ -42,24 +33,8 @@ function makeNote(pc: PitchClass, octave: number, t: number): Note {
   };
 }
 
-function createUpstreamFrame(t: number, notes: Note[]): MusicalFrame {
-  return {
-    t,
-    part: "main",
-    notes,
-    chords: [],
-    rhythmicAnalysis: {
-      detectedDivision: null,
-      onsetDrifts: [],
-      stability: 0,
-      confidence: 0,
-    },
-    dynamics: { events: [], level: 0.5, trend: "stable", contour: [], range: { min: 0, max: 0, variance: 0 } },
-    prescribedTempo: null,
-    prescribedMeter: null,
-    prescribedKey: null,
-    progression: [],
-  };
+function createUpstreamFrame(t: number, notes: Note[]) {
+  return createTestMusicalFrame(t, "main", { notes, progression: [] });
 }
 
 /**
@@ -73,7 +48,7 @@ function detectQuality(
 ): string | null {
   const notes = pitchClasses.map((pc) => makeNote(pc, 4, t));
   const upstream = createUpstreamFrame(t, notes);
-  const raw = createRawFrame(t);
+  const raw = createTestRawFrame(t);
 
   // First frame: chord enters candidate state
   stabilizer.apply(raw, upstream);
@@ -82,7 +57,7 @@ function detectQuality(
   const t2 = t + 100;
   const notes2 = pitchClasses.map((pc) => makeNote(pc, 4, t2));
   const upstream2 = createUpstreamFrame(t2, notes2);
-  const raw2 = createRawFrame(t2);
+  const raw2 = createTestRawFrame(t2);
   const result = stabilizer.apply(raw2, upstream2);
 
   if (result.chords.length === 0) return null;
