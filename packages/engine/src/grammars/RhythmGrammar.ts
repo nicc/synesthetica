@@ -42,13 +42,12 @@ import type {
 const NOW_LINE_Y = 0.85;
 
 /**
- * Rhythm grammar occupies the central 2/3 of the world width.
- * The remaining 1/6 on each side is reserved for bar grammars
- * (dynamics on the left, future grammars on the right).
+ * Rhythm grammar occupies the central column between dynamics
+ * and harmony columns. See layout.ts for the three-column system.
  */
-const RHYTHM_FRACTION = 2 / 3;
-const PITCH_MARGIN_LEFT = (1 - RHYTHM_FRACTION) / 2;   // 1/6
-const PITCH_MARGIN_RIGHT = (1 - RHYTHM_FRACTION) / 2;  // 1/6
+import { RHYTHM_LEFT, RHYTHM_RIGHT } from "./layout";
+const PITCH_MARGIN_LEFT = RHYTHM_LEFT;
+const PITCH_MARGIN_RIGHT = 1 - RHYTHM_RIGHT;
 
 /**
  * Time horizon scale (fixed mapping from time to screen position).

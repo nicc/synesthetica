@@ -25,15 +25,15 @@ const EMPTY_DYNAMICS: DynamicsState = {
   range: { min: 0, max: 0, variance: 0 },
 };
 
-// Derived layout values (must match DynamicsGrammar constants)
-const LEFT_MARGIN = 1 / 6;
-const BAR_WIDTH_FRACTION = 0.19;
-const BAR_WIDTH = LEFT_MARGIN * BAR_WIDTH_FRACTION;
-const BAR_CENTER = LEFT_MARGIN / 2;
-const BAR_LEFT = BAR_CENTER - BAR_WIDTH / 2;
-const BAR_TOP = 1 / 6;
-const BAR_BOTTOM = 5 / 6;
-const BAR_HEIGHT = BAR_BOTTOM - BAR_TOP;
+// Layout values from shared layout
+import {
+  DYNAMICS_BAR_LEFT as BAR_LEFT,
+  DYNAMICS_BAR_WIDTH as BAR_WIDTH,
+  DYNAMICS_COLUMN_WIDTH,
+  BAR_TOP,
+  BAR_BOTTOM,
+  BAR_HEIGHT,
+} from "../../src/grammars/layout";
 
 /** Filter to just indicator entities (exclude outline + ticks) */
 function indicators(entities: Entity[]): Entity[] {
@@ -85,7 +85,7 @@ describe("DynamicsGrammar", () => {
         const x = o.data?.x as number;
         const w = o.data?.w as number;
         expect(x).toBeGreaterThanOrEqual(0);
-        expect(x + w).toBeLessThan(LEFT_MARGIN);
+        expect(x + w).toBeLessThan(DYNAMICS_COLUMN_WIDTH);
       }
     });
 

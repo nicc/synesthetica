@@ -1,7 +1,7 @@
 /**
  * HarmonyGrammar Tests
  *
- * Tests the harmony grammar with chord shape visualization and tension bar.
+ * Tests the harmony grammar with chord shape visualization.
  * Run with GENERATE_SNAPSHOTS=1 to generate SVG files for visual review.
  */
 
@@ -153,7 +153,7 @@ describe("HarmonyGrammar", () => {
       expect(scene.diagnostics).toEqual([]);
     });
 
-    it("creates chord shape entity", () => {
+    it("creates chord shape entity in harmony column", () => {
       const chord = createTestChord(0, "maj", [0, 4, 7]);
       const frame = createTestFrame(1000, chord, 0.2);
       const scene = grammar.update(frame, null);
@@ -162,24 +162,9 @@ describe("HarmonyGrammar", () => {
         (e) => e.data?.type === "chord-shape"
       );
       expect(chordEntity).toBeDefined();
-      expect(chordEntity?.position).toEqual({ x: 0.5, y: 0.5 });
+      // Chord shape is in the right column
+      expect(chordEntity?.position?.x).toBeGreaterThan(0.8);
       expect(chordEntity?.data?.quality).toBe("maj");
-    });
-
-    it("creates tension bar entity when enabled", () => {
-      const g = new HarmonyGrammar({ showTensionBar: true });
-      g.init(ctx);
-
-      const chord = createTestChord(0, "maj", [0, 4, 7]);
-      const frame = createTestFrame(1000, chord, 0.5);
-      const scene = g.update(frame, null);
-
-      const tensionEntity = scene.entities.find(
-        (e) => e.data?.type === "tension-bar"
-      );
-      expect(tensionEntity).toBeDefined();
-      expect(tensionEntity?.position?.x).toBe(0.9);
-      expect(tensionEntity?.data?.tension).toBe(0.5);
     });
 
     it("passes dashed margin through entity data for sus chords", () => {
@@ -299,26 +284,6 @@ describe("HarmonyGrammar", () => {
       maybeWriteSnapshot("major-9th", svg);
     });
 
-    it("renders tension bar at different levels with appropriate chords", () => {
-      // Low tension: C major triad (consonant)
-      const lowChord = createTestChord(0, "maj", [0, 4, 7]);
-      const lowFrame = createTestFrame(1000, lowChord, 0.1);
-      const lowSvg = grammar.renderToSVG(lowFrame);
-      maybeWriteSnapshot("tension-low-cmaj", lowSvg);
-
-      // Medium tension: G7 dominant (contains tritone)
-      const midChord = createTestChord(7, "dom7", [0, 4, 7, 10]);
-      const midFrame = createTestFrame(1000, midChord, 0.5);
-      const midSvg = grammar.renderToSVG(midFrame);
-      maybeWriteSnapshot("tension-mid-g7", midSvg);
-
-      // High tension: Cdim7 (fully diminished, two tritones)
-      const highChord = createTestChord(0, "dim7", [0, 3, 6, 9]);
-      const highFrame = createTestFrame(1000, highChord, 0.85);
-      const highSvg = grammar.renderToSVG(highFrame);
-      maybeWriteSnapshot("tension-high-cdim7", highSvg);
-    });
-
     it("renders empty frame (no chord)", () => {
       const frame = createTestFrame(1000, null, 0);
       const svg = grammar.renderToSVG(frame);
@@ -329,22 +294,4 @@ describe("HarmonyGrammar", () => {
     });
   });
 
-  describe("tension bar visibility", () => {
-    it("tension bar is hidden by default", () => {
-      const g = new HarmonyGrammar();
-      g.init(ctx);
-
-      const chord = createTestChord(0, "maj", [0, 4, 7]);
-      const frame = createTestFrame(1000, chord, 0.5);
-
-      const scene = g.update(frame, null);
-      const tensionEntity = scene.entities.find(
-        (e) => e.data?.type === "tension-bar"
-      );
-      expect(tensionEntity).toBeUndefined();
-
-      const svg = g.renderToSVG(frame);
-      expect(svg).not.toContain("Tension");
-    });
-  });
 });

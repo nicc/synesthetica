@@ -24,29 +24,17 @@ import type {
 } from "@synesthetica/contracts";
 
 // ============================================================================
-// Layout Constants
+// Layout Constants (from shared layout)
 // ============================================================================
 
-/**
- * The dynamics bar sits in the left 1/6 margin of the world width
- * (the rhythm grammar occupies the central 2/3). The bar is centred
- * horizontally in that margin.
- */
-const LEFT_MARGIN = 1 / 6;                     // matches RhythmGrammar
-const BAR_WIDTH_FRACTION = 0.19;                // bar takes 19% of the margin
-const BAR_WIDTH = LEFT_MARGIN * BAR_WIDTH_FRACTION;
-const BAR_CENTER = LEFT_MARGIN / 2;
-const BAR_LEFT = BAR_CENTER - BAR_WIDTH / 2;
-const BAR_RIGHT = BAR_CENTER + BAR_WIDTH / 2;
-
-/** Top of the bar (1/6 from top — centred in 2/3 of screen height) */
-const BAR_TOP = 1 / 6;
-
-/** Bottom of the bar (5/6 from top) */
-const BAR_BOTTOM = 5 / 6;
-
-/** Bar height in normalized coordinates */
-const BAR_HEIGHT = BAR_BOTTOM - BAR_TOP;
+import {
+  DYNAMICS_BAR_LEFT as BAR_LEFT,
+  DYNAMICS_BAR_RIGHT as BAR_RIGHT,
+  DYNAMICS_BAR_WIDTH as BAR_WIDTH,
+  BAR_TOP,
+  BAR_BOTTOM,
+  BAR_HEIGHT,
+} from "./layout";
 
 /** How long indicator lines take to fully fade (ms) */
 const FADE_MS = 2000;

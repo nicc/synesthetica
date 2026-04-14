@@ -41,6 +41,11 @@ import {
   colorToCSS,
   getDashArray,
 } from "../utils/ChordShapeBuilder";
+import {
+  HARMONY_CHORD_CENTER_X,
+  HARMONY_CHORD_CENTER_Y,
+  HARMONY_CELL_SIZE,
+} from "./layout";
 
 // ============================================================================
 // Configuration
@@ -66,12 +71,6 @@ export interface HarmonyGrammarConfig {
   backgroundColor?: string;
 
   /**
-   * Whether to show the tension bar.
-   * @default true
-   */
-  showTensionBar?: boolean;
-
-  /**
    * Stroke width for chord shape outline.
    * @default 2
    */
@@ -82,7 +81,6 @@ const DEFAULT_CONFIG: Required<HarmonyGrammarConfig> = {
   width: 800,
   height: 600,
   backgroundColor: "#1a1a2e",
-  showTensionBar: false,
   strokeWidth: 2,
 };
 
@@ -121,9 +119,6 @@ export class HarmonyGrammar implements IVisualGrammar {
     const activeChord = input.chords.find((c) => c.chord.phase === "active");
     const chord = activeChord ?? input.chords[0];
 
-    // Get tension from harmonic context
-    const tension = input.harmonicContext.tension;
-
     // Create chord shape entity (simplified for runtime)
     if (chord) {
       const rootElement = chord.shape.elements.find((e) => e.interval === "1");
@@ -135,10 +130,10 @@ export class HarmonyGrammar implements IVisualGrammar {
         kind: "glyph",
         createdAt: t,
         updatedAt: t,
-        position: { x: 0.5, y: 0.5 },
+        position: { x: HARMONY_CHORD_CENTER_X, y: HARMONY_CHORD_CENTER_Y },
         style: {
           color: rootColor,
-          size: 100,
+          size: HARMONY_CELL_SIZE * 100 * 0.8, // 80% of cell, in size units
           opacity: 1,
         },
         data: {
@@ -147,27 +142,6 @@ export class HarmonyGrammar implements IVisualGrammar {
           quality: chord.chord.quality,
           elements: chord.shape.elements,
           margin: chord.shape.margin,
-        },
-      });
-    }
-
-    // Create tension bar entity (neutral gray - color reserved for harmony)
-    if (this.config.showTensionBar) {
-      entities.push({
-        id: `${this.id}:tension-bar`,
-        part,
-        kind: "glyph",
-        createdAt: t,
-        updatedAt: t,
-        position: { x: 0.9, y: 0.5 },
-        style: {
-          color: { h: 0, s: 0, v: 0.5, a: 1 }, // Neutral gray
-          size: 50,
-          opacity: 1,
-        },
-        data: {
-          type: "tension-bar",
-          tension,
         },
       });
     }
@@ -196,9 +170,6 @@ export class HarmonyGrammar implements IVisualGrammar {
     const activeChord = frame.chords.find((c) => c.chord.phase === "active");
     const chord = activeChord ?? frame.chords[0];
 
-    // Get tension from harmonic context
-    const tension = frame.harmonicContext.tension;
-
     // Start SVG
     let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">\n`;
 
@@ -208,11 +179,6 @@ export class HarmonyGrammar implements IVisualGrammar {
     // Render chord shape if we have one
     if (chord) {
       svg += this.renderChordShapeSVG(chord.shape.elements, chord.shape.margin, width, height);
-    }
-
-    // Render tension bar
-    if (this.config.showTensionBar) {
-      svg += this.renderTensionBarSVG(tension, width, height);
     }
 
     svg += "</svg>";
@@ -270,29 +236,4 @@ export class HarmonyGrammar implements IVisualGrammar {
    * Render the tension bar on the right side.
    * Uses neutral gray - no color (color is reserved for harmony).
    */
-  private renderTensionBarSVG(tension: number, width: number, height: number): string {
-    const barWidth = 20;
-    const barHeight = height * 0.6;
-    const barX = width - 60;
-    const barY = (height - barHeight) / 2;
-
-    // Clamp tension to 0-1
-    const clampedTension = Math.max(0, Math.min(1, tension));
-
-    // Indicator position (from bottom)
-    const indicatorY = barY + barHeight - barHeight * clampedTension;
-
-    let svg = "";
-
-    // Bar background (neutral gray)
-    svg += `  <rect x="${barX}" y="${barY}" width="${barWidth}" height="${barHeight}" fill="#222" stroke="#444" stroke-width="1" rx="3"/>\n`;
-
-    // Indicator line (white)
-    svg += `  <line x1="${barX - 5}" y1="${indicatorY.toFixed(1)}" x2="${barX + barWidth + 5}" y2="${indicatorY.toFixed(1)}" stroke="#fff" stroke-width="2"/>\n`;
-
-    // Label
-    svg += `  <text x="${barX + barWidth / 2}" y="${barY - 10}" text-anchor="middle" fill="#666" font-size="12">Tension</text>\n`;
-
-    return svg;
-  }
 }
