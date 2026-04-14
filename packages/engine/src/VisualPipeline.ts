@@ -420,6 +420,11 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       // Get previous frame for this stabilizer
       const previous = partState.previousMusicalFrames.get(stabilizer.id) ?? null;
 
+      // TODO: remove diagnostic
+      if (stabilizer.id === "harmony") {
+        console.log(`[pipeline:harmony] upstream=${upstream ? `key=${JSON.stringify(upstream.prescribedKey)}` : "null"}, previous=${previous ? `key=${JSON.stringify(previous.prescribedKey)}` : "null"}, using=${upstream ? "upstream" : "previous"}`);
+      }
+
       // Apply stabilizer
       const output = stabilizer.apply(raw, upstream ?? previous);
 
