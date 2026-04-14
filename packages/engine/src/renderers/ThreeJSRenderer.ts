@@ -762,12 +762,16 @@ export class ThreeJSRenderer implements IRenderer {
     const armEdges = builder.getThreeArmEdges();
     const dashParams = getThreeDashParams(margin, baseRadius);
 
+    // Outline z-offset: just enough for depth ordering, small enough to
+    // avoid parallax with the perspective camera when off-center.
+    const outlineZ = 0.01;
+
     // Per-arm coloured wedge edges
     for (let i = 0; i < armEdges.length; i++) {
       const armColor = this.hsvToThreeColor(sortedArms[i]?.color ?? rootColor);
       const positions: number[] = [];
       for (const p of armEdges[i]) {
-        positions.push(p.x, p.y, 0.5);
+        positions.push(p.x, p.y, outlineZ);
       }
       const lineGeom = new LineGeometry();
       lineGeom.setPositions(positions);
@@ -792,7 +796,7 @@ export class ThreeJSRenderer implements IRenderer {
       const colors: number[] = [];
       for (let j = 0; j < hubPoints.length; j++) {
         const p = hubPoints[j];
-        positions.push(p.x, p.y, 0.5);
+        positions.push(p.x, p.y, outlineZ);
         const t = hubPoints.length > 1 ? j / (hubPoints.length - 1) : 0.5;
         colors.push(
           colorStart.r + (colorEnd.r - colorStart.r) * t,
@@ -1017,7 +1021,7 @@ export class ThreeJSRenderer implements IRenderer {
     // Normalized y is top-down, Three.js y is bottom-up
     const cx = (nx + nw / 2) * this.config.worldWidth;
     const cy = (1 - (ny + nh / 2)) * this.config.worldHeight;
-    mesh.position.set(cx, cy, 1);
+    mesh.position.set(cx, cy, 0.01);
     mesh.scale.set(worldW, worldH, 1);
 
     const material = mesh.material as THREE.MeshBasicMaterial;
