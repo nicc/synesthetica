@@ -222,8 +222,9 @@ export class HarmonyGrammar implements IVisualGrammar {
       const angleRad = ((angleDeg - 90) * Math.PI) / 180; // -90 puts 0° at top
 
       // Position on the clock, centered on progression cell
+      // Normalized y is top-down, so +sin moves downward (clockwise)
       const x = HARMONY_PROGRESSION_CENTER_X + glyphRadius * Math.cos(angleRad);
-      const y = HARMONY_PROGRESSION_CENTER_Y - glyphRadius * Math.sin(angleRad);
+      const y = HARMONY_PROGRESSION_CENTER_Y + glyphRadius * Math.sin(angleRad);
 
       // Colour from root pitch class
       const hue = pcToHue(fc.rootPc, DEFAULT_HUE_INVARIANT);
