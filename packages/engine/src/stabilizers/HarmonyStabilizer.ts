@@ -406,8 +406,8 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
     }
 
     // TODO: remove diagnostic
-    if (upstream.prescribedKey || upstream.chords.length > 0) {
-      console.log(`[Harmony.apply] key=${!!upstream.prescribedKey} chords=${upstream.chords.length}`);
+    if (upstream.chords.length > 0) {
+      console.log(`[Harmony.apply] key=${JSON.stringify(upstream.prescribedKey)} chords=${upstream.chords.length}`);
     }
 
     const tension = this.computeTension(upstream.chords);
