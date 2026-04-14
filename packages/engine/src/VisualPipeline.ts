@@ -166,6 +166,17 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     this.prescribedMeter = null;
   }
 
+  // === Key Control ===
+
+  /**
+   * Set the prescribed key (tonic + mode).
+   * This enables functional harmony analysis (Roman numerals) in the
+   * HarmonyStabilizer and progression clock in grammars.
+   */
+  setKey(key: PrescribedKey | null): void {
+    this.prescribedKey = key;
+  }
+
   // === IPipeline ===
 
   requestFrame(targetTime: SessionMs): SceneFrame {
