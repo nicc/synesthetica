@@ -289,21 +289,7 @@ function startRenderLoop(): void {
     const sceneFrame = pipeline.requestFrame(sessionMs);
     lastSceneFrame = sceneFrame;
 
-    // Debug: log entity counts every 60 frames (~1 second)
     debugFrameCount++;
-    if (debugFrameCount % 60 === 0) {
-      const typeCounts = new Map<string, number>();
-      for (const e of sceneFrame.entities) {
-        const type = (e.data?.type as string) || e.kind;
-        typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
-      }
-      if (typeCounts.size > 0) {
-        const parts = Array.from(typeCounts.entries())
-          .map(([type, count]) => `${type}:${count}`)
-          .join(", ");
-        console.log(`t=${Math.round(sessionMs)}ms: ${parts}`);
-      }
-    }
 
     // Render to canvas
     renderer.render(sceneFrame);
