@@ -138,6 +138,21 @@ describe("RomanNumeralGlyphBuilder", () => {
       });
     }
 
+    it("lowercase numerals have dots above vertical strokes", () => {
+      const glyph = buildRomanNumeralGlyph("iii");
+      // 3 vertical strokes → 3 dots (arcs)
+      expect(glyph.arcs).toHaveLength(3);
+      // Dots are above the stroke tops
+      for (const arc of glyph.arcs) {
+        expect(arc.cy).toBeGreaterThan(0.65);
+      }
+    });
+
+    it("uppercase numerals have no dots", () => {
+      const glyph = buildRomanNumeralGlyph("III");
+      expect(glyph.arcs).toHaveLength(0);
+    });
+
     it("lowercase numerals are shorter than uppercase", () => {
       const upper = buildRomanNumeralGlyph("V");
       const lower = buildRomanNumeralGlyph("v");
@@ -221,7 +236,8 @@ describe("RomanNumeralGlyphBuilder", () => {
     it("handles lowercase with suffix", () => {
       const glyph = buildRomanNumeralGlyph("ii7");
       expect(glyph.segments.length).toBeGreaterThan(0);
-      expect(glyph.height).toBeCloseTo(0.65, 1);
+      // Height exceeds stroke height (0.65) due to dots above strokes
+      expect(glyph.height).toBeGreaterThan(0.65);
     });
 
     it("handles accidental + lowercase + suffix", () => {

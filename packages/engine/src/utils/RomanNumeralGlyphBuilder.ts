@@ -38,6 +38,12 @@ const STROKE_GAP = 0.2;
 /** Width of V/v chevron at the top */
 const CHEVRON_W = 0.5;
 
+/** Dot radius for lowercase i */
+const DOT_RADIUS = 0.04;
+
+/** Gap between stroke top and dot center */
+const DOT_GAP = 0.1;
+
 /** Suffix scale relative to base numeral height */
 const SUFFIX_SCALE = 0.35;
 
@@ -453,6 +459,18 @@ export function buildRomanNumeralGlyph(roman: string): RomanNumeralGlyph {
   const offsetBase = offsetGlyph(baseGlyph, accidentalOffset, 0);
   allSegments.push(...offsetBase.segments);
   allArcs.push(...offsetBase.arcs);
+
+  // Add dots above vertical strokes for lowercase numerals
+  if (!parsed.upper) {
+    for (const seg of offsetBase.segments) {
+      // Vertical strokes have x1 === x2
+      if (Math.abs(seg.x1 - seg.x2) < 0.001) {
+        const dotY = Math.max(seg.y1, seg.y2) + DOT_GAP;
+        allArcs.push({ cx: seg.x1, cy: dotY, r: DOT_RADIUS });
+        totalHeight = Math.max(totalHeight, dotY + DOT_RADIUS);
+      }
+    }
+  }
 
   // Append suffix if present
   if (parsed.suffix) {
