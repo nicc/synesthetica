@@ -190,6 +190,95 @@ describe("HarmonyGrammar", () => {
     });
   });
 
+  describe("progression clock", () => {
+    it("produces no entities when no key is prescribed", () => {
+      const frame = createTestAnnotatedFrame(1000, "main", {
+        harmonicContext: {
+          tension: 0,
+          keyAware: false,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 500 },
+          ],
+        },
+        // no prescribedKey
+      });
+      const scene = grammar.update(frame, null);
+      const progEntities = scene.entities.filter((e) => e.data?.type === "roman-numeral");
+      expect(progEntities).toHaveLength(0);
+    });
+
+    it("produces glyph entities when key is prescribed", () => {
+      const frame = createTestAnnotatedFrame(1000, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 800 },
+          functionalProgression: [
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 0 },
+            { degree: 4, roman: "IV", quality: "maj", rootPc: 5 as PitchClass, borrowed: false, chordId: "test:500:Fmaj", onset: 500 },
+            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "test:800:Gmaj", onset: 800 },
+          ],
+        },
+      });
+      const scene = grammar.update(frame, null);
+      const progEntities = scene.entities.filter((e) => e.data?.type === "roman-numeral");
+
+      expect(progEntities).toHaveLength(3);
+      // Each should have glyph geometry
+      for (const e of progEntities) {
+        expect(e.data?.segments).toBeDefined();
+        expect(e.position?.x).toBeGreaterThan(0.7); // in harmony column
+      }
+    });
+
+    it("fades older chords", () => {
+      const frame = createTestAnnotatedFrame(5000, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 0 },
+            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "test:4000:Gmaj", onset: 4000 },
+          ],
+        },
+      });
+      const scene = grammar.update(frame, null);
+      const progEntities = scene.entities.filter((e) => e.data?.type === "roman-numeral");
+
+      // I (onset=0, age=5000) is past the 6000ms fade window? No, 5000 < 6000 so still visible
+      // V (onset=4000, age=1000) should be brighter
+      expect(progEntities).toHaveLength(2);
+      const olderOpacity = progEntities[0].style.opacity ?? 1;
+      const newerOpacity = progEntities[1].style.opacity ?? 1;
+      expect(newerOpacity).toBeGreaterThan(olderOpacity);
+    });
+
+    it("omits chords past the fade window", () => {
+      const frame = createTestAnnotatedFrame(10000, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 0 },
+            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "test:9000:Gmaj", onset: 9000 },
+          ],
+        },
+      });
+      const scene = grammar.update(frame, null);
+      const progEntities = scene.entities.filter((e) => e.data?.type === "roman-numeral");
+
+      // I (onset=0, age=10000) is past 6000ms fade → omitted
+      // V (onset=9000, age=1000) → visible
+      expect(progEntities).toHaveLength(1);
+    });
+  });
+
   describe("SVG rendering", () => {
     it("renders major triad", () => {
       const chord = createTestChord(0, "maj", [0, 4, 7]);

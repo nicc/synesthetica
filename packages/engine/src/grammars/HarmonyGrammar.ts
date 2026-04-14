@@ -1,29 +1,23 @@
 /**
  * Harmony Grammar
  *
- * Visualizes chord shapes and harmonic tension.
+ * Visualizes chord shapes and functional harmony progression.
  *
  * ## Visual Design
  *
- * **Chord Shape (center)**
- * - Centered in viewport at 25% of screen width
+ * **Chord Shape (top cell of harmony column)**
  * - Each arm/wedge outlined in that element's note color
  * - Fill is a gradient: root color at center → element color at tip
- * - Hub margin style reflects chord quality (straight, wavy, concave, convex, dashed)
+ * - Hub margin style reflects chord quality
  *
- * **Tension Bar (right side)**
- * - Vertical gauge showing harmonic tension (0-1)
- * - Higher position = more tension
- * - Derived from HarmonyStabilizer (tier 1: interval dissonance)
+ * **Progression Clock (bottom cell of harmony column)**
+ * - Roman numeral glyphs positioned at pitch-class angles on a clock face
+ * - Each glyph coloured by root pitch-class hue (I14)
+ * - Opacity fades linearly with age (Principle 9: observation over synthesis)
+ * - Requires prescribedKey to be set; hidden when no key is prescribed
  *
- * ## Implementation Notes
- *
- * - Uses renderChordShape utility for geometry calculations
- * - Generates SVG output for snapshot testing
- * - Snaps instantly between chord changes (no animation)
- *
- * @see SPEC_010 for chord shape design
- * @see HarmonyStabilizer for tension computation
+ * @see SPEC_010 for chord shape design and Roman numeral glyph spec (I19)
+ * @see HarmonyStabilizer for functional analysis
  */
 
 import type {
@@ -34,17 +28,45 @@ import type {
   Entity,
   ChordShapeElement,
   MarginStyle,
+  FunctionalChord,
+  PitchClass,
+  ColorHSVA,
 } from "@synesthetica/contracts";
+import { pcToHue, INTERVAL_ANGLES } from "@synesthetica/contracts";
 
 import {
   ChordShapeBuilder,
   colorToCSS,
   getDashArray,
 } from "../utils/ChordShapeBuilder";
+import { buildRomanNumeralGlyph } from "../utils/RomanNumeralGlyphBuilder";
 import {
   HARMONY_CHORD_CENTER_X,
   HARMONY_CHORD_CENTER_Y,
+  HARMONY_PROGRESSION_CENTER_X,
+  HARMONY_PROGRESSION_CENTER_Y,
+  HARMONY_CELL_SIZE,
 } from "./layout";
+
+// ============================================================================
+// Progression Clock Constants
+// ============================================================================
+
+/** How long chord glyphs take to fully fade (ms) */
+const PROGRESSION_FADE_MS = 6000;
+
+/** Clock radius as fraction of cell size */
+const CLOCK_RADIUS_FRACTION = 0.35;
+
+/** Glyph placement radius as fraction of clock radius */
+const GLYPH_RADIUS_FRACTION = 0.75;
+
+/** Default pitch-hue invariant (A = red, clockwise) */
+const DEFAULT_HUE_INVARIANT = {
+  referencePc: 9 as PitchClass,
+  referenceHue: 0,
+  direction: "cw" as const,
+};
 
 // ============================================================================
 // Configuration
@@ -145,11 +167,91 @@ export class HarmonyGrammar implements IVisualGrammar {
       });
     }
 
+    // --- Progression clock (bottom cell) ---
+    // Only renders when a key is prescribed and there's progression data
+    const key = input.prescribedKey;
+    const progression = input.harmonicContext.functionalProgression;
+
+    if (key && progression.length > 0) {
+      entities.push(
+        ...this.createProgressionClock(progression, t, part, key.root),
+      );
+    }
+
     return {
       t,
       entities,
       diagnostics: [],
     };
+  }
+
+  // ==========================================================================
+  // Progression Clock
+  // ==========================================================================
+
+  /**
+   * Create entities for the progression clock.
+   * Each functional chord in the progression becomes a Roman numeral glyph
+   * positioned at its pitch-class angle, coloured by root hue, fading with age.
+   */
+  private createProgressionClock(
+    progression: FunctionalChord[],
+    t: number,
+    part: string,
+    tonicPc: PitchClass,
+  ): Entity[] {
+    const entities: Entity[] = [];
+    const clockRadius = HARMONY_CELL_SIZE * CLOCK_RADIUS_FRACTION;
+    const glyphRadius = clockRadius * GLYPH_RADIUS_FRACTION;
+
+    for (let i = 0; i < progression.length; i++) {
+      const fc = progression[i];
+      const age = t - fc.onset;
+
+      if (age < 0 || age >= PROGRESSION_FADE_MS) continue;
+
+      const fadeFraction = 1 - age / PROGRESSION_FADE_MS;
+      if (fadeFraction < 0.01) continue;
+
+      // Angular position from root pitch class relative to tonic
+      const interval = ((fc.rootPc - tonicPc) + 12) % 12;
+      const angleDeg = INTERVAL_ANGLES[interval];
+      const angleRad = ((angleDeg - 90) * Math.PI) / 180; // -90 puts 0° at top
+
+      // Position on the clock, centered on progression cell
+      const x = HARMONY_PROGRESSION_CENTER_X + glyphRadius * Math.cos(angleRad);
+      const y = HARMONY_PROGRESSION_CENTER_Y - glyphRadius * Math.sin(angleRad);
+
+      // Colour from root pitch class
+      const hue = pcToHue(fc.rootPc, DEFAULT_HUE_INVARIANT);
+      const color: ColorHSVA = { h: hue, s: 0.7, v: 0.9, a: 1 };
+
+      // Build glyph geometry
+      const glyph = buildRomanNumeralGlyph(fc.roman);
+
+      entities.push({
+        id: `${this.id}:prog:${i}`,
+        part,
+        kind: "glyph",
+        createdAt: fc.onset,
+        updatedAt: t,
+        position: { x, y },
+        style: {
+          color,
+          opacity: fadeFraction,
+          size: 20,
+        },
+        data: {
+          type: "roman-numeral",
+          segments: glyph.segments,
+          arcs: glyph.arcs,
+          width: glyph.width,
+          height: glyph.height,
+        },
+      });
+    }
+
+    return entities;
   }
 
   // ==========================================================================
@@ -231,8 +333,4 @@ export class HarmonyGrammar implements IVisualGrammar {
     return svg;
   }
 
-  /**
-   * Render the tension bar on the right side.
-   * Uses neutral gray - no color (color is reserved for harmony).
-   */
 }

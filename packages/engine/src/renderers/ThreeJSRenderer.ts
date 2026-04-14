@@ -557,6 +557,8 @@ export class ThreeJSRenderer implements IRenderer {
       this.updateDynamicsContour(entity);
     } else if (glyphType === "dynamics-indicator") {
       this.updateDynamicsIndicator(entity);
+    } else if (glyphType === "roman-numeral") {
+      this.updateRomanNumeral(entity);
     } else {
       // Default glyph: circle
       this.updateParticle(entity);
@@ -1030,6 +1032,100 @@ export class ThreeJSRenderer implements IRenderer {
     material.opacity = entity.style.opacity ?? 0.8;
   }
 
+
+  // ==========================================================================
+  // Roman Numeral Glyphs
+  // ==========================================================================
+
+  /**
+   * Render a Roman numeral glyph from line segments and arcs.
+   * Uses Line2/LineMaterial for segments, THREE.Line for arcs.
+   */
+  private updateRomanNumeral(entity: Entity): void {
+    if (!this.scene) return;
+
+    const segments = entity.data?.segments as Array<{ x1: number; y1: number; x2: number; y2: number }> | undefined;
+    const arcs = entity.data?.arcs as Array<{ cx: number; cy: number; r: number }> | undefined;
+    const glyphW = (entity.data?.width as number) ?? 0;
+    const glyphH = (entity.data?.height as number) ?? 1;
+
+    if (!segments && !arcs) return;
+
+    const color = entity.style.color ?? { h: 200, s: 0.5, v: 0.9 };
+    const threeColor = this.hsvToThreeColor(color);
+    const opacity = entity.style.opacity ?? 1;
+    const size = entity.style.size ?? 20;
+
+    // Position in world coords
+    const worldX = (entity.position?.x ?? 0.5) * this.config.worldWidth;
+    const worldY = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
+
+    // Scale: size maps glyph units to world units
+    const scale = size / glyphH;
+
+    // Remove old group if it exists (recreate each frame — geometry may change)
+    let group = this.entityObjects.get(entity.id) as THREE.Group | undefined;
+    if (group) {
+      this.scene.remove(group);
+      this.disposeObject(group);
+    }
+
+    group = new THREE.Group();
+
+    // Center the glyph: offset by half width/height
+    const offsetX = -(glyphW * scale) / 2;
+    const offsetY = -(glyphH * scale) / 2;
+
+    // Render line segments
+    if (segments) {
+      for (const seg of segments) {
+        const positions = [
+          seg.x1 * scale + offsetX, seg.y1 * scale + offsetY, 0,
+          seg.x2 * scale + offsetX, seg.y2 * scale + offsetY, 0,
+        ];
+        const lineGeom = new LineGeometry();
+        lineGeom.setPositions(positions);
+        const lineMat = new LineMaterial({
+          color: threeColor.getHex(),
+          linewidth: 2,
+          transparent: true,
+          opacity,
+          resolution: new THREE.Vector2(this.resolution.x, this.resolution.y),
+        });
+        const line = new Line2(lineGeom, lineMat);
+        group.add(line);
+      }
+    }
+
+    // Render arcs (circles for ° and ø)
+    if (arcs) {
+      for (const arc of arcs) {
+        const circleGeom = new THREE.BufferGeometry();
+        const circlePoints: THREE.Vector3[] = [];
+        const arcSegments = 24;
+        for (let i = 0; i <= arcSegments; i++) {
+          const angle = (i / arcSegments) * Math.PI * 2;
+          circlePoints.push(new THREE.Vector3(
+            (arc.cx + arc.r * Math.cos(angle)) * scale + offsetX,
+            (arc.cy + arc.r * Math.sin(angle)) * scale + offsetY,
+            0,
+          ));
+        }
+        circleGeom.setFromPoints(circlePoints);
+        const circleMat = new THREE.LineBasicMaterial({
+          color: threeColor,
+          transparent: true,
+          opacity,
+        });
+        const circleLine = new THREE.LineLoop(circleGeom, circleMat);
+        group.add(circleLine);
+      }
+    }
+
+    group.position.set(worldX, worldY, 0.02);
+    this.scene.add(group);
+    this.entityObjects.set(entity.id, group);
+  }
 
   // ==========================================================================
   // Utilities
