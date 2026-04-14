@@ -367,12 +367,14 @@ function applyKeySettings(): void {
   const rootValue = keyRootSelect.value;
   if (rootValue === "") {
     pipeline.setKey(null);
+    console.log("[Key] cleared");
     return;
   }
 
   const root = parseInt(rootValue, 10) as PitchClass;
   const mode = keyModeSelect.value as ModeId;
   pipeline.setKey({ root, mode });
+  console.log(`[Key] set to root=${root} mode=${mode}`);
 }
 
 /**
