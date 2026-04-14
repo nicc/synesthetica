@@ -61,6 +61,9 @@ const CLOCK_RADIUS_FRACTION = 0.35;
 /** Glyph placement radius as fraction of clock radius */
 const GLYPH_RADIUS_FRACTION = 0.75;
 
+/** Glyph size in world units (height of uppercase numeral) */
+const GLYPH_SIZE = 3;
+
 /** Default pitch-hue invariant (A = red, clockwise) */
 const DEFAULT_HUE_INVARIANT = {
   referencePc: 9 as PitchClass,
@@ -172,9 +175,6 @@ export class HarmonyGrammar implements IVisualGrammar {
     const key = input.prescribedKey;
     const progression = input.harmonicContext.functionalProgression;
 
-    // TODO: remove
-    if (key) console.log(`[HG] key=${key.root} prog=${progression.length} chords=${input.chords.length}`);
-
     if (key && progression.length > 0) {
       entities.push(
         ...this.createProgressionClock(progression, t, part, key.root),
@@ -242,7 +242,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         style: {
           color,
           opacity: fadeFraction,
-          size: 20,
+          size: GLYPH_SIZE,
         },
         data: {
           type: "roman-numeral",
