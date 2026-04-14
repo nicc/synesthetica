@@ -398,6 +398,18 @@ the chord shape (INTERVAL_ANGLES). This means:
 This reuses the radial vocabulary established by chord shapes (Principle 3)
 and lets the viewer perceive harmonic motion as spatial motion around the clock.
 
+### Temporal Fading (Principle 9)
+
+Each glyph's opacity reflects recency — the most recently played chord is
+at full brightness, older chords fade linearly toward transparent. This is
+the same observation-over-synthesis pattern used by the dynamics grammar:
+the system marks each chord as an event, and the viewer perceives patterns
+(repetition, harmonic range, motion direction) from the spatial + temporal
+distribution of fading markers.
+
+During silence (no active chord), all glyphs continue fading. The clock
+empties gradually rather than snapping to blank.
+
 ### Contract Types
 
 ```ts
