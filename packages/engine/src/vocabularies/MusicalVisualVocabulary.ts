@@ -106,12 +106,11 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
       notes: frame.notes.map((note) => this.annotateNote(note, frame.t)),
       chords: frame.chords.map((chord) => this.annotateChord(chord)),
       progression: frame.progression ?? [],
+      prescribedTempo: frame.prescribedTempo,
+      prescribedMeter: frame.prescribedMeter,
+      prescribedKey: frame.prescribedKey,
       harmonicContext: frame.harmonicContext ?? defaultHarmonicContext,
-      rhythm: this.annotateRhythm(
-        frame.rhythmicAnalysis,
-        frame.prescribedTempo,
-        frame.prescribedMeter
-      ),
+      rhythm: this.annotateRhythm(frame.rhythmicAnalysis),
       bars: [], // No bar detection yet
       phrases: [], // No phrase detection yet
       dynamics: this.annotateDynamics(frame.dynamics),
@@ -233,8 +232,6 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
 
   private annotateRhythm(
     analysis: RhythmicAnalysis,
-    prescribedTempo: number | null,
-    prescribedMeter: MusicalFrame["prescribedMeter"]
   ): AnnotatedRhythm {
     // Rhythm visualization uses neutral gray palette
     // Brightness based on stability (more stable = brighter)
@@ -267,8 +264,6 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
         motion,
         uncertainty: 1 - analysis.confidence,
       },
-      prescribedTempo,
-      prescribedMeter,
     };
   }
 

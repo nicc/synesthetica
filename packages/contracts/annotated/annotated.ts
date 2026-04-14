@@ -22,6 +22,7 @@ import type {
   TimeSignature,
   DynamicsState,
   HarmonicContext,
+  PrescribedKey,
 } from "../musical/musical";
 
 // ============================================================================
@@ -289,18 +290,6 @@ export interface AnnotatedRhythm {
 
   /** Visual properties for rhythm visualization */
   visual: VisualAnnotation;
-
-  /**
-   * User-prescribed tempo in BPM (from control op).
-   * When non-null, grammars can show beat-relative visuals (drift, grid).
-   */
-  prescribedTempo: number | null;
-
-  /**
-   * User-prescribed time signature (from control op).
-   * When non-null (and prescribedTempo is set), grammars can show bar-relative visuals.
-   */
-  prescribedMeter: TimeSignature | null;
 }
 
 /**
@@ -379,6 +368,17 @@ export interface AnnotatedMusicalFrame {
    * Ordered oldest to newest. Useful for grammars showing harmonic movement.
    */
   progression: ChordId[];
+
+  // Prescribed context (from control ops, not stabilizers)
+
+  /** User-prescribed tempo in BPM. Null = no explicit tempo. */
+  prescribedTempo: number | null;
+
+  /** User-prescribed time signature. Null = no explicit meter. */
+  prescribedMeter: TimeSignature | null;
+
+  /** User-prescribed key (tonic + mode). Null = no functional analysis. */
+  prescribedKey: PrescribedKey | null;
 
   /**
    * Harmonic context including tension analysis.
