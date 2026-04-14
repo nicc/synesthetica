@@ -329,3 +329,119 @@ function buildChordShape(chord: MusicalChord): ChordShapeGeometry;
 - **SPEC_003**: Instrument identity invariants (extended with I14-I18)
 - **SPEC_006**: Ruleset statefulness (vocabulary remains pure)
 - **SPEC_009**: Frame types (AnnotatedMusicalFrame structure unchanged, AnnotatedNote/AnnotatedChord extended)
+
+## Roman Numeral Glyphs (Invariant I19)
+
+### Purpose
+
+Roman numeral glyphs provide a geometric representation of functional harmony
+symbols (I, ii, V7, etc.) for use in the progression glyph and other
+harmony-related grammars. Like chord shapes, they are vocabulary-level data —
+the vocabulary produces the geometry, grammars decide where and how to render it.
+
+### Design
+
+Glyphs are geometric paths (line segments), not rendered text. This keeps them:
+- Stylistically coherent with the rest of the visual system
+- Renderable through the existing entity/renderer pipeline
+- Independent of font loading or text-rendering infrastructure
+
+### Glyph Set
+
+**Base numerals (14 glyphs):**
+
+| Degree | Uppercase | Lowercase | Geometry |
+|--------|-----------|-----------|----------|
+| 1 | I | i | Single vertical stroke |
+| 2 | II | ii | Two vertical strokes |
+| 3 | III | iii | Three vertical strokes |
+| 4 | IV | iv | Vertical + chevron |
+| 5 | V | v | Chevron |
+| 6 | VI | vi | Chevron + vertical |
+| 7 | VII | vii | Chevron + two verticals |
+
+Uppercase glyphs are taller than lowercase. The height difference encodes
+major (uppercase) vs. minor/diminished (lowercase) quality at a glance.
+
+**Quality suffixes (5 glyphs):**
+
+| Symbol | Meaning | Geometry | Position |
+|--------|---------|----------|----------|
+| ° | diminished | Small circle | Superscript, top-right |
+| ø | half-diminished | Circle with horizontal stroke | Superscript, top-right |
+| + | augmented | Plus sign | Superscript, top-right |
+| Δ | major 7th | Small triangle | Superscript, top-right |
+| 7 | seventh | Numeral 7 | Superscript, top-right |
+
+Suffixes are composed with base numerals. A "°7" suffix combines the °
+and 7 glyphs side by side in the superscript position.
+
+**Sus chords:** Not represented as Roman numeral suffixes. Sus quality is
+already encoded in the chord shape margin style (dash-short/dash-long per I18).
+The progression glyph can inherit this encoding if needed.
+
+### Colour
+
+Each Roman numeral glyph inherits the pitch-class hue of its root (I14).
+In C major, a IV chord's glyph is coloured with F's hue. This maintains
+chromatic consistency with the chord shape and note strips.
+
+### Radial Positioning (Progression Glyph)
+
+In the progression glyph, each degree's Roman numeral appears at its
+pitch-class angular position on the clock — the same positions used by
+the chord shape (INTERVAL_ANGLES). This means:
+- I appears at 0° (12 o'clock) — the tonic/root position
+- V appears at 210° — the fifth position
+- ♭III (borrowed) appears at 90° — naturally offset from diatonic positions
+
+This reuses the radial vocabulary established by chord shapes (Principle 3)
+and lets the viewer perceive harmonic motion as spatial motion around the clock.
+
+### Contract Types
+
+```ts
+// In packages/contracts/annotated/annotated.ts
+
+/** A single line segment in a Roman numeral glyph */
+interface GlyphSegment {
+  x1: number; y1: number;
+  x2: number; y2: number;
+}
+
+/** A circle arc in a Roman numeral glyph (for ° and ø) */
+interface GlyphArc {
+  cx: number; cy: number;
+  r: number;
+  startAngle?: number;  // default 0
+  endAngle?: number;    // default 2π (full circle)
+}
+
+/** Complete Roman numeral glyph geometry */
+interface RomanNumeralGlyph {
+  /** Line segments forming the glyph */
+  segments: GlyphSegment[];
+  /** Arcs forming the glyph (for ° ø suffixes) */
+  arcs: GlyphArc[];
+  /** Bounding box width in glyph units (for layout) */
+  width: number;
+  /** Bounding box height in glyph units */
+  height: number;
+}
+```
+
+### Builder Function
+
+```ts
+// In packages/engine/src/utils/RomanNumeralGlyphBuilder.ts
+function buildRomanNumeralGlyph(roman: string): RomanNumeralGlyph;
+```
+
+The builder parses the Roman numeral string (e.g. "vii°7") and composes
+the appropriate base numeral + suffix geometry.
+
+### Invariant
+
+| ID | Invariant | Meaning |
+|----|-----------|---------|
+| I19 | Roman numeral glyphs are geometric, not text | Vocabulary produces path data; rendering is grammar responsibility |
