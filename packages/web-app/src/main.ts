@@ -1,5 +1,5 @@
 import type { MidiInputInfo } from "@synesthetica/adapters";
-import type { SceneFrame } from "@synesthetica/contracts";
+import type { SceneFrame, PitchClass, ModeId } from "@synesthetica/contracts";
 import { RawMidiAdapter, WebMidiSource } from "@synesthetica/adapters";
 import {
   VisualPipeline,
@@ -26,6 +26,9 @@ const tempoInput = document.getElementById("tempo-input") as HTMLInputElement;
 const beatsPerBarInput = document.getElementById("beats-per-bar") as HTMLInputElement;
 const beatUnitInput = document.getElementById("beat-unit") as HTMLInputElement;
 const clearTempoBtn = document.getElementById("clear-tempo") as HTMLButtonElement;
+const keyRootSelect = document.getElementById("key-root") as HTMLSelectElement;
+const keyModeSelect = document.getElementById("key-mode") as HTMLSelectElement;
+const clearKeyBtn = document.getElementById("clear-key") as HTMLButtonElement;
 
 // App state
 let midiSource: WebMidiSource | null = null;
@@ -369,12 +372,42 @@ function clearTempoMeter(): void {
   }
 }
 
-// Event listeners for tempo/meter controls
+/**
+ * Apply key settings from the UI to the pipeline
+ */
+function applyKeySettings(): void {
+  if (!pipeline) return;
+
+  const rootValue = keyRootSelect.value;
+  if (rootValue === "") {
+    pipeline.setKey(null);
+    return;
+  }
+
+  const root = parseInt(rootValue, 10) as PitchClass;
+  const mode = keyModeSelect.value as ModeId;
+  pipeline.setKey({ root, mode });
+}
+
+/**
+ * Clear key setting
+ */
+function clearKey(): void {
+  keyRootSelect.value = "";
+  if (pipeline) {
+    pipeline.setKey(null);
+  }
+}
+
+// Event listeners for controls
 toggleControlsBtn.addEventListener("click", toggleControls);
 tempoInput.addEventListener("change", applyTempoMeterSettings);
 beatsPerBarInput.addEventListener("change", applyTempoMeterSettings);
 beatUnitInput.addEventListener("change", applyTempoMeterSettings);
 clearTempoBtn.addEventListener("click", clearTempoMeter);
+keyRootSelect.addEventListener("change", applyKeySettings);
+keyModeSelect.addEventListener("change", applyKeySettings);
+clearKeyBtn.addEventListener("click", clearKey);
 
 // Initialize on load
 initMidi();
