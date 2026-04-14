@@ -52,8 +52,16 @@ import {
 // Progression Clock Constants
 // ============================================================================
 
-/** How long chord glyphs take to fully fade (ms) */
-const PROGRESSION_FADE_MS = 6000;
+/**
+ * Fade control value. Unit depends on context:
+ * - Without tempo: seconds
+ * - With tempo: bars
+ * Default: 6 (6 seconds or 6 bars)
+ */
+const PROGRESSION_FADE_VALUE = 6;
+
+/** Immediate opacity step-down on release (fraction of full opacity) */
+const RELEASE_OPACITY_STEP = 0.10;
 
 /** Clock radius as fraction of cell size */
 const CLOCK_RADIUS_FRACTION = 0.35;
@@ -62,7 +70,7 @@ const CLOCK_RADIUS_FRACTION = 0.35;
 const GLYPH_RADIUS_FRACTION = 0.75;
 
 /** Glyph size in world units (height of uppercase numeral) */
-const GLYPH_SIZE = 3;
+const GLYPH_SIZE = 2;
 
 /** Default pitch-hue invariant (A = red, clockwise) */
 const DEFAULT_HUE_INVARIANT = {
@@ -174,10 +182,26 @@ export class HarmonyGrammar implements IVisualGrammar {
     // Only renders when a key is prescribed and there's progression data
     const key = input.prescribedKey;
     const progression = input.harmonicContext.functionalProgression;
+    const currentFunction = input.harmonicContext.currentFunction;
 
     if (key && progression.length > 0) {
+      // Compute fade window: bars if tempo set, seconds otherwise
+      const tempo = input.prescribedTempo;
+      let fadeMs: number;
+      if (tempo !== null) {
+        const beatMs = 60000 / tempo;
+        const meter = input.prescribedMeter;
+        const barMs = beatMs * (meter?.beatsPerBar ?? 4);
+        fadeMs = PROGRESSION_FADE_VALUE * barMs;
+      } else {
+        fadeMs = PROGRESSION_FADE_VALUE * 1000;
+      }
+
       entities.push(
-        ...this.createProgressionClock(progression, t, part, key.root),
+        ...this.createProgressionClock(
+          progression, t, part, key.root, fadeMs,
+          currentFunction?.chordId ?? null,
+        ),
       );
     }
 
@@ -202,6 +226,8 @@ export class HarmonyGrammar implements IVisualGrammar {
     t: number,
     part: string,
     tonicPc: PitchClass,
+    fadeMs: number,
+    activeChordId: string | null,
   ): Entity[] {
     const entities: Entity[] = [];
     const clockRadius = HARMONY_CELL_SIZE * CLOCK_RADIUS_FRACTION;
@@ -211,10 +237,17 @@ export class HarmonyGrammar implements IVisualGrammar {
       const fc = progression[i];
       const age = t - fc.onset;
 
-      if (age < 0 || age >= PROGRESSION_FADE_MS) continue;
+      if (age < 0 || age >= fadeMs) continue;
 
-      const fadeFraction = 1 - age / PROGRESSION_FADE_MS;
-      if (fadeFraction < 0.01) continue;
+      // Opacity: full while chord is held, then step down + fade
+      let opacity: number;
+      if (fc.chordId === activeChordId) {
+        opacity = 1.0;
+      } else {
+        const fadeFraction = 1 - age / fadeMs;
+        opacity = (1 - RELEASE_OPACITY_STEP) * fadeFraction;
+      }
+      if (opacity < 0.01) continue;
 
       // Angular position from root pitch class relative to tonic
       const interval = ((fc.rootPc - tonicPc) + 12) % 12;
@@ -242,7 +275,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         position: { x, y },
         style: {
           color,
-          opacity: fadeFraction,
+          opacity,
           size: GLYPH_SIZE,
         },
         data: {

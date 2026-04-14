@@ -1,20 +1,16 @@
 /**
  * Shared layout constants for the three-column grammar layout.
  *
- * ┌────┐ ┌──────────────┐ ┌────────────────┐
- * │    │ │              │ │   chord shape  │
- * │ dyn│ │    rhythm    │ ├────────────────┤
- * │ bar│ │ (note strips)│ │  progression   │
- * │    │ │              │ │   (future)     │
- * └────┘ └──────────────┘ └────────────────┘
- *  col 1       col 2           col 3
+ * ┌────┐  ┌──────────────┐ ┌────────────────┐
+ * │    │  │              │ │   chord shape  │
+ * │ dyn│  │    rhythm    │ │                │
+ * │ bar│  │ (note strips)│ │                │
+ * │    │  │              │ │  progression   │
+ * │    │  │              │ │    clock       │
+ * └────┘  └──────────────┘ └────────────────┘
+ *  col 1        col 2           col 3
  *
  * All values are in normalized coordinates (0–1).
- *
- * The harmony column targets H/2 × H in screen pixels. Since we work
- * in normalized coords (0–1 in each axis independently), the column
- * width in x-coords depends on aspect ratio. We assume ~16:9 and use
- * 0.30 as a good default: (0.5 * 9/16) ≈ 0.28, rounded up slightly.
  */
 
 // ============================================================================
@@ -52,8 +48,11 @@ export const DYNAMICS_BAR_WIDTH = DYNAMICS_BAR_RIGHT - DYNAMICS_BAR_LEFT;
 // Gaps
 // ============================================================================
 
-/** Consistent gap between columns */
-export const COLUMN_GAP = 0.015;
+/** Gap between dynamics and rhythm columns (wider — visual breathing room) */
+export const GAP_LEFT = 0.03;
+
+/** Gap between rhythm and harmony columns (tighter — related content) */
+export const GAP_RIGHT = 0.008;
 
 // ============================================================================
 // Harmony Column (right)
@@ -63,7 +62,7 @@ export const COLUMN_GAP = 0.015;
  * Width targets H/2 in screen pixels. At 16:9, that's ~0.28 in
  * normalized x-coords. We use 0.30 for a bit of breathing room.
  * The column is split into two rows: chord shape (top) and
- * progression placeholder (bottom), each square in screen pixels.
+ * progression clock (bottom).
  */
 export const HARMONY_COLUMN_WIDTH = 0.30;
 
@@ -78,26 +77,29 @@ export const HARMONY_LEFT = 1 - HARMONY_COLUMN_WIDTH;
  */
 export const HARMONY_CELL_SIZE = HARMONY_COLUMN_WIDTH;
 
+/** Vertical gap between chord shape and progression clock cells */
+const CELL_GAP = 0.06;
+
 /** Vertical midpoint of the usable bar area */
 const BAR_VERTICAL_CENTER = (BAR_TOP + BAR_BOTTOM) / 2;
 
 /** Top cell: chord shape */
 export const HARMONY_CHORD_CENTER_X = HARMONY_LEFT + HARMONY_COLUMN_WIDTH / 2;
-export const HARMONY_CHORD_CENTER_Y = BAR_VERTICAL_CENTER - HARMONY_CELL_SIZE / 2;
+export const HARMONY_CHORD_CENTER_Y = BAR_VERTICAL_CENTER - CELL_GAP / 2 - HARMONY_CELL_SIZE / 2;
 
-/** Bottom cell: progression (placeholder) */
+/** Bottom cell: progression clock */
 export const HARMONY_PROGRESSION_CENTER_X = HARMONY_CHORD_CENTER_X;
-export const HARMONY_PROGRESSION_CENTER_Y = BAR_VERTICAL_CENTER + HARMONY_CELL_SIZE / 2;
+export const HARMONY_PROGRESSION_CENTER_Y = BAR_VERTICAL_CENTER + CELL_GAP / 2 + HARMONY_CELL_SIZE / 2;
 
 // ============================================================================
 // Rhythm Column (center — takes remaining space)
 // ============================================================================
 
 /** Left edge of the rhythm column (after dynamics + gap) */
-export const RHYTHM_LEFT = DYNAMICS_COLUMN_WIDTH + COLUMN_GAP;
+export const RHYTHM_LEFT = DYNAMICS_COLUMN_WIDTH + GAP_LEFT;
 
 /** Right edge of the rhythm column (before gap + harmony) */
-export const RHYTHM_RIGHT = HARMONY_LEFT - COLUMN_GAP;
+export const RHYTHM_RIGHT = HARMONY_LEFT - GAP_RIGHT;
 
 /** Width of the rhythm column */
 export const RHYTHM_WIDTH = RHYTHM_RIGHT - RHYTHM_LEFT;
