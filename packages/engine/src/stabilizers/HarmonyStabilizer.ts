@@ -411,11 +411,6 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
     let currentFunction: FunctionalChord | null = null;
     let keyAware = false;
 
-    // TODO: remove diagnostic logging
-    if (key && upstream.chords.length > 0) {
-      console.log(`[HarmonyStabilizer] key=${JSON.stringify(key)}, chords=${upstream.chords.length}, active=${upstream.chords.filter(c => c.phase === "active").length}, progression=${this.progression.length}`);
-    }
-
     if (key) {
       keyAware = true;
       const diatonicTable = buildDiatonicTable(key);
@@ -433,10 +428,15 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
           lastInProgression.chordId !== currentFunction.chordId
         ) {
           this.progression.push(currentFunction);
+          // TODO: remove
+          console.log(`[Harmony] +${currentFunction.roman} (prog=${this.progression.length})`);
         }
 
         // Prune old entries
         this.pruneProgression(raw.t);
+      } else {
+        // TODO: remove
+        console.log(`[Harmony] key set, ${upstream.chords.length} chords but none active/available`);
       }
     }
 
