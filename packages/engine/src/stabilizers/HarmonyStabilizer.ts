@@ -405,11 +405,6 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
       return this.createEmptyFrame(raw.t);
     }
 
-    // TODO: remove diagnostic
-    if (upstream.chords.length > 0) {
-      console.log(`[Harmony.apply] key=${JSON.stringify(upstream.prescribedKey)} chords=${upstream.chords.length}`);
-    }
-
     const tension = this.computeTension(upstream.chords);
     const key = upstream.prescribedKey;
 
@@ -433,15 +428,10 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
           lastInProgression.chordId !== currentFunction.chordId
         ) {
           this.progression.push(currentFunction);
-          // TODO: remove
-          console.log(`[Harmony] +${currentFunction.roman} (prog=${this.progression.length})`);
         }
 
         // Prune old entries
         this.pruneProgression(raw.t);
-      } else {
-        // TODO: remove
-        console.log(`[Harmony] key set, ${upstream.chords.length} chords but none active/available`);
       }
     }
 

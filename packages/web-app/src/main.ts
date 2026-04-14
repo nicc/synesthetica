@@ -211,7 +211,7 @@ function stopSession(): void {
 }
 
 // Debug counter for throttled logging
-let debugFrameCount = 0;
+let _debugFrameCount = 0;
 let lastSceneFrame: SceneFrame | null = null;
 
 /**
@@ -289,7 +289,7 @@ function startRenderLoop(): void {
     const sceneFrame = pipeline.requestFrame(sessionMs);
     lastSceneFrame = sceneFrame;
 
-    debugFrameCount++;
+    _debugFrameCount++;
 
     // Render to canvas
     renderer.render(sceneFrame);
@@ -367,14 +367,12 @@ function applyKeySettings(): void {
   const rootValue = keyRootSelect.value;
   if (rootValue === "") {
     pipeline.setKey(null);
-    console.log("[Key] cleared");
     return;
   }
 
   const root = parseInt(rootValue, 10) as PitchClass;
   const mode = keyModeSelect.value as ModeId;
   pipeline.setKey({ root, mode });
-  console.log(`[Key] set to root=${root} mode=${mode}`);
 }
 
 /**

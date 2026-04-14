@@ -420,11 +420,6 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       // Get previous frame for this stabilizer
       const previous = partState.previousMusicalFrames.get(stabilizer.id) ?? null;
 
-      // TODO: remove diagnostic
-      if (stabilizer.id === "harmony") {
-        console.log(`[pipeline:harmony] upstream=${upstream ? `key=${JSON.stringify(upstream.prescribedKey)}` : "null"}, previous=${previous ? `key=${JSON.stringify(previous.prescribedKey)}` : "null"}, using=${upstream ? "upstream" : "previous"}`);
-      }
-
       // Apply stabilizer
       const output = stabilizer.apply(raw, upstream ?? previous);
 
@@ -495,7 +490,13 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     }
 
     if (frames.length === 1) {
-      return frames[0];
+      // Even for single frames, inject pipeline-level prescribed context
+      return {
+        ...frames[0],
+        prescribedTempo: this.prescribedTempo,
+        prescribedMeter: this.prescribedMeter,
+        prescribedKey: this.prescribedKey,
+      };
     }
 
     // Merge notes (concat, dedupe by id)
