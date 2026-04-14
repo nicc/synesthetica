@@ -44,7 +44,6 @@ import {
 import {
   HARMONY_CHORD_CENTER_X,
   HARMONY_CHORD_CENTER_Y,
-  HARMONY_CELL_SIZE,
 } from "./layout";
 
 // ============================================================================
@@ -133,7 +132,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         position: { x: HARMONY_CHORD_CENTER_X, y: HARMONY_CHORD_CENTER_Y },
         style: {
           color: rootColor,
-          size: HARMONY_CELL_SIZE * 100 * 0.8, // 80% of cell, in size units
+          size: 100,
           opacity: 1,
         },
         data: {

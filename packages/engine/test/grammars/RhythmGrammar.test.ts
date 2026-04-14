@@ -669,9 +669,9 @@ describe("RhythmGrammar snapshots", () => {
 
     console.log("\nPitch Spread:\n" + formatMetrics(metrics));
 
-    // Notes should span x-axis
+    // Notes should span the rhythm column
     expect(metrics.positions.bounds.minX).toBeLessThan(0.2);
-    expect(metrics.positions.bounds.maxX).toBeGreaterThan(0.8);
+    expect(metrics.positions.bounds.maxX).toBeGreaterThan(0.6);
   });
 
   it("renders notes with drift streaks", () => {
