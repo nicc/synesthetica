@@ -544,6 +544,11 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       if (frame.harmonicContext) harmonicContext = frame.harmonicContext;
     }
 
+    // TODO: remove diagnostic
+    if (this.prescribedKey) {
+      console.log(`[merge] prescribedKey=${JSON.stringify(this.prescribedKey)}`);
+    }
+
     // prescribedTempo, prescribedMeter, prescribedKey come from pipeline (user setting)
     return {
       t,
