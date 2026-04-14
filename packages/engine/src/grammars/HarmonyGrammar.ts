@@ -172,6 +172,9 @@ export class HarmonyGrammar implements IVisualGrammar {
     const key = input.prescribedKey;
     const progression = input.harmonicContext.functionalProgression;
 
+    // TODO: remove
+    if (key) console.log(`[HG] key=${key.root} prog=${progression.length} chords=${input.chords.length}`);
+
     if (key && progression.length > 0) {
       entities.push(
         ...this.createProgressionClock(progression, t, part, key.root),
