@@ -181,6 +181,7 @@ describe("HarmonyStabilizer", () => {
       expect(result.harmonicContext?.keyAware).toBe(true);
       expect(result.harmonicContext?.currentFunction?.degree).toBe(1);
       expect(result.harmonicContext?.currentFunction?.roman).toBe("I");
+      expect(result.harmonicContext?.currentFunction?.rootPc).toBe(0); // C
       expect(result.harmonicContext?.currentFunction?.borrowed).toBe(false);
     });
 
@@ -211,6 +212,7 @@ describe("HarmonyStabilizer", () => {
 
       expect(result.harmonicContext?.currentFunction?.degree).toBe(5);
       expect(result.harmonicContext?.currentFunction?.roman).toBe("V");
+      expect(result.harmonicContext?.currentFunction?.rootPc).toBe(7); // G
       expect(result.harmonicContext?.currentFunction?.borrowed).toBe(false);
     });
 

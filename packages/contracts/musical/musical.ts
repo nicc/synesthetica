@@ -280,6 +280,8 @@ export interface FunctionalChord {
   roman: string;
   /** Chord quality from detection */
   quality: ChordQuality;
+  /** Root pitch class of the chord (0–11) */
+  rootPc: PitchClass;
   /** True if the chord root is not diatonic to the prescribed key/mode */
   borrowed: boolean;
   /** Reference to the source detected chord */

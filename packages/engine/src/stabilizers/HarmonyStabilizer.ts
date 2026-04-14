@@ -304,6 +304,7 @@ function analyzeChord(
     degree,
     roman,
     quality: chord.quality,
+    rootPc: chord.root,
     borrowed,
     chordId: chord.id,
     onset: chord.onset,
