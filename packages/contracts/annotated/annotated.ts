@@ -188,6 +188,50 @@ export interface ChordShapeGeometry {
 }
 
 // ============================================================================
+// Roman Numeral Glyph Types (Invariant I19)
+// ============================================================================
+
+/**
+ * A line segment in a Roman numeral glyph.
+ * Coordinates are in glyph-local units (origin at bottom-left of baseline).
+ */
+export interface GlyphSegment {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+/**
+ * A circular arc in a Roman numeral glyph (for ° and ø suffixes).
+ */
+export interface GlyphArc {
+  cx: number;
+  cy: number;
+  r: number;
+  /** Start angle in radians. Default 0. */
+  startAngle?: number;
+  /** End angle in radians. Default 2π (full circle). */
+  endAngle?: number;
+}
+
+/**
+ * Complete Roman numeral glyph geometry.
+ * Produced by the vocabulary, consumed by grammars.
+ * Invariant I19: glyphs are geometric paths, not rendered text.
+ */
+export interface RomanNumeralGlyph {
+  /** Line segments forming the glyph */
+  segments: GlyphSegment[];
+  /** Arcs forming the glyph (for ° ø suffixes) */
+  arcs: GlyphArc[];
+  /** Bounding box width in glyph units */
+  width: number;
+  /** Bounding box height in glyph units */
+  height: number;
+}
+
+// ============================================================================
 // Annotated Musical Elements
 // ============================================================================
 
