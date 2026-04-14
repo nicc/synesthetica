@@ -534,14 +534,17 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       range: { min: 0, max: 0, variance: 0 },
     };
 
+    // Take latest non-null/non-default values for derived signals
+    let harmonicContext: MusicalFrame["harmonicContext"];
     for (const frame of frames) {
       if (frame.rhythmicAnalysis.detectedDivision !== null) {
         rhythmicAnalysis = frame.rhythmicAnalysis;
       }
       if (frame.dynamics.events.length > 0) dynamics = frame.dynamics;
+      if (frame.harmonicContext) harmonicContext = frame.harmonicContext;
     }
 
-    // prescribedTempo and prescribedMeter come from pipeline (user setting), not from stabilizers
+    // prescribedTempo, prescribedMeter, prescribedKey come from pipeline (user setting)
     return {
       t,
       part: partId,
@@ -553,6 +556,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       prescribedMeter: this.prescribedMeter,
       prescribedKey: this.prescribedKey,
       progression: progressionSet.size > 0 ? Array.from(progressionSet) : undefined,
+      harmonicContext,
     };
   }
 
