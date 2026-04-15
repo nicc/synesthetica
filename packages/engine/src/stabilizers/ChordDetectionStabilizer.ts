@@ -162,11 +162,15 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
   private pitchClassLastSeen: Map<PitchClass, Ms> = new Map();
 
   // Current displayed chord (after hysteresis)
-  private displayedChord: ChordInterpretation | null = null;
+  private displayedChord: {
+    harmonic: ChordInterpretation;
+    bassLed: ChordInterpretation;
+  } | null = null;
 
   // Candidate chord waiting for hysteresis
   private candidateChord: {
-    interpretation: ChordInterpretation;
+    harmonic: ChordInterpretation;
+    bassLed: ChordInterpretation;
     since: Ms;
   } | null = null;
 
@@ -316,7 +320,10 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
   private detectChordFromPitchClasses(
     pitchClasses: Set<PitchClass>,
     bassPc?: PitchClass | null,
-  ): ChordInterpretation | null {
+  ): {
+    harmonic: ChordInterpretation;
+    bassLed: ChordInterpretation;
+  } | null {
     if (pitchClasses.size < this.config.minPitchClasses) {
       return null;
     }
@@ -465,16 +472,28 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
       return a.complexity - b.complexity;
     });
     const best = candidates[0];
+    const toInterpretation = (c: Candidate): ChordInterpretation => ({
+      root: c.root,
+      quality: c.quality,
+      chordTones: c.chordTones,
+      name: c.name,
+      confidence: Math.min(1, c.coverage / pitchClasses.size) as Confidence,
+    });
 
-    const confidence = Math.min(1, best.coverage / pitchClasses.size) as Confidence;
+    const harmonic = toInterpretation(best);
 
-    return {
-      root: best.root,
-      quality: best.quality,
-      chordTones: best.chordTones,
-      name: best.name,
-      confidence,
-    };
+    // Bass-led: pick the best candidate among those rooted at the bass.
+    // If no candidate matches, fall back to harmonic (the two
+    // interpretations converge in this case — no bass-led reading exists).
+    let bassLed: ChordInterpretation = harmonic;
+    if (bassPc !== undefined && bassPc !== null) {
+      const bassLedCandidate = candidates.find((c) => c.root === bassPc);
+      if (bassLedCandidate) {
+        bassLed = toInterpretation(bassLedCandidate);
+      }
+    }
+
+    return { harmonic, bassLed };
   }
 
   /**
@@ -482,23 +501,31 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
    * Only update displayed chord if new chord is stable for hysteresisMs.
    */
   private applyHysteresis(
-    detected: ChordInterpretation | null,
+    detected: {
+      harmonic: ChordInterpretation;
+      bassLed: ChordInterpretation;
+    } | null,
     t: Ms
   ): void {
+    // Identity for hysteresis is based on the harmonic interpretation —
+    // changes in bass-led alone (e.g. same chord with different bass)
+    // shouldn't trigger a chord transition.
     const isSameAsDisplayed =
       detected &&
       this.displayedChord &&
-      detected.root === this.displayedChord.root &&
-      detected.quality === this.displayedChord.quality;
+      detected.harmonic.root === this.displayedChord.harmonic.root &&
+      detected.harmonic.quality === this.displayedChord.harmonic.quality;
 
     const isSameAsCandidate =
       detected &&
       this.candidateChord &&
-      detected.root === this.candidateChord.interpretation.root &&
-      detected.quality === this.candidateChord.interpretation.quality;
+      detected.harmonic.root === this.candidateChord.harmonic.root &&
+      detected.harmonic.quality === this.candidateChord.harmonic.quality;
 
     if (isSameAsDisplayed) {
-      // Current chord continues, clear any candidate
+      // Current chord continues — keep updating the bass-led reading in
+      // case the bass note changed while the harmonic chord held steady.
+      this.displayedChord = detected!;
       this.candidateChord = null;
       return;
     }
@@ -523,7 +550,10 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
           this.finalizeChord(this.displayedChord, this.currentChordOnset, t);
         }
         // Switch to candidate
-        this.displayedChord = this.candidateChord!.interpretation;
+        this.displayedChord = {
+          harmonic: this.candidateChord!.harmonic,
+          bassLed: this.candidateChord!.bassLed,
+        };
         this.currentChordOnset = t;
         this.candidateChord = null;
       }
@@ -532,37 +562,39 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
 
     // New candidate chord
     this.candidateChord = {
-      interpretation: detected,
+      harmonic: detected.harmonic,
+      bassLed: detected.bassLed,
       since: t,
     };
   }
 
   /**
-   * Build a MusicalChord output from a harmonic interpretation and the
-   * voicing context. In Phase 2, bassLed is populated with the same
-   * interpretation as harmonic — they'll diverge once Phase 3 adds a
-   * bass-led scorer.
+   * Build a MusicalChord output from harmonic + bass-led interpretations
+   * and the voicing context. Inversion is derived from the harmonic
+   * reading (the "which chord tone is in the bass" question only makes
+   * sense against the harmonic root).
    */
   private buildChordOutput(params: {
-    interpretation: ChordInterpretation;
+    harmonic: ChordInterpretation;
+    bassLed: ChordInterpretation;
     voicing: Pitch[];
     bassPc: PitchClass | null;
     onset: Ms;
     endTime: Ms;
     phase: "active" | "decaying";
   }): MusicalChord {
-    const { interpretation, voicing, bassPc, onset, endTime, phase } = params;
+    const { harmonic, bassLed, voicing, bassPc, onset, endTime, phase } = params;
 
     const id = createChordId(
       this.config.partId,
       onset,
-      interpretation.root,
-      interpretation.quality
+      harmonic.root,
+      harmonic.quality
     );
 
-    const actualBass = bassPc ?? interpretation.root;
-    const rootSemitone = (actualBass - interpretation.root + 12) % 12;
-    const inversionIdx = interpretation.chordTones.indexOf(rootSemitone);
+    const actualBass = bassPc ?? harmonic.root;
+    const rootSemitone = (actualBass - harmonic.root + 12) % 12;
+    const inversionIdx = harmonic.chordTones.indexOf(rootSemitone);
     const inversion = inversionIdx >= 0 ? inversionIdx : 0;
 
     return {
@@ -571,11 +603,9 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
       noteIds: [],
       bass: actualBass,
       inversion,
-      isInverted: actualBass !== interpretation.root,
-      harmonic: interpretation,
-      // Phase 2: bassLed is a copy of harmonic. Phase 3 populates it
-      // with a distinct bass-led scorer result.
-      bassLed: interpretation,
+      isInverted: actualBass !== harmonic.root,
+      harmonic,
+      bassLed,
       onset,
       duration: endTime - onset,
       phase,
@@ -587,13 +617,17 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
    * Finalize a chord and add to progression.
    */
   private finalizeChord(
-    chord: ChordInterpretation,
+    chord: {
+      harmonic: ChordInterpretation;
+      bassLed: ChordInterpretation;
+    },
     onset: Ms,
     endTime: Ms
   ): void {
     this.recentChords.push(
       this.buildChordOutput({
-        interpretation: chord,
+        harmonic: chord.harmonic,
+        bassLed: chord.bassLed,
         voicing: [],
         bassPc: null,
         onset,
@@ -620,16 +654,18 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
         octave: 4, // Reference octave
       }));
 
-      // Sort by pitch class distance from root for better voicing representation
+      // Sort by pitch class distance from harmonic root for better voicing representation
+      const harmonicRoot = this.displayedChord.harmonic.root;
       voicing.sort((a, b) => {
-        const distA = (a.pc - this.displayedChord!.root + 12) % 12;
-        const distB = (b.pc - this.displayedChord!.root + 12) % 12;
+        const distA = (a.pc - harmonicRoot + 12) % 12;
+        const distB = (b.pc - harmonicRoot + 12) % 12;
         return distA - distB;
       });
 
       chords.push(
         this.buildChordOutput({
-          interpretation: this.displayedChord,
+          harmonic: this.displayedChord.harmonic,
+          bassLed: this.displayedChord.bassLed,
           voicing,
           bassPc,
           onset: this.currentChordOnset,

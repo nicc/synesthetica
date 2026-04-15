@@ -392,6 +392,79 @@ describe("ChordDetectionStabilizer", () => {
       expect(result?.quality).toBe("maj");
     });
 
+    it("harmonic and bass-led diverge for an inversion", () => {
+      // G-Bb-Eb with G as bass (first pc → octave 3).
+      const notes = [
+        makeNote(7 as PitchClass, 3, 1000),
+        makeNote(10 as PitchClass, 4, 1000),
+        makeNote(3 as PitchClass, 4, 1000),
+      ];
+      stabilizer.apply(
+        createTestRawFrame(1000),
+        createTestMusicalFrame(1000, "main", {
+          notes,
+          progression: [],
+          prescribedKey: { root: 3 as PitchClass, mode: "ionian" },
+        }),
+      );
+      const t2 = 1100;
+      const notes2 = [
+        makeNote(7 as PitchClass, 3, t2),
+        makeNote(10 as PitchClass, 4, t2),
+        makeNote(3 as PitchClass, 4, t2),
+      ];
+      const result = stabilizer.apply(
+        createTestRawFrame(t2),
+        createTestMusicalFrame(t2, "main", {
+          notes: notes2,
+          progression: [],
+          prescribedKey: { root: 3 as PitchClass, mode: "ionian" },
+        }),
+      );
+      const chord = result.chords.find((c) => c.phase === "active");
+      expect(chord).toBeDefined();
+      // Harmonic reading: Eb major
+      expect(chord?.harmonic.root).toBe(3); // Eb
+      expect(chord?.harmonic.quality).toBe("maj");
+      // Bass-led reading: rooted on G (altered chord)
+      expect(chord?.bassLed.root).toBe(7); // G
+      // Bass tracking + inversion metadata
+      expect(chord?.bass).toBe(7);
+      expect(chord?.isInverted).toBe(true);
+    });
+
+    it("harmonic and bass-led converge for root-position chords", () => {
+      // Ab-C-Eb with Ab as bass — harmonic.root === bass, both readings
+      // produce the same interpretation.
+      const notes = [
+        makeNote(8 as PitchClass, 3, 1000),
+        makeNote(0 as PitchClass, 4, 1000),
+        makeNote(3 as PitchClass, 4, 1000),
+      ];
+      stabilizer.apply(
+        createTestRawFrame(1000),
+        createTestMusicalFrame(1000, "main", {
+          notes,
+          progression: [],
+          prescribedKey: { root: 8 as PitchClass, mode: "ionian" },
+        }),
+      );
+      const t2 = 1100;
+      const notes2 = notes.map((n) => ({ ...n, onset: t2 }));
+      const result = stabilizer.apply(
+        createTestRawFrame(t2),
+        createTestMusicalFrame(t2, "main", {
+          notes: notes2,
+          progression: [],
+          prescribedKey: { root: 8 as PitchClass, mode: "ionian" },
+        }),
+      );
+      const chord = result.chords.find((c) => c.phase === "active");
+      expect(chord?.harmonic.root).toBe(8); // Ab
+      expect(chord?.bassLed.root).toBe(8); // Ab — same
+      expect(chord?.isInverted).toBe(false);
+    });
+
     it("detects a secondary dominant (D7 in C major)", () => {
       // D7 = D(2) + F#(6) + A(9) + C(0). F# is non-diatonic in C major.
       // D7 is V/V and should be detected as D7, not D (triad without 7th).
