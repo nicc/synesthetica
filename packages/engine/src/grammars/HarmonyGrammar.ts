@@ -75,7 +75,7 @@ const RELEASE_BRIGHTNESS_STEP = 0.30;
  * exponents > 1 dim more aggressively as strokes thicken so the fade
  * feels monotonically dimmer throughout.
  */
-const WIDTH_COMPENSATION_EXPONENT = 1.5;
+const WIDTH_COMPENSATION_EXPONENT = 1.8;
 
 /** Stroke width (pixels) while chord is held or fresh */
 const STROKE_WIDTH_FRESH = 2;
