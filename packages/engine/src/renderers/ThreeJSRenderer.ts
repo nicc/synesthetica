@@ -1081,22 +1081,27 @@ export class ThreeJSRenderer implements IRenderer {
     // overlapping segment quads at joints don't stack alpha (Line2 has
     // no built-in miter join, so adjacent segments overlap by ~half
     // linewidth at each vertex).
+    // Pre-multiply colour by opacity so fade is baked into the material's
+    // colour. LineMaterial's fragment shader doesn't reliably output
+    // `opacity` as the alpha channel for our custom max-blending math to
+    // use, so we encode the fade into the colour itself and run with
+    // opacity=1.
+    const fadedColor = threeColor.clone().multiplyScalar(opacity);
+
     const makeGlyphMaterial = () => {
       const mat = new LineMaterial({
-        color: threeColor.getHex(),
+        color: fadedColor.getHex(),
         linewidth: strokeWidth,
         transparent: true,
-        opacity,
+        opacity: 1,
         resolution: new THREE.Vector2(this.resolution.x, this.resolution.y),
       });
-      // Custom blending: pre-multiply color by alpha, then take per-channel
-      // max against destination. This avoids alpha stacking at line joints
-      // (overlapping segments produce max, not sum) while still honouring
-      // opacity for fade — without it the color stays at full intensity
-      // regardless of opacity.
+      // Per-channel max blending: overlapping segment quads at joints
+      // produce max(src, dst) instead of stacking alpha. Source colour is
+      // already pre-multiplied above, so we use OneFactor on src.
       mat.blending = THREE.CustomBlending;
       mat.blendEquation = THREE.MaxEquation;
-      mat.blendSrc = THREE.SrcAlphaFactor;
+      mat.blendSrc = THREE.OneFactor;
       mat.blendDst = THREE.OneFactor;
       mat.blendEquationAlpha = THREE.MaxEquation;
       mat.blendSrcAlpha = THREE.OneFactor;
