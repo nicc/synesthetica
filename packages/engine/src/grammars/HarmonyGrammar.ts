@@ -66,7 +66,7 @@ const PROGRESSION_FADE_VALUE = 3;
  * Opacity is derived from brightness by dividing out the stroke-width
  * area growth, so the fade looks even-tempered regardless of chunkiness.
  */
-const RELEASE_BRIGHTNESS_STEP = 0.10;
+const RELEASE_BRIGHTNESS_STEP = 0.20;
 
 /** Stroke width (pixels) while chord is held or fresh */
 const STROKE_WIDTH_FRESH = 2;
