@@ -221,4 +221,98 @@ describe("ChordDetectionStabilizer", () => {
       expect(root).toBe(10); // Bb
     });
   });
+
+  describe("extended chord detection (expected failures, tracked in synesthetica-9eu)", () => {
+    /**
+     * Feed notes with a prescribed key, return detected root + quality.
+     * Currently failing because our ChordQuality enum + scoring table
+     * doesn't model extensions (9th, 11th, 13th). Extended chords fall
+     * through to subset detection which picks a worse-fitting triad or
+     * seventh from part of the voicing.
+     */
+    function detect(
+      pcs: PitchClass[],
+      key: { root: PitchClass; mode: "ionian" | "aeolian" },
+      t = 1000,
+    ): { root: PitchClass; quality: string } | null {
+      const notes = pcs.map((pc) => makeNote(pc, 4, t));
+      const raw1 = createTestRawFrame(t);
+      const upstream1 = createTestMusicalFrame(t, "main", {
+        notes,
+        progression: [],
+        prescribedKey: key,
+      });
+      stabilizer.apply(raw1, upstream1);
+
+      const t2 = t + 100;
+      const notes2 = pcs.map((pc) => makeNote(pc, 4, t2));
+      const raw2 = createTestRawFrame(t2);
+      const upstream2 = createTestMusicalFrame(t2, "main", {
+        notes: notes2,
+        progression: [],
+        prescribedKey: key,
+      });
+      const result = stabilizer.apply(raw2, upstream2);
+      if (result.chords.length === 0) return null;
+      return { root: result.chords[0].root, quality: result.chords[0].quality };
+    }
+
+    it.fails("detects Ab9 in Ab major (Ab-C-Eb-Gb-Bb)", () => {
+      // Ab9 = Ab(8) + C(0) + Eb(3) + Gb(6) + Bb(10)
+      // Currently detected as Cm7b5 or Ab7 depending on subset ordering.
+      const result = detect(
+        [8, 0, 3, 6, 10] as PitchClass[],
+        { root: 8 as PitchClass, mode: "ionian" },
+      );
+      expect(result?.root).toBe(8); // Ab
+    });
+
+    it.fails("detects Ab11 in Ab major (Ab-C-Eb-Gb-Bb-Db)", () => {
+      // Ab11 = Ab(8) + C(0) + Eb(3) + Gb(6) + Bb(10) + Db(1)
+      // Currently detected as Eb (triad) with rest as extras.
+      const result = detect(
+        [8, 0, 3, 6, 10, 1] as PitchClass[],
+        { root: 8 as PitchClass, mode: "ionian" },
+      );
+      expect(result?.root).toBe(8); // Ab
+    });
+
+    it.fails("detects Cmaj9 in C major (C-E-G-B-D)", () => {
+      // Cmaj9 = C(0) + E(4) + G(7) + B(11) + D(2)
+      const result = detect(
+        [0, 4, 7, 11, 2] as PitchClass[],
+        { root: 0 as PitchClass, mode: "ionian" },
+      );
+      expect(result?.root).toBe(0); // C
+    });
+
+    it.fails("detects Dm9 in C major (D-F-A-C-E)", () => {
+      // Dm9 = D(2) + F(5) + A(9) + C(0) + E(4)
+      const result = detect(
+        [2, 5, 9, 0, 4] as PitchClass[],
+        { root: 0 as PitchClass, mode: "ionian" },
+      );
+      expect(result?.root).toBe(2); // D
+    });
+
+    // G13 and Cadd9 already detect correctly under the current scoring
+    // (subset-based), so they live outside the expected-failure block.
+    it("detects G13 in C major (G-B-D-F-A-E) — already works", () => {
+      // G13 = G(7) + B(11) + D(2) + F(5) + A(9) + E(4)
+      const result = detect(
+        [7, 11, 2, 5, 9, 4] as PitchClass[],
+        { root: 0 as PitchClass, mode: "ionian" },
+      );
+      expect(result?.root).toBe(7); // G
+    });
+
+    it("detects Cadd9 (no 7th) C-E-G-D — already works", () => {
+      // Cadd9 = C(0) + E(4) + G(7) + D(2). Tonal recognises this.
+      const result = detect(
+        [0, 4, 7, 2] as PitchClass[],
+        { root: 0 as PitchClass, mode: "ionian" },
+      );
+      expect(result?.root).toBe(0); // C
+    });
+  });
 });
