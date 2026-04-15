@@ -108,8 +108,10 @@ const STRIP_STROKE_WIDTH = 1.5;
 /** Opacity of the chord-duration bar behind each glyph */
 const STRIP_BAR_OPACITY = 0.25;
 
-/** Chord-duration bar width as fraction of strip width */
-const STRIP_BAR_WIDTH_FRACTION = 0.27;
+/** Chord-duration bar width as fraction of strip width.
+ * Kept thin so the bar reads as a subtle trace under the glyph rather
+ * than framing it. */
+const STRIP_BAR_WIDTH_FRACTION = 0.15;
 
 /** Default pitch-hue invariant (A = red, clockwise) */
 const DEFAULT_HUE_INVARIANT = {
