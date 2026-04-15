@@ -46,7 +46,10 @@ function detectQuality(
   pitchClasses: PitchClass[],
   t: number = 1000
 ): string | null {
-  const notes = pitchClasses.map((pc) => makeNote(pc, 4, t));
+  // First pc placed at octave 3 so it's the MIDI-lowest (bass) note —
+  // matches the "various roots" convention where first pc in the array
+  // is the intended chord root/bass.
+  const notes = pitchClasses.map((pc, i) => makeNote(pc, i === 0 ? 3 : 4, t));
   const upstream = createUpstreamFrame(t, notes);
   const raw = createTestRawFrame(t);
 
@@ -55,7 +58,7 @@ function detectQuality(
 
   // Second frame after hysteresis: chord becomes displayed
   const t2 = t + 100;
-  const notes2 = pitchClasses.map((pc) => makeNote(pc, 4, t2));
+  const notes2 = pitchClasses.map((pc, i) => makeNote(pc, i === 0 ? 3 : 4, t2));
   const upstream2 = createUpstreamFrame(t2, notes2);
   const raw2 = createTestRawFrame(t2);
   const result = stabilizer.apply(raw2, upstream2);
@@ -171,7 +174,9 @@ describe("ChordDetectionStabilizer", () => {
       key: { root: PitchClass; mode: "ionian" | "aeolian" },
       t = 1000,
     ): PitchClass | null {
-      const notes = pcs.map((pc) => makeNote(pc, 4, t));
+      // First pc placed at octave 3 so it's the MIDI-lowest (bass) note,
+      // matching root-position voicings the tests describe.
+      const notes = pcs.map((pc, i) => makeNote(pc, i === 0 ? 3 : 4, t));
       const raw1 = createTestRawFrame(t);
       const upstream1 = createTestMusicalFrame(t, "main", {
         notes,
@@ -181,7 +186,7 @@ describe("ChordDetectionStabilizer", () => {
       stabilizer.apply(raw1, upstream1);
 
       const t2 = t + 100;
-      const notes2 = pcs.map((pc) => makeNote(pc, 4, t2));
+      const notes2 = pcs.map((pc, i) => makeNote(pc, i === 0 ? 3 : 4, t2));
       const raw2 = createTestRawFrame(t2);
       const upstream2 = createTestMusicalFrame(t2, "main", {
         notes: notes2,
@@ -212,6 +217,69 @@ describe("ChordDetectionStabilizer", () => {
       expect(root).toBe(9); // A
     });
 
+    it("uses bass note to disambiguate, not pc-set iteration order", () => {
+      // Regression: pitch-class map insertion order was history-dependent,
+      // so after playing a chord containing C (pc 0) the pc set iteration
+      // order for a subsequent Ab-C-Eb voicing could put C first, causing
+      // Tonal to return Cm#5 (C-rooted augmented) instead of AbM.
+      // With bass-pc tracking, the actual lowest-pitch note dictates the
+      // detection anchor.
+
+      // Play a Caug first so C enters pitchClassLastSeen before Ab.
+      stabilizer.init();
+      const t1 = 1000;
+      const caugNotes = [
+        makeNote(0 as PitchClass, 4, t1),
+        makeNote(4 as PitchClass, 4, t1),
+        makeNote(8 as PitchClass, 4, t1),
+      ];
+      const ab: { root: PitchClass; mode: "ionian" | "aeolian" } = {
+        root: 8 as PitchClass,
+        mode: "ionian",
+      };
+      stabilizer.apply(
+        createTestRawFrame(t1),
+        createTestMusicalFrame(t1, "main", {
+          notes: caugNotes,
+          progression: [],
+          prescribedKey: ab,
+        }),
+      );
+
+      // Now play Ab-C-Eb with Ab as bass (octave 3).
+      const t2 = 2000;
+      const abmNotes: Note[] = [
+        {
+          ...makeNote(8 as PitchClass, 3, t2),
+          pitch: { pc: 8 as PitchClass, octave: 3 },
+        },
+        makeNote(0 as PitchClass, 4, t2),
+        makeNote(3 as PitchClass, 4, t2),
+      ];
+      stabilizer.apply(
+        createTestRawFrame(t2),
+        createTestMusicalFrame(t2, "main", {
+          notes: abmNotes,
+          progression: [],
+          prescribedKey: ab,
+        }),
+      );
+      const t3 = 2100;
+      const result = stabilizer.apply(
+        createTestRawFrame(t3),
+        createTestMusicalFrame(t3, "main", {
+          notes: abmNotes.map((n) => ({ ...n, onset: t3 })),
+          progression: [],
+          prescribedKey: ab,
+        }),
+      );
+
+      // Should detect Ab major despite C being earlier in the pc map.
+      const current = result.chords.find((c) => c.phase === "active");
+      expect(current?.root).toBe(8);
+      expect(current?.quality).toBe("maj");
+    });
+
     it("still detects Bb major in Eb major key (flat-key spelling)", () => {
       // Bb-D-F (pc 10, 2, 5)
       const root = detectRoot(
@@ -235,7 +303,9 @@ describe("ChordDetectionStabilizer", () => {
       key: { root: PitchClass; mode: "ionian" | "aeolian" },
       t = 1000,
     ): { root: PitchClass; quality: string } | null {
-      const notes = pcs.map((pc) => makeNote(pc, 4, t));
+      // First pc placed at octave 3 so it's the MIDI-lowest (bass) note,
+      // matching root-position voicings the tests describe.
+      const notes = pcs.map((pc, i) => makeNote(pc, i === 0 ? 3 : 4, t));
       const raw1 = createTestRawFrame(t);
       const upstream1 = createTestMusicalFrame(t, "main", {
         notes,
@@ -245,7 +315,7 @@ describe("ChordDetectionStabilizer", () => {
       stabilizer.apply(raw1, upstream1);
 
       const t2 = t + 100;
-      const notes2 = pcs.map((pc) => makeNote(pc, 4, t2));
+      const notes2 = pcs.map((pc, i) => makeNote(pc, i === 0 ? 3 : 4, t2));
       const raw2 = createTestRawFrame(t2);
       const upstream2 = createTestMusicalFrame(t2, "main", {
         notes: notes2,

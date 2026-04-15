@@ -188,8 +188,15 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     // Build active pitch class set (within decay window)
     const activePitchClasses = this.getActivePitchClasses(t);
 
+    // Find the actual bass pitch class (lowest currently-sounding note).
+    // Used to disambiguate Tonal's input-order-sensitive detection: passing
+    // the bass first ensures root-position candidates surface for chords
+    // whose bass matches the root, and slash chords surface when the bass
+    // genuinely differs from the harmonic root.
+    const bassPc = this.getBassPc(upstream.notes);
+
     // Detect chord from active pitch classes
-    const detected = this.detectChordFromPitchClasses(activePitchClasses);
+    const detected = this.detectChordFromPitchClasses(activePitchClasses, bassPc);
 
     // Apply hysteresis
     this.applyHysteresis(detected, t);
@@ -198,7 +205,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     this.pruneOldChords(t);
 
     // Build current chords array
-    const chords = this.buildCurrentChords(t, activePitchClasses);
+    const chords = this.buildCurrentChords(t, activePitchClasses, bassPc);
 
     // Build progression (chord IDs only)
     const progression = this.recentChords.map((c) => c.id);
@@ -227,6 +234,25 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
   /**
    * Get pitch classes that are within the decay window.
    */
+  /**
+   * Return the pitch class of the lowest currently-sounding note, or null
+   * when no notes are active. Uses pitch + octave to find the MIDI-lowest
+   * note, then returns just its pc (since chord detection is pc-based).
+   */
+  private getBassPc(notes: Note[]): PitchClass | null {
+    let lowestMidi = Infinity;
+    let bassPc: PitchClass | null = null;
+    for (const note of notes) {
+      if (note.phase === "release") continue;
+      const midi = note.pitch.pc + note.pitch.octave * 12;
+      if (midi < lowestMidi) {
+        lowestMidi = midi;
+        bassPc = note.pitch.pc;
+      }
+    }
+    return bassPc;
+  }
+
   private getActivePitchClasses(t: Ms): Set<PitchClass> {
     const active = new Set<PitchClass>();
 
@@ -249,7 +275,8 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
    * mapping to "min").
    */
   private detectChordFromPitchClasses(
-    pitchClasses: Set<PitchClass>
+    pitchClasses: Set<PitchClass>,
+    bassPc?: PitchClass | null,
   ): {
     root: PitchClass;
     quality: ChordQuality;
@@ -260,7 +287,23 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
       return null;
     }
 
+    // Put the bass pc first if available — Tonal's Chord.detect uses the
+    // first note as a bass hint when generating candidates. Without this,
+    // iteration order of the pitch-class Set (history-dependent) would
+    // determine whether root-position or slash-chord candidates surface
+    // for a given voicing.
     const pcArray = [...pitchClasses];
+    if (
+      bassPc !== undefined &&
+      bassPc !== null &&
+      pitchClasses.has(bassPc)
+    ) {
+      const idx = pcArray.indexOf(bassPc);
+      if (idx > 0) {
+        pcArray.splice(idx, 1);
+        pcArray.unshift(bassPc);
+      }
+    }
     const noteNames = pcArray.map((pc) => this.pcToNoteName(pc));
 
     // Collect candidate detections from full set and (n-1) subsets.
@@ -490,7 +533,11 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
   /**
    * Build current chords array for output.
    */
-  private buildCurrentChords(t: Ms, activePitchClasses: Set<PitchClass>): MusicalChord[] {
+  private buildCurrentChords(
+    t: Ms,
+    activePitchClasses: Set<PitchClass>,
+    bassPc: PitchClass | null,
+  ): MusicalChord[] {
     const chords: MusicalChord[] = [];
 
     if (this.displayedChord && this.currentChordOnset !== null) {
@@ -514,13 +561,20 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
         this.displayedChord.quality
       );
 
+      // If bass is known and differs from root, chord is in an inversion
+      // (first/second/etc., depending on which chord tone is in the bass).
+      const root = this.displayedChord.root;
+      const actualBass = bassPc ?? root;
+      const rootSemitone = (actualBass - root + 12) % 12;
+      const inversion = this.displayedChord.chordTones.indexOf(rootSemitone);
+
       chords.push({
         id,
-        root: this.displayedChord.root,
+        root,
         quality: this.displayedChord.quality,
         chordTones: this.displayedChord.chordTones,
-        bass: this.displayedChord.root, // Simplified
-        inversion: 0,
+        bass: actualBass,
+        inversion: inversion >= 0 ? inversion : 0,
         voicing,
         noteIds: [], // Not tracked
         onset: this.currentChordOnset,
