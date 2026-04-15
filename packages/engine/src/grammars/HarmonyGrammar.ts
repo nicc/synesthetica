@@ -24,6 +24,7 @@ import type {
   IVisualGrammar,
   GrammarContext,
   AnnotatedMusicalFrame,
+  AnnotatedChord,
   SceneFrame,
   Entity,
   ChordShapeElement,
@@ -156,11 +157,20 @@ const DEFAULT_CONFIG: Required<HarmonyGrammarConfig> = {
 // Grammar Implementation
 // ============================================================================
 
+/** How long the chord shape + label fade out after a chord ends.
+ * Purely to smooth the hard cut — not a lingering temporal trace. */
+const CHORD_FADE_OUT_MS = 180;
+
 export class HarmonyGrammar implements IVisualGrammar {
   readonly id = "harmony-grammar";
 
   private config: Required<HarmonyGrammarConfig>;
   private ctx: GrammarContext | null = null;
+
+  // Fade-out state: when no chord is active, keep rendering the most
+  // recent chord at dropping opacity for CHORD_FADE_OUT_MS.
+  private fadingChord: AnnotatedChord | null = null;
+  private fadingChordEndTime: number | null = null;
 
   constructor(config: HarmonyGrammarConfig = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -172,6 +182,8 @@ export class HarmonyGrammar implements IVisualGrammar {
 
   dispose(): void {
     this.ctx = null;
+    this.fadingChord = null;
+    this.fadingChordEndTime = null;
   }
 
   /**
@@ -183,15 +195,37 @@ export class HarmonyGrammar implements IVisualGrammar {
     const t = input.t;
     const part = input.part;
 
-    // Get the active chord (if any)
+    // Select the chord to render and compute its fade-out opacity.
+    // A held chord renders at full opacity; once the chord ends we keep
+    // rendering the previous one at dropping opacity for CHORD_FADE_OUT_MS
+    // so the transition isn't a hard cut.
     const activeChord = input.chords.find((c) => c.chord.phase === "active");
-    const chord = activeChord ?? input.chords[0];
+    let chord: AnnotatedChord | null = null;
+    let chordOpacity = 1;
+    if (activeChord) {
+      chord = activeChord;
+      chordOpacity = 1;
+      this.fadingChord = activeChord;
+      this.fadingChordEndTime = null;
+    } else if (this.fadingChord) {
+      if (this.fadingChordEndTime === null) {
+        this.fadingChordEndTime = t;
+      }
+      const age = t - this.fadingChordEndTime;
+      if (age < CHORD_FADE_OUT_MS) {
+        chord = this.fadingChord;
+        chordOpacity = 1 - age / CHORD_FADE_OUT_MS;
+      } else {
+        this.fadingChord = null;
+        this.fadingChordEndTime = null;
+      }
+    }
 
-    // Create chord shape entity (simplified for runtime)
     if (chord) {
       const rootElement = chord.shape.elements.find((e) => e.interval === "1");
       const rootColor = rootElement?.color ?? { h: 0, s: 0, v: 0.8, a: 1 };
 
+      // Chord shape
       entities.push({
         id: `${this.id}:chord-shape-${chord.chord.id}`,
         part,
@@ -202,7 +236,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         style: {
           color: rootColor,
           size: 100,
-          opacity: 1,
+          opacity: chordOpacity,
         },
         data: {
           type: "chord-shape",
@@ -212,6 +246,35 @@ export class HarmonyGrammar implements IVisualGrammar {
           margin: chord.shape.margin,
         },
       });
+
+      // Chord label (center of progression wheel). Uses Tonal's chord
+      // name directly — already includes slash notation for inversions
+      // (e.g. "EbM/G"). Mode selects harmonic vs bass-led reading.
+      const labelName =
+        input.chordInterpretation === "bass-led"
+          ? chord.chord.bassLed.name
+          : chord.chord.harmonic.name;
+      if (labelName) {
+        entities.push({
+          id: `${this.id}:chord-label-${chord.chord.id}`,
+          part,
+          kind: "glyph",
+          createdAt: t,
+          updatedAt: t,
+          position: {
+            x: HARMONY_PROGRESSION_CENTER_X,
+            y: HARMONY_PROGRESSION_CENTER_Y,
+          },
+          style: {
+            color: { h: 0, s: 0, v: 1, a: 1 },
+            opacity: chordOpacity,
+          },
+          data: {
+            type: "chord-label",
+            text: labelName,
+          },
+        });
+      }
     }
 
     // --- Progression clock (bottom cell) ---

@@ -551,6 +551,8 @@ export class ThreeJSRenderer implements IRenderer {
 
     if (glyphType === "chord-shape") {
       this.updateChordShape(entity);
+    } else if (glyphType === "chord-label") {
+      this.updateChordLabel(entity);
     } else if (glyphType === "tension-bar") {
       this.updateTensionBar(entity);
     } else if (glyphType === "dynamics-contour") {
@@ -1050,6 +1052,97 @@ export class ThreeJSRenderer implements IRenderer {
     material.opacity = entity.style.opacity ?? 0.8;
   }
 
+
+  // ==========================================================================
+  // Chord Label (canvas-to-texture text at centre of progression wheel)
+  // ==========================================================================
+
+  /**
+   * Render the current chord name (e.g. "EbM", "EbM/G", "Cmaj7") as
+   * a canvas-rendered texture on a PlaneGeometry. The canvas is
+   * regenerated only when the text changes, cached via mesh userData.
+   */
+  private updateChordLabel(entity: Entity): void {
+    if (!this.scene) return;
+
+    const text = entity.data?.text as string | undefined;
+    if (!text) return;
+
+    // Height of the label in world units. Keeps text small relative to
+    // the harmony cell (~30 world units wide) so it reads as a label
+    // rather than a headline.
+    const LABEL_HEIGHT_WORLD = 3.5;
+    const CANVAS_TEXT_PX = 72;
+    // Thin sans — matches the hand-drawn aesthetic without joining the
+    // blocky Roman numeral family.
+    const CANVAS_FONT = `200 ${CANVAS_TEXT_PX}px "Helvetica Neue", -apple-system, "Segoe UI", sans-serif`;
+
+    let mesh = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
+    const existingText = mesh?.userData?.chordLabelText as string | undefined;
+
+    if (!mesh || existingText !== text) {
+      // Dispose old resources before rebuilding
+      if (mesh) {
+        this.scene.remove(mesh);
+        this.disposeObject(mesh);
+      }
+
+      // Measure text to size the canvas with tight bounds
+      const measureCanvas = document.createElement("canvas");
+      const measureCtx = measureCanvas.getContext("2d");
+      if (!measureCtx) return;
+      measureCtx.font = CANVAS_FONT;
+      const metrics = measureCtx.measureText(text);
+      const padding = 16;
+      const textWidth = Math.ceil(metrics.width);
+      const ascent = metrics.actualBoundingBoxAscent || CANVAS_TEXT_PX * 0.75;
+      const descent = metrics.actualBoundingBoxDescent || CANVAS_TEXT_PX * 0.25;
+      const textHeight = Math.ceil(ascent + descent);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = textWidth + padding * 2;
+      canvas.height = textHeight + padding * 2;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Transparent background, white text
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = CANVAS_FONT;
+      ctx.fillStyle = "#ffffff";
+      ctx.textBaseline = "alphabetic";
+      ctx.textAlign = "left";
+      ctx.fillText(text, padding, padding + ascent);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.needsUpdate = true;
+
+      const aspect = canvas.width / canvas.height;
+      const planeW = LABEL_HEIGHT_WORLD * aspect;
+      const planeH = LABEL_HEIGHT_WORLD;
+
+      const geometry = new THREE.PlaneGeometry(planeW, planeH);
+      const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+      });
+      mesh = new THREE.Mesh(geometry, material);
+      mesh.userData = { chordLabelText: text };
+      this.scene.add(mesh);
+      this.entityObjects.set(entity.id, mesh);
+    }
+
+    // Position at the entity's center (normalized → world, y flipped)
+    const worldX = (entity.position?.x ?? 0.5) * this.config.worldWidth;
+    const worldY = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
+    // Slight z offset so the label sits above the progression-clock glyphs
+    mesh.position.set(worldX, worldY, 0.05);
+
+    const material = mesh.material as THREE.MeshBasicMaterial;
+    material.opacity = entity.style.opacity ?? 1;
+  }
 
   // ==========================================================================
   // Roman Numeral Glyphs
