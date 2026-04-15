@@ -393,17 +393,21 @@ export class HarmonyGrammar implements IVisualGrammar {
         entities.push({
           id: `${this.id}:strip-bar:${fc.chordId}`,
           part,
-          kind: "field",
+          // "particle" kind with data.type="note-strip" routes to the
+          // renderer's rect+gradient path (same as rhythm note strips).
+          kind: "particle",
           createdAt: fc.onset,
           updatedAt: t,
-          position: { x: stripX, y: (top + bottom) / 2 },
-          style: { color, opacity: (topOpacity + bottomOpacity) / 2 },
+          position: { x: stripX, y: top },
+          style: {
+            color,
+            // Renderer divides size by 1000 to get world-unit bar width
+            size: barW * 1000,
+            opacity: (topOpacity + bottomOpacity) / 2,
+          },
           data: {
             type: "note-strip",
-            barTop: top,
-            barBottom: bottom,
             barHeight: bottom - top,
-            barWidth: barW,
             topOpacity,
             bottomOpacity,
           },
