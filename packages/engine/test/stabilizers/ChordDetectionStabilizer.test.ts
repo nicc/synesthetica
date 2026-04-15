@@ -160,4 +160,65 @@ describe("ChordDetectionStabilizer", () => {
       expect(detectQuality(stabilizer, [1, 3, 8] as PitchClass[])).toBe("sus2");
     });
   });
+
+  describe("key-aware spelling", () => {
+    /**
+     * Feed notes with a prescribed key and return the detected chord's
+     * root pitch class (or null if no chord detected).
+     */
+    function detectRoot(
+      pcs: PitchClass[],
+      key: { root: PitchClass; mode: "ionian" | "aeolian" },
+      t = 1000,
+    ): PitchClass | null {
+      const notes = pcs.map((pc) => makeNote(pc, 4, t));
+      const raw1 = createTestRawFrame(t);
+      const upstream1 = createTestMusicalFrame(t, "main", {
+        notes,
+        progression: [],
+        prescribedKey: key,
+      });
+      stabilizer.apply(raw1, upstream1);
+
+      const t2 = t + 100;
+      const notes2 = pcs.map((pc) => makeNote(pc, 4, t2));
+      const raw2 = createTestRawFrame(t2);
+      const upstream2 = createTestMusicalFrame(t2, "main", {
+        notes: notes2,
+        progression: [],
+        prescribedKey: key,
+      });
+      const result = stabilizer.apply(raw2, upstream2);
+      if (result.chords.length === 0) return null;
+      return result.chords[0].root;
+    }
+
+    it("detects D major in D major key (sharp-key spelling)", () => {
+      // D-F#-A (pc 2, 6, 9). Without key-aware spelling, pc 6 becomes
+      // "Gb" and Tonal.Chord.detect fails to find a clean D triad.
+      const root = detectRoot(
+        [2, 6, 9] as PitchClass[],
+        { root: 2 as PitchClass, mode: "ionian" },
+      );
+      expect(root).toBe(2); // D
+    });
+
+    it("detects A major in A major key", () => {
+      // A-C#-E (pc 9, 1, 4)
+      const root = detectRoot(
+        [9, 1, 4] as PitchClass[],
+        { root: 9 as PitchClass, mode: "ionian" },
+      );
+      expect(root).toBe(9); // A
+    });
+
+    it("still detects Bb major in Eb major key (flat-key spelling)", () => {
+      // Bb-D-F (pc 10, 2, 5)
+      const root = detectRoot(
+        [10, 2, 5] as PitchClass[],
+        { root: 3 as PitchClass, mode: "ionian" },
+      );
+      expect(root).toBe(10); // Bb
+    });
+  });
 });

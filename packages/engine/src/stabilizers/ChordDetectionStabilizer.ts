@@ -46,8 +46,10 @@ import type {
   Provenance,
   PartId,
   Confidence,
+  PrescribedKey,
 } from "@synesthetica/contracts";
 import { createChordId, createEmptyMusicalFrame } from "@synesthetica/contracts";
+import { buildSpellingTable, pitchClassToNoteName } from "../utils/pitchSpelling";
 
 /**
  * Configuration for the ChordDetectionStabilizer.
@@ -127,6 +129,12 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
   // Track chord onset for duration calculation
   private currentChordOnset: Ms | null = null;
 
+  // Cached pitch-class → note-name spelling table for the prescribed key.
+  // Rebuilt when the key changes; null when no key is set (falls back to
+  // default flat-preferring spelling).
+  private spellingTable: Record<PitchClass, string> | null = null;
+  private lastKeyKey: string | null = null;
+
   constructor(config: ChordDetectionConfig) {
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.provenance = {
@@ -159,6 +167,9 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     }
 
     const t = raw.t;
+
+    // Refresh the spelling table if the prescribed key changed
+    this.refreshSpellingTable(upstream.prescribedKey);
 
     // Update pitch class timestamps from active notes
     this.updatePitchClassTimestamps(upstream.notes, t);
@@ -466,8 +477,18 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
   // === Conversion helpers ===
 
   private pcToNoteName(pc: PitchClass): string {
-    const names = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
-    return names[pc];
+    return pitchClassToNoteName(pc, this.spellingTable ?? undefined);
+  }
+
+  /**
+   * Rebuild the spelling table when the prescribed key changes. Cheap to
+   * check, expensive to rebuild — skip the work when the key is stable.
+   */
+  private refreshSpellingTable(key: PrescribedKey | null): void {
+    const keySig = key ? `${key.root}:${key.mode}` : "";
+    if (keySig === this.lastKeyKey) return;
+    this.lastKeyKey = keySig;
+    this.spellingTable = key ? buildSpellingTable(key) : null;
   }
 
   private noteNameToPitchClass(noteName: string): PitchClass {
