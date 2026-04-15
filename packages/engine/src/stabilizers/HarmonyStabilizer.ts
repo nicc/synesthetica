@@ -426,7 +426,7 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
         if (!last) {
           this.progression.push(currentFunction);
         } else if (last.chordId !== currentFunction.chordId) {
-          // Mark previous chord as released at this frame time
+          // Different chord — mark previous as released, push new
           if (last.releaseTime === null) {
             this.progression[this.progression.length - 1] = {
               ...last,
@@ -434,8 +434,16 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
             };
           }
           this.progression.push(currentFunction);
+        } else if (last.releaseTime !== null) {
+          // Same chord reactivated after a brief inactive blip (e.g.
+          // pitch-decay flicker during continuous play). Clear the
+          // release marker so the glyph returns to its held state.
+          this.progression[this.progression.length - 1] = {
+            ...last,
+            releaseTime: null,
+          };
         }
-        // else: same chord still active — no change
+        // else: same chord still active with no release — no change
       } else if (last && last.releaseTime === null) {
         // No active chord but the last progression entry hasn't been marked
         // as released yet — set its release time now.
