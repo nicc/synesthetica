@@ -64,10 +64,11 @@ export const GAP_RIGHT = 0.07;
 export const NOTE_STRIP_BASE_WIDTH = 0.015;
 
 /** Duration-bar width in the chord strip.
- * Chosen as 1/φ (golden ratio inverse ≈ 0.618) of the note-strip base —
- * "just over half" a note strip. Signals "similar but distinct"
- * from the rhythm note strips. */
-export const CHORD_STRIP_BAR_WIDTH = NOTE_STRIP_BASE_WIDTH * 0.618;
+ * 1/φ² (≈ 0.382) of NOTE_STRIP_BASE_WIDTH — clearly thinner than
+ * even the softest-velocity note strip (0.5× base). Keeps the strip
+ * reading as related-but-distinct from note strips across all
+ * playing dynamics. */
+export const CHORD_STRIP_BAR_WIDTH = NOTE_STRIP_BASE_WIDTH * 0.382;
 
 /** Width of the chord-strip column (used to place the glyph centre).
  * Wider than the bar so the glyph has room. */
