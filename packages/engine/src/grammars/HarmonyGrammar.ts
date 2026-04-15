@@ -66,7 +66,16 @@ const PROGRESSION_FADE_VALUE = 3;
  * Opacity is derived from brightness by dividing out the stroke-width
  * area growth, so the fade looks even-tempered regardless of chunkiness.
  */
-const RELEASE_BRIGHTNESS_STEP = 0.20;
+const RELEASE_BRIGHTNESS_STEP = 0.30;
+
+/**
+ * Exponent applied to the stroke-width ratio when compensating opacity.
+ * Linear (1.0) matches raw pixel coverage, but human vision treats
+ * growing shapes as attention-grabbing events that read as brighter;
+ * exponents > 1 dim more aggressively as strokes thicken so the fade
+ * feels monotonically dimmer throughout.
+ */
+const WIDTH_COMPENSATION_EXPONENT = 1.5;
 
 /** Stroke width (pixels) while chord is held or fresh */
 const STROKE_WIDTH_FRESH = 2;
@@ -265,7 +274,7 @@ export class HarmonyGrammar implements IVisualGrammar {
           STROKE_WIDTH_FRESH +
           (STROKE_WIDTH_FADED - STROKE_WIDTH_FRESH) * ageFraction;
         const widthRatio = strokeWidth / STROKE_WIDTH_FRESH;
-        opacity = brightness / widthRatio;
+        opacity = brightness / Math.pow(widthRatio, WIDTH_COMPENSATION_EXPONENT);
       }
       if (opacity < 0.01) continue;
 
