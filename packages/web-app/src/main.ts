@@ -386,7 +386,10 @@ function toggleMetronome(): void {
   if (metronome.isRunning()) {
     metronome.stop();
   } else {
-    metronome.start();
+    // Phase-align to the pipeline's session clock so clicks fall on
+    // the same beat boundaries as the visual grid.
+    const sessionTime = pipeline?.getSessionTime();
+    metronome.start(sessionTime);
   }
   updateMetronomeButton();
 }

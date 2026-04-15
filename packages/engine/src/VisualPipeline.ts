@@ -177,6 +177,11 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     this.prescribedKey = key;
   }
 
+  /** Current session time (ms since pipeline started). */
+  getSessionTime(): SessionMs {
+    return this.currentTime;
+  }
+
   // === IPipeline ===
 
   requestFrame(targetTime: SessionMs): SceneFrame {

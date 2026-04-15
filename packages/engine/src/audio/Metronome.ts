@@ -67,15 +67,37 @@ export class Metronome {
     return this.running;
   }
 
-  start(): void {
+  /**
+   * Start the metronome. Optionally pass the current session time (ms
+   * since whatever clock the visual grid is anchored to) so the first
+   * click phase-aligns to the next beat boundary of that clock, with
+   * the correct beat-number within the bar. Without it, the metronome
+   * free-runs from "now".
+   */
+  start(sessionTimeMs?: number): void {
     if (this.running || this.tempo === null) return;
     // Resume context if it was suspended (browsers require user gesture)
     if (this.ctx.state === "suspended") {
       void this.ctx.resume();
     }
     this.running = true;
-    this.nextBeatTime = this.ctx.currentTime + 0.05;
-    this.nextBeatNumber = 0;
+
+    const beatMs = 60000 / this.tempo;
+    if (sessionTimeMs !== undefined) {
+      // Phase-align to the session clock. Find the next beat boundary
+      // (where sessionTime is a positive multiple of beatMs) and map
+      // that moment onto the audio clock.
+      const currentBeatFractional = sessionTimeMs / beatMs;
+      const nextBeatIndex = Math.ceil(currentBeatFractional + 1e-9);
+      const nextBeatSessionMs = nextBeatIndex * beatMs;
+      const deltaMs = nextBeatSessionMs - sessionTimeMs;
+      this.nextBeatTime = this.ctx.currentTime + deltaMs / 1000;
+      this.nextBeatNumber = nextBeatIndex % this.beatsPerBar;
+    } else {
+      this.nextBeatTime = this.ctx.currentTime + 0.05;
+      this.nextBeatNumber = 0;
+    }
+
     this.schedulerId = setInterval(() => this.schedule(), SCHEDULER_INTERVAL_MS);
   }
 
