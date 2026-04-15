@@ -33,6 +33,7 @@ import type {
   PrescribedKey,
   ModeId,
   ChordQuality,
+  ChordInterpretationMode,
 } from "@synesthetica/contracts";
 import { createEmptyMusicalFrame } from "@synesthetica/contracts";
 import { Mode, Key } from "tonal";
@@ -272,13 +273,16 @@ function analyzeChord(
   chord: MusicalChord,
   key: PrescribedKey,
   diatonicTable: DiatonicEntry[],
+  mode: ChordInterpretationMode,
 ): FunctionalChord {
-  // Functional analysis uses the harmonic interpretation — that's the
-  // reading that maps to Roman-numeral scale degrees. Bass-led would
-  // give different numerals for the same voicing; Phase 4's mode
-  // toggle can revisit this.
-  const rootPc = chord.harmonic.root;
-  const quality = chord.harmonic.quality;
+  // Functional analysis follows the selected interpretation mode so
+  // Roman numerals agree with the chord shape's root. In harmonic mode
+  // an Eb/G inversion reads as "I" (Eb is the tonic of Eb major); in
+  // bass-led mode the same voicing reads from G as root → different
+  // degree and quality.
+  const interp = mode === "bass-led" ? chord.bassLed : chord.harmonic;
+  const rootPc = interp.root;
+  const quality = interp.quality;
 
   // Find the closest scale degree
   let degree = -1;
@@ -423,7 +427,12 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
       const activeChord = upstream.chords.find((c) => c.phase === "active");
 
       if (activeChord) {
-        currentFunction = analyzeChord(activeChord, key, diatonicTable);
+        currentFunction = analyzeChord(
+          activeChord,
+          key,
+          diatonicTable,
+          upstream.chordInterpretation,
+        );
       }
 
       const last = this.progression[this.progression.length - 1];
