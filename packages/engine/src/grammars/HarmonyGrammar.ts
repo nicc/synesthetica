@@ -58,7 +58,7 @@ import {
  * - With tempo: bars
  * Default: 6 (6 seconds or 6 bars)
  */
-const PROGRESSION_FADE_VALUE = 6;
+const PROGRESSION_FADE_VALUE = 3;
 
 /** Immediate opacity step-down on release (fraction of full opacity) */
 const RELEASE_OPACITY_STEP = 0.10;
@@ -182,7 +182,6 @@ export class HarmonyGrammar implements IVisualGrammar {
     // Only renders when a key is prescribed and there's progression data
     const key = input.prescribedKey;
     const progression = input.harmonicContext.functionalProgression;
-    const currentFunction = input.harmonicContext.currentFunction;
 
     if (key && progression.length > 0) {
       // Compute fade window: bars if tempo set, seconds otherwise
@@ -198,10 +197,7 @@ export class HarmonyGrammar implements IVisualGrammar {
       }
 
       entities.push(
-        ...this.createProgressionClock(
-          progression, t, part, key.root, fadeMs,
-          currentFunction?.chordId ?? null,
-        ),
+        ...this.createProgressionClock(progression, t, part, key.root, fadeMs),
       );
     }
 
@@ -227,7 +223,6 @@ export class HarmonyGrammar implements IVisualGrammar {
     part: string,
     tonicPc: PitchClass,
     fadeMs: number,
-    activeChordId: string | null,
   ): Entity[] {
     const entities: Entity[] = [];
     const clockRadius = HARMONY_CELL_SIZE * CLOCK_RADIUS_FRACTION;
@@ -235,16 +230,15 @@ export class HarmonyGrammar implements IVisualGrammar {
 
     for (let i = 0; i < progression.length; i++) {
       const fc = progression[i];
-      const age = t - fc.onset;
 
-      if (age < 0 || age >= fadeMs) continue;
-
-      // Opacity: full while chord is held, then step down + fade
+      // Opacity: full while held (no release time), step down + fade after release
       let opacity: number;
-      if (fc.chordId === activeChordId) {
+      if (fc.releaseTime === null) {
         opacity = 1.0;
       } else {
-        const fadeFraction = 1 - age / fadeMs;
+        const ageSinceRelease = t - fc.releaseTime;
+        if (ageSinceRelease < 0 || ageSinceRelease >= fadeMs) continue;
+        const fadeFraction = 1 - ageSinceRelease / fadeMs;
         opacity = (1 - RELEASE_OPACITY_STEP) * fadeFraction;
       }
       if (opacity < 0.01) continue;

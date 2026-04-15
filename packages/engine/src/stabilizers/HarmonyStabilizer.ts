@@ -308,6 +308,7 @@ function analyzeChord(
     borrowed,
     chordId: chord.id,
     onset: chord.onset,
+    releaseTime: null,
   };
 }
 
@@ -414,25 +415,37 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
     if (key) {
       keyAware = true;
       const diatonicTable = buildDiatonicTable(key);
-      const activeChord =
-        upstream.chords.find((c) => c.phase === "active") ?? upstream.chords[0];
+      const activeChord = upstream.chords.find((c) => c.phase === "active");
 
       if (activeChord) {
         currentFunction = analyzeChord(activeChord, key, diatonicTable);
+      }
 
-        // Add to progression if new (different chordId from last entry)
-        const lastInProgression =
-          this.progression[this.progression.length - 1];
-        if (
-          !lastInProgression ||
-          lastInProgression.chordId !== currentFunction.chordId
-        ) {
+      const last = this.progression[this.progression.length - 1];
+      if (currentFunction) {
+        if (!last) {
+          this.progression.push(currentFunction);
+        } else if (last.chordId !== currentFunction.chordId) {
+          // Mark previous chord as released at this frame time
+          if (last.releaseTime === null) {
+            this.progression[this.progression.length - 1] = {
+              ...last,
+              releaseTime: raw.t,
+            };
+          }
           this.progression.push(currentFunction);
         }
-
-        // Prune old entries
-        this.pruneProgression(raw.t);
+        // else: same chord still active — no change
+      } else if (last && last.releaseTime === null) {
+        // No active chord but the last progression entry hasn't been marked
+        // as released yet — set its release time now.
+        this.progression[this.progression.length - 1] = {
+          ...last,
+          releaseTime: raw.t,
+        };
       }
+
+      this.pruneProgression(raw.t);
     }
 
     const harmonicContext: HarmonicContext = {
@@ -459,7 +472,8 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
     const cutoff = t - this.config.progressionWindowMs;
     while (
       this.progression.length > 0 &&
-      this.progression[0].onset < cutoff
+      this.progression[0].releaseTime !== null &&
+      this.progression[0].releaseTime < cutoff
     ) {
       this.progression.shift();
     }

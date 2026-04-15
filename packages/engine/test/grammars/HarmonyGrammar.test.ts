@@ -241,8 +241,10 @@ describe("HarmonyGrammar", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 0 },
-            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "test:4000:Gmaj", onset: 4000 },
+            // Released 2000ms ago — well into 3000ms fade
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 0, releaseTime: 3000 },
+            // Released 500ms ago — barely faded
+            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "test:4000:Gmaj", onset: 4000, releaseTime: 4500 },
           ],
         },
       });
@@ -265,16 +267,16 @@ describe("HarmonyGrammar", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 0 },
-            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "test:9000:Gmaj", onset: 9000 },
+            // Released at t=1000, age=9000 → past 3000ms fade → omitted
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 0, releaseTime: 1000 },
+            // Released at t=9500, age=500 → still visible
+            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "test:9000:Gmaj", onset: 9000, releaseTime: 9500 },
           ],
         },
       });
       const scene = grammar.update(frame, null);
       const progEntities = scene.entities.filter((e) => e.data?.type === "roman-numeral");
 
-      // I (onset=0, age=10000) is past 6000ms fade → omitted
-      // V (onset=9000, age=1000) → visible
       expect(progEntities).toHaveLength(1);
     });
   });

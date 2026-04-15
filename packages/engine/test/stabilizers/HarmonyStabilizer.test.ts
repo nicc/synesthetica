@@ -359,7 +359,7 @@ describe("HarmonyStabilizer", () => {
       expect(result.harmonicContext?.functionalProgression).toHaveLength(1);
     });
 
-    it("prunes old entries from progression", () => {
+    it("prunes entries whose release time is past the window", () => {
       const shortWindow = new HarmonyStabilizer({
         partId: "main",
         progressionWindowMs: 5000,
@@ -368,7 +368,7 @@ describe("HarmonyStabilizer", () => {
 
       const cMajor: PrescribedKey = { root: 0, mode: "ionian" };
 
-      // Chord at t=1000
+      // C at t=1000
       const chord1 = createChord(0, "maj", [
         { pc: 0, octave: 4 },
         { pc: 4, octave: 4 },
@@ -379,20 +379,33 @@ describe("HarmonyStabilizer", () => {
         createUpstreamFrame(1000, [chord1], cMajor),
       );
 
-      // Chord at t=7000 (6s later, past 5s window)
+      // G at t=2000 — releases C at t=2000
       const chord2 = createChord(7 as PitchClass, "maj", [
         { pc: 7 as PitchClass, octave: 3 },
         { pc: 11 as PitchClass, octave: 3 },
         { pc: 2 as PitchClass, octave: 4 },
-      ], 7000);
-      const result = shortWindow.apply(
-        createTestRawFrame(7000),
-        createUpstreamFrame(7000, [chord2], cMajor),
+      ], 2000);
+      shortWindow.apply(
+        createTestRawFrame(2000),
+        createUpstreamFrame(2000, [chord2], cMajor),
       );
 
-      // chord1 (onset=1000) should be pruned at t=7000 with 5s window
-      expect(result.harmonicContext?.functionalProgression).toHaveLength(1);
+      // F at t=8000 — releases G at t=8000
+      // C's releaseTime (2000) is now 6s old, past the 5s window → pruned
+      const chord3 = createChord(5 as PitchClass, "maj", [
+        { pc: 5 as PitchClass, octave: 3 },
+        { pc: 9 as PitchClass, octave: 3 },
+        { pc: 0 as PitchClass, octave: 4 },
+      ], 8000);
+      const result = shortWindow.apply(
+        createTestRawFrame(8000),
+        createUpstreamFrame(8000, [chord3], cMajor),
+      );
+
+      // C pruned (released long ago). G and F remain.
+      expect(result.harmonicContext?.functionalProgression).toHaveLength(2);
       expect(result.harmonicContext?.functionalProgression[0].roman).toBe("V");
+      expect(result.harmonicContext?.functionalProgression[1].roman).toBe("IV");
     });
 
     it("clears progression on reset", () => {

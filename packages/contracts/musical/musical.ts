@@ -288,6 +288,8 @@ export interface FunctionalChord {
   chordId: ChordId;
   /** Onset time of the chord */
   onset: Ms;
+  /** When the chord stopped being active. Null while still being held. */
+  releaseTime: Ms | null;
 }
 
 /**
