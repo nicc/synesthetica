@@ -48,8 +48,9 @@ const CHEVRON_W = 0.5;
 /** Height of the tiny stroke used as the "dot" for lowercase i */
 const DOT_HEIGHT = 0.06;
 
-/** Gap between stroke top and bottom of dot stroke */
-const DOT_GAP = 0.1;
+/** Gap between stroke top and bottom of dot stroke (in glyph units).
+ * Wide enough that thick fade-strokes don't visually merge with the i body. */
+const DOT_GAP = 0.18;
 
 /** Suffix scale relative to base numeral height */
 const SUFFIX_SCALE = 0.35;

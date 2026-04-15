@@ -1077,8 +1077,28 @@ export class ThreeJSRenderer implements IRenderer {
     const offsetX = -(glyphW * scale) / 2;
     const offsetY = -(glyphH * scale) / 2;
 
-    // Render polylines — each as a single Line2 so corner joins stay
-    // clean and don't stack alpha during transparent fades.
+    // Render polylines — each as a single Line2. Use Max blending so
+    // overlapping segment quads at joints don't stack alpha (Line2 has
+    // no built-in miter join, so adjacent segments overlap by ~half
+    // linewidth at each vertex).
+    const makeGlyphMaterial = () => {
+      const mat = new LineMaterial({
+        color: threeColor.getHex(),
+        linewidth: strokeWidth,
+        transparent: true,
+        opacity,
+        resolution: new THREE.Vector2(this.resolution.x, this.resolution.y),
+      });
+      mat.blending = THREE.CustomBlending;
+      mat.blendEquation = THREE.MaxEquation;
+      mat.blendSrc = THREE.OneFactor;
+      mat.blendDst = THREE.OneFactor;
+      mat.blendEquationAlpha = THREE.MaxEquation;
+      mat.blendSrcAlpha = THREE.OneFactor;
+      mat.blendDstAlpha = THREE.OneFactor;
+      return mat;
+    };
+
     if (polylines) {
       for (const poly of polylines) {
         if (poly.length < 2) continue;
@@ -1088,20 +1108,14 @@ export class ThreeJSRenderer implements IRenderer {
         }
         const lineGeom = new LineGeometry();
         lineGeom.setPositions(positions);
-        const lineMat = new LineMaterial({
-          color: threeColor.getHex(),
-          linewidth: strokeWidth,
-          transparent: true,
-          opacity,
-          resolution: new THREE.Vector2(this.resolution.x, this.resolution.y),
-        });
-        const line = new Line2(lineGeom, lineMat);
+        const line = new Line2(lineGeom, makeGlyphMaterial());
         group.add(line);
       }
     }
 
-    // Render arcs (circles for ° and ø) — use Line2/LineMaterial so
-    // linewidth grows consistently with the segments during fade.
+    // Render arcs (circles for ° and ø) using the same Max-blending
+    // material so the closed loop's self-overlap at the seam doesn't
+    // stack either.
     if (arcs) {
       for (const arc of arcs) {
         const arcSegments = 24;
@@ -1116,14 +1130,7 @@ export class ThreeJSRenderer implements IRenderer {
         }
         const arcGeom = new LineGeometry();
         arcGeom.setPositions(positions);
-        const arcMat = new LineMaterial({
-          color: threeColor.getHex(),
-          linewidth: strokeWidth,
-          transparent: true,
-          opacity,
-          resolution: new THREE.Vector2(this.resolution.x, this.resolution.y),
-        });
-        const arcLine = new Line2(arcGeom, arcMat);
+        const arcLine = new Line2(arcGeom, makeGlyphMaterial());
         group.add(arcLine);
       }
     }
