@@ -104,6 +104,24 @@ export function buildSpellingTable(key: PrescribedKey): Record<PitchClass, strin
 }
 
 /**
+ * Build the set of diatonic pitch classes for a given key. Used by
+ * downstream logic (e.g. key-aware chord scoring) to ask "is this pc
+ * in the scale?" in O(1).
+ */
+export function buildDiatonicPitchClasses(key: PrescribedKey): Set<PitchClass> {
+  const tonicName = TONIC_NAMES[key.root];
+  const scaleName = MODE_TO_SCALE[key.mode];
+  const scale = Scale.get(`${tonicName} ${scaleName}`);
+
+  const set = new Set<PitchClass>();
+  for (const noteName of scale.notes) {
+    const pc = noteNameToPitchClass(noteName);
+    if (pc !== null) set.add(pc);
+  }
+  return set;
+}
+
+/**
  * Spell a pitch class using the given spelling table, or the default
  * flat-preferring table when no table is provided.
  */

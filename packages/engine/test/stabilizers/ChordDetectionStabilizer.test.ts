@@ -266,10 +266,11 @@ describe("ChordDetectionStabilizer", () => {
       expect(result?.root).toBe(8); // Ab
     });
 
-    it.fails("detects Ab11 in Ab major (Ab-C-Eb-Gb-Bb-Db)", () => {
+    it("detects Ab11 in Ab major (Ab-C-Eb-Gb-Bb-Db)", () => {
       // Ab11 = Ab(8) + C(0) + Eb(3) + Gb(6) + Bb(10) + Db(1)
-      // 6-note voicing still misdetects — Tonal's full-set match is
-      // ambiguous and no single chord name covers all 6 tones cleanly.
+      // Tonal's full-set match returns slash-chord candidates (Bbm11A/Ab,
+      // Gb69#11/Ab). The key-aware scoring bias plus slash-chord
+      // demotion lets the root-position Ab11 from subset detection win.
       const result = detect(
         [8, 0, 3, 6, 10, 1] as PitchClass[],
         { root: 8 as PitchClass, mode: "ionian" },
@@ -293,6 +294,28 @@ describe("ChordDetectionStabilizer", () => {
         { root: 0 as PitchClass, mode: "ionian" },
       );
       expect(result?.root).toBe(2); // D
+    });
+
+    it("detects a borrowed chord (Ab7 in C major) without over-biasing to key", () => {
+      // Ab7 = Ab(8) + C(0) + Eb(3) + Gb(6). In C major, Ab is non-diatonic
+      // (♭VI). A naive key-aware scorer might prefer a diatonic
+      // interpretation — but Ab7 is the correct name for this voicing.
+      const result = detect(
+        [8, 0, 3, 6] as PitchClass[],
+        { root: 0 as PitchClass, mode: "ionian" },
+      );
+      expect(result?.root).toBe(8); // Ab, not some diatonic alternative
+    });
+
+    it("detects a secondary dominant (D7 in C major)", () => {
+      // D7 = D(2) + F#(6) + A(9) + C(0). F# is non-diatonic in C major.
+      // D7 is V/V and should be detected as D7, not D (triad without 7th).
+      const result = detect(
+        [2, 6, 9, 0] as PitchClass[],
+        { root: 0 as PitchClass, mode: "ionian" },
+      );
+      expect(result?.root).toBe(2); // D
+      expect(result?.quality).toBe("dom7");
     });
 
     // G13 and Cadd9 already detect correctly under the current scoring

@@ -49,7 +49,11 @@ import type {
   PrescribedKey,
 } from "@synesthetica/contracts";
 import { createChordId, createEmptyMusicalFrame } from "@synesthetica/contracts";
-import { buildSpellingTable, pitchClassToNoteName } from "../utils/pitchSpelling";
+import {
+  buildSpellingTable,
+  buildDiatonicPitchClasses,
+  pitchClassToNoteName,
+} from "../utils/pitchSpelling";
 
 /**
  * Configuration for the ChordDetectionStabilizer.
@@ -137,6 +141,9 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
   // Rebuilt when the key changes; null when no key is set (falls back to
   // default flat-preferring spelling).
   private spellingTable: Record<PitchClass, string> | null = null;
+  // Set of diatonic pitch classes for the current key, used by the
+  // key-aware scoring bias. null when no key is set.
+  private diatonicPcs: Set<PitchClass> | null = null;
   private lastKeyKey: string | null = null;
 
   constructor(config: ChordDetectionConfig) {
@@ -267,8 +274,11 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
       chordTones: number[];
       coverage: number;
       complexity: number;
+      keyFit: number;
+      isSlash: boolean;
     };
     const candidates: Candidate[] = [];
+    const diatonicPcs = this.diatonicPcs;
 
     const tryDetect = (names: string[]): void => {
       const detected = Tonal.Chord.detect(names);
@@ -277,6 +287,10 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
         if (!chord.tonic || !chord.intervals || chord.intervals.length === 0) {
           continue;
         }
+        // Slash chords (e.g. "Ab/C", "Gb69#11/Ab") name a chord with a
+        // specific bass. In ambiguous voicings these compete with
+        // root-position interpretations that usually read more naturally.
+        const isSlash = name.includes("/");
 
         // Parse Tonal's interval names ("1P", "3M", "5P", "7m", "9M", …)
         // into pitch-class semitones.
@@ -298,21 +312,38 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
           if (chordTones.includes(semitones)) coverage++;
         }
 
+        // Key fit (0–1): half weight on root-diatonic, half on fraction
+        // of chord tones that are diatonic. Zero when no key is set.
+        let keyFit = 0;
+        if (diatonicPcs) {
+          const rootDiatonic = diatonicPcs.has(root) ? 0.5 : 0;
+          let toneMatches = 0;
+          for (const t of chordTones) {
+            const pc = ((root + t) % 12) as PitchClass;
+            if (diatonicPcs.has(pc)) toneMatches++;
+          }
+          const tonesDiatonic = 0.5 * (toneMatches / chordTones.length);
+          keyFit = rootDiatonic + tonesDiatonic;
+        }
+
         candidates.push({
           root,
           quality,
           chordTones,
           coverage,
           complexity: chordTones.length,
+          keyFit,
+          isSlash,
         });
       }
     };
 
+    // Always collect full-set and (n-1) subset candidates. Subsets can
+    // surface root-position chords (e.g. "Ab11") that Tonal's full-set
+    // detection names only as slash chords. Coverage is still scored
+    // against the original input so lower-coverage subsets can't win.
     tryDetect(noteNames);
-
-    // Fall back to (n-1) subsets if the full set produced no candidates
-    // (some voicings aren't a named chord but their subsets are).
-    if (candidates.length === 0 && noteNames.length > this.config.minPitchClasses) {
+    if (noteNames.length > this.config.minPitchClasses) {
       for (let i = 0; i < noteNames.length; i++) {
         const subset = noteNames.filter((_, j) => j !== i);
         tryDetect(subset);
@@ -321,10 +352,25 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
 
     if (candidates.length === 0) return null;
 
-    // Prefer higher coverage. On ties, prefer the simpler chord
-    // (fewer theoretical tones) — the more parsimonious interpretation.
+    // Tiebreaker chain:
+    //   1. Effective coverage desc — coverage minus a 1-note penalty for
+    //      slash chords. Tonal sometimes names a full-voicing chord only
+    //      as a slash ("Bbm11A/Ab") when the root-position alternative
+    //      ("Ab11") by convention omits the 3rd and so technically covers
+    //      one fewer note. Equalising them here lets the root-position
+    //      win on the next tiebreaker. A higher-coverage slash chord can
+    //      still beat a lower-coverage non-slash (effective cov prevails).
+    //   2. Non-slash preferred — root-position is the parsimonious read.
+    //   3. Key fit desc — when a key is set, diatonic tones win.
+    //   4. Complexity asc — simpler interpretations when still tied.
+    const effectiveCoverage = (c: Candidate): number =>
+      c.coverage - (c.isSlash ? 1 : 0);
     candidates.sort((a, b) => {
-      if (b.coverage !== a.coverage) return b.coverage - a.coverage;
+      const ea = effectiveCoverage(a);
+      const eb = effectiveCoverage(b);
+      if (eb !== ea) return eb - ea;
+      if (a.isSlash !== b.isSlash) return a.isSlash ? 1 : -1;
+      if (diatonicPcs && b.keyFit !== a.keyFit) return b.keyFit - a.keyFit;
       return a.complexity - b.complexity;
     });
     const best = candidates[0];
@@ -517,6 +563,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     if (keySig === this.lastKeyKey) return;
     this.lastKeyKey = keySig;
     this.spellingTable = key ? buildSpellingTable(key) : null;
+    this.diatonicPcs = key ? buildDiatonicPitchClasses(key) : null;
   }
 
   private noteNameToPitchClass(noteName: string): PitchClass {
