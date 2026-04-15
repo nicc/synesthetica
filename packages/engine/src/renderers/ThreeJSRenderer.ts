@@ -1089,9 +1089,14 @@ export class ThreeJSRenderer implements IRenderer {
         opacity,
         resolution: new THREE.Vector2(this.resolution.x, this.resolution.y),
       });
+      // Custom blending: pre-multiply color by alpha, then take per-channel
+      // max against destination. This avoids alpha stacking at line joints
+      // (overlapping segments produce max, not sum) while still honouring
+      // opacity for fade — without it the color stays at full intensity
+      // regardless of opacity.
       mat.blending = THREE.CustomBlending;
       mat.blendEquation = THREE.MaxEquation;
-      mat.blendSrc = THREE.OneFactor;
+      mat.blendSrc = THREE.SrcAlphaFactor;
       mat.blendDst = THREE.OneFactor;
       mat.blendEquationAlpha = THREE.MaxEquation;
       mat.blendSrcAlpha = THREE.OneFactor;
