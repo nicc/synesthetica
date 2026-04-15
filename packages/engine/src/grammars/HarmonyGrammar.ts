@@ -109,7 +109,7 @@ const STRIP_STROKE_WIDTH = 1.5;
 const STRIP_BAR_OPACITY = 0.25;
 
 /** Chord-duration bar width as fraction of strip width */
-const STRIP_BAR_WIDTH_FRACTION = 0.4;
+const STRIP_BAR_WIDTH_FRACTION = 0.27;
 
 /** Default pitch-hue invariant (A = red, clockwise) */
 const DEFAULT_HUE_INVARIANT = {

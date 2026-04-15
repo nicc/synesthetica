@@ -62,8 +62,10 @@ export const GAP_RIGHT = 0.04;
 /** Width of the scrolling chord-glyph strip in normalized coords. */
 export const CHORD_STRIP_WIDTH = 0.03;
 
-/** Left edge of the chord strip (sits inside GAP_RIGHT). */
-export const CHORD_STRIP_LEFT_OFFSET_FROM_GAP = 0.002;
+/** Left edge of the chord strip (sits inside GAP_RIGHT).
+ * Gives the strip visual breathing room from the rhythm column so it
+ * reads as a midground between rhythm and harmony glyphs. */
+export const CHORD_STRIP_LEFT_OFFSET_FROM_GAP = 0.008;
 
 // ============================================================================
 // Harmony Column (right)
