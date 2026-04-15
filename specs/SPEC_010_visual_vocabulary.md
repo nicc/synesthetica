@@ -129,6 +129,43 @@ template that covers triads and common 7ths only. Future work: alterations
 (♭9, ♯9, ♯11) should be classified as lines even when present in
 `chordTones` — tracked under the chord-detection umbrella.
 
+## Chord Interpretation Modes
+
+Every played voicing admits multiple valid readings. A voicing like
+G-Bb-Eb could be read harmonically as Eb major in first inversion
+(EbM/G) or from the bass as G minor with an augmented 5th (Gm#5).
+Neither is universally correct; they encode different questions.
+
+The vocabulary exposes both readings on `MusicalChord` (via
+`harmonic` and `bassLed` fields, each a `ChordInterpretation`).
+Grammars pick one based on a runtime interpretation mode:
+
+- **`harmonic`** (default): identifies the simplest chord whose
+  interval set explains the voicing, ignoring which note is lowest
+  for root selection. Inversions are represented with slash notation
+  (EbM/G). Matches classical theory and lead-sheet conventions.
+- **`bass-led`**: forces root = bass and fits the best quality.
+  Matches figured-bass analysis and bass-line-focused listening.
+
+Both readings use the same `ChordInterpretation` shape:
+
+```ts
+interface ChordInterpretation {
+  root: PitchClass;
+  quality: ChordQuality;
+  chordTones: number[];
+  name: string;
+  confidence: Confidence;
+}
+```
+
+The chord-shape geometry is identical across modes — only the
+selected interpretation's root/chordTones drive it. When a chord is
+inverted (`harmonic.root !== bass`), optional bass-spoke decoration
+(e.g. thicker outline on the wedge corresponding to bass) visually
+indicates the voicing arrangement. The decoration is a composition
+of existing primitives, not a new visual element.
+
 ## Advisory Properties (Grammar-Level)
 
 These are not constrained by vocabulary. Grammars have full control:

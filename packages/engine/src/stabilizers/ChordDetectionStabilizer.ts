@@ -101,6 +101,50 @@ const DEFAULT_CONFIG: Required<Omit<ChordDetectionConfig, "partId">> = {
 };
 
 /**
+ * Tonal chord `type` values we consider "standard" — the named chord
+ * categories common in lead sheets and harmonic analysis. Anything
+ * else (including empty-string type, which Tonal returns for complex
+ * or unlabelled combinations) is treated as altered/decorated.
+ *
+ * Used to bias scoring toward musically-canonical interpretations over
+ * decorated ones when multiple candidates fit a voicing equally well.
+ */
+const STANDARD_CHORD_TYPES = new Set<string>([
+  // Triads
+  "major",
+  "minor",
+  "diminished",
+  "augmented",
+  "suspended second",
+  "suspended fourth",
+  // Sixth chords
+  "sixth",
+  "minor sixth",
+  // Sevenths
+  "major seventh",
+  "minor seventh",
+  "dominant seventh",
+  "half-diminished",
+  "diminished seventh",
+  "minor major seventh",
+  // Ninths
+  "major ninth",
+  "minor ninth",
+  "dominant ninth",
+  // Elevenths
+  "major eleventh",
+  "minor eleventh",
+  "dominant eleventh",
+  // Thirteenths
+  "major thirteenth",
+  "minor thirteenth",
+  "dominant thirteenth",
+  // Altered dominants (standard in jazz)
+  "dominant flat ninth",
+  "dominant sharp ninth",
+]);
+
+/**
  * ChordDetectionStabilizer: Detects chords using pitch-class decay.
  *
  * Depends on an upstream stabilizer (e.g., NoteTrackingStabilizer) that
@@ -319,6 +363,10 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
       complexity: number;
       keyFit: number;
       isSlash: boolean;
+      /** False when Tonal's type is a well-known standard chord label
+       * (major, minor, dom7, etc.). True for altered / decorated types
+       * like "minor augmented" or unlabelled complex types. */
+      isAltered: boolean;
     };
     const candidates: Candidate[] = [];
     const diatonicPcs = this.diatonicPcs;
@@ -369,6 +417,8 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
           keyFit = rootDiatonic + tonesDiatonic;
         }
 
+        const isAltered = !STANDARD_CHORD_TYPES.has(chord.type ?? "");
+
         candidates.push({
           root,
           quality,
@@ -377,6 +427,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
           complexity: chordTones.length,
           keyFit,
           isSlash,
+          isAltered,
         });
       }
     };
@@ -395,23 +446,28 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
 
     if (candidates.length === 0) return null;
 
-    // Tiebreaker chain:
-    //   1. Effective coverage desc — coverage minus a 1-note penalty for
-    //      slash chords. Tonal sometimes names a full-voicing chord only
-    //      as a slash ("Bbm11A/Ab") when the root-position alternative
-    //      ("Ab11") by convention omits the 3rd and so technically covers
-    //      one fewer note. Equalising them here lets the root-position
-    //      win on the next tiebreaker. A higher-coverage slash chord can
-    //      still beat a lower-coverage non-slash (effective cov prevails).
-    //   2. Non-slash preferred — root-position is the parsimonious read.
-    //   3. Key fit desc — when a key is set, diatonic tones win.
-    //   4. Complexity asc — simpler interpretations when still tied.
+    // Tiebreaker chain (harmonic-interpretation default):
+    //   1. Effective coverage desc — coverage minus a 1-note penalty only
+    //      for chords that are BOTH altered AND slash. This lets
+    //      root-position standard chords (Ab11, AbM) win over altered
+    //      slash ones (Gb69#11/Ab, Cm#5/Ab) when their raw coverage is
+    //      close. Standard slash chords (EbM/G, CM/E) are NOT demoted —
+    //      they represent legitimate inversions of simple chords.
+    //   2. Canonicity desc — standard chord types beat altered ones.
+    //      Catches cases where non-slash altered chords (e.g. Gm#5)
+    //      would otherwise win over standard slash alternatives
+    //      (e.g. EbM/G) on the non-slash tiebreaker.
+    //   3. Non-slash preferred — when both standard or both altered,
+    //      prefer the root-position reading.
+    //   4. Key fit desc — when a key is set, diatonic tones win.
+    //   5. Complexity asc — simpler interpretations when still tied.
     const effectiveCoverage = (c: Candidate): number =>
-      c.coverage - (c.isSlash ? 1 : 0);
+      c.coverage - (c.isSlash && c.isAltered ? 1 : 0);
     candidates.sort((a, b) => {
       const ea = effectiveCoverage(a);
       const eb = effectiveCoverage(b);
       if (eb !== ea) return eb - ea;
+      if (a.isAltered !== b.isAltered) return a.isAltered ? 1 : -1;
       if (a.isSlash !== b.isSlash) return a.isSlash ? 1 : -1;
       if (diatonicPcs && b.keyFit !== a.keyFit) return b.keyFit - a.keyFit;
       return a.complexity - b.complexity;

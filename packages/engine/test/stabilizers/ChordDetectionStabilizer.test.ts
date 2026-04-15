@@ -377,6 +377,18 @@ describe("ChordDetectionStabilizer", () => {
       expect(result?.root).toBe(8); // Ab, not some diatonic alternative
     });
 
+    it("detects a first-inversion triad as slash chord (Eb/G in Eb major)", () => {
+      // G-Bb-Eb voicing. Tonal offers both EbM/G (standard inversion) and
+      // Gm#5 (altered, rooted on bass). Harmonic interpretation prefers
+      // the standard chord name even though it's a slash.
+      const result = detect(
+        [7, 10, 3] as PitchClass[],
+        { root: 3 as PitchClass, mode: "ionian" },
+      );
+      expect(result?.root).toBe(3); // Eb, not G
+      expect(result?.quality).toBe("maj");
+    });
+
     it("detects a secondary dominant (D7 in C major)", () => {
       // D7 = D(2) + F#(6) + A(9) + C(0). F# is non-diatonic in C major.
       // D7 is V/V and should be detected as D7, not D (triad without 7th).
