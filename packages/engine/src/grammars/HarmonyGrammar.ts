@@ -60,8 +60,13 @@ import {
  */
 const PROGRESSION_FADE_VALUE = 3;
 
-/** Immediate opacity step-down on release (fraction of full opacity) */
-const RELEASE_OPACITY_STEP = 0.10;
+/**
+ * Immediate "perceived brightness" step-down on release (fraction of full).
+ * After this drop, brightness fades linearly to zero over the fade window.
+ * Opacity is derived from brightness by dividing out the stroke-width
+ * area growth, so the fade looks even-tempered regardless of chunkiness.
+ */
+const RELEASE_BRIGHTNESS_STEP = 0.10;
 
 /** Stroke width (pixels) while chord is held or fresh */
 const STROKE_WIDTH_FRESH = 2;
@@ -237,8 +242,14 @@ export class HarmonyGrammar implements IVisualGrammar {
     for (let i = 0; i < progression.length; i++) {
       const fc = progression[i];
 
-      // Opacity: full while held (no release time), step down + fade after release.
-      // Stroke width grows as the glyph ages — chunky, pixelated fade.
+      // Visual model: a single "perceived brightness" value drives both
+      // opacity and stroke width. While held, brightness is full. On
+      // release it drops by RELEASE_BRIGHTNESS_STEP (a small noticeable
+      // moment) then fades linearly to zero. Stroke width grows from
+      // fresh → faded over the fade window for the chunky pixel feel,
+      // and opacity is derived by dividing brightness by the stroke
+      // area ratio so the visual energy stays even-tempered as the
+      // strokes get thicker.
       let opacity: number;
       let strokeWidth: number;
       if (fc.releaseTime === null) {
@@ -248,11 +259,13 @@ export class HarmonyGrammar implements IVisualGrammar {
         const ageSinceRelease = t - fc.releaseTime;
         if (ageSinceRelease < 0 || ageSinceRelease >= fadeMs) continue;
         const fadeFraction = 1 - ageSinceRelease / fadeMs;
-        opacity = (1 - RELEASE_OPACITY_STEP) * fadeFraction;
         const ageFraction = ageSinceRelease / fadeMs;
+        const brightness = (1 - RELEASE_BRIGHTNESS_STEP) * fadeFraction;
         strokeWidth =
           STROKE_WIDTH_FRESH +
           (STROKE_WIDTH_FADED - STROKE_WIDTH_FRESH) * ageFraction;
+        const widthRatio = strokeWidth / STROKE_WIDTH_FRESH;
+        opacity = brightness / widthRatio;
       }
       if (opacity < 0.01) continue;
 
