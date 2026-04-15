@@ -769,9 +769,9 @@ export class ThreeJSRenderer implements IRenderer {
     const outlineZ = 0.01;
 
     // Per-arm coloured wedge edges. The bass arm (inversion marker) gets
-    // a thicker stroke — a composition of the existing linewidth
+    // a slightly thicker stroke — a composition of the existing linewidth
     // parameter, not a new primitive.
-    const BASS_LINEWIDTH_MULTIPLIER = 2.5;
+    const BASS_LINEWIDTH_MULTIPLIER = 1.382;
     for (let i = 0; i < armEdges.length; i++) {
       const arm = sortedArms[i];
       const armColor = this.hsvToThreeColor(arm?.color ?? rootColor);

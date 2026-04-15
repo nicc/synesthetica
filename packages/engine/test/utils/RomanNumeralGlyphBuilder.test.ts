@@ -261,19 +261,6 @@ describe("RomanNumeralGlyphBuilder", () => {
       expect(glyph.arcs.length).toBeGreaterThan(0);
     });
 
-    it("handles slash-bass notation for inversions (I/iii)", () => {
-      const base = buildRomanNumeralGlyph("I");
-      const slash = buildRomanNumeralGlyph("I/iii");
-      // Slash version has more geometry: the "/" divider + the "iii" bass
-      expect(slash.polylines.length).toBeGreaterThan(base.polylines.length);
-      // Width is larger than plain "I"
-      expect(slash.width).toBeGreaterThan(base.width);
-    });
-
-    it("handles slash-bass with quality suffix (V7/iii)", () => {
-      const glyph = buildRomanNumeralGlyph("V7/iii");
-      expect(glyph.polylines.length).toBeGreaterThan(0);
-    });
   });
 
   describe("SVG snapshots", () => {

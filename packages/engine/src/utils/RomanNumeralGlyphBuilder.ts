@@ -55,15 +55,6 @@ const DOT_GAP = 0.18;
 /** Suffix scale relative to base numeral height */
 const SUFFIX_SCALE = 0.35;
 
-/** Scale for the bass-degree Roman in slash notation (e.g. "I/iii") */
-const SLASH_BASS_SCALE = 0.5;
-
-/** Horizontal run of the "/" divider in glyph units */
-const SLASH_WIDTH = 0.25;
-
-/** Gap on either side of the "/" divider */
-const SLASH_GAP = 0.05;
-
 /** Gap between base numeral and suffix */
 const SUFFIX_GAP = 0.08;
 
@@ -290,21 +281,10 @@ interface ParsedNumeral {
   upper: boolean;     // Whether the original was uppercase
   suffix: string | null;  // °, °7, ø7, +, 7, Δ7
   accidental: string | null;  // ♭ or ♯ prefix
-  /** Roman numeral of the bass scale degree, for slash notation like
-   * "I/iii". Present only when the input contained a "/". */
-  slashBass: string | null;
 }
 
 function parseRoman(roman: string): ParsedNumeral {
-  // Split off any slash-bass suffix first: "I/iii" → main="I", slashBass="iii"
   let remaining = roman;
-  let slashBass: string | null = null;
-  const slashIdx = remaining.indexOf("/");
-  if (slashIdx >= 0) {
-    slashBass = remaining.slice(slashIdx + 1);
-    remaining = remaining.slice(0, slashIdx);
-  }
-
   let accidental: string | null = null;
 
   // Extract accidental prefix
@@ -329,13 +309,13 @@ function parseRoman(roman: string): ParsedNumeral {
 
   if (!base) {
     // Fallback: treat entire string as unknown
-    return { base: "I", upper: true, suffix: null, accidental: null, slashBass: null };
+    return { base: "I", upper: true, suffix: null, accidental: null };
   }
 
   // Everything after the base numeral is the suffix
   const suffix = remaining.length > 0 ? remaining : null;
 
-  return { base, upper, suffix, accidental, slashBass };
+  return { base, upper, suffix, accidental };
 }
 
 function offsetGlyph(glyph: RawGlyph, dx: number, dy: number): RawGlyph {
@@ -364,29 +344,6 @@ function scaleGlyph(glyph: RawGlyph, s: number): RawGlyph {
       x2: seg.x2 * s,
       y2: seg.y2 * s,
     })),
-    arcs: glyph.arcs.map((a) => ({
-      ...a,
-      cx: a.cx * s,
-      cy: a.cy * s,
-      r: a.r * s,
-    })),
-    width: glyph.width * s,
-    height: glyph.height * s,
-  };
-}
-
-/**
- * Scale a finished RomanNumeralGlyph (polylines + arcs) by a factor.
- * Used for the slash-bass glyph inset in "I/iii"-style inversions.
- */
-function scaleRomanGlyph(
-  glyph: RomanNumeralGlyph,
-  s: number,
-): RomanNumeralGlyph {
-  return {
-    polylines: glyph.polylines.map((poly) =>
-      poly.map((p) => ({ x: p.x * s, y: p.y * s })),
-    ),
     arcs: glyph.arcs.map((a) => ({
       ...a,
       cx: a.cx * s,
@@ -541,47 +498,6 @@ export function buildRomanNumeralGlyph(roman: string): RomanNumeralGlyph {
       totalWidth = Math.max(totalWidth, suffixX + scaled.width);
       totalHeight = Math.max(totalHeight, h);
     }
-  }
-
-  // Append slash-bass notation for inversions ("I/iii"). Slash diagonal
-  // from baseline at lower-left to top-of-main at upper-right, followed
-  // by the bass-degree Roman at a smaller scale.
-  if (parsed.slashBass) {
-    const slashX0 = totalWidth + SLASH_GAP;
-    allSegments.push({
-      x1: slashX0,
-      y1: 0,
-      x2: slashX0 + SLASH_WIDTH,
-      y2: h,
-    });
-    totalWidth = slashX0 + SLASH_WIDTH + SLASH_GAP;
-
-    // Build the bass-degree Roman recursively, scale it, position it
-    const bassGlyph = buildRomanNumeralGlyph(parsed.slashBass);
-    const scaledBass = scaleRomanGlyph(bassGlyph, SLASH_BASS_SCALE);
-    const bassOffsetX = totalWidth;
-    // Vertically centre the smaller glyph on the main glyph's midline
-    const bassOffsetY = (h - scaledBass.height) / 2;
-    for (const poly of scaledBass.polylines) {
-      // Convert polyline points back to segments for our segment collector
-      for (let i = 0; i < poly.length - 1; i++) {
-        allSegments.push({
-          x1: poly[i].x + bassOffsetX,
-          y1: poly[i].y + bassOffsetY,
-          x2: poly[i + 1].x + bassOffsetX,
-          y2: poly[i + 1].y + bassOffsetY,
-        });
-      }
-    }
-    for (const arc of scaledBass.arcs) {
-      allArcs.push({
-        ...arc,
-        cx: arc.cx + bassOffsetX,
-        cy: arc.cy + bassOffsetY,
-      });
-    }
-    totalWidth += scaledBass.width;
-    totalHeight = Math.max(totalHeight, bassOffsetY + scaledBass.height);
   }
 
   return {

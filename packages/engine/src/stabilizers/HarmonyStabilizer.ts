@@ -307,21 +307,11 @@ function analyzeChord(
     borrowed = true;
   }
 
-  let roman = formatRoman(degree, quality, borrowed, chromaticOffset);
+  const roman = formatRoman(degree, quality, borrowed, chromaticOffset);
 
-  // Slash notation for inversions in harmonic mode. If the bass is a
-  // diatonic scale degree different from the chord root, append
-  // "/<lowercase-roman>" to the roman string. Bass-led mode never has
-  // inversions (root === bass by construction) so this doesn't apply.
-  if (mode === "harmonic" && chord.isInverted) {
-    const bassDegree = diatonicTable.findIndex(
-      (e) => e.rootPc === chord.bass,
-    );
-    if (bassDegree >= 0) {
-      const lowercaseRomans = ["i", "ii", "iii", "iv", "v", "vi", "vii"];
-      roman = `${roman}/${lowercaseRomans[bassDegree]}`;
-    }
-  }
+  // Inversion info is intentionally NOT encoded in the roman string
+  // (would make the numeral glyph too visually noisy). It lives on
+  // MusicalChord.bass / isInverted for the chord label to render.
 
   return {
     degree,
