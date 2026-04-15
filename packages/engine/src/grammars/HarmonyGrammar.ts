@@ -47,7 +47,7 @@ import {
   HARMONY_PROGRESSION_CENTER_Y,
   HARMONY_CELL_SIZE,
   CHORD_STRIP_CENTER_X,
-  CHORD_STRIP_WIDTH,
+  CHORD_STRIP_BAR_WIDTH,
 } from "./layout";
 import { NOW_LINE_Y, timeToY } from "./timeMapping";
 
@@ -107,11 +107,6 @@ const STRIP_STROKE_WIDTH = 1.5;
 
 /** Opacity of the chord-duration bar behind each glyph */
 const STRIP_BAR_OPACITY = 0.25;
-
-/** Chord-duration bar width as fraction of strip width.
- * Kept thin so the bar reads as a subtle trace under the glyph rather
- * than framing it. */
-const STRIP_BAR_WIDTH_FRACTION = 0.15;
 
 /** Default pitch-hue invariant (A = red, clockwise) */
 const DEFAULT_HUE_INVARIANT = {
@@ -368,7 +363,7 @@ export class HarmonyGrammar implements IVisualGrammar {
   ): Entity[] {
     const entities: Entity[] = [];
     const stripX = CHORD_STRIP_CENTER_X;
-    const barW = CHORD_STRIP_WIDTH * STRIP_BAR_WIDTH_FRACTION;
+    const barW = CHORD_STRIP_BAR_WIDTH;
 
     for (let i = 0; i < progression.length; i++) {
       const fc = progression[i];

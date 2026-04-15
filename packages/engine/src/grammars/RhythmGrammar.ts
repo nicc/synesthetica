@@ -67,7 +67,8 @@ const TIGHT_TOLERANCE_MS = 30;
 const STREAK_COUNT = 3;
 
 /** Note strip width as fraction of pitch spacing */
-const NOTE_STRIP_WIDTH = 0.015;
+import { NOTE_STRIP_BASE_WIDTH } from "./layout";
+const NOTE_STRIP_WIDTH = NOTE_STRIP_BASE_WIDTH;
 
 /** Minimum note strip height in normalized coordinates */
 const MIN_NOTE_STRIP_HEIGHT = 0.008;

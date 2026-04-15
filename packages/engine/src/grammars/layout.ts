@@ -53,19 +53,30 @@ export const GAP_LEFT = 0.03;
 
 /** Gap between rhythm and harmony columns. Houses the chord strip
  * plus breathing room on both sides. */
-export const GAP_RIGHT = 0.055;
+export const GAP_RIGHT = 0.07;
 
 // ============================================================================
 // Chord Strip (sits in GAP_RIGHT between rhythm and harmony)
 // ============================================================================
 
-/** Width of the scrolling chord-glyph strip in normalized coords. */
+/** Base width of rhythm note strips (max-velocity value). Exported
+ * here so the chord strip can derive a visually related ratio. */
+export const NOTE_STRIP_BASE_WIDTH = 0.015;
+
+/** Duration-bar width in the chord strip.
+ * Chosen as 1/φ (golden ratio inverse ≈ 0.618) of the note-strip base —
+ * "just over half" a note strip. Signals "similar but distinct"
+ * from the rhythm note strips. */
+export const CHORD_STRIP_BAR_WIDTH = NOTE_STRIP_BASE_WIDTH * 0.618;
+
+/** Width of the chord-strip column (used to place the glyph centre).
+ * Wider than the bar so the glyph has room. */
 export const CHORD_STRIP_WIDTH = 0.02;
 
 /** Offset from rhythm column's right edge to the strip's left edge.
  * Generous spacing so the strip reads as a midground, not crammed
  * against the note strips. */
-export const CHORD_STRIP_LEFT_OFFSET_FROM_GAP = 0.025;
+export const CHORD_STRIP_LEFT_OFFSET_FROM_GAP = 0.0375;
 
 // ============================================================================
 // Harmony Column (right)
