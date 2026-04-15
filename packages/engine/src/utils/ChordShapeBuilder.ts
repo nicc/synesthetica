@@ -60,6 +60,8 @@ interface ArmGeometry {
   baseLeft: Point;
   baseRight: Point;
   tip: Point;
+  /** True when this arm corresponds to the chord's bass note (inversion marker). */
+  isBass: boolean;
 }
 
 interface LineGeometry {
@@ -128,6 +130,7 @@ export class ChordShapeBuilder {
         baseLeft: this.polarToXY(armLeftAngle, this.hubR),
         baseRight: this.polarToXY(armRightAngle, this.hubR),
         tip: this.polarToXY(el.angle, tipR),
+        isBass: el.isBass === true,
       };
     });
   }

@@ -162,6 +162,11 @@ export interface ChordShapeElement {
   interval: string;
   /** Color for this element (computed from pitch class of root + interval) */
   color: ColorHSVA;
+  /** True when this element's pitch class matches the chord's bass note.
+   * Set only when bass differs from the chord's root (an inversion).
+   * Renderers can decorate this element distinctly — e.g. thicker
+   * outline — to show which chord tone is in the bass. */
+  isBass?: boolean;
 }
 
 /**

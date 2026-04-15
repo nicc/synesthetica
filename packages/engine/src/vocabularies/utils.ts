@@ -33,12 +33,16 @@ import {
  * @param interpretation - The chord reading (harmonic or bass-led) to render
  * @param voicing - The actual pitches played (for brightness and interval extraction)
  * @param invariant - Pitch-hue invariant configuration
+ * @param bassPc - Optional bass pitch class. When provided AND differs from
+ *                 interpretation.root, the matching chord-element gets
+ *                 isBass=true so renderers can decorate it (inversion marker).
  * @returns Complete chord shape geometry with per-element colors
  */
 export function buildChordShape(
   interpretation: ChordInterpretation,
   voicing: Pitch[],
-  invariant: PitchHueInvariant
+  invariant: PitchHueInvariant,
+  bassPc?: PitchClass | null,
 ): ChordShapeGeometry {
   const elements: ChordShapeElement[] = [];
 
@@ -81,6 +85,14 @@ export function buildChordShape(
     const isChordTone =
       chordToneSet === null || chordToneSet.includes(normalizedSemitones);
 
+    // Mark the bass element for inversion-indicator rendering.
+    // Only meaningful when the bass differs from the chord root.
+    const isBass =
+      bassPc !== undefined &&
+      bassPc !== null &&
+      bassPc !== interpretation.root &&
+      elementPc === bassPc;
+
     elements.push({
       angle,
       radius,
@@ -88,6 +100,7 @@ export function buildChordShape(
       style: isChordTone ? "wedge" : "line",
       interval: label,
       color,
+      ...(isBass ? { isBass: true } : {}),
     });
   }
 

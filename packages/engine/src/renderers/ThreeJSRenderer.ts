@@ -768,9 +768,13 @@ export class ThreeJSRenderer implements IRenderer {
     // avoid parallax with the perspective camera when off-center.
     const outlineZ = 0.01;
 
-    // Per-arm coloured wedge edges
+    // Per-arm coloured wedge edges. The bass arm (inversion marker) gets
+    // a thicker stroke — a composition of the existing linewidth
+    // parameter, not a new primitive.
+    const BASS_LINEWIDTH_MULTIPLIER = 2.5;
     for (let i = 0; i < armEdges.length; i++) {
-      const armColor = this.hsvToThreeColor(sortedArms[i]?.color ?? rootColor);
+      const arm = sortedArms[i];
+      const armColor = this.hsvToThreeColor(arm?.color ?? rootColor);
       const positions: number[] = [];
       for (const p of armEdges[i]) {
         positions.push(p.x, p.y, outlineZ);
@@ -779,7 +783,7 @@ export class ThreeJSRenderer implements IRenderer {
       lineGeom.setPositions(positions);
       const lineMat = new LineMaterial({
         color: armColor.getHex(),
-        linewidth: 2,
+        linewidth: arm?.isBass ? 2 * BASS_LINEWIDTH_MULTIPLIER : 2,
         resolution: this.resolution,
       });
       const line = new Line2(lineGeom, lineMat);

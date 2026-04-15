@@ -282,6 +282,36 @@ describe("buildChordShape", () => {
       expect(ninth?.style).toBe("line");
     });
 
+    it("marks the bass-matching element isBass when bass differs from root", () => {
+      // EbM triad with G in the bass (first inversion)
+      const chord = makeChord(3 as PitchClass, "maj", [0, 4, 7]); // Eb, G, Bb
+      const shape = buildChordShape(
+        chord.harmonic,
+        chord.voicing,
+        defaultInvariant,
+        7 as PitchClass, // bass = G
+      );
+      // G is 4 semitones from Eb → label "3"
+      const gElement = shape.elements.find((e) => e.interval === "3");
+      expect(gElement?.isBass).toBe(true);
+      // Other elements shouldn't be marked
+      const rootElement = shape.elements.find((e) => e.interval === "1");
+      expect(rootElement?.isBass).toBeUndefined();
+    });
+
+    it("does not mark bass when bass equals root (root position)", () => {
+      const chord = makeChord(3 as PitchClass, "maj", [0, 4, 7]);
+      const shape = buildChordShape(
+        chord.harmonic,
+        chord.voicing,
+        defaultInvariant,
+        3 as PitchClass, // bass = Eb = root
+      );
+      for (const el of shape.elements) {
+        expect(el.isBass).toBeUndefined();
+      }
+    });
+
     it("renders ♭9 as a line in a dominant flat-nine (chordTones does include it)", () => {
       // C7♭9: C-E-G-Bb-Db. The detector does include ♭9 in intervals,
       // so strictly speaking it becomes a wedge. This test documents

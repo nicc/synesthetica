@@ -215,12 +215,20 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
       flow: chord.phase === "active" ? 0.2 : -0.2,
     };
 
-    // Build chord shape geometry (Invariant I18)
-    const shape = buildChordShape(interpretation, chord.voicing, {
-      referencePc: this.config.referencePc,
-      referenceHue: this.config.referenceHue,
-      direction: this.config.hueDirection,
-    });
+    // Build chord shape geometry (Invariant I18). Pass the bass so the
+    // element matching the bass pitch class can be marked for inversion
+    // rendering. Only meaningful under harmonic mode — under bass-led,
+    // the interpretation's root IS the bass so there's nothing to mark.
+    const shape = buildChordShape(
+      interpretation,
+      chord.voicing,
+      {
+        referencePc: this.config.referencePc,
+        referenceHue: this.config.referenceHue,
+        direction: this.config.hueDirection,
+      },
+      mode === "harmonic" ? chord.bass : null,
+    );
 
     return {
       chord,
