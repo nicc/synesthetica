@@ -37,6 +37,7 @@ import type {
   PitchClass,
   Note,
   MusicalChord,
+  ChordInterpretationMode,
   RhythmicAnalysis,
   DynamicsState,
   Ms,
@@ -104,11 +105,14 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
       t: frame.t,
       part: frame.part,
       notes: frame.notes.map((note) => this.annotateNote(note, frame.t)),
-      chords: frame.chords.map((chord) => this.annotateChord(chord)),
+      chords: frame.chords.map((chord) =>
+        this.annotateChord(chord, frame.chordInterpretation),
+      ),
       progression: frame.progression ?? [],
       prescribedTempo: frame.prescribedTempo,
       prescribedMeter: frame.prescribedMeter,
       prescribedKey: frame.prescribedKey,
+      chordInterpretation: frame.chordInterpretation,
       harmonicContext: frame.harmonicContext ?? defaultHarmonicContext,
       rhythm: this.annotateRhythm(frame.rhythmicAnalysis),
       bars: [], // No bar detection yet
@@ -174,10 +178,12 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
   // Chord Annotation
   // ===========================================================================
 
-  private annotateChord(chord: MusicalChord): AnnotatedChord {
-    // Vocabulary uses the harmonic interpretation by default. Phase 4 will
-    // add a mode setting that lets consumers pick harmonic or bass-led.
-    const interpretation = chord.harmonic;
+  private annotateChord(
+    chord: MusicalChord,
+    mode: ChordInterpretationMode,
+  ): AnnotatedChord {
+    const interpretation =
+      mode === "bass-led" ? chord.bassLed : chord.harmonic;
 
     // Root hue from pitch class (Invariant I14)
     const rootHue = pcToHue(interpretation.root, {

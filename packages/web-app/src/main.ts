@@ -1,5 +1,10 @@
 import type { MidiInputInfo } from "@synesthetica/adapters";
-import type { SceneFrame, PitchClass, ModeId } from "@synesthetica/contracts";
+import type {
+  SceneFrame,
+  PitchClass,
+  ModeId,
+  ChordInterpretationMode,
+} from "@synesthetica/contracts";
 import { RawMidiAdapter, WebMidiSource } from "@synesthetica/adapters";
 import {
   VisualPipeline,
@@ -31,12 +36,14 @@ const toggleMetronomeBtn = document.getElementById("toggle-metronome") as HTMLBu
 const keyRootSelect = document.getElementById("key-root") as HTMLSelectElement;
 const keyModeSelect = document.getElementById("key-mode") as HTMLSelectElement;
 const clearKeyBtn = document.getElementById("clear-key") as HTMLButtonElement;
+const toggleChordModeBtn = document.getElementById("toggle-chord-mode") as HTMLButtonElement;
 
 // App state
 let midiSource: WebMidiSource | null = null;
 let pipeline: VisualPipeline | null = null;
 let renderer: ThreeJSRenderer | null = null;
 let metronome: Metronome | null = null;
+let chordMode: ChordInterpretationMode = "harmonic";
 
 // Resize canvas to fill viewport
 function resizeCanvas() {
@@ -426,6 +433,17 @@ function clearKey(): void {
   }
 }
 
+/**
+ * Toggle between harmonic and bass-led chord interpretation.
+ * See SPEC_010 for what these modes mean.
+ */
+function toggleChordMode(): void {
+  chordMode = chordMode === "harmonic" ? "bass-led" : "harmonic";
+  pipeline?.setChordInterpretation(chordMode);
+  toggleChordModeBtn.textContent =
+    chordMode === "harmonic" ? "Chord mode: Harmonic" : "Chord mode: Bass-led";
+}
+
 // Event listeners for controls
 toggleControlsBtn.addEventListener("click", toggleControls);
 tempoInput.addEventListener("change", applyTempoMeterSettings);
@@ -436,6 +454,7 @@ toggleMetronomeBtn.addEventListener("click", toggleMetronome);
 keyRootSelect.addEventListener("change", applyKeySettings);
 keyModeSelect.addEventListener("change", applyKeySettings);
 clearKeyBtn.addEventListener("click", clearKey);
+toggleChordModeBtn.addEventListener("click", toggleChordMode);
 
 // Initialize on load
 initMidi();

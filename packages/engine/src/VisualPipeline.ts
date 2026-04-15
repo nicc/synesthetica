@@ -26,6 +26,7 @@ import type {
   Ms,
   Diagnostic,
   PrescribedKey,
+  ChordInterpretationMode,
 } from "@synesthetica/contracts";
 import { createEmptyMusicalFrame as contractsCreateEmptyMusicalFrame } from "@synesthetica/contracts";
 
@@ -90,6 +91,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
   private prescribedTempo: number | null = null;
   private prescribedMeter: { beatsPerBar: number; beatUnit: number } | null = null;
   private prescribedKey: PrescribedKey | null = null;
+  private chordInterpretation: ChordInterpretationMode = "harmonic";
 
   constructor(config: VisualPipelineConfig) {
     this.config = config;
@@ -175,6 +177,15 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
    */
   setKey(key: PrescribedKey | null): void {
     this.prescribedKey = key;
+  }
+
+  /**
+   * Set the chord interpretation mode (harmonic vs bass-led). Grammars
+   * that render chords pick between chord.harmonic and chord.bassLed
+   * based on this.
+   */
+  setChordInterpretation(mode: ChordInterpretationMode): void {
+    this.chordInterpretation = mode;
   }
 
   /** Current session time (ms since pipeline started). */
@@ -364,6 +375,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       prescribedTempo: this.prescribedTempo,
       prescribedMeter: this.prescribedMeter,
       prescribedKey: this.prescribedKey,
+      chordInterpretation: this.chordInterpretation,
     };
   }
 
@@ -501,6 +513,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
         prescribedTempo: this.prescribedTempo,
         prescribedMeter: this.prescribedMeter,
         prescribedKey: this.prescribedKey,
+        chordInterpretation: this.chordInterpretation,
       };
     }
 
@@ -566,6 +579,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       prescribedTempo: this.prescribedTempo,
       prescribedMeter: this.prescribedMeter,
       prescribedKey: this.prescribedKey,
+      chordInterpretation: this.chordInterpretation,
       progression: progressionSet.size > 0 ? Array.from(progressionSet) : undefined,
       harmonicContext,
     };

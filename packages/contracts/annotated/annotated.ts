@@ -23,6 +23,7 @@ import type {
   DynamicsState,
   HarmonicContext,
   PrescribedKey,
+  ChordInterpretationMode,
 } from "../musical/musical";
 
 // ============================================================================
@@ -376,6 +377,9 @@ export interface AnnotatedMusicalFrame {
 
   /** User-prescribed key (tonic + mode). Null = no functional analysis. */
   prescribedKey: PrescribedKey | null;
+
+  /** Chord interpretation mode — harmonic or bass-led. */
+  chordInterpretation: ChordInterpretationMode;
 
   /**
    * Harmonic context including tension analysis.

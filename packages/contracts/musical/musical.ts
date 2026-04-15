@@ -308,6 +308,17 @@ export interface PrescribedKey {
 }
 
 /**
+ * Chord interpretation mode. Selects which reading of a voicing the
+ * grammar renders.
+ * - "harmonic": simplest chord that explains the notes, bass-agnostic
+ *   (EbM/G renders as Eb major, first inversion)
+ * - "bass-led": force root = bass; voicing read from the bass up
+ *   (EbM/G renders as Gm#5, G minor with augmented 5th)
+ * See SPEC_010 for design rationale.
+ */
+export type ChordInterpretationMode = "harmonic" | "bass-led";
+
+/**
  * A chord analyzed in functional harmony terms relative to a prescribed key.
  */
 export interface FunctionalChord {
@@ -425,6 +436,13 @@ export interface MusicalFrame {
    */
   prescribedKey: PrescribedKey | null;
 
+  /**
+   * Selected chord interpretation mode. Grammars that render chords use
+   * this to pick between MusicalChord.harmonic and MusicalChord.bassLed.
+   * Defaults to "harmonic" — the simplest chord that explains the voicing.
+   */
+  chordInterpretation: ChordInterpretationMode;
+
   // Recent context (references, not copies)
   progression?: ChordId[]; // Recent chord history
   phrases?: Phrase[]; // Phrase boundaries
@@ -526,5 +544,6 @@ export function createEmptyMusicalFrame(t: Ms, part: PartId): MusicalFrame {
     prescribedTempo: null,
     prescribedMeter: null,
     prescribedKey: null,
+    chordInterpretation: "harmonic",
   };
 }
