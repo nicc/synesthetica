@@ -74,6 +74,15 @@ export interface MusicalChord {
   phase: "active" | "decaying";
   confidence: Confidence;
   provenance: Provenance;
+  /**
+   * Semitones-from-root of the chord's theoretical tones, e.g. for an Ab9:
+   * [0, 2, 4, 7, 10]. Populated by the detector from the full chord type
+   * (including extensions), so rendering can tell "chord tone" from
+   * "chromatic alteration" even when the simplified `quality` field rounds
+   * off details. Optional for backwards compat with test fixtures; consumers
+   * should fall back to quality-derived intervals when absent.
+   */
+  chordTones?: number[];
 }
 
 /**

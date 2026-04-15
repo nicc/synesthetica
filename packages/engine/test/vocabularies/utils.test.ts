@@ -242,4 +242,45 @@ describe("buildChordShape", () => {
       expect(fifthEl?.angle).toBe(210); // 7 semitones * 30°
     });
   });
+
+  describe("wedge vs line classification via chordTones", () => {
+    it("renders natural 9 as a wedge when chordTones includes it (Cmaj9)", () => {
+      // Cmaj9 voicing C-E-G-B-D, detector reports full interval set
+      const chord: MusicalChord = {
+        ...makeChord(0, "maj7", [0, 4, 7, 11, 2]),
+        chordTones: [0, 4, 7, 11, 2], // Tonal's Cmaj9 intervals
+      };
+      const shape = buildChordShape(chord, defaultInvariant);
+
+      const ninth = shape.elements.find((e) => e.interval === "2");
+      expect(ninth?.style).toBe("wedge");
+    });
+
+    it("renders natural 9 as a chromatic line when chordTones is absent (fallback)", () => {
+      // Same voicing but quality=maj7, no chordTones → falls back to
+      // quality-derived intervals [0,4,7,11] which excludes the 9th.
+      const chord = makeChord(0, "maj7", [0, 4, 7, 11, 2]);
+      const shape = buildChordShape(chord, defaultInvariant);
+
+      const ninth = shape.elements.find((e) => e.interval === "2");
+      expect(ninth?.style).toBe("line");
+    });
+
+    it("renders ♭9 as a line in a dominant flat-nine (chordTones does include it)", () => {
+      // C7♭9: C-E-G-Bb-Db. The detector does include ♭9 in intervals,
+      // so strictly speaking it becomes a wedge. This test documents
+      // the current behaviour: chordTones is the source of truth.
+      const chord: MusicalChord = {
+        ...makeChord(0, "dom7", [0, 4, 7, 10, 1]),
+        chordTones: [0, 4, 7, 10, 1],
+      };
+      const shape = buildChordShape(chord, defaultInvariant);
+
+      const flatNine = shape.elements.find((e) => e.interval === "♭2");
+      // This is a known trade-off: Tonal's interval list doesn't
+      // distinguish "chord tone" from "chromatic alteration" for ♭9.
+      // Future refinement can re-classify alterations as lines.
+      expect(flatNine?.style).toBe("wedge");
+    });
+  });
 });

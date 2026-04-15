@@ -120,6 +120,15 @@ Angular positions (30° per slot, root at 0°/12 o'clock):
 - Chromatic alterations (♭9, ♯9, ♯11, etc.): Rendered as lines
 - Altered chord tones (e.g., ♭5 in dom7♭5): Rendered as wedges in altered position
 
+The wedge vs line distinction uses `MusicalChord.chordTones` (semitones from
+root) as the source of truth. The detector populates this with the full
+interval set of the detected chord — including extensions like 9/11/13 —
+parsed directly from Tonal's interval output. When `chordTones` is absent
+(e.g. legacy test fixtures), the renderer falls back to a quality-derived
+template that covers triads and common 7ths only. Future work: alterations
+(♭9, ♯9, ♯11) should be classified as lines even when present in
+`chordTones` — tracked under the chord-detection umbrella.
+
 ## Advisory Properties (Grammar-Level)
 
 These are not constrained by vocabulary. Grammars have full control:

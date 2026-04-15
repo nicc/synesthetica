@@ -113,13 +113,17 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
   private pitchClassLastSeen: Map<PitchClass, Ms> = new Map();
 
   // Current displayed chord (after hysteresis)
-  private displayedChord: { root: PitchClass; quality: ChordQuality } | null =
-    null;
+  private displayedChord: {
+    root: PitchClass;
+    quality: ChordQuality;
+    chordTones: number[];
+  } | null = null;
 
   // Candidate chord waiting for hysteresis
   private candidateChord: {
     root: PitchClass;
     quality: ChordQuality;
+    chordTones: number[];
     since: Ms;
   } | null = null;
 
@@ -239,7 +243,12 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
    */
   private detectChordFromPitchClasses(
     pitchClasses: Set<PitchClass>
-  ): { root: PitchClass; quality: ChordQuality; confidence: Confidence } | null {
+  ): {
+    root: PitchClass;
+    quality: ChordQuality;
+    chordTones: number[];
+    confidence: Confidence;
+  } | null {
     if (pitchClasses.size < this.config.minPitchClasses) {
       return null;
     }
@@ -247,76 +256,87 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     const pcArray = [...pitchClasses];
     const noteNames = pcArray.map((pc) => this.pcToNoteName(pc));
 
-    // Collect candidate detections from full set and (n-1) subsets
-    type Candidate = { root: PitchClass; quality: ChordQuality; coverage: number };
+    // Collect candidate detections from full set and (n-1) subsets.
+    // We score against the chord's actual intervals from Tonal (which
+    // include extensions like 9, 11, 13), not the simplified quality's
+    // triad/7th template. This lets extended chords beat partial-voicing
+    // triads on coverage instead of being silently skipped as "unknown".
+    type Candidate = {
+      root: PitchClass;
+      quality: ChordQuality;
+      chordTones: number[];
+      coverage: number;
+      complexity: number;
+    };
     const candidates: Candidate[] = [];
 
-    // Helper: run detection on a set of note names and score results
     const tryDetect = (names: string[]): void => {
       const detected = Tonal.Chord.detect(names);
       for (const name of detected) {
         const chord = Tonal.Chord.get(name);
-        if (!chord.tonic) continue;
+        if (!chord.tonic || !chord.intervals || chord.intervals.length === 0) {
+          continue;
+        }
+
+        // Parse Tonal's interval names ("1P", "3M", "5P", "7m", "9M", …)
+        // into pitch-class semitones.
+        const chordTones = chord.intervals
+          .map((ivl) => Tonal.Interval.semitones(ivl))
+          .filter((s): s is number => s !== undefined)
+          .map((s) => ((s % 12) + 12) % 12);
+
+        if (chordTones.length === 0) continue;
 
         const root = this.noteNameToPitchClass(chord.tonic);
         const quality = this.mapTonalQuality(chord.quality, chord.type);
-        const expected = this.getExpectedSemitones(quality);
-        if (!expected) continue; // Skip unknown qualities
 
-        // Count how many input PCs match this chord's expected intervals
+        // Coverage: how many input PCs are accounted for by the chord's
+        // actual interval set.
         let coverage = 0;
         for (const pc of pitchClasses) {
           const semitones = (pc - root + 12) % 12;
-          if (expected.includes(semitones)) coverage++;
+          if (chordTones.includes(semitones)) coverage++;
         }
-        candidates.push({ root, quality, coverage });
+
+        candidates.push({
+          root,
+          quality,
+          chordTones,
+          coverage,
+          complexity: chordTones.length,
+        });
       }
     };
 
-    // Try the full note set
     tryDetect(noteNames);
 
-    // Try (n-1) subsets — dropping each note once
-    if (noteNames.length > this.config.minPitchClasses) {
+    // Fall back to (n-1) subsets if the full set produced no candidates
+    // (some voicings aren't a named chord but their subsets are).
+    if (candidates.length === 0 && noteNames.length > this.config.minPitchClasses) {
       for (let i = 0; i < noteNames.length; i++) {
         const subset = noteNames.filter((_, j) => j !== i);
         tryDetect(subset);
       }
     }
 
-    if (candidates.length === 0) {
-      return null;
-    }
+    if (candidates.length === 0) return null;
 
-    // Pick the candidate with the best mapped coverage
-    candidates.sort((a, b) => b.coverage - a.coverage);
+    // Prefer higher coverage. On ties, prefer the simpler chord
+    // (fewer theoretical tones) — the more parsimonious interpretation.
+    candidates.sort((a, b) => {
+      if (b.coverage !== a.coverage) return b.coverage - a.coverage;
+      return a.complexity - b.complexity;
+    });
     const best = candidates[0];
 
-    // Confidence: higher coverage = higher confidence
     const confidence = Math.min(1, best.coverage / pitchClasses.size) as Confidence;
 
-    return { root: best.root, quality: best.quality, confidence };
-  }
-
-  /**
-   * Expected interval semitones for each chord quality.
-   * Used for scoring: how many input notes are explained by a detected chord.
-   */
-  private getExpectedSemitones(quality: ChordQuality): number[] | null {
-    const map: Partial<Record<ChordQuality, number[]>> = {
-      maj: [0, 4, 7],
-      min: [0, 3, 7],
-      dim: [0, 3, 6],
-      aug: [0, 4, 8],
-      sus2: [0, 2, 7],
-      sus4: [0, 5, 7],
-      maj7: [0, 4, 7, 11],
-      min7: [0, 3, 7, 10],
-      dom7: [0, 4, 7, 10],
-      hdim7: [0, 3, 6, 10],
-      dim7: [0, 3, 6, 9],
+    return {
+      root: best.root,
+      quality: best.quality,
+      chordTones: best.chordTones,
+      confidence,
     };
-    return map[quality] ?? null;
   }
 
   /**
@@ -324,7 +344,11 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
    * Only update displayed chord if new chord is stable for hysteresisMs.
    */
   private applyHysteresis(
-    detected: { root: PitchClass; quality: ChordQuality } | null,
+    detected: {
+      root: PitchClass;
+      quality: ChordQuality;
+      chordTones: number[];
+    } | null,
     t: Ms
   ): void {
     const isSameAsDisplayed =
@@ -368,6 +392,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
         this.displayedChord = {
           root: this.candidateChord!.root,
           quality: this.candidateChord!.quality,
+          chordTones: this.candidateChord!.chordTones,
         };
         this.currentChordOnset = t;
         this.candidateChord = null;
@@ -379,6 +404,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     this.candidateChord = {
       root: detected.root,
       quality: detected.quality,
+      chordTones: detected.chordTones,
       since: t,
     };
   }
@@ -387,7 +413,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
    * Finalize a chord and add to progression.
    */
   private finalizeChord(
-    chord: { root: PitchClass; quality: ChordQuality },
+    chord: { root: PitchClass; quality: ChordQuality; chordTones: number[] },
     onset: Ms,
     endTime: Ms
   ): void {
@@ -402,6 +428,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
       id,
       root: chord.root,
       quality: chord.quality,
+      chordTones: chord.chordTones,
       bass: chord.root, // Simplified: assume root position
       inversion: 0,
       voicing: [], // Not tracked in this approach
@@ -445,6 +472,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
         id,
         root: this.displayedChord.root,
         quality: this.displayedChord.quality,
+        chordTones: this.displayedChord.chordTones,
         bass: this.displayedChord.root, // Simplified
         inversion: 0,
         voicing,

@@ -257,9 +257,8 @@ describe("ChordDetectionStabilizer", () => {
       return { root: result.chords[0].root, quality: result.chords[0].quality };
     }
 
-    it.fails("detects Ab9 in Ab major (Ab-C-Eb-Gb-Bb)", () => {
+    it("detects Ab9 in Ab major (Ab-C-Eb-Gb-Bb)", () => {
       // Ab9 = Ab(8) + C(0) + Eb(3) + Gb(6) + Bb(10)
-      // Currently detected as Cm7b5 or Ab7 depending on subset ordering.
       const result = detect(
         [8, 0, 3, 6, 10] as PitchClass[],
         { root: 8 as PitchClass, mode: "ionian" },
@@ -269,7 +268,8 @@ describe("ChordDetectionStabilizer", () => {
 
     it.fails("detects Ab11 in Ab major (Ab-C-Eb-Gb-Bb-Db)", () => {
       // Ab11 = Ab(8) + C(0) + Eb(3) + Gb(6) + Bb(10) + Db(1)
-      // Currently detected as Eb (triad) with rest as extras.
+      // 6-note voicing still misdetects — Tonal's full-set match is
+      // ambiguous and no single chord name covers all 6 tones cleanly.
       const result = detect(
         [8, 0, 3, 6, 10, 1] as PitchClass[],
         { root: 8 as PitchClass, mode: "ionian" },
@@ -277,7 +277,7 @@ describe("ChordDetectionStabilizer", () => {
       expect(result?.root).toBe(8); // Ab
     });
 
-    it.fails("detects Cmaj9 in C major (C-E-G-B-D)", () => {
+    it("detects Cmaj9 in C major (C-E-G-B-D)", () => {
       // Cmaj9 = C(0) + E(4) + G(7) + B(11) + D(2)
       const result = detect(
         [0, 4, 7, 11, 2] as PitchClass[],
@@ -286,7 +286,7 @@ describe("ChordDetectionStabilizer", () => {
       expect(result?.root).toBe(0); // C
     });
 
-    it.fails("detects Dm9 in C major (D-F-A-C-E)", () => {
+    it("detects Dm9 in C major (D-F-A-C-E)", () => {
       // Dm9 = D(2) + F(5) + A(9) + C(0) + E(4)
       const result = detect(
         [2, 5, 9, 0, 4] as PitchClass[],

@@ -50,7 +50,14 @@ export function buildChordShape(
       : 4;
   const brightness = octaveToBrightness(avgOctave);
 
-  const expectedSemitones = getExpectedSemitones(chord.quality);
+  // Prefer the chord's actual interval set (populated by the detector
+  // from Tonal, covers extensions like 9/11/13). Fall back to the
+  // simplified-quality template for legacy callers that don't provide
+  // chordTones.
+  const chordToneSet: number[] | null =
+    chord.chordTones && chord.chordTones.length > 0
+      ? chord.chordTones
+      : getExpectedSemitones(chord.quality);
 
   for (const semitones of intervals) {
     const normalizedSemitones = semitones % 12;
@@ -69,10 +76,9 @@ export function buildChordShape(
       a: 1,
     };
 
-    // Chord tones get wedge arms; extra notes get chromatic lines
+    // Chord tones get wedge arms; chromatic additions get lines
     const isChordTone =
-      expectedSemitones === null ||
-      expectedSemitones.includes(normalizedSemitones);
+      chordToneSet === null || chordToneSet.includes(normalizedSemitones);
 
     elements.push({
       angle,
