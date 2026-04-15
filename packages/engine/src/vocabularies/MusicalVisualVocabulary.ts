@@ -175,15 +175,19 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
   // ===========================================================================
 
   private annotateChord(chord: MusicalChord): AnnotatedChord {
+    // Vocabulary uses the harmonic interpretation by default. Phase 4 will
+    // add a mode setting that lets consumers pick harmonic or bass-led.
+    const interpretation = chord.harmonic;
+
     // Root hue from pitch class (Invariant I14)
-    const rootHue = pcToHue(chord.root, {
+    const rootHue = pcToHue(interpretation.root, {
       referencePc: this.config.referencePc,
       referenceHue: this.config.referenceHue,
       direction: this.config.hueDirection,
     });
 
     // Uncertainty is higher for chords (detection is harder)
-    const uncertainty = 1 - chord.confidence;
+    const uncertainty = 1 - interpretation.confidence;
 
     const palette: PaletteRef = {
       id: `chord-${chord.id}`,
@@ -206,7 +210,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     };
 
     // Build chord shape geometry (Invariant I18)
-    const shape = buildChordShape(chord, {
+    const shape = buildChordShape(interpretation, chord.voicing, {
       referencePc: this.config.referencePc,
       referenceHue: this.config.referenceHue,
       direction: this.config.hueDirection,
@@ -403,8 +407,8 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
       "A#",
       "B",
     ];
-    const qualitySuffix = chord.quality === "min" ? "m" : "";
-    return `${rootNames[chord.root]}${qualitySuffix}`;
+    const qualitySuffix = chord.harmonic.quality === "min" ? "m" : "";
+    return `${rootNames[chord.harmonic.root]}${qualitySuffix}`;
   }
 
 }

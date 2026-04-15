@@ -6,7 +6,8 @@
  */
 
 import type {
-  MusicalChord,
+  ChordInterpretation,
+  Pitch,
   ChordShapeGeometry,
   ChordShapeElement,
   MarginStyle,
@@ -26,48 +27,48 @@ import {
 } from "@synesthetica/contracts";
 
 /**
- * Builds chord shape geometry from a MusicalChord.
+ * Builds chord shape geometry from a chord interpretation and its voicing.
  * Invariant I18: This algorithm is fixed; grammars cannot compute shapes.
  *
- * @param chord - The musical chord to build a shape for
+ * @param interpretation - The chord reading (harmonic or bass-led) to render
+ * @param voicing - The actual pitches played (for brightness and interval extraction)
  * @param invariant - Pitch-hue invariant configuration
  * @returns Complete chord shape geometry with per-element colors
  */
 export function buildChordShape(
-  chord: MusicalChord,
+  interpretation: ChordInterpretation,
+  voicing: Pitch[],
   invariant: PitchHueInvariant
 ): ChordShapeGeometry {
   const elements: ChordShapeElement[] = [];
 
-  // Get intervals from voicing relative to root
-  const intervals = getIntervalsFromVoicing(chord);
+  // Get intervals from voicing relative to the interpretation's root
+  const intervals = getIntervalsFromVoicing(interpretation.root, voicing);
 
   // Compute average octave for brightness (or use default if no voicing)
   const avgOctave =
-    chord.voicing.length > 0
-      ? chord.voicing.reduce((sum, p) => sum + p.octave, 0) /
-        chord.voicing.length
+    voicing.length > 0
+      ? voicing.reduce((sum, p) => sum + p.octave, 0) / voicing.length
       : 4;
   const brightness = octaveToBrightness(avgOctave);
 
-  // Prefer the chord's actual interval set (populated by the detector
-  // from Tonal, covers extensions like 9/11/13). Fall back to the
-  // simplified-quality template for legacy callers that don't provide
-  // chordTones.
+  // Prefer the chord's actual interval set (from Tonal, covers extensions
+  // like 9/11/13). Fall back to the simplified-quality template if the
+  // interpretation's chordTones is missing (shouldn't happen in practice).
   const chordToneSet: number[] | null =
-    chord.chordTones && chord.chordTones.length > 0
-      ? chord.chordTones
-      : getExpectedSemitones(chord.quality);
+    interpretation.chordTones.length > 0
+      ? interpretation.chordTones
+      : getExpectedSemitones(interpretation.quality);
 
   for (const semitones of intervals) {
     const normalizedSemitones = semitones % 12;
     const angle = INTERVAL_ANGLES[normalizedSemitones];
-    const tier = getTierForInterval(normalizedSemitones, chord.quality);
+    const tier = getTierForInterval(normalizedSemitones, interpretation.quality);
     const radius = RADIUS_BY_TIER[tier];
     const label = INTERVAL_LABELS[normalizedSemitones];
 
     // Compute color from pitch class of this chord tone
-    const elementPc = ((chord.root + normalizedSemitones) % 12) as PitchClass;
+    const elementPc = ((interpretation.root + normalizedSemitones) % 12) as PitchClass;
     const hue = pcToHue(elementPc, invariant);
     const color: ColorHSVA = {
       h: hue,
@@ -90,7 +91,7 @@ export function buildChordShape(
     });
   }
 
-  const margin = getMarginStyle(chord.quality);
+  const margin = getMarginStyle(interpretation.quality);
 
   return {
     elements,
@@ -99,17 +100,13 @@ export function buildChordShape(
   };
 }
 
-/**
- * Extracts interval semitones from chord voicing.
- */
-function getIntervalsFromVoicing(chord: MusicalChord): number[] {
+/** Extract unique semitone intervals in a voicing relative to a root pc. */
+function getIntervalsFromVoicing(root: PitchClass, voicing: Pitch[]): number[] {
   const intervals = new Set<number>();
-
-  for (const pitch of chord.voicing) {
-    const semitones = (pitch.pc - chord.root + 12) % 12;
+  for (const pitch of voicing) {
+    const semitones = (pitch.pc - root + 12) % 12;
     intervals.add(semitones);
   }
-
   return Array.from(intervals).sort((a, b) => a - b);
 }
 

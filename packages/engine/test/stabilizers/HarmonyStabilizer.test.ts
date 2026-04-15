@@ -9,6 +9,7 @@ import {
 } from "../../src/stabilizers/HarmonyStabilizer";
 import type {
   MusicalChord,
+  ChordQuality,
   PitchClass,
   PrescribedKey,
 } from "@synesthetica/contracts";
@@ -20,22 +21,29 @@ import { createTestRawFrame, createTestMusicalFrame } from "../_harness/frames";
 
 function createChord(
   root: PitchClass,
-  quality: MusicalChord["quality"],
+  quality: ChordQuality,
   voicing: Array<{ pc: PitchClass; octave: number }>,
   onset = 0,
 ): MusicalChord {
-  return {
-    id: `test:${onset}:${root}${quality}`,
+  const interp = {
     root,
     quality,
+    chordTones: [],
+    name: "",
+    confidence: 1.0 as const,
+  };
+  return {
+    id: `test:${onset}:${root}${quality}`,
     bass: voicing[0].pc,
     inversion: 0,
+    isInverted: voicing[0].pc !== root,
     voicing: voicing.map((p) => ({ pc: p.pc, octave: p.octave })),
     noteIds: [],
+    harmonic: interp,
+    bassLed: interp,
     onset,
     duration: 1000,
     phase: "active",
-    confidence: 1.0,
     provenance: { source: "test", stream: "test", version: "1.0" },
   };
 }

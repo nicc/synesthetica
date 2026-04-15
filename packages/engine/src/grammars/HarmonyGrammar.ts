@@ -207,7 +207,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         data: {
           type: "chord-shape",
           chordId: chord.chord.id,
-          quality: chord.chord.quality,
+          quality: chord.chord.harmonic.quality,
           elements: chord.shape.elements,
           margin: chord.shape.margin,
         },

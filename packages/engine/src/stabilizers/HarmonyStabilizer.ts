@@ -118,7 +118,7 @@ export function defaultDissonanceAlgorithm(chord: MusicalChord): number {
     intervalTension += INTERVAL_DISSONANCE[interval] ?? 0;
   }
 
-  const qualityTension = QUALITY_TENSION[chord.quality] ?? 0;
+  const qualityTension = QUALITY_TENSION[chord.harmonic.quality] ?? 0;
   return Math.min(intervalTension + qualityTension, 1.0);
 }
 
@@ -273,7 +273,12 @@ function analyzeChord(
   key: PrescribedKey,
   diatonicTable: DiatonicEntry[],
 ): FunctionalChord {
-  const rootPc = chord.root;
+  // Functional analysis uses the harmonic interpretation — that's the
+  // reading that maps to Roman-numeral scale degrees. Bass-led would
+  // give different numerals for the same voicing; Phase 4's mode
+  // toggle can revisit this.
+  const rootPc = chord.harmonic.root;
+  const quality = chord.harmonic.quality;
 
   // Find the closest scale degree
   let degree = -1;
@@ -298,13 +303,13 @@ function analyzeChord(
     borrowed = true;
   }
 
-  const roman = formatRoman(degree, chord.quality, borrowed, chromaticOffset);
+  const roman = formatRoman(degree, quality, borrowed, chromaticOffset);
 
   return {
     degree,
     roman,
-    quality: chord.quality,
-    rootPc: chord.root,
+    quality,
+    rootPc,
     borrowed,
     chordId: chord.id,
     onset: chord.onset,

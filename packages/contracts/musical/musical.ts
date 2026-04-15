@@ -59,30 +59,58 @@ export interface Note {
 export type ChordId = string;
 
 /**
+ * A single interpretation of a voicing — e.g. the "harmonic" reading
+ * (simplest chord explaining the notes, bass-agnostic) or the "bass-led"
+ * reading (chord rooted on the bass note).
+ *
+ * Every voicing admits multiple valid readings. See SPEC_010 for the mode
+ * toggle that selects which interpretation grammars render.
+ */
+export interface ChordInterpretation {
+  /** Harmonic root of this reading */
+  root: PitchClass;
+  /** Simplified chord quality (maj, min, dom7, etc.) for display */
+  quality: ChordQuality;
+  /**
+   * Semitones-from-root of the chord's theoretical tones — e.g. Ab9:
+   * [0, 2, 4, 7, 10]. Includes extensions like 9/11/13 so renderers can
+   * distinguish chord tones from chromatic alterations even when
+   * `quality` rounds off details.
+   */
+  chordTones: number[];
+  /** Full chord name as produced by the detector, e.g. "AbM", "EbM/G" */
+  name: string;
+  /** Confidence in this specific interpretation, 0–1 */
+  confidence: Confidence;
+}
+
+/**
  * A musical chord detected by stabilizers.
+ *
+ * Carries BOTH a harmonic and a bass-led interpretation of the voicing.
+ * When bass equals the harmonic root, the two interpretations converge
+ * (populated with the same values). Grammars pick which to render via a
+ * runtime mode setting.
  */
 export interface MusicalChord {
   id: ChordId;
-  root: PitchClass;
-  quality: ChordQuality;
-  bass: PitchClass; // Lowest sounding pitch class (for slash chords like C/E)
-  inversion: number; // 0 = root position, 1 = first inversion, etc.
-  voicing: Pitch[]; // All pitches in the chord, ordered low to high
+  /** All pitches in the chord, ordered low to high */
+  voicing: Pitch[];
   noteIds: NoteId[];
+  /** Lowest sounding pitch class (MIDI-lowest note's pc) */
+  bass: PitchClass;
+  /** Position of bass in the harmonic interpretation's chordTones list */
+  inversion: number;
+  /** True when harmonic.root !== bass — i.e. the chord is an inversion */
+  isInverted: boolean;
+  /** Harmonic interpretation: simplest chord that explains the voicing */
+  harmonic: ChordInterpretation;
+  /** Bass-led interpretation: chord rooted on the bass note */
+  bassLed: ChordInterpretation;
   onset: Ms;
   duration: Ms;
   phase: "active" | "decaying";
-  confidence: Confidence;
   provenance: Provenance;
-  /**
-   * Semitones-from-root of the chord's theoretical tones, e.g. for an Ab9:
-   * [0, 2, 4, 7, 10]. Populated by the detector from the full chord type
-   * (including extensions), so rendering can tell "chord tone" from
-   * "chromatic alteration" even when the simplified `quality` field rounds
-   * off details. Optional for backwards compat with test fixtures; consumers
-   * should fall back to quality-derived intervals when absent.
-   */
-  chordTones?: number[];
 }
 
 /**

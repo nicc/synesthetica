@@ -64,7 +64,7 @@ function detectQuality(
   const result = stabilizer.apply(raw2, upstream2);
 
   if (result.chords.length === 0) return null;
-  return result.chords[0].quality;
+  return result.chords[0].harmonic.quality;
 }
 
 // ============================================================================
@@ -195,7 +195,7 @@ describe("ChordDetectionStabilizer", () => {
       });
       const result = stabilizer.apply(raw2, upstream2);
       if (result.chords.length === 0) return null;
-      return result.chords[0].root;
+      return result.chords[0].harmonic.root;
     }
 
     it("detects D major in D major key (sharp-key spelling)", () => {
@@ -276,8 +276,8 @@ describe("ChordDetectionStabilizer", () => {
 
       // Should detect Ab major despite C being earlier in the pc map.
       const current = result.chords.find((c) => c.phase === "active");
-      expect(current?.root).toBe(8);
-      expect(current?.quality).toBe("maj");
+      expect(current?.harmonic.root).toBe(8);
+      expect(current?.harmonic.quality).toBe("maj");
     });
 
     it("still detects Bb major in Eb major key (flat-key spelling)", () => {
@@ -324,7 +324,10 @@ describe("ChordDetectionStabilizer", () => {
       });
       const result = stabilizer.apply(raw2, upstream2);
       if (result.chords.length === 0) return null;
-      return { root: result.chords[0].root, quality: result.chords[0].quality };
+      return {
+        root: result.chords[0].harmonic.root,
+        quality: result.chords[0].harmonic.quality,
+      };
     }
 
     it("detects Ab9 in Ab major (Ab-C-Eb-Gb-Bb)", () => {

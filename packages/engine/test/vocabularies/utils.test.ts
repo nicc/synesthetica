@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 import { buildChordShape } from "../../src/vocabularies/utils";
 import type {
   MusicalChord,
+  ChordQuality,
   PitchClass,
   PitchHueInvariant,
 } from "@synesthetica/contracts";
@@ -21,24 +22,31 @@ const defaultInvariant: PitchHueInvariant = {
 // Helper to create a test chord
 function makeChord(
   root: PitchClass,
-  quality: MusicalChord["quality"],
-  intervals: number[]
+  quality: ChordQuality,
+  intervals: number[],
 ): MusicalChord {
-  return {
-    id: `test:0:${root}${quality}`,
+  const interp = {
     root,
     quality,
+    chordTones: intervals,
+    name: "",
+    confidence: 1.0 as const,
+  };
+  return {
+    id: `test:0:${root}${quality}`,
     bass: root,
     inversion: 0,
+    isInverted: false,
     voicing: intervals.map((semitones) => ({
       pc: ((root + semitones) % 12) as PitchClass,
       octave: 4,
     })),
     noteIds: [],
+    harmonic: interp,
+    bassLed: interp,
     onset: 0,
     duration: 1000,
     phase: "active",
-    confidence: 1.0,
     provenance: { source: "test", stream: "test", version: "1.0" },
   };
 }
@@ -47,7 +55,7 @@ describe("buildChordShape", () => {
   describe("element structure", () => {
     it("builds correct elements for major triad", () => {
       const chord = makeChord(0, "maj", [0, 4, 7]); // C-E-G
-      const shape = buildChordShape(chord, defaultInvariant);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
 
       expect(shape.elements).toHaveLength(3);
       expect(shape.margin).toBe("straight");
@@ -62,7 +70,7 @@ describe("buildChordShape", () => {
 
     it("builds correct elements for minor triad", () => {
       const chord = makeChord(0, "min", [0, 3, 7]); // C-Eb-G
-      const shape = buildChordShape(chord, defaultInvariant);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
 
       expect(shape.elements).toHaveLength(3);
       expect(shape.margin).toBe("wavy");
@@ -75,7 +83,7 @@ describe("buildChordShape", () => {
 
     it("builds correct elements for dominant 7th", () => {
       const chord = makeChord(0, "dom7", [0, 4, 7, 10]); // C-E-G-Bb
-      const shape = buildChordShape(chord, defaultInvariant);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
 
       expect(shape.elements).toHaveLength(4);
       expect(shape.margin).toBe("straight");
@@ -94,7 +102,7 @@ describe("buildChordShape", () => {
 
     it("builds correct elements for diminished 7th", () => {
       const chord = makeChord(0, "dim7", [0, 3, 6, 9]); // C-Eb-Gb-Bbb
-      const shape = buildChordShape(chord, defaultInvariant);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
 
       expect(shape.elements).toHaveLength(4);
       expect(shape.margin).toBe("concave");
@@ -108,7 +116,7 @@ describe("buildChordShape", () => {
   describe("context-aware tier classification", () => {
     it("classifies ♭5 as triadic in diminished chords", () => {
       const dim = makeChord(0, "dim", [0, 3, 6]);
-      const shape = buildChordShape(dim, defaultInvariant);
+      const shape = buildChordShape(dim.harmonic, dim.voicing, defaultInvariant);
 
       const flatFifth = shape.elements.find((e) => e.interval === "♭5");
       expect(flatFifth?.tier).toBe("triadic");
@@ -116,7 +124,7 @@ describe("buildChordShape", () => {
 
     it("classifies ♭5 as triadic in half-diminished chords", () => {
       const hdim = makeChord(0, "hdim7", [0, 3, 6, 10]);
-      const shape = buildChordShape(hdim, defaultInvariant);
+      const shape = buildChordShape(hdim.harmonic, hdim.voicing, defaultInvariant);
 
       const flatFifth = shape.elements.find((e) => e.interval === "♭5");
       expect(flatFifth?.tier).toBe("triadic");
@@ -124,7 +132,7 @@ describe("buildChordShape", () => {
 
     it("classifies 9th as extension", () => {
       const maj9 = makeChord(0, "maj7", [0, 4, 7, 11, 2]); // C-E-G-B-D
-      const shape = buildChordShape(maj9, defaultInvariant);
+      const shape = buildChordShape(maj9.harmonic, maj9.voicing, defaultInvariant);
 
       const ninth = shape.elements.find((e) => e.interval === "2"); // 9th = 2 semitones
       expect(ninth?.tier).toBe("extension");
@@ -134,7 +142,7 @@ describe("buildChordShape", () => {
   describe("per-element color", () => {
     it("computes color from pitch class of each element", () => {
       const chord = makeChord(0, "maj", [0, 4, 7]); // C-E-G (pc 0, 4, 7)
-      const shape = buildChordShape(chord, defaultInvariant);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
 
       // Root (C, pc=0) should have hue for C
       const rootEl = shape.elements.find((e) => e.interval === "1");
@@ -160,7 +168,7 @@ describe("buildChordShape", () => {
       };
 
       const chord = makeChord(0, "maj", [0, 4, 7]);
-      const shape = buildChordShape(chord, customInvariant);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, customInvariant);
 
       // Root (C) should be at reference hue (0 = red)
       const rootEl = shape.elements.find((e) => e.interval === "1");
@@ -173,26 +181,33 @@ describe("buildChordShape", () => {
 
     it("uses average octave brightness for all elements", () => {
       // Chord with mixed octaves
+      const interp = {
+        root: 0 as PitchClass,
+        quality: "maj" as ChordQuality,
+        chordTones: [0, 4, 7],
+        name: "",
+        confidence: 1.0 as const,
+      };
       const chord: MusicalChord = {
         id: "test:0:Cmaj",
-        root: 0,
-        quality: "maj",
         bass: 0,
         inversion: 0,
+        isInverted: false,
         voicing: [
           { pc: 0, octave: 3 }, // Low C
           { pc: 4, octave: 4 }, // Mid E
           { pc: 7, octave: 5 }, // High G
         ],
         noteIds: [],
+        harmonic: interp,
+        bassLed: interp,
         onset: 0,
         duration: 1000,
         phase: "active",
-        confidence: 1.0,
         provenance: { source: "test", stream: "test", version: "1.0" },
       };
 
-      const shape = buildChordShape(chord, defaultInvariant);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
 
       // All elements should have the same brightness (from avg octave 4)
       const brightnesses = shape.elements.map((e) => e.color.v);
@@ -217,7 +232,7 @@ describe("buildChordShape", () => {
 
     it.each(cases)("maps %s quality to %s margin", (quality, expectedMargin) => {
       const chord = makeChord(0, quality, [0, 4, 7]);
-      const shape = buildChordShape(chord, defaultInvariant);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
       expect(shape.margin).toBe(expectedMargin);
     });
   });
@@ -225,7 +240,7 @@ describe("buildChordShape", () => {
   describe("angular positions", () => {
     it("places root at 0°", () => {
       const chord = makeChord(0, "maj", [0, 4, 7]);
-      const shape = buildChordShape(chord, defaultInvariant);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
 
       const rootEl = shape.elements.find((e) => e.interval === "1");
       expect(rootEl?.angle).toBe(0);
@@ -233,7 +248,7 @@ describe("buildChordShape", () => {
 
     it("places intervals at correct angles (30° per semitone)", () => {
       const chord = makeChord(0, "maj", [0, 4, 7]);
-      const shape = buildChordShape(chord, defaultInvariant);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
 
       const thirdEl = shape.elements.find((e) => e.interval === "3");
       expect(thirdEl?.angle).toBe(120); // 4 semitones * 30°
@@ -246,21 +261,22 @@ describe("buildChordShape", () => {
   describe("wedge vs line classification via chordTones", () => {
     it("renders natural 9 as a wedge when chordTones includes it (Cmaj9)", () => {
       // Cmaj9 voicing C-E-G-B-D, detector reports full interval set
-      const chord: MusicalChord = {
-        ...makeChord(0, "maj7", [0, 4, 7, 11, 2]),
-        chordTones: [0, 4, 7, 11, 2], // Tonal's Cmaj9 intervals
-      };
-      const shape = buildChordShape(chord, defaultInvariant);
+      const chord = makeChord(0, "maj7", [0, 4, 7, 11, 2]);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
 
       const ninth = shape.elements.find((e) => e.interval === "2");
       expect(ninth?.style).toBe("wedge");
     });
 
-    it("renders natural 9 as a chromatic line when chordTones is absent (fallback)", () => {
-      // Same voicing but quality=maj7, no chordTones → falls back to
-      // quality-derived intervals [0,4,7,11] which excludes the 9th.
-      const chord = makeChord(0, "maj7", [0, 4, 7, 11, 2]);
-      const shape = buildChordShape(chord, defaultInvariant);
+    it("renders natural 9 as a chromatic line when chordTones is empty (fallback)", () => {
+      // Empty chordTones forces the fallback to quality-derived intervals
+      // [0,4,7,11], which excludes the 9th.
+      const base = makeChord(0, "maj7", [0, 4, 7, 11, 2]);
+      const chord: MusicalChord = {
+        ...base,
+        harmonic: { ...base.harmonic, chordTones: [] },
+      };
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
 
       const ninth = shape.elements.find((e) => e.interval === "2");
       expect(ninth?.style).toBe("line");
@@ -270,11 +286,8 @@ describe("buildChordShape", () => {
       // C7♭9: C-E-G-Bb-Db. The detector does include ♭9 in intervals,
       // so strictly speaking it becomes a wedge. This test documents
       // the current behaviour: chordTones is the source of truth.
-      const chord: MusicalChord = {
-        ...makeChord(0, "dom7", [0, 4, 7, 10, 1]),
-        chordTones: [0, 4, 7, 10, 1],
-      };
-      const shape = buildChordShape(chord, defaultInvariant);
+      const chord = makeChord(0, "dom7", [0, 4, 7, 10, 1]);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
 
       const flatNine = shape.elements.find((e) => e.interval === "♭2");
       // This is a known trade-off: Tonal's interval list doesn't

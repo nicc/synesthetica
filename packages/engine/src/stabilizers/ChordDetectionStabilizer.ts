@@ -38,6 +38,7 @@ import type {
   RawInputFrame,
   MusicalFrame,
   MusicalChord,
+  ChordInterpretation,
   Note,
   Pitch,
   PitchClass,
@@ -161,17 +162,11 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
   private pitchClassLastSeen: Map<PitchClass, Ms> = new Map();
 
   // Current displayed chord (after hysteresis)
-  private displayedChord: {
-    root: PitchClass;
-    quality: ChordQuality;
-    chordTones: number[];
-  } | null = null;
+  private displayedChord: ChordInterpretation | null = null;
 
   // Candidate chord waiting for hysteresis
   private candidateChord: {
-    root: PitchClass;
-    quality: ChordQuality;
-    chordTones: number[];
+    interpretation: ChordInterpretation;
     since: Ms;
   } | null = null;
 
@@ -321,12 +316,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
   private detectChordFromPitchClasses(
     pitchClasses: Set<PitchClass>,
     bassPc?: PitchClass | null,
-  ): {
-    root: PitchClass;
-    quality: ChordQuality;
-    chordTones: number[];
-    confidence: Confidence;
-  } | null {
+  ): ChordInterpretation | null {
     if (pitchClasses.size < this.config.minPitchClasses) {
       return null;
     }
@@ -359,6 +349,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
       root: PitchClass;
       quality: ChordQuality;
       chordTones: number[];
+      name: string;
       coverage: number;
       complexity: number;
       keyFit: number;
@@ -423,6 +414,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
           root,
           quality,
           chordTones,
+          name,
           coverage,
           complexity: chordTones.length,
           keyFit,
@@ -480,6 +472,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
       root: best.root,
       quality: best.quality,
       chordTones: best.chordTones,
+      name: best.name,
       confidence,
     };
   }
@@ -489,11 +482,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
    * Only update displayed chord if new chord is stable for hysteresisMs.
    */
   private applyHysteresis(
-    detected: {
-      root: PitchClass;
-      quality: ChordQuality;
-      chordTones: number[];
-    } | null,
+    detected: ChordInterpretation | null,
     t: Ms
   ): void {
     const isSameAsDisplayed =
@@ -505,8 +494,8 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     const isSameAsCandidate =
       detected &&
       this.candidateChord &&
-      detected.root === this.candidateChord.root &&
-      detected.quality === this.candidateChord.quality;
+      detected.root === this.candidateChord.interpretation.root &&
+      detected.quality === this.candidateChord.interpretation.quality;
 
     if (isSameAsDisplayed) {
       // Current chord continues, clear any candidate
@@ -534,11 +523,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
           this.finalizeChord(this.displayedChord, this.currentChordOnset, t);
         }
         // Switch to candidate
-        this.displayedChord = {
-          root: this.candidateChord!.root,
-          quality: this.candidateChord!.quality,
-          chordTones: this.candidateChord!.chordTones,
-        };
+        this.displayedChord = this.candidateChord!.interpretation;
         this.currentChordOnset = t;
         this.candidateChord = null;
       }
@@ -547,10 +532,54 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
 
     // New candidate chord
     this.candidateChord = {
-      root: detected.root,
-      quality: detected.quality,
-      chordTones: detected.chordTones,
+      interpretation: detected,
       since: t,
+    };
+  }
+
+  /**
+   * Build a MusicalChord output from a harmonic interpretation and the
+   * voicing context. In Phase 2, bassLed is populated with the same
+   * interpretation as harmonic — they'll diverge once Phase 3 adds a
+   * bass-led scorer.
+   */
+  private buildChordOutput(params: {
+    interpretation: ChordInterpretation;
+    voicing: Pitch[];
+    bassPc: PitchClass | null;
+    onset: Ms;
+    endTime: Ms;
+    phase: "active" | "decaying";
+  }): MusicalChord {
+    const { interpretation, voicing, bassPc, onset, endTime, phase } = params;
+
+    const id = createChordId(
+      this.config.partId,
+      onset,
+      interpretation.root,
+      interpretation.quality
+    );
+
+    const actualBass = bassPc ?? interpretation.root;
+    const rootSemitone = (actualBass - interpretation.root + 12) % 12;
+    const inversionIdx = interpretation.chordTones.indexOf(rootSemitone);
+    const inversion = inversionIdx >= 0 ? inversionIdx : 0;
+
+    return {
+      id,
+      voicing,
+      noteIds: [],
+      bass: actualBass,
+      inversion,
+      isInverted: actualBass !== interpretation.root,
+      harmonic: interpretation,
+      // Phase 2: bassLed is a copy of harmonic. Phase 3 populates it
+      // with a distinct bass-led scorer result.
+      bassLed: interpretation,
+      onset,
+      duration: endTime - onset,
+      phase,
+      provenance: this.provenance,
     };
   }
 
@@ -558,32 +587,20 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
    * Finalize a chord and add to progression.
    */
   private finalizeChord(
-    chord: { root: PitchClass; quality: ChordQuality; chordTones: number[] },
+    chord: ChordInterpretation,
     onset: Ms,
     endTime: Ms
   ): void {
-    const id = createChordId(
-      this.config.partId,
-      onset,
-      chord.root,
-      chord.quality
+    this.recentChords.push(
+      this.buildChordOutput({
+        interpretation: chord,
+        voicing: [],
+        bassPc: null,
+        onset,
+        endTime,
+        phase: "decaying",
+      }),
     );
-
-    this.recentChords.push({
-      id,
-      root: chord.root,
-      quality: chord.quality,
-      chordTones: chord.chordTones,
-      bass: chord.root, // Simplified: assume root position
-      inversion: 0,
-      voicing: [], // Not tracked in this approach
-      noteIds: [], // Not tracked in this approach
-      onset,
-      duration: endTime - onset,
-      phase: "decaying",
-      confidence: 0.8,
-      provenance: this.provenance,
-    });
   }
 
   /**
@@ -610,35 +627,16 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
         return distA - distB;
       });
 
-      const id = createChordId(
-        this.config.partId,
-        this.currentChordOnset,
-        this.displayedChord.root,
-        this.displayedChord.quality
+      chords.push(
+        this.buildChordOutput({
+          interpretation: this.displayedChord,
+          voicing,
+          bassPc,
+          onset: this.currentChordOnset,
+          endTime: t,
+          phase: "active",
+        }),
       );
-
-      // If bass is known and differs from root, chord is in an inversion
-      // (first/second/etc., depending on which chord tone is in the bass).
-      const root = this.displayedChord.root;
-      const actualBass = bassPc ?? root;
-      const rootSemitone = (actualBass - root + 12) % 12;
-      const inversion = this.displayedChord.chordTones.indexOf(rootSemitone);
-
-      chords.push({
-        id,
-        root,
-        quality: this.displayedChord.quality,
-        chordTones: this.displayedChord.chordTones,
-        bass: actualBass,
-        inversion: inversion >= 0 ? inversion : 0,
-        voicing,
-        noteIds: [], // Not tracked
-        onset: this.currentChordOnset,
-        duration: t - this.currentChordOnset,
-        phase: "active",
-        confidence: 0.8,
-        provenance: this.provenance,
-      });
     }
 
     return chords;

@@ -13,6 +13,7 @@ import type {
   AnnotatedChord,
   PitchClass,
   MusicalChord,
+  ChordQuality,
   PitchHueInvariant,
 } from "@synesthetica/contracts";
 import { createTestAnnotatedFrame } from "../_harness/frames";
@@ -40,30 +41,38 @@ const defaultInvariant: PitchHueInvariant = {
  */
 function createTestChord(
   root: PitchClass,
-  quality: MusicalChord["quality"],
-  intervals: number[]
+  quality: ChordQuality,
+  intervals: number[],
 ): AnnotatedChord {
   const voicing = intervals.map((semitones) => ({
     pc: ((root + semitones) % 12) as PitchClass,
     octave: 4,
   }));
 
-  const chord: MusicalChord = {
-    id: `test:0:${root}${quality}`,
+  const interp = {
     root,
     quality,
+    chordTones: intervals,
+    name: "",
+    confidence: 1.0 as const,
+  };
+
+  const chord: MusicalChord = {
+    id: `test:0:${root}${quality}`,
     bass: voicing[0].pc,
     inversion: 0,
+    isInverted: voicing[0].pc !== root,
     voicing,
     noteIds: [],
+    harmonic: interp,
+    bassLed: interp,
     onset: 0,
     duration: 1000,
     phase: "active",
-    confidence: 1.0,
     provenance: { source: "test", stream: "test", version: "1.0" },
   };
 
-  const shape = buildChordShape(chord, defaultInvariant);
+  const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
 
   return {
     chord,
