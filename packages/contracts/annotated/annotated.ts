@@ -193,15 +193,12 @@ export interface ChordShapeGeometry {
 // ============================================================================
 
 /**
- * A line segment in a Roman numeral glyph.
+ * A chain of connected points forming a polyline in a Roman numeral glyph.
  * Coordinates are in glyph-local units (origin at bottom-left of baseline).
+ * Rendered as a single stroked path so corners join cleanly without
+ * opacity stacking during transparent fades.
  */
-export interface GlyphSegment {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-}
+export type GlyphPolyline = Array<{ x: number; y: number }>;
 
 /**
  * A circular arc in a Roman numeral glyph (for ° and ø suffixes).
@@ -222,8 +219,8 @@ export interface GlyphArc {
  * Invariant I19: glyphs are geometric paths, not rendered text.
  */
 export interface RomanNumeralGlyph {
-  /** Line segments forming the glyph */
-  segments: GlyphSegment[];
+  /** Connected polylines forming the glyph strokes */
+  polylines: GlyphPolyline[];
   /** Arcs forming the glyph (for ° ø suffixes) */
   arcs: GlyphArc[];
   /** Bounding box width in glyph units */

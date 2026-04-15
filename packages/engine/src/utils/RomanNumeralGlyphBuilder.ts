@@ -17,10 +17,17 @@
  */
 
 import type {
-  GlyphSegment,
   GlyphArc,
+  GlyphPolyline,
   RomanNumeralGlyph,
 } from "@synesthetica/contracts";
+
+interface GlyphSegment {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
 
 // ============================================================================
 // Dimensions
@@ -38,10 +45,10 @@ const STROKE_GAP = 0.2;
 /** Width of V/v chevron at the top */
 const CHEVRON_W = 0.5;
 
-/** Dot radius for lowercase i */
-const DOT_RADIUS = 0.04;
+/** Height of the tiny stroke used as the "dot" for lowercase i */
+const DOT_HEIGHT = 0.06;
 
-/** Gap between stroke top and dot center */
+/** Gap between stroke top and bottom of dot stroke */
 const DOT_GAP = 0.1;
 
 /** Suffix scale relative to base numeral height */
@@ -435,7 +442,7 @@ export function buildRomanNumeralGlyph(roman: string): RomanNumeralGlyph {
   const h = parsed.upper ? UPPER_H : LOWER_H;
   const builder = NUMERAL_BUILDERS[parsed.base];
   if (!builder) {
-    return { segments: [], arcs: [], width: 0, height: 0 };
+    return { polylines: [], arcs: [], width: 0, height: 0 };
   }
 
   const baseGlyph = builder(h);
@@ -460,14 +467,17 @@ export function buildRomanNumeralGlyph(roman: string): RomanNumeralGlyph {
   allSegments.push(...offsetBase.segments);
   allArcs.push(...offsetBase.arcs);
 
-  // Add dots above vertical strokes for lowercase numerals
+  // Add dots above vertical strokes for lowercase numerals.
+  // Rendered as a short vertical stroke (a "pixel" that grows chunky
+  // with the rest of the glyph as it fades) rather than a ring.
   if (!parsed.upper) {
     for (const seg of offsetBase.segments) {
       // Vertical strokes have x1 === x2
       if (Math.abs(seg.x1 - seg.x2) < 0.001) {
-        const dotY = Math.max(seg.y1, seg.y2) + DOT_GAP;
-        allArcs.push({ cx: seg.x1, cy: dotY, r: DOT_RADIUS });
-        totalHeight = Math.max(totalHeight, dotY + DOT_RADIUS);
+        const dotBaseY = Math.max(seg.y1, seg.y2) + DOT_GAP;
+        const dotTopY = dotBaseY + DOT_HEIGHT;
+        allSegments.push({ x1: seg.x1, y1: dotBaseY, x2: seg.x1, y2: dotTopY });
+        totalHeight = Math.max(totalHeight, dotTopY);
       }
     }
   }
@@ -490,9 +500,82 @@ export function buildRomanNumeralGlyph(roman: string): RomanNumeralGlyph {
   }
 
   return {
-    segments: allSegments,
+    polylines: segmentsToPolylines(allSegments),
     arcs: allArcs,
     width: totalWidth,
     height: totalHeight,
   };
+}
+
+/**
+ * Merge connected segments into polylines.
+ * Two segments are "connected" if they share an endpoint (within epsilon).
+ * This lets the renderer draw each chain as a single stroked path,
+ * giving clean corner joins without alpha stacking during fades.
+ */
+function segmentsToPolylines(segments: GlyphSegment[]): GlyphPolyline[] {
+  const EPS = 0.001;
+  const pool = segments.map((s) => ({ ...s, used: false }));
+  const polylines: GlyphPolyline[] = [];
+
+  const same = (ax: number, ay: number, bx: number, by: number) =>
+    Math.abs(ax - bx) < EPS && Math.abs(ay - by) < EPS;
+
+  for (let i = 0; i < pool.length; i++) {
+    if (pool[i].used) continue;
+    pool[i].used = true;
+
+    const chain: GlyphPolyline = [
+      { x: pool[i].x1, y: pool[i].y1 },
+      { x: pool[i].x2, y: pool[i].y2 },
+    ];
+
+    // Extend forward: find a segment whose endpoint matches the chain's end
+    let extended = true;
+    while (extended) {
+      extended = false;
+      const end = chain[chain.length - 1];
+      for (let j = 0; j < pool.length; j++) {
+        if (pool[j].used) continue;
+        const s = pool[j];
+        if (same(s.x1, s.y1, end.x, end.y)) {
+          chain.push({ x: s.x2, y: s.y2 });
+          pool[j].used = true;
+          extended = true;
+          break;
+        } else if (same(s.x2, s.y2, end.x, end.y)) {
+          chain.push({ x: s.x1, y: s.y1 });
+          pool[j].used = true;
+          extended = true;
+          break;
+        }
+      }
+    }
+
+    // Extend backward: find a segment whose endpoint matches the chain's start
+    extended = true;
+    while (extended) {
+      extended = false;
+      const start = chain[0];
+      for (let j = 0; j < pool.length; j++) {
+        if (pool[j].used) continue;
+        const s = pool[j];
+        if (same(s.x2, s.y2, start.x, start.y)) {
+          chain.unshift({ x: s.x1, y: s.y1 });
+          pool[j].used = true;
+          extended = true;
+          break;
+        } else if (same(s.x1, s.y1, start.x, start.y)) {
+          chain.unshift({ x: s.x2, y: s.y2 });
+          pool[j].used = true;
+          extended = true;
+          break;
+        }
+      }
+    }
+
+    polylines.push(chain);
+  }
+
+  return polylines;
 }

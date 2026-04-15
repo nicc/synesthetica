@@ -38,8 +38,10 @@ function glyphToSVG(
   // Flip Y: SVG is Y-down, glyph coords are Y-up
   svg += `  <g transform="translate(${padding}, ${padding + glyph.height * scale}) scale(${scale}, ${-scale})">\n`;
 
-  for (const seg of glyph.segments) {
-    svg += `    <line x1="${seg.x1}" y1="${seg.y1}" x2="${seg.x2}" y2="${seg.y2}" stroke="${color}" stroke-width="${2 / scale}" stroke-linecap="round"/>\n`;
+  for (const poly of glyph.polylines) {
+    if (poly.length < 2) continue;
+    const d = poly.map((p, i) => `${i === 0 ? "M" : "L"}${p.x} ${p.y}`).join(" ");
+    svg += `    <path d="${d}" fill="none" stroke="${color}" stroke-width="${2 / scale}" stroke-linecap="round" stroke-linejoin="round"/>\n`;
   }
 
   for (const arc of glyph.arcs) {
@@ -104,8 +106,10 @@ function renderGlyphGrid(
 
     svg += `  <g transform="translate(${gx}, ${baseY}) scale(${scale}, ${-scale})">\n`;
 
-    for (const seg of glyph.segments) {
-      svg += `    <line x1="${seg.x1}" y1="${seg.y1}" x2="${seg.x2}" y2="${seg.y2}" stroke="#e0e0e0" stroke-width="${2 / scale}" stroke-linecap="round"/>\n`;
+    for (const poly of glyph.polylines) {
+      if (poly.length < 2) continue;
+      const d = poly.map((p, i) => `${i === 0 ? "M" : "L"}${p.x} ${p.y}`).join(" ");
+      svg += `    <path d="${d}" fill="none" stroke="#e0e0e0" stroke-width="${2 / scale}" stroke-linecap="round" stroke-linejoin="round"/>\n`;
     }
     for (const arc of glyph.arcs) {
       svg += `    <circle cx="${arc.cx}" cy="${arc.cy}" r="${arc.r}" fill="none" stroke="#e0e0e0" stroke-width="${2 / scale}"/>\n`;
@@ -122,6 +126,15 @@ function renderGlyphGrid(
 }
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+/** Total vertex count across all polylines — proxy for "glyph complexity". */
+function totalPoints(glyph: RomanNumeralGlyph): number {
+  return glyph.polylines.reduce((sum, p) => sum + p.length, 0);
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -132,24 +145,28 @@ describe("RomanNumeralGlyphBuilder", () => {
     for (const numeral of cases) {
       it(`produces geometry for ${numeral}`, () => {
         const glyph = buildRomanNumeralGlyph(numeral);
-        expect(glyph.segments.length).toBeGreaterThan(0);
+        expect(glyph.polylines.length).toBeGreaterThan(0);
         expect(glyph.height).toBeCloseTo(1.0, 1); // Uppercase = full height
         expect(glyph.width).toBeGreaterThanOrEqual(0);
       });
     }
 
-    it("lowercase numerals have dots above vertical strokes", () => {
+    it("lowercase numerals have dot strokes above vertical strokes", () => {
       const glyph = buildRomanNumeralGlyph("iii");
-      // 3 vertical strokes → 3 dots (arcs)
-      expect(glyph.arcs).toHaveLength(3);
-      // Dots are above the stroke tops
-      for (const arc of glyph.arcs) {
-        expect(arc.cy).toBeGreaterThan(0.65);
-      }
+      // 3 vertical strokes → 3 extra tiny "dot" polylines above them.
+      // Total polylines: 3 main strokes + 3 dots = 6.
+      expect(glyph.polylines).toHaveLength(6);
+      // Dot polylines sit above y=0.65 (lowercase height).
+      const dotLike = glyph.polylines.filter(
+        (p) => p.length === 2 && Math.min(p[0].y, p[1].y) > 0.65,
+      );
+      expect(dotLike).toHaveLength(3);
     });
 
     it("uppercase numerals have no dots", () => {
       const glyph = buildRomanNumeralGlyph("III");
+      // III: three vertical polylines, no extras.
+      expect(glyph.polylines).toHaveLength(3);
       expect(glyph.arcs).toHaveLength(0);
     });
 
@@ -175,45 +192,43 @@ describe("RomanNumeralGlyphBuilder", () => {
     it("°7 adds arc and extra segments (dim7)", () => {
       const glyph = buildRomanNumeralGlyph("vii°7");
       expect(glyph.arcs.length).toBeGreaterThan(0);
-      // 7 has segments beyond the base numeral
       const base = buildRomanNumeralGlyph("vii");
-      expect(glyph.segments.length).toBeGreaterThan(base.segments.length);
+      expect(totalPoints(glyph)).toBeGreaterThan(totalPoints(base));
     });
 
     it("ø7 adds arc with stroke (half-dim)", () => {
       const glyph = buildRomanNumeralGlyph("vii" + "ø7");
       expect(glyph.arcs.length).toBeGreaterThan(0);
-      // The ø stroke adds a segment beyond what ° would have
       const dim = buildRomanNumeralGlyph("vii°7");
-      expect(glyph.segments.length).toBeGreaterThan(dim.segments.length);
+      expect(totalPoints(glyph)).toBeGreaterThan(totalPoints(dim));
     });
 
     it("+ adds segments (augmented)", () => {
       const base = buildRomanNumeralGlyph("III");
       const aug = buildRomanNumeralGlyph("III+");
-      expect(aug.segments.length).toBeGreaterThan(base.segments.length);
+      expect(totalPoints(aug)).toBeGreaterThan(totalPoints(base));
     });
 
     it("7 adds segments (dominant)", () => {
       const base = buildRomanNumeralGlyph("V");
       const dom = buildRomanNumeralGlyph("V7");
-      expect(dom.segments.length).toBeGreaterThan(base.segments.length);
+      expect(totalPoints(dom)).toBeGreaterThan(totalPoints(base));
     });
 
     it("Δ7 adds triangle segments (major 7th)", () => {
       const base = buildRomanNumeralGlyph("I");
       const maj7 = buildRomanNumeralGlyph("I" + "Δ7");
-      expect(maj7.segments.length).toBeGreaterThan(base.segments.length);
+      expect(totalPoints(maj7)).toBeGreaterThan(totalPoints(base));
     });
 
     it("suffix is positioned to the right of the base", () => {
       const glyph = buildRomanNumeralGlyph("V7");
-      // The 7 suffix segments should have x values beyond the V chevron width
       const base = buildRomanNumeralGlyph("V");
-      const suffixSegments = glyph.segments.slice(base.segments.length);
-      for (const seg of suffixSegments) {
-        expect(Math.max(seg.x1, seg.x2)).toBeGreaterThan(base.width * 0.5);
-      }
+      // At least one polyline has all its points beyond the V chevron's center.
+      const suffixPolys = glyph.polylines.filter(
+        (p) => p.every((pt) => pt.x > base.width * 0.5),
+      );
+      expect(suffixPolys.length).toBeGreaterThan(0);
     });
   });
 
@@ -221,28 +236,28 @@ describe("RomanNumeralGlyphBuilder", () => {
     it("♭ prefix adds segments before the numeral", () => {
       const plain = buildRomanNumeralGlyph("III");
       const flat = buildRomanNumeralGlyph("♭III");
-      expect(flat.segments.length).toBeGreaterThan(plain.segments.length);
+      expect(totalPoints(flat)).toBeGreaterThan(totalPoints(plain));
       expect(flat.width).toBeGreaterThan(plain.width);
     });
 
     it("♯ prefix adds segments before the numeral", () => {
       const plain = buildRomanNumeralGlyph("II");
       const sharp = buildRomanNumeralGlyph("♯II");
-      expect(sharp.segments.length).toBeGreaterThan(plain.segments.length);
+      expect(totalPoints(sharp)).toBeGreaterThan(totalPoints(plain));
     });
   });
 
   describe("parsing edge cases", () => {
     it("handles lowercase with suffix", () => {
       const glyph = buildRomanNumeralGlyph("ii7");
-      expect(glyph.segments.length).toBeGreaterThan(0);
+      expect(glyph.polylines.length).toBeGreaterThan(0);
       // Height exceeds stroke height (0.65) due to dots above strokes
       expect(glyph.height).toBeGreaterThan(0.65);
     });
 
     it("handles accidental + lowercase + suffix", () => {
       const glyph = buildRomanNumeralGlyph("♭vi°");
-      expect(glyph.segments.length).toBeGreaterThan(0);
+      expect(glyph.polylines.length).toBeGreaterThan(0);
       expect(glyph.arcs.length).toBeGreaterThan(0);
     });
   });
@@ -296,7 +311,7 @@ describe("RomanNumeralGlyphBuilder", () => {
       // Basic sanity: every entry produces geometry
       for (const { roman } of entries) {
         const glyph = buildRomanNumeralGlyph(roman);
-        expect(glyph.segments.length + glyph.arcs.length).toBeGreaterThan(0);
+        expect(glyph.polylines.length + glyph.arcs.length).toBeGreaterThan(0);
       }
     });
   });

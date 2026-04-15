@@ -1044,13 +1044,13 @@ export class ThreeJSRenderer implements IRenderer {
   private updateRomanNumeral(entity: Entity): void {
     if (!this.scene) return;
 
-    const segments = entity.data?.segments as Array<{ x1: number; y1: number; x2: number; y2: number }> | undefined;
+    const polylines = entity.data?.polylines as Array<Array<{ x: number; y: number }>> | undefined;
     const arcs = entity.data?.arcs as Array<{ cx: number; cy: number; r: number }> | undefined;
     const glyphW = (entity.data?.width as number) ?? 0;
     const glyphH = (entity.data?.height as number) ?? 1;
     const strokeWidth = (entity.data?.strokeWidth as number) ?? 2;
 
-    if (!segments && !arcs) return;
+    if (!polylines && !arcs) return;
 
     const color = entity.style.color ?? { h: 200, s: 0.5, v: 0.9 };
     const threeColor = this.hsvToThreeColor(color);
@@ -1077,13 +1077,15 @@ export class ThreeJSRenderer implements IRenderer {
     const offsetX = -(glyphW * scale) / 2;
     const offsetY = -(glyphH * scale) / 2;
 
-    // Render line segments
-    if (segments) {
-      for (const seg of segments) {
-        const positions = [
-          seg.x1 * scale + offsetX, seg.y1 * scale + offsetY, 0,
-          seg.x2 * scale + offsetX, seg.y2 * scale + offsetY, 0,
-        ];
+    // Render polylines — each as a single Line2 so corner joins stay
+    // clean and don't stack alpha during transparent fades.
+    if (polylines) {
+      for (const poly of polylines) {
+        if (poly.length < 2) continue;
+        const positions: number[] = [];
+        for (const p of poly) {
+          positions.push(p.x * scale + offsetX, p.y * scale + offsetY, 0);
+        }
         const lineGeom = new LineGeometry();
         lineGeom.setPositions(positions);
         const lineMat = new LineMaterial({

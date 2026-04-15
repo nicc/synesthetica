@@ -228,7 +228,7 @@ describe("HarmonyGrammar", () => {
       expect(progEntities).toHaveLength(3);
       // Each should have glyph geometry
       for (const e of progEntities) {
-        expect(e.data?.segments).toBeDefined();
+        expect(e.data?.polylines).toBeDefined();
         expect(e.position?.x).toBeGreaterThan(0.7); // in harmony column
       }
     });

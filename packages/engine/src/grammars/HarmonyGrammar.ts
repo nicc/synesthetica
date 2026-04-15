@@ -287,7 +287,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         },
         data: {
           type: "roman-numeral",
-          segments: glyph.segments,
+          polylines: glyph.polylines,
           arcs: glyph.arcs,
           width: glyph.width,
           height: glyph.height,

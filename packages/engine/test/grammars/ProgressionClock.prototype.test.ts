@@ -223,8 +223,10 @@ function renderGlyphSVG(
   // Glyph group — Y-flipped
   svg += `  <g transform="translate(${offsetX.toFixed(1)}, ${offsetY.toFixed(1)}) scale(${GLYPH_SCALE}, ${-GLYPH_SCALE})">\n`;
 
-  for (const seg of glyph.segments) {
-    svg += `    <line x1="${seg.x1}" y1="${seg.y1}" x2="${seg.x2}" y2="${seg.y2}" stroke="${color}" stroke-width="${2 / GLYPH_SCALE}" stroke-linecap="round"/>\n`;
+  for (const poly of glyph.polylines) {
+    if (poly.length < 2) continue;
+    const d = poly.map((p, i) => `${i === 0 ? "M" : "L"}${p.x} ${p.y}`).join(" ");
+    svg += `    <path d="${d}" fill="none" stroke="${color}" stroke-width="${2 / GLYPH_SCALE}" stroke-linecap="round" stroke-linejoin="round"/>\n`;
   }
 
   for (const arc of glyph.arcs) {
