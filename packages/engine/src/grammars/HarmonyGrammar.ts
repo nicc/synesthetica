@@ -46,7 +46,10 @@ import {
   HARMONY_PROGRESSION_CENTER_X,
   HARMONY_PROGRESSION_CENTER_Y,
   HARMONY_CELL_SIZE,
+  CHORD_STRIP_CENTER_X,
+  CHORD_STRIP_WIDTH,
 } from "./layout";
+import { NOW_LINE_Y, timeToY } from "./timeMapping";
 
 // ============================================================================
 // Progression Clock Constants
@@ -91,6 +94,22 @@ const GLYPH_RADIUS_FRACTION = 0.75;
 
 /** Glyph size in world units (height of uppercase numeral) */
 const GLYPH_SIZE = 2;
+
+// ============================================================================
+// Scrolling Chord Strip Constants
+// ============================================================================
+
+/** Size of Roman numeral glyphs in the scrolling strip (world units) */
+const STRIP_GLYPH_SIZE = 1.2;
+
+/** Stroke width for strip glyphs (pixels) — thinner to match their smaller size */
+const STRIP_STROKE_WIDTH = 1.5;
+
+/** Opacity of the chord-duration bar behind each glyph */
+const STRIP_BAR_OPACITY = 0.25;
+
+/** Chord-duration bar width as fraction of strip width */
+const STRIP_BAR_WIDTH_FRACTION = 0.4;
 
 /** Default pitch-hue invariant (A = red, clockwise) */
 const DEFAULT_HUE_INVARIANT = {
@@ -219,6 +238,9 @@ export class HarmonyGrammar implements IVisualGrammar {
       entities.push(
         ...this.createProgressionClock(progression, t, part, key.root, fadeMs),
       );
+      entities.push(
+        ...this.createScrollingRomans(progression, t, part),
+      );
     }
 
     return {
@@ -314,6 +336,102 @@ export class HarmonyGrammar implements IVisualGrammar {
           width: glyph.width,
           height: glyph.height,
           strokeWidth,
+        },
+      });
+    }
+
+    return entities;
+  }
+
+  // ==========================================================================
+  // Scrolling Chord Strip
+  // ==========================================================================
+
+  /**
+   * Create entities for the scrolling Roman-numeral strip. Each chord in
+   * the progression renders as:
+   * - A thin vertical duration bar from its onset Y to its release Y
+   *   (or the now-line if still being held), coloured by root pitch
+   *   class at low opacity.
+   * - A mini Roman numeral glyph anchored at the onset Y.
+   *
+   * Glyphs scroll upward in sync with the rhythm grammar's timeline
+   * and fade out as they approach the top edge (matching the rhythm
+   * grammar's own top-edge opacity gradient).
+   */
+  private createScrollingRomans(
+    progression: FunctionalChord[],
+    t: number,
+    part: string,
+  ): Entity[] {
+    const entities: Entity[] = [];
+    const stripX = CHORD_STRIP_CENTER_X;
+    const barW = CHORD_STRIP_WIDTH * STRIP_BAR_WIDTH_FRACTION;
+
+    for (let i = 0; i < progression.length; i++) {
+      const fc = progression[i];
+
+      const onsetY = timeToY(fc.onset, t);
+      const endY = timeToY(fc.releaseTime ?? t, t);
+
+      // Cull if entirely above the visible area (fully scrolled off top)
+      if (onsetY < 0 && endY < 0) continue;
+
+      const hue = pcToHue(fc.rootPc, DEFAULT_HUE_INVARIANT);
+      const color: ColorHSVA = { h: hue, s: 0.7, v: 0.9, a: 1 };
+
+      // Duration bar: clamp so in-progress chords don't extend into
+      // the future and the bar only exists when there's extent to show.
+      const top = Math.max(Math.min(onsetY, endY), 0);
+      const bottom = Math.min(Math.max(onsetY, endY), NOW_LINE_Y);
+
+      if (bottom > top) {
+        // Proximity to top edge fades like rhythm note strips
+        const topOpacity = STRIP_BAR_OPACITY * Math.min(top / NOW_LINE_Y, 1);
+        const bottomOpacity =
+          STRIP_BAR_OPACITY * Math.min(bottom / NOW_LINE_Y, 1);
+        entities.push({
+          id: `${this.id}:strip-bar:${fc.chordId}`,
+          part,
+          kind: "field",
+          createdAt: fc.onset,
+          updatedAt: t,
+          position: { x: stripX, y: (top + bottom) / 2 },
+          style: { color, opacity: (topOpacity + bottomOpacity) / 2 },
+          data: {
+            type: "note-strip",
+            barTop: top,
+            barBottom: bottom,
+            barHeight: bottom - top,
+            barWidth: barW,
+            topOpacity,
+            bottomOpacity,
+          },
+        });
+      }
+
+      // Mini Roman numeral glyph at the chord's onset Y — unless the
+      // onset itself has already scrolled off the top.
+      if (onsetY < 0) continue;
+      const glyphOpacity = Math.min(onsetY / NOW_LINE_Y, 1);
+      if (glyphOpacity < 0.01) continue;
+
+      const glyph = buildRomanNumeralGlyph(fc.roman);
+      entities.push({
+        id: `${this.id}:strip-glyph:${fc.chordId}`,
+        part,
+        kind: "glyph",
+        createdAt: fc.onset,
+        updatedAt: t,
+        position: { x: stripX, y: onsetY },
+        style: { color, opacity: glyphOpacity, size: STRIP_GLYPH_SIZE },
+        data: {
+          type: "roman-numeral",
+          polylines: glyph.polylines,
+          arcs: glyph.arcs,
+          width: glyph.width,
+          height: glyph.height,
+          strokeWidth: STRIP_STROKE_WIDTH,
         },
       });
     }

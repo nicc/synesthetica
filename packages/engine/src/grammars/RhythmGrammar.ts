@@ -38,25 +38,14 @@ import type {
 // Exploration Controls (adjustable during development)
 // ============================================================================
 
-/** NOW line vertical position (0 = top, 1 = bottom). 0.85 = 15% from bottom */
-const NOW_LINE_Y = 0.85;
-
 /**
  * Rhythm grammar occupies the central column between dynamics
  * and harmony columns. See layout.ts for the three-column system.
  */
 import { RHYTHM_LEFT, RHYTHM_RIGHT } from "./layout";
+import { NOW_LINE_Y, timeToY } from "./timeMapping";
 const PITCH_MARGIN_LEFT = RHYTHM_LEFT;
 const PITCH_MARGIN_RIGHT = 1 - RHYTHM_RIGHT;
-
-/**
- * Time horizon scale (fixed mapping from time to screen position).
- * This is the total time range that maps to the visible past area.
- * Visible windows filter what's shown, but don't change this scale.
- * Future: this will become a macro (see synesthetica-135).
- */
-const TIME_HORIZON_HISTORY_MS = 8000;
-const TIME_HORIZON_FUTURE_MS = 2000;
 
 /** Maximum visible window for grid elements at max horizon */
 const MAX_GRID_HISTORY_MS = 8000;
@@ -369,7 +358,7 @@ export class RhythmGrammar implements IVisualGrammar {
 
     // Generate beat lines
     for (let beatTime = firstBeat; beatTime <= futureEnd; beatTime += beatMs) {
-      const y = this.timeToY(beatTime, t);
+      const y = timeToY(beatTime, t);
 
       // Skip if outside visible range
       if (y < 0 || y > 1) continue;
@@ -430,7 +419,7 @@ export class RhythmGrammar implements IVisualGrammar {
 
     // Generate bar lines
     for (let barTime = firstBar; barTime <= futureEnd; barTime += barMs) {
-      const y = this.timeToY(barTime, t);
+      const y = timeToY(barTime, t);
 
       if (y < 0 || y > 1) continue;
 
@@ -487,12 +476,12 @@ export class RhythmGrammar implements IVisualGrammar {
 
     // Position: x is pitch class, y is onset time (top of bar)
     const x = this.pitchClassToX(note.pitch.pc);
-    const onsetY = this.timeToY(note.onset, t);
+    const onsetY = timeToY(note.onset, t);
 
     // Bar bottom: clamp to NOW line. During sustain, noteEndTime = currentTime
     // so rawEndY = NOW_LINE_Y naturally. After release, duration is frozen so
     // noteEndTime is a fixed past timestamp — rawEndY < NOW_LINE_Y, scrolling up.
-    const rawEndY = this.timeToY(noteEndTime, t);
+    const rawEndY = timeToY(noteEndTime, t);
     const endY = Math.min(rawEndY, NOW_LINE_Y);
 
     // Screen-based culling only: remove when entire bar is off-screen.
@@ -518,7 +507,7 @@ export class RhythmGrammar implements IVisualGrammar {
       const refOpacity = this.distanceToOpacity(fadeAge, windows.streakHistoryMs);
 
       // Add reference line showing where the beat was
-      const refLineY = this.timeToY(
+      const refLineY = timeToY(
         note.onset - driftInfo.driftMs, // Where the beat actually was
         t
       );
@@ -843,30 +832,9 @@ export class RhythmGrammar implements IVisualGrammar {
     return PITCH_MARGIN_LEFT + (pc / 11) * usableWidth;
   }
 
-  /**
-   * Map time to y position using FIXED time horizon scale.
-   * NOW is at NOW_LINE_Y.
-   * Past (positive age) maps above NOW (smaller y).
-   * Future (negative age) maps below NOW (larger y).
-   *
-   * IMPORTANT: This uses the fixed TIME_HORIZON_* constants, not the visible windows.
-   * Visible windows control filtering (what's shown), not positioning (where it's shown).
-   */
-  private timeToY(eventTime: number, now: number): number {
-    const age = now - eventTime; // Positive = past, negative = future
-
-    if (age >= 0) {
-      // Past: Y decreases linearly with age. Notes older than
-      // TIME_HORIZON_HISTORY_MS go past the top of the screen (Y < 0)
-      // and are culled by screen-based checks (endY < 0).
-      const normalizedAge = age / TIME_HORIZON_HISTORY_MS;
-      return NOW_LINE_Y - normalizedAge * NOW_LINE_Y;
-    } else {
-      // Future: map to range [NOW_LINE_Y, 1]
-      const normalizedFuture = Math.min(-age / TIME_HORIZON_FUTURE_MS, 1);
-      return NOW_LINE_Y + normalizedFuture * (1 - NOW_LINE_Y);
-    }
-  }
+  // timeToY moved to ./timeMapping so other grammars can phase-lock to
+  // the same horizon. Uses TIME_HORIZON_* constants, not the visible
+  // windows (those filter what's shown, not where it's positioned).
 
   /**
    * Calculate opacity based on distance from NOW.

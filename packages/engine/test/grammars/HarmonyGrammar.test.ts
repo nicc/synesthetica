@@ -204,7 +204,9 @@ describe("HarmonyGrammar", () => {
         // no prescribedKey
       });
       const scene = grammar.update(frame, null);
-      const progEntities = scene.entities.filter((e) => e.data?.type === "roman-numeral");
+      const progEntities = scene.entities.filter(
+        (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
+      );
       expect(progEntities).toHaveLength(0);
     });
 
@@ -223,7 +225,9 @@ describe("HarmonyGrammar", () => {
         },
       });
       const scene = grammar.update(frame, null);
-      const progEntities = scene.entities.filter((e) => e.data?.type === "roman-numeral");
+      const progEntities = scene.entities.filter(
+        (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
+      );
 
       expect(progEntities).toHaveLength(3);
       // Each should have glyph geometry
@@ -249,7 +253,9 @@ describe("HarmonyGrammar", () => {
         },
       });
       const scene = grammar.update(frame, null);
-      const progEntities = scene.entities.filter((e) => e.data?.type === "roman-numeral");
+      const progEntities = scene.entities.filter(
+        (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
+      );
 
       // I (onset=0, age=5000) is past the 6000ms fade window? No, 5000 < 6000 so still visible
       // V (onset=4000, age=1000) should be brighter
@@ -275,9 +281,61 @@ describe("HarmonyGrammar", () => {
         },
       });
       const scene = grammar.update(frame, null);
-      const progEntities = scene.entities.filter((e) => e.data?.type === "roman-numeral");
+      const progEntities = scene.entities.filter(
+        (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
+      );
 
       expect(progEntities).toHaveLength(1);
+    });
+  });
+
+  describe("scrolling chord strip", () => {
+    it("produces duration-bar and glyph entities for each chord", () => {
+      const frame = createTestAnnotatedFrame(2000, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "cid-a", onset: 500, releaseTime: 1500 },
+            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "cid-b", onset: 1500, releaseTime: null },
+          ],
+        },
+      });
+      const scene = grammar.update(frame, null);
+
+      const bars = scene.entities.filter((e) => e.id.includes(":strip-bar:"));
+      const glyphs = scene.entities.filter((e) => e.id.includes(":strip-glyph:"));
+      expect(bars).toHaveLength(2);
+      expect(glyphs).toHaveLength(2);
+    });
+
+    it("positions glyphs using the shared timeToY mapping", () => {
+      // At t=1000, a chord with onset=1000 should sit at NOW_LINE_Y;
+      // an older onset should be above it (smaller y).
+      const frame = createTestAnnotatedFrame(1000, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "cid-old", onset: 0, releaseTime: 500 },
+            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "cid-now", onset: 1000, releaseTime: null },
+          ],
+        },
+      });
+      const scene = grammar.update(frame, null);
+      const glyphs = scene.entities
+        .filter((e) => e.id.includes(":strip-glyph:"))
+        .sort((a, b) => (a.position?.y ?? 0) - (b.position?.y ?? 0));
+
+      // Older chord (onset=0) should be higher up the screen (smaller y)
+      expect(glyphs[0].id).toContain("cid-old");
+      // Newest chord (onset=1000) should be at the now-line (~0.85)
+      expect(glyphs[1].id).toContain("cid-now");
+      expect(glyphs[1].position?.y).toBeCloseTo(0.85, 1);
     });
   });
 

@@ -51,8 +51,19 @@ export const DYNAMICS_BAR_WIDTH = DYNAMICS_BAR_RIGHT - DYNAMICS_BAR_LEFT;
 /** Gap between dynamics and rhythm columns (wider — visual breathing room) */
 export const GAP_LEFT = 0.03;
 
-/** Gap between rhythm and harmony columns (tighter — related content) */
-export const GAP_RIGHT = 0.008;
+/** Gap between rhythm and harmony columns. Widened from 0.008 to make
+ * room for the scrolling Roman-numeral strip. */
+export const GAP_RIGHT = 0.04;
+
+// ============================================================================
+// Chord Strip (in the gap between rhythm and harmony)
+// ============================================================================
+
+/** Width of the scrolling chord-glyph strip in normalized coords. */
+export const CHORD_STRIP_WIDTH = 0.03;
+
+/** Left edge of the chord strip (sits inside GAP_RIGHT). */
+export const CHORD_STRIP_LEFT_OFFSET_FROM_GAP = 0.002;
 
 // ============================================================================
 // Harmony Column (right)
@@ -103,3 +114,13 @@ export const RHYTHM_RIGHT = HARMONY_LEFT - GAP_RIGHT;
 
 /** Width of the rhythm column */
 export const RHYTHM_WIDTH = RHYTHM_RIGHT - RHYTHM_LEFT;
+
+/**
+ * Center X of the scrolling chord-glyph strip. Sits inside GAP_RIGHT,
+ * just to the right of the rhythm column, so the glyphs belong to the
+ * rhythmic timeline visually without competing with note strips for
+ * horizontal space.
+ */
+export const CHORD_STRIP_LEFT =
+  RHYTHM_RIGHT + CHORD_STRIP_LEFT_OFFSET_FROM_GAP;
+export const CHORD_STRIP_CENTER_X = CHORD_STRIP_LEFT + CHORD_STRIP_WIDTH / 2;
