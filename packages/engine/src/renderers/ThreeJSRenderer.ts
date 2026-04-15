@@ -1048,6 +1048,7 @@ export class ThreeJSRenderer implements IRenderer {
     const arcs = entity.data?.arcs as Array<{ cx: number; cy: number; r: number }> | undefined;
     const glyphW = (entity.data?.width as number) ?? 0;
     const glyphH = (entity.data?.height as number) ?? 1;
+    const strokeWidth = (entity.data?.strokeWidth as number) ?? 2;
 
     if (!segments && !arcs) return;
 
@@ -1087,7 +1088,7 @@ export class ThreeJSRenderer implements IRenderer {
         lineGeom.setPositions(positions);
         const lineMat = new LineMaterial({
           color: threeColor.getHex(),
-          linewidth: 2,
+          linewidth: strokeWidth,
           transparent: true,
           opacity,
           resolution: new THREE.Vector2(this.resolution.x, this.resolution.y),
@@ -1097,28 +1098,31 @@ export class ThreeJSRenderer implements IRenderer {
       }
     }
 
-    // Render arcs (circles for ° and ø)
+    // Render arcs (circles for ° and ø) — use Line2/LineMaterial so
+    // linewidth grows consistently with the segments during fade.
     if (arcs) {
       for (const arc of arcs) {
-        const circleGeom = new THREE.BufferGeometry();
-        const circlePoints: THREE.Vector3[] = [];
         const arcSegments = 24;
+        const positions: number[] = [];
         for (let i = 0; i <= arcSegments; i++) {
           const angle = (i / arcSegments) * Math.PI * 2;
-          circlePoints.push(new THREE.Vector3(
+          positions.push(
             (arc.cx + arc.r * Math.cos(angle)) * scale + offsetX,
             (arc.cy + arc.r * Math.sin(angle)) * scale + offsetY,
             0,
-          ));
+          );
         }
-        circleGeom.setFromPoints(circlePoints);
-        const circleMat = new THREE.LineBasicMaterial({
-          color: threeColor,
+        const arcGeom = new LineGeometry();
+        arcGeom.setPositions(positions);
+        const arcMat = new LineMaterial({
+          color: threeColor.getHex(),
+          linewidth: strokeWidth,
           transparent: true,
           opacity,
+          resolution: new THREE.Vector2(this.resolution.x, this.resolution.y),
         });
-        const circleLine = new THREE.LineLoop(circleGeom, circleMat);
-        group.add(circleLine);
+        const arcLine = new Line2(arcGeom, arcMat);
+        group.add(arcLine);
       }
     }
 

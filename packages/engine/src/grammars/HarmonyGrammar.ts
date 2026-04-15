@@ -63,6 +63,12 @@ const PROGRESSION_FADE_VALUE = 3;
 /** Immediate opacity step-down on release (fraction of full opacity) */
 const RELEASE_OPACITY_STEP = 0.10;
 
+/** Stroke width (pixels) while chord is held or fresh */
+const STROKE_WIDTH_FRESH = 2;
+
+/** Stroke width (pixels) at full fade — chunky, blocky */
+const STROKE_WIDTH_FADED = 8;
+
 /** Clock radius as fraction of cell size */
 const CLOCK_RADIUS_FRACTION = 0.35;
 
@@ -231,15 +237,22 @@ export class HarmonyGrammar implements IVisualGrammar {
     for (let i = 0; i < progression.length; i++) {
       const fc = progression[i];
 
-      // Opacity: full while held (no release time), step down + fade after release
+      // Opacity: full while held (no release time), step down + fade after release.
+      // Stroke width grows as the glyph ages — chunky, pixelated fade.
       let opacity: number;
+      let strokeWidth: number;
       if (fc.releaseTime === null) {
         opacity = 1.0;
+        strokeWidth = STROKE_WIDTH_FRESH;
       } else {
         const ageSinceRelease = t - fc.releaseTime;
         if (ageSinceRelease < 0 || ageSinceRelease >= fadeMs) continue;
         const fadeFraction = 1 - ageSinceRelease / fadeMs;
         opacity = (1 - RELEASE_OPACITY_STEP) * fadeFraction;
+        const ageFraction = ageSinceRelease / fadeMs;
+        strokeWidth =
+          STROKE_WIDTH_FRESH +
+          (STROKE_WIDTH_FADED - STROKE_WIDTH_FRESH) * ageFraction;
       }
       if (opacity < 0.01) continue;
 
@@ -278,6 +291,7 @@ export class HarmonyGrammar implements IVisualGrammar {
           arcs: glyph.arcs,
           width: glyph.width,
           height: glyph.height,
+          strokeWidth,
         },
       });
     }
