@@ -585,8 +585,18 @@ export class ThreeJSRenderer implements IRenderer {
     let group = this.entityObjects.get(entity.id) as THREE.Group | undefined;
     const existingElementCount = group?.userData?.elementCount as number | undefined;
     const existingMargin = group?.userData?.margin as string | undefined;
+    const existingBassIdx = group?.userData?.bassArmIndex as number | undefined;
+    // Find which element (if any) is currently marked as bass. Voicing
+    // changes that shift the bass while the same chord is held need to
+    // rebuild so the thicker bass-arm stroke tracks.
+    const bassIdx = elements.findIndex((e) => e.isBass === true);
 
-    if (!group || existingElementCount !== elements.length || existingMargin !== margin) {
+    if (
+      !group ||
+      existingElementCount !== elements.length ||
+      existingMargin !== margin ||
+      existingBassIdx !== bassIdx
+    ) {
       // Remove old group if it exists
       if (group) {
         this.scene.remove(group);
@@ -595,7 +605,11 @@ export class ThreeJSRenderer implements IRenderer {
 
       // Build new geometry
       group = this.buildChordShapeGroup(elements, margin);
-      group.userData = { elementCount: elements.length, margin };
+      group.userData = {
+        elementCount: elements.length,
+        margin,
+        bassArmIndex: bassIdx,
+      };
       this.scene.add(group);
       this.entityObjects.set(entity.id, group);
     }
