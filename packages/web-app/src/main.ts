@@ -14,6 +14,7 @@ import {
   DynamicsGrammar,
   DynamicsStabilizer,
   IdentityCompositor,
+  Metronome,
 } from "@synesthetica/engine";
 
 // UI elements
@@ -26,6 +27,7 @@ const tempoInput = document.getElementById("tempo-input") as HTMLInputElement;
 const beatsPerBarInput = document.getElementById("beats-per-bar") as HTMLInputElement;
 const beatUnitInput = document.getElementById("beat-unit") as HTMLInputElement;
 const clearTempoBtn = document.getElementById("clear-tempo") as HTMLButtonElement;
+const toggleMetronomeBtn = document.getElementById("toggle-metronome") as HTMLButtonElement;
 const keyRootSelect = document.getElementById("key-root") as HTMLSelectElement;
 const keyModeSelect = document.getElementById("key-mode") as HTMLSelectElement;
 const clearKeyBtn = document.getElementById("clear-key") as HTMLButtonElement;
@@ -34,6 +36,7 @@ const clearKeyBtn = document.getElementById("clear-key") as HTMLButtonElement;
 let midiSource: WebMidiSource | null = null;
 let pipeline: VisualPipeline | null = null;
 let renderer: ThreeJSRenderer | null = null;
+let metronome: Metronome | null = null;
 
 // Resize canvas to fill viewport
 function resizeCanvas() {
@@ -330,8 +333,10 @@ function applyTempoMeterSettings(): void {
   const tempoValue = tempoInput.value ? parseInt(tempoInput.value, 10) : null;
   if (tempoValue !== null && tempoValue >= 20 && tempoValue <= 300) {
     pipeline.setTempo(tempoValue);
+    metronome?.setTempo(tempoValue);
   } else {
     pipeline.setTempo(null);
+    metronome?.setTempo(null);
   }
 
   // Apply meter
@@ -340,6 +345,7 @@ function applyTempoMeterSettings(): void {
 
   if (beatsPerBar !== null && beatsPerBar >= 1 && beatsPerBar <= 16) {
     pipeline.setMeter(beatsPerBar, beatUnit);
+    metronome?.setMeter(beatsPerBar);
   } else {
     pipeline.setMeter(null);
   }
@@ -356,6 +362,38 @@ function clearTempoMeter(): void {
   if (pipeline) {
     pipeline.clearTempoAndMeter();
   }
+  metronome?.setTempo(null);
+  updateMetronomeButton();
+}
+
+/**
+ * Toggle metronome on/off. Creates the AudioContext + Metronome on
+ * first use (requires a user gesture). Only starts if a tempo is set.
+ */
+function toggleMetronome(): void {
+  if (!metronome) {
+    const ctx = new AudioContext();
+    metronome = new Metronome(ctx);
+    // Sync current tempo/meter state
+    const tempoValue = tempoInput.value ? parseInt(tempoInput.value, 10) : null;
+    if (tempoValue !== null && tempoValue >= 20 && tempoValue <= 300) {
+      metronome.setTempo(tempoValue);
+    }
+    const beatsPerBar = beatsPerBarInput.value ? parseInt(beatsPerBarInput.value, 10) : 4;
+    metronome.setMeter(beatsPerBar);
+  }
+
+  if (metronome.isRunning()) {
+    metronome.stop();
+  } else {
+    metronome.start();
+  }
+  updateMetronomeButton();
+}
+
+function updateMetronomeButton(): void {
+  const running = metronome?.isRunning() ?? false;
+  toggleMetronomeBtn.textContent = running ? "Metronome: On" : "Metronome: Off";
 }
 
 /**
@@ -391,6 +429,7 @@ tempoInput.addEventListener("change", applyTempoMeterSettings);
 beatsPerBarInput.addEventListener("change", applyTempoMeterSettings);
 beatUnitInput.addEventListener("change", applyTempoMeterSettings);
 clearTempoBtn.addEventListener("click", clearTempoMeter);
+toggleMetronomeBtn.addEventListener("click", toggleMetronome);
 keyRootSelect.addEventListener("change", applyKeySettings);
 keyModeSelect.addEventListener("change", applyKeySettings);
 clearKeyBtn.addEventListener("click", clearKey);

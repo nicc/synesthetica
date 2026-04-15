@@ -15,3 +15,6 @@ export { IdentityCompositor } from "./stubs/IdentityCompositor";
 
 // Renderers
 export * from "./renderers";
+
+// Audio
+export { Metronome, type MetronomeConfig } from "./audio/Metronome";
