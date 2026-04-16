@@ -25,7 +25,6 @@ describe("Web App Smoke Tests", () => {
       expect(engine.VisualPipeline).toBeDefined();
       expect(engine.NoteTrackingStabilizer).toBeDefined();
       expect(engine.ChordDetectionStabilizer).toBeDefined();
-      expect(engine.BeatDetectionStabilizer).toBeDefined();
       expect(engine.MusicalVisualVocabulary).toBeDefined();
       expect(engine.RhythmGrammar).toBeDefined();
       expect(engine.TestChordProgressionGrammar).toBeDefined();
@@ -57,20 +56,16 @@ describe("Web App Smoke Tests", () => {
       const {
         NoteTrackingStabilizer,
         ChordDetectionStabilizer,
-        BeatDetectionStabilizer,
       } = await import("@synesthetica/engine");
 
       const noteStabilizer = new NoteTrackingStabilizer({ partId: "test" });
       const chordStabilizer = new ChordDetectionStabilizer({ partId: "test" });
-      const beatStabilizer = new BeatDetectionStabilizer({ partId: "test" });
 
       expect(noteStabilizer).toBeDefined();
       expect(chordStabilizer).toBeDefined();
-      expect(beatStabilizer).toBeDefined();
 
       noteStabilizer.dispose();
       chordStabilizer.dispose();
-      beatStabilizer.dispose();
     });
 
     it("can create a ruleset", async () => {

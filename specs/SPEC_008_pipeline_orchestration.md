@@ -93,7 +93,10 @@ Stabilizers form a directed acyclic graph (DAG) based on their dependencies. Som
 These process RawInputFrame directly:
 
 - **NoteTrackingStabilizer** — Correlates note_on/note_off into Notes with duration
-- **BeatDetectionStabilizer** — Detects beats from onset patterns
+
+(Note: tempo/meter are user-prescribed via control ops, not inferred
+from onset patterns. Free-time mode is the default when nothing is
+prescribed. See RFC 007 for historical rationale.)
 
 ### Derived Stabilizers
 
@@ -131,7 +134,6 @@ When multiple stabilizers produce output, their contributions merge:
 
 - `notes[]` — Union of all notes (NoteTrackingStabilizer owns this)
 - `chords[]` — Union of all chords (ChordDetectionStabilizer owns this)
-- `beat` — Single authoritative source (BeatDetectionStabilizer owns this)
 - `dynamics` — Single authoritative source (DynamicsStabilizer owns this)
 - `progression` — ChordId references (ProgressionStabilizer owns this)
 - `phrases` — Phrase boundaries (PhraseDetectionStabilizer owns this)

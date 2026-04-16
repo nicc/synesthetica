@@ -45,18 +45,7 @@ function createTestFrame(
       phase?: "attack" | "sustain" | "release";
     }>;
     tempo?: number;
-    /** Detected division in ms (from beat detection). Defaults to deriving from tempo. */
-    detectedDivision?: number | null;
     meter?: { beatsPerBar: number; beatUnit: number };
-    onsetDrifts?: Array<{
-      t: number;
-      subdivisions: Array<{
-        label: string;
-        period: number;
-        drift: number;
-        nearest: boolean;
-      }>;
-    }>;
   }
 ) {
   const vel = (v: number) => v ?? 80;
@@ -93,18 +82,13 @@ function createTestFrame(
     },
   }));
 
-  // detectedDivision: explicit option > derived from tempo > null
-  const detectedDivision = options.detectedDivision !== undefined
-    ? options.detectedDivision
-    : options.tempo ? 60000 / options.tempo : null;
-
   return createTestAnnotatedFrame(t, "main", {
     notes,
     rhythmicAnalysis: {
-      detectedDivision,
-      onsetDrifts: options.onsetDrifts ?? [],
-      stability: 0.9,
-      confidence: 0.9,
+      detectedDivision: null,
+      onsetDrifts: [],
+      stability: 0,
+      confidence: 0,
     },
     prescribedTempo: options.tempo ?? null,
     prescribedMeter: options.meter ?? null,
@@ -157,99 +141,28 @@ describe("RhythmGrammar", () => {
     });
   });
 
-  describe("inferred tempo (detected division, no prescribed tempo)", () => {
-    it("produces beat grid lines from detected division", () => {
-      // Simulate beat detection inferring 120 BPM (500ms division)
-      // without user calling setTempo()
+  describe("free-time mode (no prescribed tempo)", () => {
+    it("renders now line + notes but no grid or drift when tempo is null", () => {
       const frame = createTestFrame(2000, {
-        detectedDivision: 500, // 120 BPM detected
-        // tempo is NOT set (prescribedTempo will be null)
+        notes: [{ id: "n1", pc: 0, onset: 1800 }],
+        // no tempo prescribed
       });
 
       const scene = grammar.update(frame, null);
 
-      const beatLines = scene.entities.filter((e) => e.data?.type === "beat-line");
-      expect(beatLines.length).toBeGreaterThan(0);
-    });
-
-    it("produces bar lines from detected division with default 4/4 meter", () => {
-      // Key regression test: bar lines should appear even without prescribedTempo
-      const frame = createTestFrame(4000, {
-        detectedDivision: 500, // 120 BPM detected
-        // No tempo, no meter prescribed
-      });
-
-      const scene = grammar.update(frame, null);
-
-      const barLines = scene.entities.filter((e) => e.data?.type === "bar-line");
-      expect(barLines.length).toBeGreaterThan(0);
-
-      // Bar spacing should be 4 beats (default 4/4) = 2000ms at 120 BPM
-      const barTimes = barLines.map((e) => e.data?.barTime as number);
-      if (barTimes.length >= 2) {
-        const spacing = barTimes[1] - barTimes[0];
-        expect(spacing).toBe(2000); // 4 beats × 500ms
-      }
-    });
-
-    it("uses prescribed meter over default when tempo is inferred", () => {
-      const frame = createTestFrame(4000, {
-        detectedDivision: 500, // 120 BPM detected
-        meter: { beatsPerBar: 3, beatUnit: 4 }, // 3/4 time
-      });
-
-      const scene = grammar.update(frame, null);
-
-      const barLines = scene.entities.filter((e) => e.data?.type === "bar-line");
-      expect(barLines.length).toBeGreaterThan(0);
-
-      // Bar spacing should be 3 beats = 1500ms at 120 BPM
-      const barTimes = barLines.map((e) => e.data?.barTime as number);
-      if (barTimes.length >= 2) {
-        const spacing = barTimes[1] - barTimes[0];
-        expect(spacing).toBe(1500); // 3 beats × 500ms
-      }
-    });
-
-    it("produces no grid when neither tempo nor division is available", () => {
-      const frame = createTestFrame(2000, {
-        // No tempo, no detectedDivision
-        detectedDivision: null,
-      });
-
-      const scene = grammar.update(frame, null);
-
+      const nowLine = scene.entities.find((e) => e.data?.type === "now-line");
       const beatLines = scene.entities.filter((e) => e.data?.type === "beat-line");
       const barLines = scene.entities.filter((e) => e.data?.type === "bar-line");
+      const streaks = scene.entities.filter((e) => e.data?.type === "streak");
+      const refLines = scene.entities.filter((e) => e.data?.type === "reference-line");
+      const notes = scene.entities.filter((e) => e.data?.type === "note-strip");
+
+      expect(nowLine).toBeDefined();
+      expect(notes.length).toBeGreaterThan(0);
       expect(beatLines.length).toBe(0);
       expect(barLines.length).toBe(0);
-
-      // NOW line should still be present
-      const nowLine = scene.entities.find((e) => e.data?.type === "now-line");
-      expect(nowLine).toBeDefined();
-    });
-
-    it("uses drift info from onset drifts with inferred tempo", () => {
-      const frame = createTestFrame(1000, {
-        detectedDivision: 500, // 120 BPM detected, no prescribed tempo
-        notes: [
-          { id: "late", pc: 0, onset: 550 }, // 50ms late
-        ],
-        onsetDrifts: [
-          {
-            t: 550,
-            subdivisions: [
-              { label: "1x", period: 500, drift: 50, nearest: true },
-            ],
-          },
-        ],
-      });
-
-      const scene = grammar.update(frame, null);
-
-      // Should have streak entities (tier 2 from inferred tempo)
-      const streaks = scene.entities.filter((e) => e.data?.type === "streak");
-      expect(streaks.length).toBeGreaterThan(0);
+      expect(streaks.length).toBe(0);
+      expect(refLines.length).toBe(0);
     });
   });
 
@@ -316,51 +229,29 @@ describe("RhythmGrammar", () => {
   describe("drift visualization", () => {
     it("adds streak lines for notes with drift", () => {
       // 120 BPM = 500ms per beat
+      // Tempo=120 gives 500ms beats. Onset at 550 = 50ms after the 500ms beat line.
       const frame = createTestFrame(1000, {
         tempo: 120,
-        notes: [
-          { id: "late", pc: 0, onset: 550 }, // 50ms late
-        ],
-        onsetDrifts: [
-          {
-            t: 550,
-            subdivisions: [
-              { label: "quarter", period: 500, drift: 50, nearest: true },
-            ],
-          },
-        ],
+        notes: [{ id: "late", pc: 0, onset: 550 }],
       });
 
       const scene = grammar.update(frame, null);
 
-      // Should have streak entities for the late note
       const streaks = scene.entities.filter((e) => e.data?.type === "streak");
       expect(streaks.length).toBeGreaterThan(0);
-
-      // Streaks should reference the note
       expect(streaks[0].data?.noteId).toBe("late");
-      expect(streaks[0].data?.driftMs).toBe(50);
+      expect(streaks[0].data?.driftMs as number).toBeCloseTo(50, 6);
     });
 
     it("adds reference line for tight notes", () => {
+      // Onset at 510 is only 10ms late — within tolerance, tight.
       const frame = createTestFrame(1000, {
         tempo: 120,
-        notes: [
-          { id: "tight", pc: 0, onset: 510 }, // Only 10ms late - within tolerance
-        ],
-        onsetDrifts: [
-          {
-            t: 510,
-            subdivisions: [
-              { label: "quarter", period: 500, drift: 10, nearest: true },
-            ],
-          },
-        ],
+        notes: [{ id: "tight", pc: 0, onset: 510 }],
       });
 
       const scene = grammar.update(frame, null);
 
-      // Should have reference line for tight note
       const refLines = scene.entities.filter((e) => e.data?.type === "reference-line");
       expect(refLines.length).toBe(1);
       expect(refLines[0].data?.noteId).toBe("tight");
@@ -369,17 +260,7 @@ describe("RhythmGrammar", () => {
     it("does not add streaks for tight notes", () => {
       const frame = createTestFrame(1000, {
         tempo: 120,
-        notes: [
-          { id: "tight", pc: 0, onset: 510 },
-        ],
-        onsetDrifts: [
-          {
-            t: 510,
-            subdivisions: [
-              { label: "quarter", period: 500, drift: 10, nearest: true },
-            ],
-          },
-        ],
+        notes: [{ id: "tight", pc: 0, onset: 510 }],
       });
 
       const scene = grammar.update(frame, null);
@@ -390,31 +271,25 @@ describe("RhythmGrammar", () => {
   });
 
   describe("drift cache (referential transparency)", () => {
-    it("freezes drift once computed, even when analysis changes", () => {
-      // Frame 1: note with prescribed tempo → drift computed from onsetDrifts
+    it("freezes drift once computed, even when tempo changes", () => {
+      // Frame 1: tempo=120 (500ms beat), onset=550 → drift=50
       const frame1 = createTestFrame(1000, {
         tempo: 120,
         notes: [{ id: "n1", pc: 0, onset: 550 }],
-        onsetDrifts: [
-          { t: 550, subdivisions: [{ label: "quarter", period: 500, drift: 50, nearest: true }] },
-        ],
       });
-
       const scene1 = grammar.update(frame1, null);
       const note1 = scene1.entities.find((e) => e.data?.type === "note-strip");
-      expect(note1?.data?.driftMs).toBe(50);
+      expect(note1?.data?.driftMs as number).toBeCloseTo(50, 6);
 
-      // Frame 2: same note but onsetDrift data is gone (aged out of stabilizer window)
-      // and detected division has shifted. Drift should still be 50 (from cache).
+      // Frame 2: tempo changes to 100 (600ms beat). Recomputing from the
+      // new grid would give a different drift; cache keeps drift=50.
       const frame2 = createTestFrame(1100, {
-        tempo: 120,
+        tempo: 100,
         notes: [{ id: "n1", pc: 0, onset: 550 }],
-        onsetDrifts: [], // Drift data aged out
       });
-
       const scene2 = grammar.update(frame2, null);
       const note2 = scene2.entities.find((e) => e.data?.type === "note-strip");
-      expect(note2?.data?.driftMs).toBe(50); // Cached, not recomputed
+      expect(note2?.data?.driftMs as number).toBeCloseTo(50, 6);
     });
 
     it("preserves drift when tier drops from 2 to 1", () => {
@@ -422,26 +297,19 @@ describe("RhythmGrammar", () => {
       const frame1 = createTestFrame(1000, {
         tempo: 120,
         notes: [{ id: "n1", pc: 0, onset: 550 }],
-        onsetDrifts: [
-          { t: 550, subdivisions: [{ label: "quarter", period: 500, drift: 50, nearest: true }] },
-        ],
       });
-
       const scene1 = grammar.update(frame1, null);
       const streaks1 = scene1.entities.filter((e) => e.data?.type === "streak");
       expect(streaks1.length).toBeGreaterThan(0);
 
-      // Frame 2: tier drops to 1 (no tempo). Without cache, getDriftInfo returns null
-      // and streaks would vanish. With cache, drift is preserved.
+      // Frame 2: tempo cleared → tier 1. Without cache, drift would go null
+      // and streaks would vanish. Cache preserves the drift value.
       const frame2 = createTestFrame(1100, {
-        detectedDivision: null, // No tempo, no detection → tier 1
         notes: [{ id: "n1", pc: 0, onset: 550 }],
-        onsetDrifts: [],
       });
-
       const scene2 = grammar.update(frame2, null);
       const streaks2 = scene2.entities.filter((e) => e.data?.type === "streak");
-      expect(streaks2.length).toBeGreaterThan(0); // Still has streaks from cache
+      expect(streaks2.length).toBeGreaterThan(0);
     });
 
     it("prunes cache when note leaves the frame", () => {
@@ -449,9 +317,6 @@ describe("RhythmGrammar", () => {
       const frame1 = createTestFrame(1000, {
         tempo: 120,
         notes: [{ id: "n1", pc: 0, onset: 550 }],
-        onsetDrifts: [
-          { t: 550, subdivisions: [{ label: "quarter", period: 500, drift: 50, nearest: true }] },
-        ],
       });
       grammar.update(frame1, null);
 
@@ -462,19 +327,16 @@ describe("RhythmGrammar", () => {
       });
       grammar.update(frame2, null);
 
-      // Frame 3: same note ID reappears with different drift (e.g. new note reusing ID)
-      // Should get the NEW drift, not the old cached one.
+      // Frame 3: same note ID reappears with a different onset and so a
+      // different drift. Should compute fresh from the grid, not return
+      // the stale cached value.
       const frame3 = createTestFrame(3000, {
         tempo: 120,
-        notes: [{ id: "n1", pc: 0, onset: 2550 }],
-        onsetDrifts: [
-          { t: 2550, subdivisions: [{ label: "quarter", period: 500, drift: -30, nearest: true }] },
-        ],
+        notes: [{ id: "n1", pc: 0, onset: 2470 }], // 30ms early vs 2500
       });
-
       const scene3 = grammar.update(frame3, null);
       const note3 = scene3.entities.find((e) => e.data?.type === "note-strip");
-      expect(note3?.data?.driftMs).toBe(-30); // New drift, not old cached 50
+      expect(note3?.data?.driftMs as number).toBeCloseTo(-30, 6);
     });
   });
 
@@ -483,9 +345,6 @@ describe("RhythmGrammar", () => {
       const frame1 = createTestFrame(1000, {
         tempo: 120,
         notes: [{ id: "n1", pc: 0, onset: 800 }],
-        onsetDrifts: [
-          { t: 800, subdivisions: [{ label: "quarter", period: 500, drift: 50, nearest: true }] },
-        ],
       });
 
       const scene1 = grammar.update(frame1, null);
@@ -494,9 +353,6 @@ describe("RhythmGrammar", () => {
       const frame2 = createTestFrame(1050, {
         tempo: 120,
         notes: [{ id: "n1", pc: 0, onset: 800 }],
-        onsetDrifts: [
-          { t: 800, subdivisions: [{ label: "quarter", period: 500, drift: 50, nearest: true }] },
-        ],
       });
 
       const scene2 = grammar.update(frame2, null);
@@ -599,16 +455,6 @@ describe("RhythmGrammar", () => {
       const frame = createTestFrame(1000, {
         tempo: 120,
         notes: [{ id: "n", pc: 0, onset: 125 }],
-        onsetDrifts: [
-          {
-            t: 125,
-            subdivisions: [
-              { label: "quarter", period: 500, drift: 125, nearest: false },
-              { label: "8th", period: 250, drift: 125, nearest: false },
-              { label: "16th", period: 125, drift: 0, nearest: true },
-            ],
-          },
-        ],
       });
 
       // At 16th subdivision (default), drift should be 0
@@ -637,6 +483,10 @@ describe("RhythmGrammar snapshots", () => {
   beforeEach(() => {
     grammar = new RhythmGrammar();
     grammar.init(ctx);
+    // Snapshot tests describe drift against the quarter-note grid. The
+    // grammar's default subdivisionDepth is "16th"; override for these
+    // fixtures so onset offsets of ~100ms are clearly off-beat.
+    grammar.setMacros({ subdivisionDepth: "quarter" });
   });
 
   it("renders basic beat grid (Tier 2)", () => {
@@ -682,20 +532,6 @@ describe("RhythmGrammar snapshots", () => {
         { id: "early", pc: 2, onset: 1400 }, // 100ms early
         { id: "tight", pc: 5, onset: 1505 }, // 5ms late (tight)
         { id: "late", pc: 9, onset: 1600 }, // 100ms late
-      ],
-      onsetDrifts: [
-        {
-          t: 1400,
-          subdivisions: [{ label: "quarter", period: 500, drift: -100, nearest: true }],
-        },
-        {
-          t: 1505,
-          subdivisions: [{ label: "quarter", period: 500, drift: 5, nearest: true }],
-        },
-        {
-          t: 1600,
-          subdivisions: [{ label: "quarter", period: 500, drift: 100, nearest: true }],
-        },
       ],
     });
 
@@ -813,20 +649,6 @@ describe("RhythmGrammar snapshots", () => {
         // On-beat note: played exactly at 2000 - reference line only
         { id: "onbeat", pc: 5, onset: 2000, duration: 300 },
       ],
-      onsetDrifts: [
-        {
-          t: 1400,
-          subdivisions: [{ label: "quarter", period: 500, drift: -100, nearest: true }],
-        },
-        {
-          t: 1600,
-          subdivisions: [{ label: "quarter", period: 500, drift: 100, nearest: true }],
-        },
-        {
-          t: 2000,
-          subdivisions: [{ label: "quarter", period: 500, drift: 0, nearest: true }],
-        },
-      ],
     });
 
     const scene = grammar.update(frame, null);
@@ -858,20 +680,6 @@ describe("RhythmGrammar snapshots", () => {
         { id: "old-early", pc: 2, onset: 1200, duration: 300 }, // 3800ms old, early
         { id: "old-late", pc: 9, onset: 1800, duration: 300 }, // 3200ms old, late
         { id: "recent", pc: 5, onset: 4500, duration: 300 }, // 500ms old, on-beat
-      ],
-      onsetDrifts: [
-        {
-          t: 1200,
-          subdivisions: [{ label: "quarter", period: 500, drift: -80, nearest: true }],
-        },
-        {
-          t: 1800,
-          subdivisions: [{ label: "quarter", period: 500, drift: 80, nearest: true }],
-        },
-        {
-          t: 4500,
-          subdivisions: [{ label: "quarter", period: 500, drift: 0, nearest: true }],
-        },
       ],
     });
 
@@ -925,22 +733,15 @@ describe("RhythmGrammar snapshots", () => {
     const frame = createTestFrame(10000, {
       tempo: 120,
       notes: [
-        // These notes are OUTSIDE note window (>8000ms old) but INSIDE reference window
-        // They should show reference lines but NO note bars (released, not sustaining)
+        // Faded notes: past the note window but inside the reference
+        // window. Bars + reference lines shouldn't render (onsetY < 0).
         { id: "faded-early", pc: 0, onset: 1500, duration: 200, phase: "release" }, // 8500ms old
         { id: "faded-late", pc: 3, onset: 1700, duration: 200, phase: "release" }, // 8300ms old
         { id: "faded-tight", pc: 6, onset: 1900, duration: 200, phase: "release" }, // 8100ms old
 
-        // These notes are INSIDE note window - should show both bars AND reference lines
-        { id: "visible-early", pc: 9, onset: 8500, duration: 200 }, // 1500ms old
-        { id: "visible-late", pc: 11, onset: 9500, duration: 200 }, // 500ms old
-      ],
-      onsetDrifts: [
-        { t: 1500, subdivisions: [{ label: "quarter", period: 500, drift: -60, nearest: true }] },
-        { t: 1700, subdivisions: [{ label: "quarter", period: 500, drift: 70, nearest: true }] },
-        { t: 1900, subdivisions: [{ label: "quarter", period: 500, drift: 50, nearest: true }] },
-        { t: 8500, subdivisions: [{ label: "quarter", period: 500, drift: -50, nearest: true }] },
-        { t: 9500, subdivisions: [{ label: "quarter", period: 500, drift: 80, nearest: true }] },
+        // Visible notes. Off-grid onsets so they produce drift streaks.
+        { id: "visible-early", pc: 9, onset: 8580, duration: 200 }, // 80ms late vs beat 8500
+        { id: "visible-late", pc: 11, onset: 9420, duration: 200 }, // 80ms early vs beat 9500
       ],
     });
 
@@ -950,13 +751,11 @@ describe("RhythmGrammar snapshots", () => {
 
     console.log("\nLinger Effect:\n" + formatMetrics(metrics));
 
-    // Should have 3 note strips: 2 visible + faded-tight (endY just barely on-screen).
-    // faded-early/faded-late have endY < 0 (scrolled off top of screen).
+    // Only the 2 visible notes have onsetY >= 0 and render bars.
     expect(metrics.byType["note-strip"]).toBe(3);
-    // Reference lines only render when onsetY >= 0. The 3 faded notes have
-    // onsetY < 0 (past the 8000ms scroll horizon). Only 2 visible notes qualify.
+    // Both visible notes qualify for reference lines.
     expect(metrics.byType["reference-line"]).toBe(2);
-    // Faded notes with drift should still have streaks
+    // Both visible notes are off-grid (80ms drift) so produce streaks.
     expect(metrics.byType["streak"]).toBeGreaterThan(0);
   });
 });

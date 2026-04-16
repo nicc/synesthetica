@@ -81,6 +81,11 @@ export interface MusicalFrame {
   harmonicContext?: HarmonicContext;     // Tension + functional analysis
 }
 
+// Currently unpopulated: BeatDetectionStabilizer has been removed
+// and drift is computed directly in RhythmGrammar from the prescribed
+// tempo grid. The type stays on MusicalFrame as a forward-looking
+// slot: a future audio adapter may measure drift from the waveform
+// and populate these fields.
 export interface RhythmicAnalysis {
   detectedDivision: Ms | null;     // Most prominent IOI (not a tempo)
   onsetDrifts: OnsetDrift[];       // Per-onset drift data at 4 subdivision levels

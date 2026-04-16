@@ -11,7 +11,6 @@ import {
   ThreeJSRenderer,
   NoteTrackingStabilizer,
   ChordDetectionStabilizer,
-  BeatDetectionStabilizer,
   HarmonyStabilizer,
   MusicalVisualVocabulary,
   RhythmGrammar,
@@ -161,7 +160,6 @@ function startSession(midiInput: MidiInputInfo): void {
     pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
     pipeline.addStabilizerFactory(() => new DynamicsStabilizer({ partId }));
     pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
-    pipeline.addStabilizerFactory(() => new BeatDetectionStabilizer({ partId }));
     pipeline.addStabilizerFactory(() => new HarmonyStabilizer({ partId }));
     pipeline.setVocabulary(new MusicalVisualVocabulary());
     // Use grammars - they'll be composited together

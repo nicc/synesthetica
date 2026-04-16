@@ -7,7 +7,9 @@
       "Bash(node tmp-ab.mjs)",
       "Bash(rm -f tmp-ab.mjs)",
       "Bash(node packages/engine/tmp-sim.mjs)",
-      "Bash(node tmp-probe.mjs)"
+      "Bash(node tmp-probe.mjs)",
+      "Bash(awk -F'P' '{print \"P\"$2}')",
+      "Bash(awk '{print $1}')"
     ]
   }
 }
