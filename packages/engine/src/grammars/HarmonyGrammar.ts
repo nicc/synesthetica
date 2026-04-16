@@ -159,7 +159,7 @@ const DEFAULT_CONFIG: Required<HarmonyGrammarConfig> = {
 
 /** How long the chord shape + label fade out after a chord ends.
  * Purely to smooth the hard cut — not a lingering temporal trace. */
-const CHORD_FADE_OUT_MS = 180;
+const CHORD_FADE_OUT_MS = 80;
 
 export class HarmonyGrammar implements IVisualGrammar {
   readonly id = "harmony-grammar";

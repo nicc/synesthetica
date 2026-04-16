@@ -626,16 +626,27 @@ export class ThreeJSRenderer implements IRenderer {
     const scale = size / 100; // Normalized scale
     group.scale.set(scale, scale, 1);
 
-    // Update material opacity (gradient fill uses ShaderMaterial, others use MeshBasicMaterial)
-    const opacity = (entity.style.opacity ?? 1) * 0.8;
+    // Update material opacity. The gradient-fill body caps at 0.8 so the
+    // brighter margin strokes (1.0) read clearly over it; during fade the
+    // common entity opacity multiplies both so the body and margins reach
+    // zero together, preserving their relative emphasis throughout.
+    const entityOpacity = entity.style.opacity ?? 1;
+    const bodyOpacity = entityOpacity * 0.8;
     group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         const mat = child.material;
         if (mat instanceof THREE.ShaderMaterial && mat.uniforms.opacity) {
-          mat.uniforms.opacity.value = opacity;
+          mat.uniforms.opacity.value = bodyOpacity;
         } else if (mat instanceof THREE.MeshBasicMaterial) {
-          mat.opacity = opacity;
+          mat.opacity = bodyOpacity;
         }
+      }
+      // Line2/LineSegments2 store LineMaterial here; it doesn't extend
+      // MeshBasicMaterial so the branches above don't catch it.
+      if (child instanceof Line2) {
+        const mat = child.material as LineMaterial;
+        mat.transparent = true;
+        mat.opacity = entityOpacity;
       }
     });
   }
