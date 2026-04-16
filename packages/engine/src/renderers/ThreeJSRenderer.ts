@@ -458,8 +458,9 @@ export class ThreeJSRenderer implements IRenderer {
 
   /**
    * Render a thin guide ring at the progression wheel.
-   * radius (world units) comes from entity.data.radius; entity position
-   * is in normalized [0,1] grammar coords like every other glyph.
+   * data.radius is a normalized [0,1] x-axis length matching grammar
+   * coords; it scales by worldWidth so the ring is a true circle in
+   * world space.
    */
   private updateProgressionGuideRing(entity: Entity): void {
     if (!this.scene) return;
@@ -484,8 +485,10 @@ export class ThreeJSRenderer implements IRenderer {
     const y = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
     ring.position.set(x, y, 0);
 
-    const radius = (entity.data?.radius as number | undefined) ?? 1;
-    ring.scale.set(radius, radius, 1);
+    const normalizedRadius =
+      (entity.data?.radius as number | undefined) ?? 0.1;
+    const worldRadius = normalizedRadius * this.config.worldWidth;
+    ring.scale.set(worldRadius, worldRadius, 1);
 
     const material = ring.material as THREE.LineBasicMaterial;
     const color = entity.style.color ?? { h: 0, s: 0, v: 0.55 };
