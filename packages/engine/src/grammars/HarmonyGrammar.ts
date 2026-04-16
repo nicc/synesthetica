@@ -99,16 +99,24 @@ const CLOCK_RADIUS_FRACTION = 0.35;
  *   positions interpolate between adjacent diatonic slots based on
  *   chromatic distance (e.g. ♭III sits midway between ii and iii in C major).
  */
-const DIATONIC_GLYPH_RADIUS_FRACTION = 0.62;
-const BORROWED_GLYPH_RADIUS_FRACTION = 0.92;
+const DIATONIC_GLYPH_RADIUS_FRACTION = 0.50;
+const BORROWED_GLYPH_RADIUS_FRACTION = 0.74;
 
 /**
- * Subtle guide-ring radii — thin grey circles drawn between the chord
- * label and the diatonic glyph ring, and between the diatonic and
- * borrowed glyph rings, to visually organise the layers.
+ * Three concentric guide rings bound two equal-width annular bands,
+ * one for each glyph ring. The middle guide is the midpoint between
+ * the two glyph rings; the inner and outer guides are placed one
+ * half-band-width inside and outside the glyph rings so that each
+ * numeral sits exactly at the radial centre of its band.
  */
-const GUIDE_RING_INNER_FRACTION = 0.38;
-const GUIDE_RING_OUTER_FRACTION = 0.78;
+const GLYPH_BAND_WIDTH =
+  BORROWED_GLYPH_RADIUS_FRACTION - DIATONIC_GLYPH_RADIUS_FRACTION;
+const GUIDE_RING_INNER_FRACTION =
+  DIATONIC_GLYPH_RADIUS_FRACTION - GLYPH_BAND_WIDTH / 2;
+const GUIDE_RING_MIDDLE_FRACTION =
+  (DIATONIC_GLYPH_RADIUS_FRACTION + BORROWED_GLYPH_RADIUS_FRACTION) / 2;
+const GUIDE_RING_OUTER_FRACTION =
+  BORROWED_GLYPH_RADIUS_FRACTION + GLYPH_BAND_WIDTH / 2;
 
 /** Glyph size in world units (height of uppercase numeral) */
 const GLYPH_SIZE = 2;
@@ -407,10 +415,12 @@ export class HarmonyGrammar implements IVisualGrammar {
     const diatonicRadius = clockRadius * DIATONIC_GLYPH_RADIUS_FRACTION;
     const borrowedRadius = clockRadius * BORROWED_GLYPH_RADIUS_FRACTION;
 
-    // Guide rings — subtle grey circles framing the two glyph rings.
-    // Opacity is constant; they do not fade with progression activity.
+    // Guide rings — three subtle grey circles that bound the two
+    // annular glyph bands. Each numeral sits at the radial centre of
+    // its band. Opacity is constant; they do not fade with activity.
     for (const [suffix, fraction] of [
       ["inner", GUIDE_RING_INNER_FRACTION],
+      ["middle", GUIDE_RING_MIDDLE_FRACTION],
       ["outer", GUIDE_RING_OUTER_FRACTION],
     ] as const) {
       entities.push({

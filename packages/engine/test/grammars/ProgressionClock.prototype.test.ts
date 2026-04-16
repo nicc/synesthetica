@@ -50,14 +50,18 @@ const GLYPH_SCALE = 28;
 const FADE_MS = 4000;
 
 /** Diatonic (inner) glyph ring radius as fraction of clock radius */
-const DIATONIC_RADIUS_FRACTION = 0.62;
+const DIATONIC_RADIUS_FRACTION = 0.50;
 
 /** Borrowed (outer) glyph ring radius as fraction of clock radius */
-const BORROWED_RADIUS_FRACTION = 0.92;
+const BORROWED_RADIUS_FRACTION = 0.74;
 
-/** Subtle guide ring radii */
-const GUIDE_RING_INNER_FRACTION = 0.38;
-const GUIDE_RING_OUTER_FRACTION = 0.78;
+/** Three guide rings bound two equal annular bands so each numeral
+ *  sits at the radial centre of its band. */
+const GLYPH_BAND_WIDTH = BORROWED_RADIUS_FRACTION - DIATONIC_RADIUS_FRACTION;
+const GUIDE_RING_INNER_FRACTION = DIATONIC_RADIUS_FRACTION - GLYPH_BAND_WIDTH / 2;
+const GUIDE_RING_MIDDLE_FRACTION =
+  (DIATONIC_RADIUS_FRACTION + BORROWED_RADIUS_FRACTION) / 2;
+const GUIDE_RING_OUTER_FRACTION = BORROWED_RADIUS_FRACTION + GLYPH_BAND_WIDTH / 2;
 
 /** Borrowed-ring glyph scale (1/φ) */
 const BORROWED_SCALE = 1 / 1.618033988749895;
@@ -180,8 +184,12 @@ function renderProgressionClock(
   let svg = `<svg width="${SVG_SIZE}" height="${SVG_SIZE}" viewBox="0 0 ${SVG_SIZE} ${SVG_SIZE}" xmlns="http://www.w3.org/2000/svg">\n`;
   svg += `  <rect width="${SVG_SIZE}" height="${SVG_SIZE}" fill="#0a0a0f"/>\n`;
 
-  // Two subtle guide rings between chord label and each glyph ring.
-  for (const fraction of [GUIDE_RING_INNER_FRACTION, GUIDE_RING_OUTER_FRACTION]) {
+  // Three subtle guide rings bound the two glyph bands.
+  for (const fraction of [
+    GUIDE_RING_INNER_FRACTION,
+    GUIDE_RING_MIDDLE_FRACTION,
+    GUIDE_RING_OUTER_FRACTION,
+  ]) {
     svg += `  <circle cx="${CX}" cy="${CY}" r="${(CLOCK_RADIUS * fraction).toFixed(1)}" fill="none" stroke="#333" stroke-width="1" opacity="0.5"/>\n`;
   }
 
