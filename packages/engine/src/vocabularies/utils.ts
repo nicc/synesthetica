@@ -27,6 +27,16 @@ import {
 } from "@synesthetica/contracts";
 
 /**
+ * Semitones-from-root for the natural extensions: 9 (2 semis),
+ * 11 (5 semis), 13 (9 semis). Per SPEC_010, these count as diatonic
+ * chord tones (→ wedges) regardless of whether the chord's explicit
+ * interval set lists them. Tonal's dominant-13 dictionary entry omits
+ * the 11 by jazz convention, but when a player voices it we still
+ * want it rendered as an extension wedge, not a chromatic line.
+ */
+const NATURAL_EXTENSION_SEMITONES = new Set<number>([2, 5, 9]);
+
+/**
  * Builds chord shape geometry from a chord interpretation and its voicing.
  * Invariant I18: This algorithm is fixed; grammars cannot compute shapes.
  *
@@ -81,9 +91,20 @@ export function buildChordShape(
       a: 1,
     };
 
-    // Chord tones get wedge arms; chromatic additions get lines
+    // Chord tones get wedge arms; chromatic additions get lines.
+    // SPEC_010 classifies natural extensions (9/11/13 = semitones 2/5/9
+    // from root) as diatonic chord tones even when the chord's interval
+    // set doesn't explicitly include them — e.g. Tonal's Ab13 omits the
+    // 11th by jazz convention, but a played 11th should still render as
+    // a wedge, not a chromatic line. Alterations (♭9/♯9/♯11/♭13 =
+    // semitones 1/3/6/8 in most dom contexts) remain lines.
+    const isNaturalExtension = NATURAL_EXTENSION_SEMITONES.has(
+      normalizedSemitones,
+    );
     const isChordTone =
-      chordToneSet === null || chordToneSet.includes(normalizedSemitones);
+      chordToneSet === null ||
+      chordToneSet.includes(normalizedSemitones) ||
+      isNaturalExtension;
 
     // Mark the bass element for inversion-indicator rendering.
     // Only meaningful when the bass differs from the chord root.

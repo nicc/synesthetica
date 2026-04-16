@@ -9,7 +9,11 @@
       "Bash(node packages/engine/tmp-sim.mjs)",
       "Bash(node tmp-probe.mjs)",
       "Bash(awk -F'P' '{print \"P\"$2}')",
-      "Bash(awk '{print $1}')"
+      "Bash(awk '{print $1}')",
+      "Bash(node /tmp/tonal_probe.mjs)",
+      "Bash(cp /tmp/tonal_probe.mjs /Users/nicyoung/source/play/synesthetica/tonal_probe.mjs)",
+      "Bash(node tonal_probe.mjs)",
+      "Bash(node /Users/nicyoung/source/play/synesthetica/tonal_probe.mjs)"
     ]
   }
 }

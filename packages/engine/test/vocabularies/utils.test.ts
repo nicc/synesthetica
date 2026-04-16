@@ -268,9 +268,12 @@ describe("buildChordShape", () => {
       expect(ninth?.style).toBe("wedge");
     });
 
-    it("renders natural 9 as a chromatic line when chordTones is empty (fallback)", () => {
-      // Empty chordTones forces the fallback to quality-derived intervals
-      // [0,4,7,11], which excludes the 9th.
+    it("renders natural 9 as a wedge even when chordTones omits it (natural extension)", () => {
+      // Natural extensions (9, 11, 13) always render as wedges per
+      // SPEC_010, even when the chord's explicit chordTones list
+      // doesn't include them — e.g. Tonal's Ab13 omits the 11th by
+      // jazz convention but a played 11th is still a diatonic chord
+      // tone, not a chromatic alteration.
       const base = makeChord(0, "maj7", [0, 4, 7, 11, 2]);
       const chord: MusicalChord = {
         ...base,
@@ -279,7 +282,31 @@ describe("buildChordShape", () => {
       const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
 
       const ninth = shape.elements.find((e) => e.interval === "2");
-      expect(ninth?.style).toBe("line");
+      expect(ninth?.style).toBe("wedge");
+    });
+
+    it("renders natural 11 as a wedge when chord lacks it (Ab13 convention)", () => {
+      // Regression for synesthetica-ylm. Tonal's Ab13 dictionary entry
+      // is [1P, 3M, 5P, 7m, 9M, 13M] — no 11. If the player voices the
+      // 11 (Db from Ab), it's a natural extension, so wedge not line.
+      const ab = 8 as PitchClass;
+      const chord = makeChord(ab, "dom7", [0, 4, 7, 10, 2, 9, 5]); // add 11 (5) to voicing
+      // Interpretation's chordTones lacks semitone 5 (the 11)
+      const customChord: MusicalChord = {
+        ...chord,
+        harmonic: {
+          ...chord.harmonic,
+          chordTones: [0, 4, 7, 10, 2, 9], // Ab13 canonical — no 11
+        },
+      };
+      const shape = buildChordShape(
+        customChord.harmonic,
+        customChord.voicing,
+        defaultInvariant,
+      );
+
+      const eleventh = shape.elements.find((e) => e.interval === "4");
+      expect(eleventh?.style).toBe("wedge");
     });
 
     it("marks the bass-matching element isBass when bass differs from root", () => {
