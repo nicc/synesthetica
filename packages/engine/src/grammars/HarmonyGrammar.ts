@@ -30,10 +30,11 @@ import type {
   ChordShapeElement,
   MarginStyle,
   FunctionalChord,
+  ModeId,
   PitchClass,
   ColorHSVA,
 } from "@synesthetica/contracts";
-import { pcToHue, INTERVAL_ANGLES } from "@synesthetica/contracts";
+import { pcToHue, MODE_SCALE_INTERVALS } from "@synesthetica/contracts";
 
 import {
   ChordShapeBuilder,
@@ -90,11 +91,34 @@ const STROKE_WIDTH_FADED = 8;
 /** Clock radius as fraction of cell size */
 const CLOCK_RADIUS_FRACTION = 0.35;
 
-/** Glyph placement radius as fraction of clock radius */
-const GLYPH_RADIUS_FRACTION = 0.75;
+/**
+ * Two concentric glyph rings:
+ * - Inner (diatonic): chords whose root is in the prescribed key.
+ *   Seven equally-spaced angular slots (360/7 per degree, I at 12 o'clock).
+ * - Outer (borrowed): chords whose root is outside the key. Angular
+ *   positions interpolate between adjacent diatonic slots based on
+ *   chromatic distance (e.g. ♭III sits midway between ii and iii in C major).
+ */
+const DIATONIC_GLYPH_RADIUS_FRACTION = 0.62;
+const BORROWED_GLYPH_RADIUS_FRACTION = 0.92;
+
+/**
+ * Subtle guide-ring radii — thin grey circles drawn between the chord
+ * label and the diatonic glyph ring, and between the diatonic and
+ * borrowed glyph rings, to visually organise the layers.
+ */
+const GUIDE_RING_INNER_FRACTION = 0.38;
+const GUIDE_RING_OUTER_FRACTION = 0.78;
 
 /** Glyph size in world units (height of uppercase numeral) */
 const GLYPH_SIZE = 2;
+
+/**
+ * Scale factor applied to borrowed-ring glyphs (size + stroke). 1/φ ≈ 0.618
+ * gives the outer ring a lighter visual weight matching its outside-the-key
+ * status.
+ */
+const BORROWED_SCALE = 1 / 1.618033988749895;
 
 // ============================================================================
 // Scrolling Chord Strip Constants
@@ -115,6 +139,50 @@ const DEFAULT_HUE_INVARIANT = {
   referenceHue: 0,
   direction: "cw" as const,
 };
+
+// ============================================================================
+// Wheel Angle Helper
+// ============================================================================
+
+/** Angle (degrees, 0 = 12 o'clock) for a 1-indexed scale degree on the 7-slot diatonic wheel. */
+function degreeAngle(degree: number): number {
+  return ((degree - 1) * 360) / 7;
+}
+
+/**
+ * Map a chromatic offset from the tonic to an angle on the 7-degree wheel.
+ * Exact scale-degree matches land on one of the seven slots. Borrowed
+ * offsets interpolate linearly between the two adjacent diatonic slots
+ * based on their semitone distance (so e.g. ♭III in C major sits exactly
+ * midway between ii and iii).
+ */
+function modalWheelAngle(semitones: number, mode: ModeId): number {
+  const scale = MODE_SCALE_INTERVALS[mode];
+  const exactIdx = scale.indexOf(semitones);
+  if (exactIdx >= 0) return degreeAngle(exactIdx + 1);
+
+  // Find lower neighbour (scale[0] = 0 is always ≤ semitones).
+  let lowerIdx = 0;
+  for (let i = 0; i < scale.length; i++) {
+    if (scale[i] <= semitones) lowerIdx = i;
+  }
+  const lowerSemi = scale[lowerIdx];
+  const lowerAngle = degreeAngle(lowerIdx + 1);
+
+  let upperSemi: number;
+  let upperAngle: number;
+  if (lowerIdx === scale.length - 1) {
+    // Above the highest scale degree — interpolate toward the next octave's tonic.
+    upperSemi = 12;
+    upperAngle = 360;
+  } else {
+    upperSemi = scale[lowerIdx + 1];
+    upperAngle = degreeAngle(lowerIdx + 2);
+  }
+
+  const frac = (semitones - lowerSemi) / (upperSemi - lowerSemi);
+  return lowerAngle + (upperAngle - lowerAngle) * frac;
+}
 
 // ============================================================================
 // Configuration
@@ -296,7 +364,14 @@ export class HarmonyGrammar implements IVisualGrammar {
       }
 
       entities.push(
-        ...this.createProgressionClock(progression, t, part, key.root, fadeMs),
+        ...this.createProgressionClock(
+          progression,
+          t,
+          part,
+          key.root,
+          key.mode,
+          fadeMs,
+        ),
       );
       entities.push(
         ...this.createScrollingRomans(progression, t, part),
@@ -324,11 +399,40 @@ export class HarmonyGrammar implements IVisualGrammar {
     t: number,
     part: string,
     tonicPc: PitchClass,
+    mode: ModeId,
     fadeMs: number,
   ): Entity[] {
     const entities: Entity[] = [];
     const clockRadius = HARMONY_CELL_SIZE * CLOCK_RADIUS_FRACTION;
-    const glyphRadius = clockRadius * GLYPH_RADIUS_FRACTION;
+    const diatonicRadius = clockRadius * DIATONIC_GLYPH_RADIUS_FRACTION;
+    const borrowedRadius = clockRadius * BORROWED_GLYPH_RADIUS_FRACTION;
+
+    // Guide rings — subtle grey circles framing the two glyph rings.
+    // Opacity is constant; they do not fade with progression activity.
+    for (const [suffix, fraction] of [
+      ["inner", GUIDE_RING_INNER_FRACTION],
+      ["outer", GUIDE_RING_OUTER_FRACTION],
+    ] as const) {
+      entities.push({
+        id: `${this.id}:guide-ring-${suffix}`,
+        part,
+        kind: "glyph",
+        createdAt: t,
+        updatedAt: t,
+        position: {
+          x: HARMONY_PROGRESSION_CENTER_X,
+          y: HARMONY_PROGRESSION_CENTER_Y,
+        },
+        style: {
+          color: { h: 0, s: 0, v: 0.55, a: 1 },
+          opacity: 0.18,
+        },
+        data: {
+          type: "progression-guide-ring",
+          radius: clockRadius * fraction,
+        },
+      });
+    }
 
     for (let i = 0; i < progression.length; i++) {
       const fc = progression[i];
@@ -360,15 +464,20 @@ export class HarmonyGrammar implements IVisualGrammar {
       }
       if (opacity < 0.01) continue;
 
-      // Angular position from root pitch class relative to tonic
-      const interval = ((fc.rootPc - tonicPc) + 12) % 12;
-      const angleDeg = INTERVAL_ANGLES[interval];
+      // Angular position: 7 equally-spaced slots for diatonic degrees,
+      // with borrowed chords interpolated between adjacent diatonic
+      // positions based on chromatic distance. Borrowed chords also sit
+      // on a larger radius ring so they are visually outside the key.
+      const semitonesFromTonic = (fc.rootPc - tonicPc + 12) % 12;
+      const angleDeg = modalWheelAngle(semitonesFromTonic, mode);
       const angleRad = ((angleDeg - 90) * Math.PI) / 180; // -90 puts 0° at top
+      const radius = fc.borrowed ? borrowedRadius : diatonicRadius;
+      const scale = fc.borrowed ? BORROWED_SCALE : 1;
 
       // Position on the clock, centered on progression cell
       // Normalized y is top-down, so +sin moves downward (clockwise)
-      const x = HARMONY_PROGRESSION_CENTER_X + glyphRadius * Math.cos(angleRad);
-      const y = HARMONY_PROGRESSION_CENTER_Y + glyphRadius * Math.sin(angleRad);
+      const x = HARMONY_PROGRESSION_CENTER_X + radius * Math.cos(angleRad);
+      const y = HARMONY_PROGRESSION_CENTER_Y + radius * Math.sin(angleRad);
 
       // Colour from root pitch class
       const hue = pcToHue(fc.rootPc, DEFAULT_HUE_INVARIANT);
@@ -387,7 +496,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         style: {
           color,
           opacity,
-          size: GLYPH_SIZE,
+          size: GLYPH_SIZE * scale,
         },
         data: {
           type: "roman-numeral",
@@ -395,7 +504,7 @@ export class HarmonyGrammar implements IVisualGrammar {
           arcs: glyph.arcs,
           width: glyph.width,
           height: glyph.height,
-          strokeWidth,
+          strokeWidth: strokeWidth * scale,
         },
       });
     }

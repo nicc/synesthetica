@@ -296,6 +296,23 @@ export const MODE_LABELS: Record<ModeId, string> = {
 };
 
 /**
+ * Semitone offsets from tonic for each mode's seven scale degrees
+ * (degree 1 first). Used for functional analysis and for positioning
+ * diatonic vs borrowed chords on the progression wheel.
+ */
+export const MODE_SCALE_INTERVALS: Record<ModeId, readonly number[]> = {
+  "ionian":         [0, 2, 4, 5, 7, 9, 11],
+  "dorian":         [0, 2, 3, 5, 7, 9, 10],
+  "phrygian":       [0, 1, 3, 5, 7, 8, 10],
+  "lydian":         [0, 2, 4, 6, 7, 9, 11],
+  "mixolydian":     [0, 2, 4, 5, 7, 9, 10],
+  "aeolian":        [0, 2, 3, 5, 7, 8, 10],
+  "locrian":        [0, 1, 3, 5, 6, 8, 10],
+  "harmonic-minor": [0, 2, 3, 5, 7, 8, 11],
+  "melodic-minor":  [0, 2, 3, 5, 7, 9, 11],
+};
+
+/**
  * User-prescribed key.
  * Set via control op, not inferred by stabilizers.
  * When present, enables functional harmony analysis (Roman numerals).

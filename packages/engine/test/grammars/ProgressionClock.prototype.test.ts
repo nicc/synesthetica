@@ -2,8 +2,9 @@
  * Progression Clock Prototype
  *
  * SVG snapshots of the progression clock concept: Roman numeral glyphs
- * positioned radially (pitch-class angles), coloured by root hue (I14),
- * fading with age (Principle 9).
+ * positioned on a 7-degree diatonic wheel (inner ring) with borrowed
+ * chords on an outer ring between adjacent diatonic slots, coloured by
+ * root hue (I14), fading with age (Principle 9).
  *
  * This is a design prototype — no grammar or renderer code. Just SVG
  * generation for visual review.
@@ -19,8 +20,9 @@ import type {
   PitchClass,
   ChordQuality,
   RomanNumeralGlyph,
+  ModeId,
 } from "@synesthetica/contracts";
-import { pcToHue, INTERVAL_ANGLES } from "@synesthetica/contracts";
+import { pcToHue, MODE_SCALE_INTERVALS } from "@synesthetica/contracts";
 import { writeFileSync, mkdirSync } from "fs";
 import { resolve } from "path";
 
@@ -47,24 +49,50 @@ const GLYPH_SCALE = 28;
 /** Fade window in ms — matches dynamics grammar */
 const FADE_MS = 4000;
 
+/** Diatonic (inner) glyph ring radius as fraction of clock radius */
+const DIATONIC_RADIUS_FRACTION = 0.62;
+
+/** Borrowed (outer) glyph ring radius as fraction of clock radius */
+const BORROWED_RADIUS_FRACTION = 0.92;
+
+/** Subtle guide ring radii */
+const GUIDE_RING_INNER_FRACTION = 0.38;
+const GUIDE_RING_OUTER_FRACTION = 0.78;
+
+/** Borrowed-ring glyph scale (1/φ) */
+const BORROWED_SCALE = 1 / 1.618033988749895;
+
 /** Default pitch-hue invariant (A = red, clockwise) */
 const HUE_INV = { referencePc: 9 as PitchClass, referenceHue: 0, direction: "cw" as const };
 
 // ============================================================================
-// Scale Intervals (duplicated from HarmonyStabilizer for test isolation)
+// Wheel Helpers
 // ============================================================================
 
-const SCALE_INTERVALS: Record<string, number[]> = {
-  "ionian": [0, 2, 4, 5, 7, 9, 11],
-  "dorian": [0, 2, 3, 5, 7, 9, 10],
-  "phrygian": [0, 1, 3, 5, 7, 8, 10],
-  "lydian": [0, 2, 4, 6, 7, 9, 11],
-  "mixolydian": [0, 2, 4, 5, 7, 9, 10],
-  "aeolian": [0, 2, 3, 5, 7, 8, 10],
-  "locrian": [0, 1, 3, 5, 6, 8, 10],
-  "harmonic-minor": [0, 2, 3, 5, 7, 8, 11],
-  "melodic-minor": [0, 2, 3, 5, 7, 9, 11],
-};
+function degreeAngle(degree: number): number {
+  return ((degree - 1) * 360) / 7;
+}
+
+function modalWheelAngle(semitones: number, mode: ModeId): number {
+  const scale = MODE_SCALE_INTERVALS[mode];
+  const exactIdx = scale.indexOf(semitones);
+  if (exactIdx >= 0) return degreeAngle(exactIdx + 1);
+
+  let lowerIdx = 0;
+  for (let i = 0; i < scale.length; i++) {
+    if (scale[i] <= semitones) lowerIdx = i;
+  }
+  const lowerSemi = scale[lowerIdx];
+  const lowerAngle = degreeAngle(lowerIdx + 1);
+
+  const upperSemi =
+    lowerIdx === scale.length - 1 ? 12 : scale[lowerIdx + 1];
+  const upperAngle =
+    lowerIdx === scale.length - 1 ? 360 : degreeAngle(lowerIdx + 2);
+
+  const frac = (semitones - lowerSemi) / (upperSemi - lowerSemi);
+  return lowerAngle + (upperAngle - lowerAngle) * frac;
+}
 
 // ============================================================================
 // Test Helpers
@@ -87,7 +115,7 @@ function makeChordEvent(
   onset: number,
   borrowed = false,
 ): ChordEvent {
-  const intervals = SCALE_INTERVALS[key.mode];
+  const intervals = MODE_SCALE_INTERVALS[key.mode];
   const rootPc = borrowed
     ? inferBorrowedPc(key, roman)
     : ((key.root + intervals[degree - 1]) % 12) as PitchClass;
@@ -97,7 +125,7 @@ function makeChordEvent(
 
 /** Infer root PC for borrowed chords from the accidental in the roman string */
 function inferBorrowedPc(key: PrescribedKey, roman: string): PitchClass {
-  const intervals = SCALE_INTERVALS[key.mode];
+  const intervals = MODE_SCALE_INTERVALS[key.mode];
   // Parse degree from roman numeral
   const upper = roman.replace(/[♭♯]/g, "").toUpperCase();
   let degreeIdx = 0;
@@ -152,20 +180,22 @@ function renderProgressionClock(
   let svg = `<svg width="${SVG_SIZE}" height="${SVG_SIZE}" viewBox="0 0 ${SVG_SIZE} ${SVG_SIZE}" xmlns="http://www.w3.org/2000/svg">\n`;
   svg += `  <rect width="${SVG_SIZE}" height="${SVG_SIZE}" fill="#0a0a0f"/>\n`;
 
-  // Clock face — subtle ring
-  svg += `  <circle cx="${CX}" cy="${CY}" r="${CLOCK_RADIUS}" fill="none" stroke="#222" stroke-width="1"/>\n`;
+  // Two subtle guide rings between chord label and each glyph ring.
+  for (const fraction of [GUIDE_RING_INNER_FRACTION, GUIDE_RING_OUTER_FRACTION]) {
+    svg += `  <circle cx="${CX}" cy="${CY}" r="${(CLOCK_RADIUS * fraction).toFixed(1)}" fill="none" stroke="#333" stroke-width="1" opacity="0.5"/>\n`;
+  }
 
-  // Tick marks at each pitch-class position (subtle)
-  for (let pc = 0; pc < 12; pc++) {
-    const angleDeg = INTERVAL_ANGLES[pc];
+  // Tick marks at each diatonic scale-degree slot on the inner ring.
+  for (let deg = 1; deg <= 7; deg++) {
+    const angleDeg = degreeAngle(deg);
     const angleRad = ((angleDeg - 90) * Math.PI) / 180; // -90 to put 0° at top
-    const innerR = CLOCK_RADIUS - 5;
-    const outerR = CLOCK_RADIUS + 5;
+    const innerR = CLOCK_RADIUS * DIATONIC_RADIUS_FRACTION - 8;
+    const outerR = CLOCK_RADIUS * DIATONIC_RADIUS_FRACTION + 8;
     const x1 = CX + innerR * Math.cos(angleRad);
     const y1 = CY + innerR * Math.sin(angleRad);
     const x2 = CX + outerR * Math.cos(angleRad);
     const y2 = CY + outerR * Math.sin(angleRad);
-    svg += `  <line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#1a1a1a" stroke-width="1"/>\n`;
+    svg += `  <line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#222" stroke-width="1"/>\n`;
   }
 
   // Render each chord event as a positioned, coloured, fading glyph
@@ -176,14 +206,16 @@ function renderProgressionClock(
     const fadeFraction = 1 - age / FADE_MS;
     const opacity = fadeFraction;
 
-    // Angular position from root pitch class interval relative to tonic
-    const interval = ((event.rootPc - key.root) + 12) % 12;
-    const angleDeg = INTERVAL_ANGLES[interval];
+    // Angular position on the 7-degree wheel; borrowed chords sit on an outer ring.
+    const semitones = (event.rootPc - key.root + 12) % 12;
+    const angleDeg = modalWheelAngle(semitones, key.mode);
     const angleRad = ((angleDeg - 90) * Math.PI) / 180;
 
-    // Position on the clock
-    const glyphCX = CX + CLOCK_RADIUS * 0.75 * Math.cos(angleRad);
-    const glyphCY = CY + CLOCK_RADIUS * 0.75 * Math.sin(angleRad);
+    const ringFraction = event.borrowed
+      ? BORROWED_RADIUS_FRACTION
+      : DIATONIC_RADIUS_FRACTION;
+    const glyphCX = CX + CLOCK_RADIUS * ringFraction * Math.cos(angleRad);
+    const glyphCY = CY + CLOCK_RADIUS * ringFraction * Math.sin(angleRad);
 
     // Colour from root pitch class
     const hue = pcToHue(event.rootPc, HUE_INV);
@@ -192,8 +224,9 @@ function renderProgressionClock(
     // Build glyph geometry
     const glyph = buildRomanNumeralGlyph(event.roman);
 
-    // Render glyph centered at position
-    svg += renderGlyphSVG(glyph, glyphCX, glyphCY, color, angleDeg);
+    // Render glyph centered at position; borrowed glyphs render smaller.
+    const scale = event.borrowed ? BORROWED_SCALE : 1;
+    svg += renderGlyphSVG(glyph, glyphCX, glyphCY, color, angleDeg, scale);
   }
 
   // Title
@@ -213,27 +246,31 @@ function renderGlyphSVG(
   cy: number,
   color: string,
   _angleDeg: number,
+  scale: number,
 ): string {
   let svg = "";
 
+  const effectiveScale = GLYPH_SCALE * scale;
+  const strokeWidth = 2 / GLYPH_SCALE; // keep visual stroke width constant
+
   // Center the glyph on the position
-  const offsetX = cx - (glyph.width * GLYPH_SCALE) / 2;
-  const offsetY = cy + (glyph.height * GLYPH_SCALE) / 2; // flip Y
+  const offsetX = cx - (glyph.width * effectiveScale) / 2;
+  const offsetY = cy + (glyph.height * effectiveScale) / 2; // flip Y
 
   // Glyph group — Y-flipped
-  svg += `  <g transform="translate(${offsetX.toFixed(1)}, ${offsetY.toFixed(1)}) scale(${GLYPH_SCALE}, ${-GLYPH_SCALE})">\n`;
+  svg += `  <g transform="translate(${offsetX.toFixed(1)}, ${offsetY.toFixed(1)}) scale(${effectiveScale}, ${-effectiveScale})">\n`;
 
   for (const poly of glyph.polylines) {
     if (poly.length < 2) continue;
     const d = poly.map((p, i) => `${i === 0 ? "M" : "L"}${p.x} ${p.y}`).join(" ");
-    svg += `    <path d="${d}" fill="none" stroke="${color}" stroke-width="${2 / GLYPH_SCALE}" stroke-linecap="round" stroke-linejoin="round"/>\n`;
+    svg += `    <path d="${d}" fill="none" stroke="${color}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>\n`;
   }
 
   for (const arc of glyph.arcs) {
     const start = arc.startAngle ?? 0;
     const end = arc.endAngle ?? Math.PI * 2;
     if (Math.abs(end - start - Math.PI * 2) < 0.01) {
-      svg += `    <circle cx="${arc.cx}" cy="${arc.cy}" r="${arc.r}" fill="none" stroke="${color}" stroke-width="${2 / GLYPH_SCALE}"/>\n`;
+      svg += `    <circle cx="${arc.cx}" cy="${arc.cy}" r="${arc.r}" fill="none" stroke="${color}" stroke-width="${strokeWidth}"/>\n`;
     }
   }
 

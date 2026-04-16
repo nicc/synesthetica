@@ -35,7 +35,10 @@ import type {
   ChordQuality,
   ChordInterpretationMode,
 } from "@synesthetica/contracts";
-import { createEmptyMusicalFrame } from "@synesthetica/contracts";
+import {
+  createEmptyMusicalFrame,
+  MODE_SCALE_INTERVALS,
+} from "@synesthetica/contracts";
 import { Mode, Key } from "tonal";
 
 /**
@@ -333,7 +336,7 @@ function chromaticToDegree(
   semitones: number,
   mode: ModeId,
 ): { deg: number; offset: number } {
-  const scaleIntervals = getScaleIntervals(mode);
+  const scaleIntervals = MODE_SCALE_INTERVALS[mode];
 
   // Check exact match first
   for (let i = 0; i < scaleIntervals.length; i++) {
@@ -356,22 +359,6 @@ function chromaticToDegree(
 
   // Fallback (shouldn't happen with 7 scale degrees covering 12 semitones)
   return { deg: 1, offset: 0 };
-}
-
-/** Semitone intervals from tonic for each mode */
-function getScaleIntervals(mode: ModeId): number[] {
-  const intervals: Record<ModeId, number[]> = {
-    "ionian":         [0, 2, 4, 5, 7, 9, 11],
-    "dorian":         [0, 2, 3, 5, 7, 9, 10],
-    "phrygian":       [0, 1, 3, 5, 7, 8, 10],
-    "lydian":         [0, 2, 4, 6, 7, 9, 11],
-    "mixolydian":     [0, 2, 4, 5, 7, 9, 10],
-    "aeolian":        [0, 2, 3, 5, 7, 8, 10],
-    "locrian":        [0, 1, 3, 5, 6, 8, 10],
-    "harmonic-minor": [0, 2, 3, 5, 7, 8, 11],
-    "melodic-minor":  [0, 2, 3, 5, 7, 9, 11],
-  };
-  return intervals[mode];
 }
 
 // ============================================================================

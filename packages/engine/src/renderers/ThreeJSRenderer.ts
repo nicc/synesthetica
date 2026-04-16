@@ -457,6 +457,43 @@ export class ThreeJSRenderer implements IRenderer {
   }
 
   /**
+   * Render a thin guide ring at the progression wheel.
+   * radius (world units) comes from entity.data.radius; entity position
+   * is in normalized [0,1] grammar coords like every other glyph.
+   */
+  private updateProgressionGuideRing(entity: Entity): void {
+    if (!this.scene) return;
+
+    let ring = this.entityObjects.get(entity.id) as THREE.LineLoop | undefined;
+
+    if (!ring) {
+      const segments = 96;
+      const points: THREE.Vector3[] = [];
+      for (let i = 0; i < segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        points.push(new THREE.Vector3(Math.cos(angle), Math.sin(angle), 0));
+      }
+      const geometry = new THREE.BufferGeometry().setFromPoints(points);
+      const material = new THREE.LineBasicMaterial({ transparent: true });
+      ring = new THREE.LineLoop(geometry, material);
+      this.scene.add(ring);
+      this.entityObjects.set(entity.id, ring);
+    }
+
+    const x = (entity.position?.x ?? 0.5) * this.config.worldWidth;
+    const y = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
+    ring.position.set(x, y, 0);
+
+    const radius = (entity.data?.radius as number | undefined) ?? 1;
+    ring.scale.set(radius, radius, 1);
+
+    const material = ring.material as THREE.LineBasicMaterial;
+    const color = entity.style.color ?? { h: 0, s: 0, v: 0.55 };
+    material.color.copy(this.hsvToThreeColor(color));
+    material.opacity = entity.style.opacity ?? 0.18;
+  }
+
+  /**
    * Render a glowing field effect.
    */
   private updateGlowField(entity: Entity): void {
@@ -561,6 +598,8 @@ export class ThreeJSRenderer implements IRenderer {
       this.updateDynamicsIndicator(entity);
     } else if (glyphType === "roman-numeral") {
       this.updateRomanNumeral(entity);
+    } else if (glyphType === "progression-guide-ring") {
+      this.updateProgressionGuideRing(entity);
     } else {
       // Default glyph: circle
       this.updateParticle(entity);
