@@ -339,18 +339,53 @@ describe("buildChordShape", () => {
       }
     });
 
-    it("renders ♭9 as a line in a dominant flat-nine (chordTones does include it)", () => {
-      // C7♭9: C-E-G-Bb-Db. The detector does include ♭9 in intervals,
-      // so strictly speaking it becomes a wedge. This test documents
-      // the current behaviour: chordTones is the source of truth.
+    it("renders ♭9 as a line even when chord's interval set includes it", () => {
+      // C7♭9: C-E-G-Bb-Db. Per SPEC_010, ♭9 is a chromatic alteration
+      // regardless of whether it's listed in Tonal's chord definition.
       const chord = makeChord(0, "dom7", [0, 4, 7, 10, 1]);
       const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
 
       const flatNine = shape.elements.find((e) => e.interval === "♭2");
-      // This is a known trade-off: Tonal's interval list doesn't
-      // distinguish "chord tone" from "chromatic alteration" for ♭9.
-      // Future refinement can re-classify alterations as lines.
-      expect(flatNine?.style).toBe("wedge");
+      expect(flatNine?.style).toBe("line");
+    });
+
+    it("renders ♯11 as a line in a dominant chord (alteration of P5)", () => {
+      // Ab13♯11 voicing with the ♯11 (D, semitone 6 from Ab) present.
+      // Chord has P5 → semitone 6 is an alteration, not ♭5.
+      const ab = 8 as PitchClass;
+      const chord = makeChord(ab, "dom7", [0, 4, 7, 10, 2, 9, 6]);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
+
+      const sharp11 = shape.elements.find((e) => e.interval === "♭5");
+      expect(sharp11?.style).toBe("line");
+    });
+
+    it("renders ♭5 as a wedge in a diminished chord (chord tone, no P5)", () => {
+      // Cdim: C-Eb-Gb. Semitone 6 is ♭5, which IS the fifth of the
+      // chord — no P5 competes — so it's a chord tone, not an alteration.
+      const chord = makeChord(0, "dim", [0, 3, 6]);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
+
+      const flat5 = shape.elements.find((e) => e.interval === "♭5");
+      expect(flat5?.style).toBe("wedge");
+    });
+
+    it("renders ♯5 as a wedge in an augmented chord (chord tone, no P5)", () => {
+      // Caug: C-E-G♯. Semitone 8 is ♯5; no P5 present → chord tone.
+      const chord = makeChord(0, "aug", [0, 4, 8]);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
+
+      const sharp5 = shape.elements.find((e) => e.interval === "♯5");
+      expect(sharp5?.style).toBe("wedge");
+    });
+
+    it("renders ♯9 as a line when chord has M3 (alteration)", () => {
+      // C7♯9 voicing: C-E-G-Bb-D♯. Chord has M3 (4) so semitone 3 is ♯9.
+      const chord = makeChord(0, "dom7", [0, 4, 7, 10, 3]);
+      const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
+
+      const sharp9 = shape.elements.find((e) => e.interval === "♭3");
+      expect(sharp9?.style).toBe("line");
     });
   });
 });

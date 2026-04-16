@@ -37,6 +37,31 @@ import {
 const NATURAL_EXTENSION_SEMITONES = new Set<number>([2, 5, 9]);
 
 /**
+ * Context-aware classification of chromatic alterations. SPEC_010 lists
+ * ♭9, ♯9, ♯11, ♭13 as chromatic alterations (lines). But some of these
+ * semitones can also be legitimate chord tones in the right context —
+ * e.g. semitone 6 is ♭5 in a diminished chord (chord tone) OR ♯11 in a
+ * dominant chord (alteration). The distinction: an alteration is a
+ * chromatic decoration of an already-present natural tone.
+ *
+ * - ♭9 (1): always an alteration (never a stand-alone chord tone)
+ * - ♯9 (3): alteration when chord has M3 (4); else it IS the m3
+ * - ♯11 (6): alteration when chord has P5 (7); else it IS the ♭5
+ * - ♭13 (8): alteration when chord has P5 (7); else it IS the ♯5
+ */
+function isAlteration(
+  normalizedSemitones: number,
+  chordToneSet: number[] | null,
+): boolean {
+  if (normalizedSemitones === 1) return true;
+  if (!chordToneSet) return false;
+  if (normalizedSemitones === 3 && chordToneSet.includes(4)) return true;
+  if (normalizedSemitones === 6 && chordToneSet.includes(7)) return true;
+  if (normalizedSemitones === 8 && chordToneSet.includes(7)) return true;
+  return false;
+}
+
+/**
  * Builds chord shape geometry from a chord interpretation and its voicing.
  * Invariant I18: This algorithm is fixed; grammars cannot compute shapes.
  *
@@ -92,19 +117,25 @@ export function buildChordShape(
     };
 
     // Chord tones get wedge arms; chromatic additions get lines.
-    // SPEC_010 classifies natural extensions (9/11/13 = semitones 2/5/9
-    // from root) as diatonic chord tones even when the chord's interval
-    // set doesn't explicitly include them — e.g. Tonal's Ab13 omits the
-    // 11th by jazz convention, but a played 11th should still render as
-    // a wedge, not a chromatic line. Alterations (♭9/♯9/♯11/♭13 =
-    // semitones 1/3/6/8 in most dom contexts) remain lines.
+    // SPEC_010 distinguishes "diatonic chord tones" (wedges) from
+    // "chromatic alterations" (lines). The rule here:
+    //   1. Alterations always render as lines (even if Tonal's chord
+    //      dictionary lists them as part of the chord, e.g. ♯11 in
+    //      Ab13♯11 or ♭9 in Ab7♭9 — SPEC is clear these are lines).
+    //   2. Otherwise, a tone is a chord tone (wedge) if it's either in
+    //      the chord's explicit interval set OR is a natural extension
+    //      (9/11/13) — per SPEC, these are diatonic chord tones even
+    //      when the chord's interval list omits them (e.g. Tonal's
+    //      Ab13 drops the 11 by jazz convention).
+    const altered = isAlteration(normalizedSemitones, chordToneSet);
     const isNaturalExtension = NATURAL_EXTENSION_SEMITONES.has(
       normalizedSemitones,
     );
     const isChordTone =
-      chordToneSet === null ||
-      chordToneSet.includes(normalizedSemitones) ||
-      isNaturalExtension;
+      !altered &&
+      (chordToneSet === null ||
+        chordToneSet.includes(normalizedSemitones) ||
+        isNaturalExtension);
 
     // Mark the bass element for inversion-indicator rendering.
     // Only meaningful when the bass differs from the chord root.
