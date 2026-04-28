@@ -1,6 +1,37 @@
-# RhythmGrammar Glossary
+# Grammar Glossary
 
-Terms used in the rhythm grammar visualization system.
+Terms used in the grammar visualization systems. Organized by grammar.
+
+---
+
+# Harmony Grammar
+
+## Harmony Clock
+
+**Harmony clock**
+The circular progression display occupying the bottom-right cell of the harmony column. Shows functional chords as radially-positioned chord numerals that fade with age.
+
+**Guide band**
+An annular region within the harmony clock, bounded by guide rings. The harmony clock is divided into guide bands concentrically. The diatonic ring and borrowed ring are both guide bands. Each chord numeral sits at the radial centre of its guide band.
+
+**Diatonic ring**
+The inner guide band where chords whose roots are diatonic to the prescribed key sit. Contains seven equally-spaced angular slots, one per scale degree.
+
+**Slot**
+One of seven angular positions on the diatonic ring, spaced at 360/7 (approximately 51.4 degrees). Degree I sits at 12 o'clock, proceeding clockwise through VII.
+
+**Chord numeral**
+A Roman numeral rendered as geometric line segments and arcs (not text). Carries root pitch-class hue. Positioned on its guide band at the angular slot corresponding to its scale degree. Examples: I, ii, V7, ♭III.
+
+**Chord symbol**
+The radial wedge/line shape in the top-right cell showing a chord's interval structure. Distinct from chord numerals on the harmony clock.
+
+**Fade trail**
+The visual afterimage of a released chord on the harmony clock. On release, brightness drops by a step, then decays linearly over the fade window. Stroke width grows as opacity falls, producing a chunky-to-transparent progression.
+
+---
+
+# Rhythm Grammar
 
 ## Time and Positioning
 

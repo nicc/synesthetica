@@ -20,6 +20,7 @@ This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get sta
 12. [Context Awareness](#context-awareness-before-action)
 13. [Verification After Changes](#verification-after-changes)
 14. [Commit Messages](#commit-messages)
+15. [Glossary Alignment](#glossary-alignment)
 
 ---
 
@@ -371,5 +372,20 @@ git commit -m "Add pcToHue function to contracts
 
 Also created issues for derived signals schema and stabilizer ordering."
 ```
+
+## Glossary Alignment
+
+**Push back when the user uses ambiguous language. Align to the glossary.**
+
+Glossaries exist at two levels:
+- **Project-wide**: `GLOSSARY_FULL.md` — architectural, interaction, and domain terms
+- **Grammar-specific**: `packages/engine/src/grammars/GLOSSARY.md` — visual element terms per grammar
+
+When the user uses a term that:
+- **Has a glossary definition but is used loosely** — gently restate using the glossary term. E.g. if they say "the ring thing" when they mean "harmony clock", say so.
+- **Is ambiguous between glossary entries** — ask which they mean. E.g. "glyph" could mean the entity type or a chord numeral; clarify.
+- **Doesn't exist yet** — propose a definition and ask for approval before using it further.
+
+This is not pedantry — it prevents design conversations from drifting when the same word means different things to each participant. The cost of a quick clarification is low; the cost of building the wrong thing because of a misunderstood term is high.
 
 If you are resuming from compaction, re-read this file before proceeding.
