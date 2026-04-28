@@ -20,6 +20,9 @@ The inner guide band where chords whose roots are diatonic to the prescribed key
 **Slot**
 One of seven angular positions on the diatonic ring, spaced at 360/7 (approximately 51.4 degrees). Degree I sits at 12 o'clock, proceeding clockwise through VII.
 
+**Borrowed ring**
+The outer guide band on the harmony clock, containing chord numerals whose roots are not diatonic to the prescribed key. Angular positions are interpolated between adjacent diatonic ring slots based on chromatic distance from the tonic. Chord numerals on the borrowed ring are scaled by 1/φ relative to the diatonic ring. Chords on the borrowed ring may have weighted functional connections to chords on either ring — including other chords on the borrowed ring itself (e.g. in secondary dominant chains).
+
 **Chord numeral**
 A Roman numeral rendered as geometric line segments and arcs (not text). Carries root pitch-class hue. Positioned on its guide band at the angular slot corresponding to its scale degree. Examples: I, ii, V7, ♭III.
 
