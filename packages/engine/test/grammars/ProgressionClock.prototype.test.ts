@@ -66,8 +66,31 @@ const GUIDE_RING_OUTER_FRACTION = BORROWED_RADIUS_FRACTION + GLYPH_BAND_WIDTH / 
 /** Borrowed-ring glyph scale (1/φ) */
 const BORROWED_SCALE = 1 / 1.618033988749895;
 
+/** Connection strip length (SVG pixels) — from near-numeral to guide ring */
+const STRIP_LENGTH = 14;
+
+/** Gap between strip end and numeral (SVG pixels) */
+const STRIP_GAP = 3;
+
+/** Strip stroke width (SVG pixels) */
+const STRIP_WIDTH = 4;
+
 /** Default pitch-hue invariant (A = red, clockwise) */
 const HUE_INV = { referencePc: 9 as PitchClass, referenceHue: 0, direction: "cw" as const };
+
+/**
+ * Circular midpoint of two hues on the 360° wheel.
+ * Takes the shorter arc so that e.g. midpoint(350, 10) = 0, not 180.
+ */
+function circularMidpointHue(h1: number, h2: number): number {
+  let diff = h2 - h1;
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+  let mid = h1 + diff / 2;
+  if (mid < 0) mid += 360;
+  if (mid >= 360) mid -= 360;
+  return mid;
+}
 
 // ============================================================================
 // Wheel Helpers
@@ -101,6 +124,24 @@ function modalWheelAngle(semitones: number, mode: ModeId): number {
 // ============================================================================
 // Test Helpers
 // ============================================================================
+
+/** A functional connection between two chords (SPEC 011). */
+interface FunctionalConnection {
+  /** Source chord root pitch class */
+  sourcePc: PitchClass;
+  /** Whether source is on the borrowed ring */
+  sourceBorrowed: boolean;
+  /** Target chord root pitch class */
+  targetPc: PitchClass;
+  /** Whether target is on the diatonic ring */
+  targetDiatonic: boolean;
+  /** Conventional weight (0–1) */
+  weight: number;
+  /** Whether the target chord has been played */
+  resolved: boolean;
+  /** Onset of the source chord (for fade) */
+  sourceOnset: number;
+}
 
 interface ChordEvent {
   roman: string;
@@ -180,8 +221,70 @@ function renderProgressionClock(
   currentTime: number,
   key: PrescribedKey,
   title: string,
+  connections: FunctionalConnection[] = [],
 ): string {
   let svg = `<svg width="${SVG_SIZE}" height="${SVG_SIZE}" viewBox="0 0 ${SVG_SIZE} ${SVG_SIZE}" xmlns="http://www.w3.org/2000/svg">\n`;
+
+  // Gradient definitions for connection strips
+  let defs = "  <defs>\n";
+  for (let ci = 0; ci < connections.length; ci++) {
+    const conn = connections[ci];
+    const age = currentTime - conn.sourceOnset;
+    if (age < 0 || age >= FADE_MS) continue;
+
+    const sourceHue = pcToHue(conn.sourcePc, HUE_INV);
+    const targetHue = pcToHue(conn.targetPc, HUE_INV);
+    const midHue = circularMidpointHue(sourceHue, targetHue);
+    const fadeOpacity = (1 - age / FADE_MS) * conn.weight;
+
+    // Source strip gradient: chord hue → midpoint hue (radially inward)
+    const srcSemitones = (conn.sourcePc - key.root + 12) % 12;
+    const srcAngleDeg = modalWheelAngle(srcSemitones, key.mode);
+    const srcAngleRad = ((srcAngleDeg - 90) * Math.PI) / 180;
+    const srcRingFraction = conn.sourceBorrowed
+      ? BORROWED_RADIUS_FRACTION
+      : DIATONIC_RADIUS_FRACTION;
+    // Strip from near-numeral (chord hue) to guide ring (midpoint hue)
+    const srcOuterR = CLOCK_RADIUS * srcRingFraction - STRIP_GAP;
+    const srcInnerR = srcOuterR - STRIP_LENGTH;
+    const srcX1 = CX + srcOuterR * Math.cos(srcAngleRad);
+    const srcY1 = CY + srcOuterR * Math.sin(srcAngleRad);
+    const srcX2 = CX + srcInnerR * Math.cos(srcAngleRad);
+    const srcY2 = CY + srcInnerR * Math.sin(srcAngleRad);
+
+    defs += `    <linearGradient id="conn-${ci}-src" gradientUnits="userSpaceOnUse" x1="${srcX1.toFixed(1)}" y1="${srcY1.toFixed(1)}" x2="${srcX2.toFixed(1)}" y2="${srcY2.toFixed(1)}">\n`;
+    defs += `      <stop offset="0%" stop-color="${hsvToCSS(sourceHue, 0.7, 0.9, 1)}" />\n`;
+    defs += `      <stop offset="100%" stop-color="${hsvToCSS(midHue, 0.7, 0.9, 1)}" />\n`;
+    defs += `    </linearGradient>\n`;
+
+    // Target strip gradient: midpoint hue → chord hue (radially outward)
+    const tgtSemitones = (conn.targetPc - key.root + 12) % 12;
+    const tgtAngleDeg = modalWheelAngle(tgtSemitones, key.mode);
+    const tgtAngleRad = ((tgtAngleDeg - 90) * Math.PI) / 180;
+    const tgtRingFraction = conn.targetDiatonic
+      ? DIATONIC_RADIUS_FRACTION
+      : BORROWED_RADIUS_FRACTION;
+    // Strip from guide ring (midpoint hue) to near-slot (target hue)
+    const tgtInnerR = CLOCK_RADIUS * tgtRingFraction + STRIP_GAP;
+    const tgtOuterR = tgtInnerR + STRIP_LENGTH;
+    const tgtX1 = CX + tgtInnerR * Math.cos(tgtAngleRad);
+    const tgtY1 = CY + tgtInnerR * Math.sin(tgtAngleRad);
+    const tgtX2 = CX + tgtOuterR * Math.cos(tgtAngleRad);
+    const tgtY2 = CY + tgtOuterR * Math.sin(tgtAngleRad);
+
+    defs += `    <linearGradient id="conn-${ci}-tgt" gradientUnits="userSpaceOnUse" x1="${tgtX1.toFixed(1)}" y1="${tgtY1.toFixed(1)}" x2="${tgtX2.toFixed(1)}" y2="${tgtY2.toFixed(1)}">\n`;
+    defs += `      <stop offset="0%" stop-color="${hsvToCSS(midHue, 0.7, 0.9, 1)}" />\n`;
+    defs += `      <stop offset="100%" stop-color="${hsvToCSS(targetHue, 0.7, 0.9, 1)}" />\n`;
+    defs += `    </linearGradient>\n`;
+
+    // Store strip geometry for rendering after defs
+    (conn as FunctionalConnection & { _svg?: string })._svg =
+      `  <line x1="${srcX1.toFixed(1)}" y1="${srcY1.toFixed(1)}" x2="${srcX2.toFixed(1)}" y2="${srcY2.toFixed(1)}" stroke="url(#conn-${ci}-src)" stroke-width="${STRIP_WIDTH}" stroke-linecap="round" opacity="${fadeOpacity.toFixed(2)}" />\n` +
+      `  <line x1="${tgtX1.toFixed(1)}" y1="${tgtY1.toFixed(1)}" x2="${tgtX2.toFixed(1)}" y2="${tgtY2.toFixed(1)}" stroke="url(#conn-${ci}-tgt)" stroke-width="${STRIP_WIDTH}" stroke-linecap="round" opacity="${fadeOpacity.toFixed(2)}" />\n`;
+  }
+  defs += "  </defs>\n";
+  svg += defs;
+
   svg += `  <rect width="${SVG_SIZE}" height="${SVG_SIZE}" fill="#0a0a0f"/>\n`;
 
   // Three subtle guide rings bound the two glyph bands.
@@ -196,7 +299,7 @@ function renderProgressionClock(
   // Tick marks at each diatonic scale-degree slot on the inner ring.
   for (let deg = 1; deg <= 7; deg++) {
     const angleDeg = degreeAngle(deg);
-    const angleRad = ((angleDeg - 90) * Math.PI) / 180; // -90 to put 0° at top
+    const angleRad = ((angleDeg - 90) * Math.PI) / 180;
     const innerR = CLOCK_RADIUS * DIATONIC_RADIUS_FRACTION - 8;
     const outerR = CLOCK_RADIUS * DIATONIC_RADIUS_FRACTION + 8;
     const x1 = CX + innerR * Math.cos(angleRad);
@@ -204,6 +307,12 @@ function renderProgressionClock(
     const x2 = CX + outerR * Math.cos(angleRad);
     const y2 = CY + outerR * Math.sin(angleRad);
     svg += `  <line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#222" stroke-width="1"/>\n`;
+  }
+
+  // Render connection strips (behind chord numerals)
+  for (const conn of connections) {
+    const connWithSvg = conn as FunctionalConnection & { _svg?: string };
+    if (connWithSvg._svg) svg += connWithSvg._svg;
   }
 
   // Render each chord event as a positioned, coloured, fading glyph
@@ -214,7 +323,6 @@ function renderProgressionClock(
     const fadeFraction = 1 - age / FADE_MS;
     const opacity = fadeFraction;
 
-    // Angular position on the 7-degree wheel; borrowed chords sit on an outer ring.
     const semitones = (event.rootPc - key.root + 12) % 12;
     const angleDeg = modalWheelAngle(semitones, key.mode);
     const angleRad = ((angleDeg - 90) * Math.PI) / 180;
@@ -225,14 +333,10 @@ function renderProgressionClock(
     const glyphCX = CX + CLOCK_RADIUS * ringFraction * Math.cos(angleRad);
     const glyphCY = CY + CLOCK_RADIUS * ringFraction * Math.sin(angleRad);
 
-    // Colour from root pitch class
     const hue = pcToHue(event.rootPc, HUE_INV);
     const color = hsvToCSS(hue, 0.7, 0.9, opacity);
 
-    // Build glyph geometry
     const glyph = buildRomanNumeralGlyph(event.roman);
-
-    // Render glyph centered at position; borrowed glyphs render smaller.
     const scale = event.borrowed ? BORROWED_SCALE : 1;
     svg += renderGlyphSVG(glyph, glyphCX, glyphCY, color, angleDeg, scale);
   }
@@ -426,5 +530,134 @@ describe("Progression Clock prototype", () => {
     maybeWriteSnapshot("dense-progression", svg);
 
     expect(events).toHaveLength(8);
+  });
+
+  // ==========================================================================
+  // Connection Strip Scenarios (SPEC 011)
+  // ==========================================================================
+
+  it("♭VII → IV unresolved (subdominant borrowing, target not yet played)", () => {
+    // ♭VII played but IV not yet — both strips appear, no IV numeral
+    const bVII = makeChordEvent(cMajor, 7, "♭VII", "maj", 0, true);
+    const events = [bVII];
+
+    const connections: FunctionalConnection[] = [{
+      sourcePc: bVII.rootPc,
+      sourceBorrowed: true,
+      targetPc: 5 as PitchClass, // F = IV in C
+      targetDiatonic: true,
+      weight: 0.85,
+      resolved: false,
+      sourceOnset: 0,
+    }];
+
+    const svg = renderProgressionClock(events, 0, cMajor,
+      "♭VII → IV unresolved (strips present, IV numeral absent)", connections);
+    maybeWriteSnapshot("conn-bVII-IV-unresolved", svg);
+
+    expect(connections).toHaveLength(1);
+    expect(connections[0].resolved).toBe(false);
+  });
+
+  it("♭VII → IV resolved (both chords played)", () => {
+    const bVII = makeChordEvent(cMajor, 7, "♭VII", "maj", 0, true);
+    const IV = makeChordEvent(cMajor, 4, "IV", "maj", 1500);
+    const events = [bVII, IV];
+
+    const connections: FunctionalConnection[] = [{
+      sourcePc: bVII.rootPc,
+      sourceBorrowed: true,
+      targetPc: IV.rootPc,
+      targetDiatonic: true,
+      weight: 0.85,
+      resolved: true,
+      sourceOnset: 0,
+    }];
+
+    const svg = renderProgressionClock(events, 1500, cMajor,
+      "♭VII → IV resolved (both numerals + strips)", connections);
+    maybeWriteSnapshot("conn-bVII-IV-resolved", svg);
+
+    expect(connections[0].resolved).toBe(true);
+  });
+
+  it("V/V → V (secondary dominant, resolved)", () => {
+    // D major (V/V) resolves to G (V) in C major
+    // D = pc 2, not diatonic in C major
+    const VofV = makeChordEvent(cMajor, 2, "V/V", "maj", 0, true);
+    const V = makeChordEvent(cMajor, 5, "V", "maj", 1500);
+    const events = [VofV, V];
+
+    const connections: FunctionalConnection[] = [{
+      sourcePc: VofV.rootPc,
+      sourceBorrowed: true,
+      targetPc: V.rootPc,
+      targetDiatonic: true,
+      weight: 0.92,
+      resolved: true,
+      sourceOnset: 0,
+    }];
+
+    const svg = renderProgressionClock(events, 1500, cMajor,
+      "V/V → V resolved (secondary dominant)", connections);
+    maybeWriteSnapshot("conn-VofV-V-resolved", svg);
+
+    expect(connections[0].weight).toBeGreaterThan(0.9);
+  });
+
+  it("multiple connections — ♭VII → IV and V/V → V", () => {
+    const bVII = makeChordEvent(cMajor, 7, "♭VII", "maj", 0, true);
+    const VofV = makeChordEvent(cMajor, 2, "V/V", "maj", 500, true);
+    const IV = makeChordEvent(cMajor, 4, "IV", "maj", 1500);
+    const V = makeChordEvent(cMajor, 5, "V", "maj", 2000);
+    const events = [bVII, VofV, IV, V];
+
+    const connections: FunctionalConnection[] = [
+      {
+        sourcePc: bVII.rootPc,
+        sourceBorrowed: true,
+        targetPc: IV.rootPc,
+        targetDiatonic: true,
+        weight: 0.85,
+        resolved: true,
+        sourceOnset: 0,
+      },
+      {
+        sourcePc: VofV.rootPc,
+        sourceBorrowed: true,
+        targetPc: V.rootPc,
+        targetDiatonic: true,
+        weight: 0.92,
+        resolved: true,
+        sourceOnset: 500,
+      },
+    ];
+
+    const svg = renderProgressionClock(events, 2000, cMajor,
+      "♭VII→IV + V/V→V (two resolved connections)", connections);
+    maybeWriteSnapshot("conn-multiple-resolved", svg);
+
+    expect(connections).toHaveLength(2);
+  });
+
+  it("weak connection — ♭VI → ii (moderate weight)", () => {
+    const bVI = makeChordEvent(cMajor, 6, "♭VI", "maj", 0, true);
+    const events = [bVI];
+
+    const connections: FunctionalConnection[] = [{
+      sourcePc: bVI.rootPc,
+      sourceBorrowed: true,
+      targetPc: 2 as PitchClass, // D = ii in C
+      targetDiatonic: true,
+      weight: 0.45,
+      resolved: false,
+      sourceOnset: 0,
+    }];
+
+    const svg = renderProgressionClock(events, 0, cMajor,
+      "♭VI → ii unresolved (moderate weight, subtle strips)", connections);
+    maybeWriteSnapshot("conn-bVI-ii-weak", svg);
+
+    expect(connections[0].weight).toBeLessThan(0.5);
   });
 });
