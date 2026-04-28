@@ -29,6 +29,9 @@ A Roman numeral rendered as geometric line segments and arcs (not text). Carries
 **Chord symbol**
 The radial wedge/line shape in the top-right cell showing a chord's interval structure. Distinct from chord numerals on the harmony clock.
 
+**Connection strip**
+A short gradient mark sitting on the radial edge of a chord numeral or slot on the harmony clock. Connection strips appear in pairs — one at the source chord, one at the target chord — linked by a shared midpoint pitch-class hue. They indicate a functional relationship between chords without drawing lines across the clock face. Strip intensity scales with the connection's conventional weight.
+
 **Fade trail**
 The visual afterimage of a released chord on the harmony clock. On release, brightness drops by a step, then decays linearly over the fade window. Stroke width grows as opacity falls, producing a chunky-to-transparent progression.
 
