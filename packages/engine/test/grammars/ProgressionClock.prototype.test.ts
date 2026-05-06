@@ -49,25 +49,26 @@ const GLYPH_SCALE = 28;
 /** Fade window in ms — matches dynamics grammar */
 const FADE_MS = 4000;
 
-/** Diatonic (inner) glyph ring radius as fraction of clock radius */
-const DIATONIC_RADIUS_FRACTION = 0.50;
-
-/** Borrowed (outer) glyph ring radius as fraction of clock radius */
-const BORROWED_RADIUS_FRACTION = 0.74;
-
-/** Three guide rings bound two equal annular bands so each numeral
- *  sits at the radial centre of its band. */
-const GLYPH_BAND_WIDTH = BORROWED_RADIUS_FRACTION - DIATONIC_RADIUS_FRACTION;
-const GUIDE_RING_INNER_FRACTION = DIATONIC_RADIUS_FRACTION - GLYPH_BAND_WIDTH / 2;
-const GUIDE_RING_MIDDLE_FRACTION =
-  (DIATONIC_RADIUS_FRACTION + BORROWED_RADIUS_FRACTION) / 2;
-const GUIDE_RING_OUTER_FRACTION = BORROWED_RADIUS_FRACTION + GLYPH_BAND_WIDTH / 2;
+/**
+ * Layout fractions of clock radius (redesigned per harmony clock holistic
+ * proposal). Three guide rings anchor to numeral extents and clock edge:
+ *   - Inner guide (0.32): outer edge of the chord-label area
+ *   - Middle guide (0.62): between diatonic and borrowed numerals
+ *   - Outer guide (1.00): clock edge
+ * Numeral rings sit in their bands; bias places diatonic slightly inward
+ * (more breathing room above the label) and borrowed near band centre.
+ */
+const DIATONIC_RADIUS_FRACTION = 0.45;
+const BORROWED_RADIUS_FRACTION = 0.80;
+const GUIDE_RING_INNER_FRACTION = 0.32;
+const GUIDE_RING_MIDDLE_FRACTION = 0.62;
+const GUIDE_RING_OUTER_FRACTION = 1.00;
 
 /** Borrowed-ring glyph scale (1/φ) */
 const BORROWED_SCALE = 1 / 1.618033988749895;
 
-/** Strip radial height (SVG pixels) — thin in the toward/away-from-center direction */
-const STRIP_RADIAL_HEIGHT = 4;
+/** Strip radial height (SVG pixels) — extends from its anchored guide ring toward the numeral */
+const STRIP_RADIAL_HEIGHT = 6;
 
 /** Strip arc width (SVG pixels) — matches numeral extent along the ring */
 const STRIP_ARC_WIDTH = GLYPH_SCALE;
@@ -292,22 +293,44 @@ function renderProgressionClock(
     const srcColorTransparent = hsvToCSS(sourceHue, 0.7, 0.9, 0);
     const tgtColorTransparent = hsvToCSS(targetHue, 0.7, 0.9, 0);
 
-    // Each strip's midpoint-coloured end sits exactly on the middle
-    // guide ring; the chord-coloured end extends toward its numeral.
-    // If the two strips were rotated to align, their midpoint ends
-    // would meet at the guide ring producing a continuous gradient.
-    const middleGuideR = CLOCK_RADIUS * GUIDE_RING_MIDDLE_FRACTION;
-
+    // Strip directionality (SPEC 011 update): the "from" strip sits
+    // INWARD of its numeral; the "to" strip sits OUTWARD of its
+    // numeral. Each strip's midpoint-coloured end anchors to the
+    // adjacent guide ring on the appropriate side of its numeral.
+    //
+    //   Chord on            Role          Midpoint anchored at
+    //   ---------------------------------------------------------
+    //   Diatonic ring       source (from) Inner guide ring
+    //   Diatonic ring       target (to)   Middle guide ring
+    //   Borrowed ring       source (from) Middle guide ring
+    //   Borrowed ring       target (to)   Outer guide ring
+    //
+    // Cross-ring connections (most common) place both midpoints at
+    // the middle guide ring; within-ring connections anchor to
+    // different guide rings — the colour link is purely chromatic.
+    const srcAnchorR = CLOCK_RADIUS * (conn.sourceBorrowed
+      ? GUIDE_RING_MIDDLE_FRACTION
+      : GUIDE_RING_INNER_FRACTION);
+    // Source strip extends OUTWARD from its anchor toward the numeral
+    // (numeral is outward of the inward-side anchor).
+    const srcChordR = srcAnchorR + STRIP_RADIAL_HEIGHT;
     const srcStrip = buildStrip({
       angleRad: ((modalWheelAngle((conn.sourcePc - key.root + 12) % 12, key.mode) - 90) * Math.PI) / 180,
-      midR: middleGuideR,
-      chordR: middleGuideR + (conn.sourceBorrowed ? +1 : -1) * STRIP_RADIAL_HEIGHT,
+      midR: srcAnchorR,
+      chordR: srcChordR,
       arcWidth: conn.sourceBorrowed ? STRIP_ARC_WIDTH * BORROWED_SCALE : STRIP_ARC_WIDTH,
     });
+
+    const tgtAnchorR = CLOCK_RADIUS * (conn.targetDiatonic
+      ? GUIDE_RING_MIDDLE_FRACTION
+      : GUIDE_RING_OUTER_FRACTION);
+    // Target strip extends INWARD from its anchor toward the numeral
+    // (numeral is inward of the outward-side anchor).
+    const tgtChordR = tgtAnchorR - STRIP_RADIAL_HEIGHT;
     const tgtStrip = buildStrip({
       angleRad: ((modalWheelAngle((conn.targetPc - key.root + 12) % 12, key.mode) - 90) * Math.PI) / 180,
-      midR: middleGuideR,
-      chordR: middleGuideR + (conn.targetDiatonic ? -1 : +1) * STRIP_RADIAL_HEIGHT,
+      midR: tgtAnchorR,
+      chordR: tgtChordR,
       arcWidth: conn.targetDiatonic ? STRIP_ARC_WIDTH : STRIP_ARC_WIDTH * BORROWED_SCALE,
     });
 
@@ -686,6 +709,35 @@ describe("Progression Clock prototype", () => {
     maybeWriteSnapshot("conn-multiple-resolved", svg);
 
     expect(connections).toHaveLength(2);
+  });
+
+  it("within-ring chain — V/V/V → V/V (both on borrowed ring)", () => {
+    // V = G (diatonic), V/V = D (borrowed), V/V/V = A (borrowed).
+    // The chain V/V/V → V/V is a within-ring connection: source and
+    // target are both on the borrowed ring. Source strip sits inward
+    // of V/V/V (midpoint at middle guide). Target strip sits outward
+    // of V/V (midpoint at outer guide). Different anchors; colour
+    // link via shared midpoint hue.
+    const VofVofV = makeChordEvent(cMajor, 6, "V/V/V", "maj", 0, true);  // A maj
+    const VofV = makeChordEvent(cMajor, 2, "V/V", "maj", 1500, true);    // D maj
+    const events = [VofVofV, VofV];
+
+    const connections: FunctionalConnection[] = [{
+      sourcePc: VofVofV.rootPc,
+      sourceBorrowed: true,
+      targetPc: VofV.rootPc,
+      targetDiatonic: false, // both on borrowed ring
+      weight: 0.88,
+      resolved: true,
+      sourceOnset: 0,
+    }];
+
+    const svg = renderProgressionClock(events, 1500, cMajor,
+      "V/V/V → V/V (within-ring; source strip below, target strip above)",
+      connections);
+    maybeWriteSnapshot("conn-within-ring-VofVofV", svg);
+
+    expect(connections[0].targetDiatonic).toBe(false);
   });
 
   it("weak connection — ♭VI → ii (moderate weight)", () => {
