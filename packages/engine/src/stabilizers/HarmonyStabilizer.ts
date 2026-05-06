@@ -295,7 +295,12 @@ function analyzeChord(
   for (let i = 0; i < diatonicTable.length; i++) {
     if (diatonicTable[i].rootPc === rootPc) {
       degree = i + 1;
-      borrowed = false;
+      // Root is diatonic, but the chord may still be borrowed if its
+      // quality differs from the expected diatonic quality at this
+      // degree. Gm at V in C major is borrowed (G is diatonic, but
+      // the diatonic V is G major). The ring is determined by this
+      // flag; the angular position is the slot's diatonic angle.
+      borrowed = !qualityMatchesDiatonic(quality, diatonicTable[i].quality, degree);
       break;
     }
   }
@@ -326,6 +331,60 @@ function analyzeChord(
     onset: chord.onset,
     releaseTime: null,
   };
+}
+
+/**
+ * Determine whether the chord's quality matches the expected diatonic
+ * quality at this scale degree. The chord is non-diatonic (borrowed)
+ * if the quality differs — even when the root is in the scale.
+ *
+ * Triadic core matches (e.g. maj7 ↔ maj, min7 ↔ min, hdim7 ↔ dim).
+ * Special cases:
+ * - dom7 at degree 5 (V) is treated as diatonic in major-quality
+ *   contexts — V7 is the canonical cadential dominant in tonal music.
+ * - sus2/sus4 at any diatonic root are treated as diatonic; suspensions
+ *   don't have a triadic quality to disagree with.
+ */
+function qualityMatchesDiatonic(
+  chordQuality: ChordQuality,
+  diatonicQuality: "maj" | "min" | "dim" | "aug",
+  degree: number,
+): boolean {
+  // Suspensions accepted at any diatonic root.
+  if (chordQuality === "sus2" || chordQuality === "sus4") return true;
+
+  const triadCore = extractTriadCore(chordQuality);
+  if (triadCore !== null && triadCore === diatonicQuality) return true;
+
+  // V7 (dom7 at the V slot) accepted as diatonic in major-quality slots.
+  if (chordQuality === "dom7" && degree === 5 && diatonicQuality === "maj") {
+    return true;
+  }
+
+  return false;
+}
+
+function extractTriadCore(
+  quality: ChordQuality,
+): "maj" | "min" | "dim" | "aug" | null {
+  switch (quality) {
+    case "maj":
+    case "maj7":
+      return "maj";
+    case "min":
+    case "min7":
+      return "min";
+    case "dim":
+    case "dim7":
+    case "hdim7":
+      return "dim";
+    case "aug":
+      return "aug";
+    case "dom7":
+      return "maj"; // dominant 7th has a major triad core
+    default:
+      return null;
+  }
 }
 
 /**

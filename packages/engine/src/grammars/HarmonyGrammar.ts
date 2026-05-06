@@ -108,8 +108,10 @@ const GUIDE_RING_INNER_FRACTION = 0.32;
 const GUIDE_RING_MIDDLE_FRACTION = 0.62;
 const GUIDE_RING_OUTER_FRACTION = 1.00;
 
-/** Glyph size in world units (height of uppercase numeral) */
-const GLYPH_SIZE = 2;
+/** Glyph size in world units (height of uppercase numeral). Sized to
+ *  remain visually proportional to the larger clock (SPEC 011 layout).
+ */
+const GLYPH_SIZE = 4;
 
 /**
  * Scale factor applied to borrowed-ring glyphs (size + stroke). 1/φ ≈ 0.618

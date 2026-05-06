@@ -268,6 +268,58 @@ describe("HarmonyStabilizer", () => {
       expect(result.harmonicContext?.currentFunction?.borrowed).toBe(true);
       expect(result.harmonicContext?.currentFunction?.roman).toContain("♭");
     });
+
+    it("marks Gm in C major as borrowed (diatonic root, non-diatonic quality)", () => {
+      // G is diatonic (V) but the diatonic V quality is major. Gm is
+      // borrowed even though G is in the scale. No ♭/♯ prefix because
+      // the root is diatonic.
+      const raw = createTestRawFrame(1000);
+      const chord = createChord(7 as PitchClass, "min", [
+        { pc: 7 as PitchClass, octave: 3 },
+        { pc: 10 as PitchClass, octave: 3 },
+        { pc: 2 as PitchClass, octave: 4 },
+      ]);
+      const upstream = createUpstreamFrame(1000, [chord], cMajor);
+      const result = stabilizer.apply(raw, upstream);
+
+      expect(result.harmonicContext?.currentFunction?.degree).toBe(5);
+      expect(result.harmonicContext?.currentFunction?.borrowed).toBe(true);
+      expect(result.harmonicContext?.currentFunction?.roman).toBe("v");
+    });
+
+    it("marks Caug in C major as borrowed (diatonic root, non-diatonic quality)", () => {
+      const raw = createTestRawFrame(1000);
+      const chord = createChord(0 as PitchClass, "aug", [
+        { pc: 0 as PitchClass, octave: 4 },
+        { pc: 4 as PitchClass, octave: 4 },
+        { pc: 8 as PitchClass, octave: 4 },
+      ]);
+      const upstream = createUpstreamFrame(1000, [chord], cMajor);
+      const result = stabilizer.apply(raw, upstream);
+
+      expect(result.harmonicContext?.currentFunction?.degree).toBe(1);
+      expect(result.harmonicContext?.currentFunction?.borrowed).toBe(true);
+      expect(result.harmonicContext?.currentFunction?.roman).toBe("I+");
+    });
+
+    it("keeps V7 (dom7 at V) as diatonic in major", () => {
+      // G7 in C major — the canonical cadential dominant. Quality is
+      // dom7 which differs from the table's "maj" but it's the
+      // accepted V chord in major.
+      const raw = createTestRawFrame(1000);
+      const chord = createChord(7 as PitchClass, "dom7", [
+        { pc: 7 as PitchClass, octave: 3 },
+        { pc: 11 as PitchClass, octave: 3 },
+        { pc: 2 as PitchClass, octave: 4 },
+        { pc: 5 as PitchClass, octave: 4 },
+      ]);
+      const upstream = createUpstreamFrame(1000, [chord], cMajor);
+      const result = stabilizer.apply(raw, upstream);
+
+      expect(result.harmonicContext?.currentFunction?.degree).toBe(5);
+      expect(result.harmonicContext?.currentFunction?.borrowed).toBe(false);
+      expect(result.harmonicContext?.currentFunction?.roman).toBe("V7");
+    });
   });
 
   describe("modes", () => {
