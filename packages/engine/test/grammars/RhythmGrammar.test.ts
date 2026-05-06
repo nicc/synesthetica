@@ -519,9 +519,10 @@ describe("RhythmGrammar snapshots", () => {
 
     console.log("\nPitch Spread:\n" + formatMetrics(metrics));
 
-    // Notes should span the rhythm column
+    // Notes should span the rhythm column. Column is narrower in the
+    // new layout (rhythm 0.44 wide, ending at ~0.51).
     expect(metrics.positions.bounds.minX).toBeLessThan(0.2);
-    expect(metrics.positions.bounds.maxX).toBeGreaterThan(0.6);
+    expect(metrics.positions.bounds.maxX).toBeGreaterThan(0.45);
   });
 
   it("renders notes with drift streaks", () => {

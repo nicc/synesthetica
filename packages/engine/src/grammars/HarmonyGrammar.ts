@@ -88,35 +88,25 @@ const STROKE_WIDTH_FRESH = 2;
 /** Stroke width (pixels) at full fade — chunky, blocky */
 const STROKE_WIDTH_FADED = 8;
 
-/** Clock radius as fraction of cell size */
-const CLOCK_RADIUS_FRACTION = 0.35;
+/** Clock radius as fraction of cell size — sized so clock diameter is
+ *  2× the chord glyph diameter (SPEC 011 cell-sizing). */
+const CLOCK_RADIUS_FRACTION = 0.475;
 
 /**
- * Two concentric glyph rings:
- * - Inner (diatonic): chords whose root is in the prescribed key.
- *   Seven equally-spaced angular slots (360/7 per degree, I at 12 o'clock).
- * - Outer (borrowed): chords whose root is outside the key. Angular
- *   positions interpolate between adjacent diatonic slots based on
- *   chromatic distance (e.g. ♭III sits midway between ii and iii in C major).
+ * Layout fractions of clock radius (SPEC 011). Three guide rings anchor
+ * to layout boundaries (label edge, between-rings, clock edge):
+ *   - Inner guide  (0.32) — outer edge of chord-label area
+ *   - Middle guide (0.62) — between diatonic and borrowed numerals
+ *   - Outer guide  (1.00) — clock outer edge
+ * Numeral rings:
+ *   - Diatonic (0.45) — biased inward of band centre for label breathing room
+ *   - Borrowed (0.80) — near band centre
  */
-const DIATONIC_GLYPH_RADIUS_FRACTION = 0.50;
-const BORROWED_GLYPH_RADIUS_FRACTION = 0.74;
-
-/**
- * Three concentric guide rings bound two equal-width annular bands,
- * one for each glyph ring. The middle guide is the midpoint between
- * the two glyph rings; the inner and outer guides are placed one
- * half-band-width inside and outside the glyph rings so that each
- * numeral sits exactly at the radial centre of its band.
- */
-const GLYPH_BAND_WIDTH =
-  BORROWED_GLYPH_RADIUS_FRACTION - DIATONIC_GLYPH_RADIUS_FRACTION;
-const GUIDE_RING_INNER_FRACTION =
-  DIATONIC_GLYPH_RADIUS_FRACTION - GLYPH_BAND_WIDTH / 2;
-const GUIDE_RING_MIDDLE_FRACTION =
-  (DIATONIC_GLYPH_RADIUS_FRACTION + BORROWED_GLYPH_RADIUS_FRACTION) / 2;
-const GUIDE_RING_OUTER_FRACTION =
-  BORROWED_GLYPH_RADIUS_FRACTION + GLYPH_BAND_WIDTH / 2;
+const DIATONIC_GLYPH_RADIUS_FRACTION = 0.45;
+const BORROWED_GLYPH_RADIUS_FRACTION = 0.80;
+const GUIDE_RING_INNER_FRACTION = 0.32;
+const GUIDE_RING_MIDDLE_FRACTION = 0.62;
+const GUIDE_RING_OUTER_FRACTION = 1.00;
 
 /** Glyph size in world units (height of uppercase numeral) */
 const GLYPH_SIZE = 2;

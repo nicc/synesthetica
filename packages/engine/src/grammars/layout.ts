@@ -84,37 +84,54 @@ export const CHORD_STRIP_LEFT_OFFSET_FROM_GAP = 0.0375;
 // ============================================================================
 
 /**
- * Width targets H/2 in screen pixels. At 16:9, that's ~0.28 in
- * normalized x-coords. We use 0.30 for a bit of breathing room.
- * The column is split into two rows: chord shape (top) and
- * progression clock (bottom).
+ * Width chosen so the progression cell (square, equal to column width)
+ * accommodates a harmony clock at 2× the chord glyph's linear size
+ * (SPEC 011). The column is split into two rows of asymmetric height:
+ * a shorter chord cell (top) and a taller progression cell (bottom).
  */
-export const HARMONY_COLUMN_WIDTH = 0.30;
+export const HARMONY_COLUMN_WIDTH = 0.42;
 
 /** Left edge of the harmony column */
 export const HARMONY_LEFT = 1 - HARMONY_COLUMN_WIDTH;
 
-/**
- * Each cell is square in screen pixels. In normalized coords the
- * cell height = HARMONY_COLUMN_WIDTH (same fraction of both axes,
- * which makes it square when the viewport is square; on wide
- * displays the cells are wider than tall — acceptable).
- */
-export const HARMONY_CELL_SIZE = HARMONY_COLUMN_WIDTH;
+/** Chord cell vertical extent (top of column). Smaller than the column
+ *  width — the chord glyph fits with margin and gives the progression
+ *  clock more vertical space. */
+export const HARMONY_CHORD_CELL_HEIGHT = 0.21;
 
-/** Vertical gap between chord shape and progression clock cells */
-const CELL_GAP = 0.06;
+/** Progression cell vertical extent (bottom of column). Equal to column
+ *  width so the cell is square and the clock can fill it as a circle. */
+export const HARMONY_PROGRESSION_CELL_HEIGHT = HARMONY_COLUMN_WIDTH;
+
+/** Backwards-compatible alias used by HarmonyGrammar for clock-radius
+ *  math. Refers to the progression cell, which is square. */
+export const HARMONY_CELL_SIZE = HARMONY_PROGRESSION_CELL_HEIGHT;
+
+/** Vertical gap between chord cell and progression cell */
+const CELL_GAP = 0.04;
 
 /** Vertical midpoint of the usable bar area */
 const BAR_VERTICAL_CENTER = (BAR_TOP + BAR_BOTTOM) / 2;
 
+/** Total vertical extent of the harmony stack (chord + gap + progression) */
+const HARMONY_STACK_HEIGHT =
+  HARMONY_CHORD_CELL_HEIGHT + CELL_GAP + HARMONY_PROGRESSION_CELL_HEIGHT;
+
+/** Top of the harmony stack — positions both cells centered around the bar vertical centre. */
+const HARMONY_STACK_TOP = BAR_VERTICAL_CENTER - HARMONY_STACK_HEIGHT / 2;
+
 /** Top cell: chord shape */
 export const HARMONY_CHORD_CENTER_X = HARMONY_LEFT + HARMONY_COLUMN_WIDTH / 2;
-export const HARMONY_CHORD_CENTER_Y = BAR_VERTICAL_CENTER - CELL_GAP / 2 - HARMONY_CELL_SIZE / 2;
+export const HARMONY_CHORD_CENTER_Y =
+  HARMONY_STACK_TOP + HARMONY_CHORD_CELL_HEIGHT / 2;
 
 /** Bottom cell: progression clock */
 export const HARMONY_PROGRESSION_CENTER_X = HARMONY_CHORD_CENTER_X;
-export const HARMONY_PROGRESSION_CENTER_Y = BAR_VERTICAL_CENTER + CELL_GAP / 2 + HARMONY_CELL_SIZE / 2;
+export const HARMONY_PROGRESSION_CENTER_Y =
+  HARMONY_STACK_TOP +
+  HARMONY_CHORD_CELL_HEIGHT +
+  CELL_GAP +
+  HARMONY_PROGRESSION_CELL_HEIGHT / 2;
 
 // ============================================================================
 // Rhythm Column (center — takes remaining space)

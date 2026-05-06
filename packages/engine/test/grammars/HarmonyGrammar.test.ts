@@ -171,8 +171,8 @@ describe("HarmonyGrammar", () => {
         (e) => e.data?.type === "chord-shape"
       );
       expect(chordEntity).toBeDefined();
-      // Chord shape is in the right column
-      expect(chordEntity?.position?.x).toBeGreaterThan(0.8);
+      // Chord shape is in the right column (harmony column starts at 0.58 in new layout)
+      expect(chordEntity?.position?.x).toBeGreaterThan(0.7);
       expect(chordEntity?.data?.quality).toBe("maj");
     });
 
