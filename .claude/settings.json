@@ -13,7 +13,12 @@
       "Bash(node /tmp/tonal_probe.mjs)",
       "Bash(cp /tmp/tonal_probe.mjs /Users/nicyoung/source/play/synesthetica/tonal_probe.mjs)",
       "Bash(node tonal_probe.mjs)",
-      "Bash(node /Users/nicyoung/source/play/synesthetica/tonal_probe.mjs)"
+      "Bash(node /Users/nicyoung/source/play/synesthetica/tonal_probe.mjs)",
+      "Skill(update-config)",
+      "Skill(update-config:*)"
+    ],
+    "additionalDirectories": [
+      "/Users/nicyoung/.claude"
     ]
   }
 }

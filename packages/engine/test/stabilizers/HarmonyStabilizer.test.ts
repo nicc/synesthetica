@@ -320,6 +320,132 @@ describe("HarmonyStabilizer", () => {
       expect(result.harmonicContext?.currentFunction?.borrowed).toBe(false);
       expect(result.harmonicContext?.currentFunction?.roman).toBe("V7");
     });
+
+    it("marks C7 in C major as borrowed (V/IV — dom7 only diatonic at V)", () => {
+      // C7 — root is C (diatonic I) but quality is dom7. dom7 is only
+      // diatonic at V; here it's V/IV (the dominant of IV).
+      const raw = createTestRawFrame(1000);
+      const chord = createChord(0 as PitchClass, "dom7", [
+        { pc: 0 as PitchClass, octave: 3 },
+        { pc: 4 as PitchClass, octave: 3 },
+        { pc: 7 as PitchClass, octave: 3 },
+        { pc: 10 as PitchClass, octave: 3 },
+      ]);
+      const upstream = createUpstreamFrame(1000, [chord], cMajor);
+      const result = stabilizer.apply(raw, upstream);
+
+      expect(result.harmonicContext?.currentFunction?.degree).toBe(1);
+      expect(result.harmonicContext?.currentFunction?.borrowed).toBe(true);
+    });
+  });
+
+  describe("functional edges (SPEC 011)", () => {
+    const cMajor: PrescribedKey = { root: 0 as PitchClass, mode: "ionian" };
+
+    it("emits no edges for diatonic chords", () => {
+      const raw = createTestRawFrame(1000);
+      const chord = createChord(0 as PitchClass, "maj", [
+        { pc: 0 as PitchClass, octave: 4 },
+        { pc: 4 as PitchClass, octave: 4 },
+        { pc: 7 as PitchClass, octave: 4 },
+      ]);
+      const upstream = createUpstreamFrame(1000, [chord], cMajor);
+      const result = stabilizer.apply(raw, upstream);
+
+      expect(result.harmonicContext?.functionalEdges).toEqual([]);
+    });
+
+    it("emits ♭VII → IV edge (subdominant borrowing)", () => {
+      // B♭ major in C major
+      const raw = createTestRawFrame(1000);
+      const chord = createChord(10 as PitchClass, "maj", [
+        { pc: 10 as PitchClass, octave: 3 },
+        { pc: 2 as PitchClass, octave: 4 },
+        { pc: 5 as PitchClass, octave: 4 },
+      ]);
+      const upstream = createUpstreamFrame(1000, [chord], cMajor);
+      const result = stabilizer.apply(raw, upstream);
+
+      const edges = result.harmonicContext?.functionalEdges ?? [];
+      expect(edges).toHaveLength(1);
+      expect(edges[0].targetDegree).toBe(4);
+      expect(edges[0].targetPc).toBe(5); // F
+      expect(edges[0].targetDiatonic).toBe(true);
+      expect(edges[0].type).toBe("subdominant-borrowing");
+      expect(edges[0].weight).toBeGreaterThan(0.8);
+    });
+
+    it("emits V/V → V edge (secondary dominant)", () => {
+      // D major in C major
+      const raw = createTestRawFrame(1000);
+      const chord = createChord(2 as PitchClass, "maj", [
+        { pc: 2 as PitchClass, octave: 3 },
+        { pc: 6 as PitchClass, octave: 3 },
+        { pc: 9 as PitchClass, octave: 3 },
+      ]);
+      const upstream = createUpstreamFrame(1000, [chord], cMajor);
+      const result = stabilizer.apply(raw, upstream);
+
+      const edges = result.harmonicContext?.functionalEdges ?? [];
+      expect(edges).toHaveLength(1);
+      expect(edges[0].targetDegree).toBe(5);
+      expect(edges[0].targetPc).toBe(7); // G
+      expect(edges[0].targetDiatonic).toBe(true);
+      expect(edges[0].type).toBe("secondary-dominant");
+      expect(edges[0].weight).toBeGreaterThan(0.9);
+    });
+
+    it("emits V/IV → IV edge from C7", () => {
+      // C7 in C major — V/IV (the dominant of IV)
+      const raw = createTestRawFrame(1000);
+      const chord = createChord(0 as PitchClass, "dom7", [
+        { pc: 0 as PitchClass, octave: 3 },
+        { pc: 4 as PitchClass, octave: 3 },
+        { pc: 7 as PitchClass, octave: 3 },
+        { pc: 10 as PitchClass, octave: 3 },
+      ]);
+      const upstream = createUpstreamFrame(1000, [chord], cMajor);
+      const result = stabilizer.apply(raw, upstream);
+
+      const edges = result.harmonicContext?.functionalEdges ?? [];
+      expect(edges).toHaveLength(1);
+      expect(edges[0].targetDegree).toBe(4);
+      expect(edges[0].targetPc).toBe(5); // F
+      expect(edges[0].type).toBe("secondary-dominant");
+    });
+
+    it("emits ♭VI → ii AND ♭VI → IV edges (fan-out)", () => {
+      // A♭ major in C major
+      const raw = createTestRawFrame(1000);
+      const chord = createChord(8 as PitchClass, "maj", [
+        { pc: 8 as PitchClass, octave: 3 },
+        { pc: 0 as PitchClass, octave: 4 },
+        { pc: 3 as PitchClass, octave: 4 },
+      ]);
+      const upstream = createUpstreamFrame(1000, [chord], cMajor);
+      const result = stabilizer.apply(raw, upstream);
+
+      const edges = result.harmonicContext?.functionalEdges ?? [];
+      expect(edges).toHaveLength(2);
+      const targets = edges.map((e) => e.targetDegree).sort();
+      expect(targets).toEqual([2, 4]);
+    });
+
+    it("emits no edge for borrowed chord without a known relationship", () => {
+      // Gm in C major — borrowed via quality (G is V root, but Gm has
+      // wrong quality). Not in modal interchange table; quality isn't
+      // major/dom7/maj7 so secondary dominant rule doesn't fire.
+      const raw = createTestRawFrame(1000);
+      const chord = createChord(7 as PitchClass, "min", [
+        { pc: 7 as PitchClass, octave: 3 },
+        { pc: 10 as PitchClass, octave: 3 },
+        { pc: 2 as PitchClass, octave: 4 },
+      ]);
+      const upstream = createUpstreamFrame(1000, [chord], cMajor);
+      const result = stabilizer.apply(raw, upstream);
+
+      expect(result.harmonicContext?.functionalEdges).toEqual([]);
+    });
   });
 
   describe("modes", () => {

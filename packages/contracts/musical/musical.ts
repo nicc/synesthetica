@@ -358,6 +358,40 @@ export interface FunctionalChord {
 }
 
 /**
+ * Classification of a functional relationship between chords.
+ * Carried as metadata on FunctionalEdge; not rendered visually by
+ * default (SPEC 011).
+ */
+export type FunctionalRelationType =
+  | "secondary-dominant"
+  | "subdominant-borrowing"
+  | "modal-interchange"
+  | "other";
+
+/**
+ * A weighted directed edge from a borrowed source chord to a target
+ * slot on the harmony clock (SPEC 011). The grammar renders this as
+ * a pair of connection strips at the source and target positions,
+ * linked by a shared midpoint pitch-class hue. The target chord may
+ * or may not have been played — resolution is perceptual, not
+ * tracked as state.
+ */
+export interface FunctionalEdge {
+  /** Source chord ID (the chord whose detection triggered this edge) */
+  sourceChordId: ChordId;
+  /** Target scale degree (1–7) within the prescribed key */
+  targetDegree: number;
+  /** Target pitch class (for hue computation and angular positioning) */
+  targetPc: PitchClass;
+  /** Whether the target slot is on the diatonic ring */
+  targetDiatonic: boolean;
+  /** Conventional weight of this relationship (0–1) */
+  weight: number;
+  /** Relationship classification (metadata, not rendered by default) */
+  type: FunctionalRelationType;
+}
+
+/**
  * Harmonic context produced by HarmonyStabilizer.
  *
  * Always provides tension. When a key is prescribed, also provides
@@ -392,6 +426,15 @@ export interface HarmonicContext {
    * Only populated when a key is prescribed.
    */
   functionalProgression: FunctionalChord[];
+
+  /**
+   * Active functional edges (SPEC 011). Each edge originates from a
+   * borrowed chord in the progression and points to a slot on the
+   * harmony clock. Edges share their source chord's lifecycle —
+   * present while the source is in the progression window, removed
+   * when it falls out.
+   */
+  functionalEdges: FunctionalEdge[];
 }
 
 /**
@@ -541,6 +584,7 @@ export const EMPTY_HARMONIC_CONTEXT: Readonly<HarmonicContext> = Object.freeze({
   keyAware: false,
   currentFunction: null,
   functionalProgression: [],
+  functionalEdges: [],
 });
 
 /**

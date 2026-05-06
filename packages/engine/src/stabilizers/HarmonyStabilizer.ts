@@ -28,8 +28,11 @@ import type {
   Pitch,
   Ms,
   PartId,
+  PitchClass,
   HarmonicContext,
   FunctionalChord,
+  FunctionalEdge,
+  FunctionalRelationType,
   PrescribedKey,
   ModeId,
   ChordQuality,
@@ -381,7 +384,11 @@ function extractTriadCore(
     case "aug":
       return "aug";
     case "dom7":
-      return "maj"; // dominant 7th has a major triad core
+      // dom7 is only diatonic at V (handled by the explicit special
+      // case in qualityMatchesDiatonic). Returning null here ensures
+      // dom7 at non-V degrees is correctly flagged borrowed — e.g.
+      // C7 in C major is V/IV (borrowed), not diatonic at I.
+      return null;
     default:
       return null;
   }
@@ -418,6 +425,124 @@ function chromaticToDegree(
 
   // Fallback (shouldn't happen with 7 scale degrees covering 12 semitones)
   return { deg: 1, offset: 0 };
+}
+
+// ============================================================================
+// Functional Edge Emission (SPEC 011)
+// ============================================================================
+
+interface RelationshipEntry {
+  targetDegree: number;
+  weight: number;
+  type: FunctionalRelationType;
+}
+
+/**
+ * Modal interchange / subdominant borrowing table for major (Ionian).
+ * Keyed by the chord's Roman numeral. Weights are music-theoretic
+ * judgement; iterate with real progressions to refine.
+ */
+const MODAL_INTERCHANGE_MAJOR: Record<string, RelationshipEntry[]> = {
+  "♭VII": [{ targetDegree: 4, weight: 0.85, type: "subdominant-borrowing" }],
+  "♭III": [{ targetDegree: 6, weight: 0.65, type: "modal-interchange" }],
+  "♭VI": [
+    { targetDegree: 2, weight: 0.55, type: "subdominant-borrowing" },
+    { targetDegree: 4, weight: 0.50, type: "subdominant-borrowing" },
+  ],
+  "iv": [{ targetDegree: 1, weight: 0.75, type: "modal-interchange" }],
+  "♭II": [{ targetDegree: 5, weight: 0.80, type: "modal-interchange" }],
+};
+
+/** Conventional weights for V/X → X resolutions, keyed by target degree. */
+const SECONDARY_DOMINANT_WEIGHTS: Record<number, number> = {
+  2: 0.88, // V/ii → ii
+  3: 0.80, // V/iii → iii
+  4: 0.82, // V/IV → IV
+  5: 0.92, // V/V → V (strongest secondary dominant)
+  6: 0.88, // V/vi → vi
+};
+
+/**
+ * Compute the functional edges originating from a chord. Only borrowed
+ * chords emit edges — diatonic chords have implied resolutions (e.g.
+ * V → I) that the design intentionally doesn't render.
+ *
+ * Detection has two paths:
+ *   1. Modal interchange table — keyed by Roman numeral. Used for the
+ *      well-known borrowed chords (♭VII, ♭III, ♭VI, iv, ♭II in major).
+ *   2. Secondary dominant rule — fires for major-quality (or dom7)
+ *      borrowed chords when their root is a perfect fifth above a
+ *      diatonic root. Catches V/V, V/ii, V/vi, V/IV, V/iii, V/IV (C7),
+ *      and the recursive case V/V/V (A maj → D, where D is the V/V
+ *      root — diatonic root, but D maj is itself borrowed).
+ *
+ * Modal interchange takes precedence; the secondary dominant rule
+ * only fires when no table entry matches. This avoids spurious
+ * "circle of fifths" edges from chords that have a stronger
+ * conventional reading (e.g. ♭VII reads as subdominant, not as
+ * V of E♭).
+ */
+function emitFunctionalEdges(
+  fc: FunctionalChord,
+  key: PrescribedKey,
+): FunctionalEdge[] {
+  if (!fc.borrowed) return [];
+
+  // 1. Modal interchange table (major key only for v1)
+  if (key.mode === "ionian") {
+    const entries = MODAL_INTERCHANGE_MAJOR[fc.roman];
+    if (entries) {
+      return entries.map((entry) =>
+        makeEdgeFromEntry(fc.chordId, key, entry.targetDegree, entry.weight, entry.type),
+      );
+    }
+  }
+
+  // 2. Secondary dominant detection
+  const isMajorOrDom7 =
+    fc.quality === "maj" || fc.quality === "dom7" || fc.quality === "maj7";
+  if (isMajorOrDom7) {
+    const targetPc = ((fc.rootPc - 7 + 12) % 12) as PitchClass;
+    const targetSemiFromTonic = (targetPc - key.root + 12) % 12;
+    const targetDegreeIdx =
+      MODE_SCALE_INTERVALS[key.mode].indexOf(targetSemiFromTonic);
+    if (targetDegreeIdx >= 0) {
+      const targetDegree = targetDegreeIdx + 1;
+      const weight = SECONDARY_DOMINANT_WEIGHTS[targetDegree] ?? 0.85;
+      return [
+        {
+          sourceChordId: fc.chordId,
+          targetDegree,
+          targetPc,
+          targetDiatonic: true,
+          weight,
+          type: "secondary-dominant",
+        },
+      ];
+    }
+  }
+
+  return [];
+}
+
+function makeEdgeFromEntry(
+  sourceChordId: string,
+  key: PrescribedKey,
+  targetDegree: number,
+  weight: number,
+  type: FunctionalRelationType,
+): FunctionalEdge {
+  const targetSemiFromTonic =
+    MODE_SCALE_INTERVALS[key.mode][targetDegree - 1];
+  const targetPc = ((key.root + targetSemiFromTonic) % 12) as PitchClass;
+  return {
+    sourceChordId,
+    targetDegree,
+    targetPc,
+    targetDiatonic: true,
+    weight,
+    type,
+  };
 }
 
 // ============================================================================
@@ -520,11 +645,20 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
       this.pruneProgression(raw.t);
     }
 
+    // Functional edges (SPEC 011): one set per borrowed chord still in
+    // the progression. Recomputed each frame from the progression list,
+    // so edges automatically expire when a chord falls out of the
+    // window via pruneProgression().
+    const functionalEdges: FunctionalEdge[] = key
+      ? this.progression.flatMap((fc) => emitFunctionalEdges(fc, key))
+      : [];
+
     const harmonicContext: HarmonicContext = {
       tension,
       keyAware,
       currentFunction,
       functionalProgression: key ? [...this.progression] : [],
+      functionalEdges,
     };
 
     return {
