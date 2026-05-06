@@ -30,6 +30,7 @@ import type {
   ChordShapeElement,
   MarginStyle,
   FunctionalChord,
+  FunctionalEdge,
   ModeId,
   PitchClass,
   ColorHSVA,
@@ -121,6 +122,18 @@ const GLYPH_SIZE = 4;
 const BORROWED_SCALE = 1 / 1.618033988749895;
 
 // ============================================================================
+// Connection Strip Constants (SPEC 011)
+// ============================================================================
+
+/** Strip radial extent as fraction of clock radius. Short — strips are
+ *  accent marks, not bars spanning the band. */
+const STRIP_RADIAL_FRACTION = 0.08;
+
+/** Strip arc width in world units. Roughly matches the numeral's
+ *  rendered height; borrowed strips scale by 1/φ to match borrowed numerals. */
+const STRIP_ARC_WIDTH = GLYPH_SIZE * 1.5;
+
+// ============================================================================
 // Scrolling Chord Strip Constants
 // ============================================================================
 
@@ -182,6 +195,21 @@ function modalWheelAngle(semitones: number, mode: ModeId): number {
 
   const frac = (semitones - lowerSemi) / (upperSemi - lowerSemi);
   return lowerAngle + (upperAngle - lowerAngle) * frac;
+}
+
+/**
+ * Circular midpoint of two hues on the 360° wheel. Takes the shorter
+ * arc so e.g. midpoint(350, 10) = 0, not 180. Used for the shared
+ * gradient endpoint colour on connection strip pairs (SPEC 011).
+ */
+function circularMidpointHue(h1: number, h2: number): number {
+  let diff = h2 - h1;
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+  let mid = h1 + diff / 2;
+  if (mid < 0) mid += 360;
+  if (mid >= 360) mid -= 360;
+  return mid;
 }
 
 // ============================================================================
@@ -374,6 +402,17 @@ export class HarmonyGrammar implements IVisualGrammar {
         ),
       );
       entities.push(
+        ...this.createConnectionStrips(
+          input.harmonicContext.functionalEdges ?? [],
+          progression,
+          t,
+          part,
+          key.root,
+          key.mode,
+          fadeMs,
+        ),
+      );
+      entities.push(
         ...this.createScrollingRomans(progression, t, part),
       );
     }
@@ -507,6 +546,128 @@ export class HarmonyGrammar implements IVisualGrammar {
           width: glyph.width,
           height: glyph.height,
           strokeWidth: strokeWidth * scale,
+        },
+      });
+    }
+
+    return entities;
+  }
+
+  // ==========================================================================
+  // Connection Strips (SPEC 011)
+  // ==========================================================================
+
+  /**
+   * Create entities for functional connection strips. Each FunctionalEdge
+   * produces one entity carrying both source and target strip geometries.
+   * Strips fade with their source chord's lifecycle (no separate
+   * resolution-tracking state).
+   *
+   * Strip directionality (SPEC 011):
+   *   - "from" strip sits INWARD of source numeral
+   *   - "to"   strip sits OUTWARD of target numeral
+   *   - Each strip's midpoint-coloured end anchors to the adjacent
+   *     guide ring on the appropriate side of its numeral.
+   */
+  private createConnectionStrips(
+    edges: FunctionalEdge[],
+    progression: FunctionalChord[],
+    t: number,
+    part: string,
+    tonicPc: PitchClass,
+    mode: ModeId,
+    fadeMs: number,
+  ): Entity[] {
+    if (edges.length === 0) return [];
+
+    const entities: Entity[] = [];
+    const clockRadius = HARMONY_CELL_SIZE * CLOCK_RADIUS_FRACTION;
+    const stripRadialHeight = clockRadius * STRIP_RADIAL_FRACTION;
+
+    // Build a chord-id index for source-chord lookup.
+    const chordsById = new Map<string, FunctionalChord>();
+    for (const fc of progression) chordsById.set(fc.chordId, fc);
+
+    for (const edge of edges) {
+      const sourceChord = chordsById.get(edge.sourceChordId);
+      if (!sourceChord) continue;
+
+      // Fade follows the source chord's lifecycle — same model as the
+      // chord numeral, so strips and numerals fade together.
+      // releaseTime can be null OR undefined (older fixture shape) — both mean "still held".
+      const releaseTime = sourceChord.releaseTime ?? null;
+      let fadeOpacity: number;
+      if (releaseTime === null) {
+        fadeOpacity = 1.0;
+      } else {
+        const ageSinceRelease = t - releaseTime;
+        if (ageSinceRelease < 0 || ageSinceRelease >= fadeMs) continue;
+        fadeOpacity = 1 - ageSinceRelease / fadeMs;
+      }
+
+      const overallOpacity = fadeOpacity * edge.weight;
+      if (overallOpacity < 0.01) continue;
+
+      // Source: always borrowed (only borrowed chords emit edges).
+      // Strip is inward of the source numeral; midpoint anchored at
+      // the middle guide ring.
+      const sourceSemitones = (sourceChord.rootPc - tonicPc + 12) % 12;
+      const sourceAngleDeg = modalWheelAngle(sourceSemitones, mode);
+      const sourceMidR = clockRadius * GUIDE_RING_MIDDLE_FRACTION;
+      const sourceChordR = sourceMidR + stripRadialHeight;
+
+      // Target: diatonic or borrowed depending on edge.targetDiatonic.
+      // Strip is outward of the target numeral.
+      //   - Diatonic target: anchor at middle guide ring (cross-ring case)
+      //   - Borrowed target: anchor at outer guide ring (within-ring case)
+      const targetSemitones = (edge.targetPc - tonicPc + 12) % 12;
+      const targetAngleDeg = modalWheelAngle(targetSemitones, mode);
+      const targetAnchorFraction = edge.targetDiatonic
+        ? GUIDE_RING_MIDDLE_FRACTION
+        : GUIDE_RING_OUTER_FRACTION;
+      const targetMidR = clockRadius * targetAnchorFraction;
+      const targetChordR = targetMidR - stripRadialHeight;
+
+      // Hues
+      const sourceHue = pcToHue(sourceChord.rootPc, DEFAULT_HUE_INVARIANT);
+      const targetHue = pcToHue(edge.targetPc, DEFAULT_HUE_INVARIANT);
+      const midpointHue = circularMidpointHue(sourceHue, targetHue);
+
+      // Borrowed-ring strips scale arc width down (matches numeral scale).
+      const sourceArcWidth = STRIP_ARC_WIDTH * BORROWED_SCALE; // source is always borrowed
+      const targetArcWidth = edge.targetDiatonic
+        ? STRIP_ARC_WIDTH
+        : STRIP_ARC_WIDTH * BORROWED_SCALE;
+
+      entities.push({
+        id: `${this.id}:edge:${sourceChord.chordId}:${edge.targetDegree}`,
+        part,
+        kind: "glyph",
+        createdAt: sourceChord.onset,
+        updatedAt: t,
+        position: {
+          x: HARMONY_PROGRESSION_CENTER_X,
+          y: HARMONY_PROGRESSION_CENTER_Y,
+        },
+        style: {
+          opacity: overallOpacity,
+        },
+        data: {
+          type: "connection-strip",
+          // Source strip
+          sourceAngleDeg,
+          sourceMidR,
+          sourceChordR,
+          sourceArcWidth,
+          // Target strip
+          targetAngleDeg,
+          targetMidR,
+          targetChordR,
+          targetArcWidth,
+          // Hues
+          sourceHue,
+          targetHue,
+          midpointHue,
         },
       });
     }

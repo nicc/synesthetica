@@ -274,6 +274,68 @@ describe("HarmonyGrammar", () => {
       expect(newerOpacity).toBeGreaterThan(olderOpacity);
     });
 
+    it("produces connection-strip entity per functional edge", () => {
+      // ♭VII in C major emits a single edge to IV (subdominant borrowing)
+      const frame = createTestAnnotatedFrame(1000, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500 },
+          ],
+          functionalEdges: [
+            {
+              sourceChordId: "bvii",
+              targetDegree: 4,
+              targetPc: 5 as PitchClass,
+              targetDiatonic: true,
+              weight: 0.85,
+              type: "subdominant-borrowing",
+            },
+          ],
+        },
+      });
+      const scene = grammar.update(frame, null);
+      const stripEntities = scene.entities.filter(
+        (e) => e.data?.type === "connection-strip",
+      );
+
+      expect(stripEntities).toHaveLength(1);
+      const strip = stripEntities[0];
+      // Carries source + target geometry and three hues
+      expect(strip.data?.sourceAngleDeg).toBeDefined();
+      expect(strip.data?.targetAngleDeg).toBeDefined();
+      expect(strip.data?.sourceHue).toBeDefined();
+      expect(strip.data?.targetHue).toBeDefined();
+      expect(strip.data?.midpointHue).toBeDefined();
+      // Cross-ring: both anchors at middle guide ring (same midR)
+      expect(strip.data?.sourceMidR).toBeCloseTo(strip.data?.targetMidR as number);
+      // Opacity scaled by edge weight
+      expect(strip.style.opacity).toBeCloseTo(0.85, 1);
+    });
+
+    it("emits no strip entities when no edges exist", () => {
+      const frame = createTestAnnotatedFrame(1000, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "i", onset: 500 },
+          ],
+          functionalEdges: [],
+        },
+      });
+      const scene = grammar.update(frame, null);
+      const stripEntities = scene.entities.filter(
+        (e) => e.data?.type === "connection-strip",
+      );
+      expect(stripEntities).toHaveLength(0);
+    });
+
     it("omits chords past the fade window", () => {
       const frame = createTestAnnotatedFrame(10000, "main", {
         prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
