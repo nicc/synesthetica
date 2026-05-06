@@ -82,6 +82,10 @@ The "from" strip sits **inward** of the source numeral; the "to" strip sits **ou
 
 For cross-ring connections (the common case — source on borrowed, target on diatonic), both strips' midpoint ends land on the middle guide ring, producing a continuous-gradient feel if the two strips were aligned. For within-ring connections, the strips anchor to different guide rings; the visual link is purely chromatic via the shared midpoint hue.
 
+### Ring Topology
+
+Within-ring connections arise as a natural consequence of collapsing all non-diatonic chords into a single borrowed ring. A chain of secondary dominants (V/V/V → V/V → V → I) resolves through the borrowed ring at each step until it lands on a diatonic target — every borrowed→borrowed step is a within-ring connection; only the final step is cross-ring. The two-ring design (diatonic + borrowed) is sufficient at any depth of functional nesting; chain depth is encoded in the connection graph, not in additional rings.
+
 ### Strip Geometry
 
 Each strip is a thin tangent-oriented polygon:
