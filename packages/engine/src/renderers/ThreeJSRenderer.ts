@@ -497,6 +497,177 @@ export class ThreeJSRenderer implements IRenderer {
   }
 
   /**
+   * Render a functional connection strip pair (SPEC 011). The entity
+   * carries source + target strip geometries; each strip is a thin
+   * tangent-oriented rectangle with a radial gradient — chord hue at
+   * the numeral side, fading through the midpoint hue at the guide
+   * ring side, and fading to transparent over the last 10% of the
+   * radial axis where the strip approaches the numeral.
+   */
+  private updateConnectionStrip(entity: Entity): void {
+    if (!this.scene) return;
+
+    let group = this.entityObjects.get(entity.id) as THREE.Group | undefined;
+    if (!group) {
+      group = new THREE.Group();
+      // Two child meshes: source strip + target strip
+      group.add(this.makeConnectionStripMesh());
+      group.add(this.makeConnectionStripMesh());
+      this.scene.add(group);
+      this.entityObjects.set(entity.id, group);
+    }
+
+    // Position the group at the clock center
+    const x = (entity.position?.x ?? 0.5) * this.config.worldWidth;
+    const y = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
+    group.position.set(x, y, 0);
+
+    const data = entity.data ?? {};
+    const sourceHue = data.sourceHue as number;
+    const targetHue = data.targetHue as number;
+    const midpointHue = data.midpointHue as number;
+    const overallOpacity = entity.style.opacity ?? 1;
+
+    // Update source strip
+    this.updateConnectionStripChild(
+      group.children[0] as THREE.Mesh,
+      data.sourceAngleDeg as number,
+      data.sourceMidR as number,
+      data.sourceChordR as number,
+      data.sourceArcWidth as number,
+      midpointHue,
+      sourceHue,
+      overallOpacity,
+    );
+
+    // Update target strip
+    this.updateConnectionStripChild(
+      group.children[1] as THREE.Mesh,
+      data.targetAngleDeg as number,
+      data.targetMidR as number,
+      data.targetChordR as number,
+      data.targetArcWidth as number,
+      midpointHue,
+      targetHue,
+      overallOpacity,
+    );
+  }
+
+  /** Build a connection-strip mesh (4 vertices, 2 triangles, ShaderMaterial). */
+  private makeConnectionStripMesh(): THREE.Mesh {
+    const geometry = new THREE.BufferGeometry();
+    // 4 vertices, positions updated per-frame
+    const positions = new Float32Array(4 * 3);
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    // UVs encode position along the radial axis (UV.x: 0=midR side, 1=chordR side)
+    const uvs = new Float32Array([0, 0, 0, 1, 1, 1, 1, 0]);
+    geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+    geometry.setIndex([0, 1, 2, 0, 2, 3]);
+
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        midColor: { value: new THREE.Color(1, 1, 1) },
+        chordColor: { value: new THREE.Color(1, 1, 1) },
+        overallOpacity: { value: 1 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform vec3 midColor;
+        uniform vec3 chordColor;
+        uniform float overallOpacity;
+        void main() {
+          float t = vUv.x;
+          vec3 color;
+          float alpha;
+          if (t < 0.9) {
+            color = mix(midColor, chordColor, t / 0.9);
+            alpha = 1.0;
+          } else {
+            color = chordColor;
+            alpha = 1.0 - (t - 0.9) / 0.1;
+          }
+          gl_FragColor = vec4(color, alpha * overallOpacity);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+    });
+
+    return new THREE.Mesh(geometry, material);
+  }
+
+  /** Update one connection-strip child mesh's geometry and uniforms. */
+  private updateConnectionStripChild(
+    mesh: THREE.Mesh,
+    angleDeg: number,
+    midR: number,
+    chordR: number,
+    arcWidth: number,
+    midHue: number,
+    chordHue: number,
+    overallOpacity: number,
+  ): void {
+    // Convert normalized radii to world units (matches existing
+    // updateProgressionGuideRing convention).
+    const midRWorld = midR * this.config.worldWidth;
+    const chordRWorld = chordR * this.config.worldWidth;
+
+    // Angle: 0° at top (12 o'clock), clockwise. Three.js y-up, so
+    // negate sin to keep the visual orientation consistent.
+    const angleRad = ((angleDeg - 90) * Math.PI) / 180;
+    const cosA = Math.cos(angleRad);
+    const sinA = Math.sin(angleRad);
+
+    // Radial unit vector (pointing outward from clock center)
+    const rx = cosA;
+    const ry = -sinA; // y-up flip
+
+    // Tangent unit vector (perpendicular to radial)
+    const tx = sinA;
+    const ty = cosA;
+
+    const halfW = arcWidth / 2;
+
+    // 4 corners (in group-local coords; group is positioned at clock center)
+    // Index → UV mapping (set in geometry above):
+    //   0: (0,0) — midR side, -tangent
+    //   1: (0,1) — midR side, +tangent
+    //   2: (1,1) — chordR side, +tangent
+    //   3: (1,0) — chordR side, -tangent
+    const positions = (mesh.geometry.attributes.position as THREE.BufferAttribute);
+    const arr = positions.array as Float32Array;
+    arr[0] = midRWorld * rx - halfW * tx;
+    arr[1] = midRWorld * ry - halfW * ty;
+    arr[2] = 0;
+    arr[3] = midRWorld * rx + halfW * tx;
+    arr[4] = midRWorld * ry + halfW * ty;
+    arr[5] = 0;
+    arr[6] = chordRWorld * rx + halfW * tx;
+    arr[7] = chordRWorld * ry + halfW * ty;
+    arr[8] = 0;
+    arr[9] = chordRWorld * rx - halfW * tx;
+    arr[10] = chordRWorld * ry - halfW * ty;
+    arr[11] = 0;
+    positions.needsUpdate = true;
+
+    const material = mesh.material as THREE.ShaderMaterial;
+    (material.uniforms.midColor.value as THREE.Color).copy(
+      this.hsvToThreeColor({ h: midHue, s: 0.7, v: 0.9 }),
+    );
+    (material.uniforms.chordColor.value as THREE.Color).copy(
+      this.hsvToThreeColor({ h: chordHue, s: 0.7, v: 0.9 }),
+    );
+    material.uniforms.overallOpacity.value = overallOpacity;
+  }
+
+  /**
    * Render a glowing field effect.
    */
   private updateGlowField(entity: Entity): void {
@@ -603,6 +774,8 @@ export class ThreeJSRenderer implements IRenderer {
       this.updateRomanNumeral(entity);
     } else if (glyphType === "progression-guide-ring") {
       this.updateProgressionGuideRing(entity);
+    } else if (glyphType === "connection-strip") {
+      this.updateConnectionStrip(entity);
     } else {
       // Default glyph: circle
       this.updateParticle(entity);
