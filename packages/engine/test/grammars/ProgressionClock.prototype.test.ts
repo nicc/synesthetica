@@ -67,10 +67,7 @@ const GUIDE_RING_OUTER_FRACTION = BORROWED_RADIUS_FRACTION + GLYPH_BAND_WIDTH / 
 const BORROWED_SCALE = 1 / 1.618033988749895;
 
 /** Strip radial height (SVG pixels) — thin in the toward/away-from-center direction */
-const STRIP_RADIAL_HEIGHT = 6;
-
-/** Gap between strip and numeral (SVG pixels) */
-const STRIP_GAP = 4;
+const STRIP_RADIAL_HEIGHT = 4;
 
 /** Strip arc width (SVG pixels) — matches numeral extent along the ring */
 const STRIP_ARC_WIDTH = GLYPH_SCALE;
@@ -212,6 +209,52 @@ function hsvToCSS(h: number, s: number, v: number, a: number): string {
   return `rgba(${ri},${gi},${bi},${a.toFixed(2)})`;
 }
 
+/**
+ * Build a tangent-oriented connection strip polygon and the radial
+ * gradient endpoint coordinates for it. The strip spans from `midR`
+ * (guide-ring side, midpoint colour) to `chordR` (numeral side, chord
+ * hue with fade) along the radial direction at `angleRad`, with a
+ * tangential extent of `arcWidth`.
+ */
+function buildStrip(opts: {
+  angleRad: number;
+  midR: number;
+  chordR: number;
+  arcWidth: number;
+}): {
+  points: string;
+  midX: number;
+  midY: number;
+  chordX: number;
+  chordY: number;
+} {
+  const { angleRad, midR, chordR, arcWidth } = opts;
+  const cosA = Math.cos(angleRad);
+  const sinA = Math.sin(angleRad);
+  // Tangent unit vector perpendicular to the radial direction
+  const tx = -sinA;
+  const ty = cosA;
+  const hw = arcWidth / 2;
+
+  const corners = [
+    [CX + midR * cosA - hw * tx, CY + midR * sinA - hw * ty],
+    [CX + midR * cosA + hw * tx, CY + midR * sinA + hw * ty],
+    [CX + chordR * cosA + hw * tx, CY + chordR * sinA + hw * ty],
+    [CX + chordR * cosA - hw * tx, CY + chordR * sinA - hw * ty],
+  ];
+  const points = corners
+    .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
+    .join(" ");
+
+  return {
+    points,
+    midX: CX + midR * cosA,
+    midY: CY + midR * sinA,
+    chordX: CX + chordR * cosA,
+    chordY: CY + chordR * sinA,
+  };
+}
+
 // ============================================================================
 // SVG Clock Renderer
 // ============================================================================
@@ -249,93 +292,43 @@ function renderProgressionClock(
     const srcColorTransparent = hsvToCSS(sourceHue, 0.7, 0.9, 0);
     const tgtColorTransparent = hsvToCSS(targetHue, 0.7, 0.9, 0);
 
-    // --- Source strip (inner edge of source numeral, facing guide ring) ---
-    const srcSemitones = (conn.sourcePc - key.root + 12) % 12;
-    const srcAngleRad = ((modalWheelAngle(srcSemitones, key.mode) - 90) * Math.PI) / 180;
-    const srcRingR = CLOCK_RADIUS * (conn.sourceBorrowed
-      ? BORROWED_RADIUS_FRACTION
-      : DIATONIC_RADIUS_FRACTION);
-    // Strip sits inward from numeral: outerR near numeral, innerR toward guide ring
-    const srcOuterR = srcRingR - STRIP_GAP;
-    const srcInnerR = srcOuterR - STRIP_RADIAL_HEIGHT;
-    const srcArcW = conn.sourceBorrowed
-      ? STRIP_ARC_WIDTH * BORROWED_SCALE
-      : STRIP_ARC_WIDTH;
+    // Each strip's midpoint-coloured end sits exactly on the middle
+    // guide ring; the chord-coloured end extends toward its numeral.
+    // If the two strips were rotated to align, their midpoint ends
+    // would meet at the guide ring producing a continuous gradient.
+    const middleGuideR = CLOCK_RADIUS * GUIDE_RING_MIDDLE_FRACTION;
 
-    // Tangent unit vector (perpendicular to radial, clockwise)
-    const srcTx = -Math.sin(srcAngleRad);
-    const srcTy = Math.cos(srcAngleRad);
-    const srcHW = srcArcW / 2; // half-width along arc
+    const srcStrip = buildStrip({
+      angleRad: ((modalWheelAngle((conn.sourcePc - key.root + 12) % 12, key.mode) - 90) * Math.PI) / 180,
+      midR: middleGuideR,
+      chordR: middleGuideR + (conn.sourceBorrowed ? +1 : -1) * STRIP_RADIAL_HEIGHT,
+      arcWidth: conn.sourceBorrowed ? STRIP_ARC_WIDTH * BORROWED_SCALE : STRIP_ARC_WIDTH,
+    });
+    const tgtStrip = buildStrip({
+      angleRad: ((modalWheelAngle((conn.targetPc - key.root + 12) % 12, key.mode) - 90) * Math.PI) / 180,
+      midR: middleGuideR,
+      chordR: middleGuideR + (conn.targetDiatonic ? -1 : +1) * STRIP_RADIAL_HEIGHT,
+      arcWidth: conn.targetDiatonic ? STRIP_ARC_WIDTH : STRIP_ARC_WIDTH * BORROWED_SCALE,
+    });
 
-    // Four corners of the source strip polygon
-    const srcPoly = [
-      [CX + srcInnerR * Math.cos(srcAngleRad) - srcHW * srcTx,
-       CY + srcInnerR * Math.sin(srcAngleRad) - srcHW * srcTy],
-      [CX + srcInnerR * Math.cos(srcAngleRad) + srcHW * srcTx,
-       CY + srcInnerR * Math.sin(srcAngleRad) + srcHW * srcTy],
-      [CX + srcOuterR * Math.cos(srcAngleRad) + srcHW * srcTx,
-       CY + srcOuterR * Math.sin(srcAngleRad) + srcHW * srcTy],
-      [CX + srcOuterR * Math.cos(srcAngleRad) - srcHW * srcTx,
-       CY + srcOuterR * Math.sin(srcAngleRad) - srcHW * srcTy],
-    ];
-    const srcPoints = srcPoly.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-
-    // Gradient: innerR (guide ring side) = midpoint, outerR (numeral side) = chord hue → fade
-    const srcGradX1 = CX + srcInnerR * Math.cos(srcAngleRad);
-    const srcGradY1 = CY + srcInnerR * Math.sin(srcAngleRad);
-    const srcGradX2 = CX + srcOuterR * Math.cos(srcAngleRad);
-    const srcGradY2 = CY + srcOuterR * Math.sin(srcAngleRad);
-
-    defs += `    <linearGradient id="conn-${ci}-src" gradientUnits="userSpaceOnUse" x1="${srcGradX1.toFixed(1)}" y1="${srcGradY1.toFixed(1)}" x2="${srcGradX2.toFixed(1)}" y2="${srcGradY2.toFixed(1)}">\n`;
+    // Gradient stops: midpoint at guide-ring end (full opacity) → chord
+    // hue at numeral end (fading to 0% opacity over the last 10% of
+    // height so the strip doesn't crowd the numeral).
+    defs += `    <linearGradient id="conn-${ci}-src" gradientUnits="userSpaceOnUse" x1="${srcStrip.midX.toFixed(1)}" y1="${srcStrip.midY.toFixed(1)}" x2="${srcStrip.chordX.toFixed(1)}" y2="${srcStrip.chordY.toFixed(1)}">\n`;
     defs += `      <stop offset="0%" stop-color="${midColor}" />\n`;
     defs += `      <stop offset="90%" stop-color="${srcColor}" />\n`;
     defs += `      <stop offset="100%" stop-color="${srcColorTransparent}" />\n`;
     defs += `    </linearGradient>\n`;
 
-    // --- Target strip (outer edge of target slot, facing guide ring) ---
-    const tgtSemitones = (conn.targetPc - key.root + 12) % 12;
-    const tgtAngleRad = ((modalWheelAngle(tgtSemitones, key.mode) - 90) * Math.PI) / 180;
-    const tgtRingR = CLOCK_RADIUS * (conn.targetDiatonic
-      ? DIATONIC_RADIUS_FRACTION
-      : BORROWED_RADIUS_FRACTION);
-    // Strip sits outward from slot: innerR near numeral, outerR toward guide ring
-    const tgtInnerR = tgtRingR + STRIP_GAP;
-    const tgtOuterR = tgtInnerR + STRIP_RADIAL_HEIGHT;
-    const tgtArcW = conn.targetDiatonic
-      ? STRIP_ARC_WIDTH
-      : STRIP_ARC_WIDTH * BORROWED_SCALE;
-
-    const tgtTx = -Math.sin(tgtAngleRad);
-    const tgtTy = Math.cos(tgtAngleRad);
-    const tgtHW = tgtArcW / 2;
-
-    const tgtPoly = [
-      [CX + tgtInnerR * Math.cos(tgtAngleRad) - tgtHW * tgtTx,
-       CY + tgtInnerR * Math.sin(tgtAngleRad) - tgtHW * tgtTy],
-      [CX + tgtInnerR * Math.cos(tgtAngleRad) + tgtHW * tgtTx,
-       CY + tgtInnerR * Math.sin(tgtAngleRad) + tgtHW * tgtTy],
-      [CX + tgtOuterR * Math.cos(tgtAngleRad) + tgtHW * tgtTx,
-       CY + tgtOuterR * Math.sin(tgtAngleRad) + tgtHW * tgtTy],
-      [CX + tgtOuterR * Math.cos(tgtAngleRad) - tgtHW * tgtTx,
-       CY + tgtOuterR * Math.sin(tgtAngleRad) - tgtHW * tgtTy],
-    ];
-    const tgtPoints = tgtPoly.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-
-    // Gradient: innerR (numeral side) = chord hue → fade, outerR (guide ring side) = midpoint
-    const tgtGradX1 = CX + tgtInnerR * Math.cos(tgtAngleRad);
-    const tgtGradY1 = CY + tgtInnerR * Math.sin(tgtAngleRad);
-    const tgtGradX2 = CX + tgtOuterR * Math.cos(tgtAngleRad);
-    const tgtGradY2 = CY + tgtOuterR * Math.sin(tgtAngleRad);
-
-    defs += `    <linearGradient id="conn-${ci}-tgt" gradientUnits="userSpaceOnUse" x1="${tgtGradX1.toFixed(1)}" y1="${tgtGradY1.toFixed(1)}" x2="${tgtGradX2.toFixed(1)}" y2="${tgtGradY2.toFixed(1)}">\n`;
-    defs += `      <stop offset="0%" stop-color="${tgtColorTransparent}" />\n`;
-    defs += `      <stop offset="10%" stop-color="${tgtColor}" />\n`;
-    defs += `      <stop offset="100%" stop-color="${midColor}" />\n`;
+    defs += `    <linearGradient id="conn-${ci}-tgt" gradientUnits="userSpaceOnUse" x1="${tgtStrip.midX.toFixed(1)}" y1="${tgtStrip.midY.toFixed(1)}" x2="${tgtStrip.chordX.toFixed(1)}" y2="${tgtStrip.chordY.toFixed(1)}">\n`;
+    defs += `      <stop offset="0%" stop-color="${midColor}" />\n`;
+    defs += `      <stop offset="90%" stop-color="${tgtColor}" />\n`;
+    defs += `      <stop offset="100%" stop-color="${tgtColorTransparent}" />\n`;
     defs += `    </linearGradient>\n`;
 
     connSvgFragments.push(
-      `  <polygon points="${srcPoints}" fill="url(#conn-${ci}-src)" opacity="${fadeOpacity.toFixed(2)}" />\n` +
-      `  <polygon points="${tgtPoints}" fill="url(#conn-${ci}-tgt)" opacity="${fadeOpacity.toFixed(2)}" />\n`,
+      `  <polygon points="${srcStrip.points}" fill="url(#conn-${ci}-src)" opacity="${fadeOpacity.toFixed(2)}" />\n` +
+      `  <polygon points="${tgtStrip.points}" fill="url(#conn-${ci}-tgt)" opacity="${fadeOpacity.toFixed(2)}" />\n`,
     );
   }
   defs += "  </defs>\n";
