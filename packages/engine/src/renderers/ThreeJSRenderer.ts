@@ -457,62 +457,67 @@ export class ThreeJSRenderer implements IRenderer {
   }
 
   /**
-   * Render a thin guide ring at the progression wheel.
+   * Render a thin guide ring at the progression wheel using Line2 +
+   * LineMaterial so the stroke is anti-aliased (LineBasicMaterial draws
+   * raw GL lines that read as jaggy on most GPUs).
    * data.radius is a normalized [0,1] x-axis length matching grammar
-   * coords; it scales by worldWidth so the ring is a true circle in
-   * world space.
+   * coords; it scales to worldWidth so the ring is a true circle in
+   * world space. linewidth is in screen pixels, so the line stays
+   * crisp regardless of parent scale.
    */
   private updateProgressionGuideRing(entity: Entity): void {
     if (!this.scene) return;
 
-    let ring = this.entityObjects.get(entity.id) as THREE.LineLoop | undefined;
-
-    if (!ring) {
-      const segments = 96;
-      const points: THREE.Vector3[] = [];
-      for (let i = 0; i < segments; i++) {
-        const angle = (i / segments) * Math.PI * 2;
-        points.push(new THREE.Vector3(Math.cos(angle), Math.sin(angle), 0));
-      }
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      const material = new THREE.LineBasicMaterial({ transparent: true });
-      ring = new THREE.LineLoop(geometry, material);
-      this.scene.add(ring);
-      this.entityObjects.set(entity.id, ring);
-    }
-
-    const x = (entity.position?.x ?? 0.5) * this.config.worldWidth;
-    const y = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
-    ring.position.set(x, y, 0);
-
     const normalizedRadius =
       (entity.data?.radius as number | undefined) ?? 0.1;
     const worldRadius = normalizedRadius * this.config.worldWidth;
-    ring.scale.set(worldRadius, worldRadius, 1);
-
-    const material = ring.material as THREE.LineBasicMaterial;
+    const cx = (entity.position?.x ?? 0.5) * this.config.worldWidth;
+    const cy = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
     const color = entity.style.color ?? { h: 0, s: 0, v: 0.55 };
-    material.color.copy(this.hsvToThreeColor(color));
-    material.opacity = entity.style.opacity ?? 0.18;
+    const threeColor = this.hsvToThreeColor(color);
+    const opacity = entity.style.opacity ?? 0.18;
+
+    let ring = this.entityObjects.get(entity.id) as Line2 | undefined;
+
+    if (!ring) {
+      const segments = 96;
+      const positions: number[] = [];
+      for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        positions.push(Math.cos(angle), Math.sin(angle), 0);
+      }
+      const geometry = new LineGeometry();
+      geometry.setPositions(positions);
+      const material = new LineMaterial({
+        color: threeColor.getHex(),
+        linewidth: 1.5,
+        transparent: true,
+        opacity,
+        resolution: new THREE.Vector2(this.resolution.x, this.resolution.y),
+      });
+      ring = new Line2(geometry, material);
+      ring.computeLineDistances();
+      this.scene.add(ring);
+      this.entityObjects.set(entity.id, ring);
+    } else {
+      const mat = ring.material as LineMaterial;
+      mat.color.copy(threeColor);
+      mat.opacity = opacity;
+      mat.resolution.set(this.resolution.x, this.resolution.y);
+    }
+
+    ring.position.set(cx, cy, 0);
+    ring.scale.set(worldRadius, worldRadius, 1);
   }
 
   /**
    * Render a slot tick mark at a scale-degree position on the
-   * diatonic ring. data.{innerRadius,outerRadius} are normalized
+   * diatonic ring using Line2 + LineMaterial for an anti-aliased
+   * stroke. data.{innerRadius,outerRadius} are normalized
    * fractions; data.angleDeg is measured clockwise from 12 o'clock.
    */
   private updateProgressionSlotTick(entity: Entity): void {
     if (!this.scene) return;
-
-    let line = this.entityObjects.get(entity.id) as THREE.Line | undefined;
-
-    if (!line) {
-      const geometry = new THREE.BufferGeometry();
-      const material = new THREE.LineBasicMaterial({ transparent: true });
-      line = new THREE.Line(geometry, material);
-      this.scene.add(line);
-      this.entityObjects.set(entity.id, line);
-    }
 
     const cx = (entity.position?.x ?? 0.5) * this.config.worldWidth;
     const cy = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
@@ -528,16 +533,39 @@ export class ThreeJSRenderer implements IRenderer {
     const rx = Math.cos(angleRad);
     const ry = -Math.sin(angleRad);
 
-    const points = [
-      new THREE.Vector3(cx + innerR * rx, cy + innerR * ry, 0),
-      new THREE.Vector3(cx + outerR * rx, cy + outerR * ry, 0),
+    const positions = [
+      cx + innerR * rx, cy + innerR * ry, 0,
+      cx + outerR * rx, cy + outerR * ry, 0,
     ];
-    (line.geometry as THREE.BufferGeometry).setFromPoints(points);
 
-    const material = line.material as THREE.LineBasicMaterial;
     const color = entity.style.color ?? { h: 0, s: 0, v: 0.55 };
-    material.color.copy(this.hsvToThreeColor(color));
-    material.opacity = entity.style.opacity ?? 0.18;
+    const threeColor = this.hsvToThreeColor(color);
+    const opacity = entity.style.opacity ?? 0.18;
+
+    let line = this.entityObjects.get(entity.id) as Line2 | undefined;
+
+    if (!line) {
+      const geometry = new LineGeometry();
+      geometry.setPositions(positions);
+      const material = new LineMaterial({
+        color: threeColor.getHex(),
+        linewidth: 1.5,
+        transparent: true,
+        opacity,
+        resolution: new THREE.Vector2(this.resolution.x, this.resolution.y),
+      });
+      line = new Line2(geometry, material);
+      line.computeLineDistances();
+      this.scene.add(line);
+      this.entityObjects.set(entity.id, line);
+    } else {
+      const geom = line.geometry as LineGeometry;
+      geom.setPositions(positions);
+      const mat = line.material as LineMaterial;
+      mat.color.copy(threeColor);
+      mat.opacity = opacity;
+      mat.resolution.set(this.resolution.x, this.resolution.y);
+    }
   }
 
   /**
