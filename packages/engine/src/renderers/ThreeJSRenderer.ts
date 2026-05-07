@@ -1418,20 +1418,65 @@ export class ThreeJSRenderer implements IRenderer {
         this.disposeObject(mesh);
       }
 
-      // Measure each line, take the widest for canvas width.
+      // Lucida (and most fonts that include music symbols) renders ♭/♯
+      // with wide built-in side-bearings — standard music-typography
+      // spacing where accidentals normally sit on their own. Inline
+      // with letters that reads as too-loose, so we tokenise each line
+      // into text runs and accidental runs and advance the cursor by
+      // a fraction of the accidental's natural width. The glyph itself
+      // is still drawn by the font (textAlign:center at slot midpoint),
+      // we just claim less horizontal space for it.
+      const ACCIDENTAL_TIGHTEN = 0.55;
       const measureCanvas = document.createElement("canvas");
       const measureCtx = measureCanvas.getContext("2d");
       if (!measureCtx) return;
       measureCtx.font = CANVAS_FONT;
 
-      const lineMetrics = lines.map((line) => measureCtx.measureText(line));
-      const maxLineWidth = Math.ceil(
-        Math.max(...lineMetrics.map((m) => m.width)),
+      type Run =
+        | { kind: "text"; text: string; advance: number }
+        | { kind: "accidental"; text: string; advance: number };
+
+      const tokenize = (line: string): Run[] => {
+        const runs: Run[] = [];
+        let buf = "";
+        const flushBuf = () => {
+          if (buf) {
+            runs.push({
+              kind: "text",
+              text: buf,
+              advance: measureCtx.measureText(buf).width,
+            });
+            buf = "";
+          }
+        };
+        for (const ch of line) {
+          if (ch === "♭" || ch === "♯") {
+            flushBuf();
+            const natural = measureCtx.measureText(ch).width;
+            runs.push({
+              kind: "accidental",
+              text: ch,
+              advance: natural * ACCIDENTAL_TIGHTEN,
+            });
+          } else {
+            buf += ch;
+          }
+        }
+        flushBuf();
+        return runs;
+      };
+
+      const lineRuns = lines.map(tokenize);
+      const lineWidths = lineRuns.map((runs) =>
+        runs.reduce((sum, r) => sum + r.advance, 0),
       );
+      const maxLineWidth = Math.ceil(Math.max(...lineWidths));
+
+      const firstLineMetric = measureCtx.measureText(lines[0]);
       const ascent =
-        lineMetrics[0].actualBoundingBoxAscent || CANVAS_TEXT_PX * 0.75;
+        firstLineMetric.actualBoundingBoxAscent || CANVAS_TEXT_PX * 0.75;
       const descent =
-        lineMetrics[0].actualBoundingBoxDescent || CANVAS_TEXT_PX * 0.25;
+        firstLineMetric.actualBoundingBoxDescent || CANVAS_TEXT_PX * 0.25;
       const lineHeightPx = Math.ceil(ascent + descent);
       const lineGapPx = Math.round(lineHeightPx * LINE_GAP_FRACTION);
       const totalTextHeight =
@@ -1444,16 +1489,27 @@ export class ThreeJSRenderer implements IRenderer {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // Transparent background, white text — centre each line horizontally.
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.font = CANVAS_FONT;
       ctx.fillStyle = "#ffffff";
       ctx.textBaseline = "alphabetic";
-      ctx.textAlign = "center";
       const centerX = canvas.width / 2;
       for (let i = 0; i < lines.length; i++) {
+        const runs = lineRuns[i];
         const baselineY = padding + ascent + i * (lineHeightPx + lineGapPx);
-        ctx.fillText(lines[i], centerX, baselineY);
+        let cursor = centerX - lineWidths[i] / 2;
+        for (const run of runs) {
+          if (run.kind === "accidental") {
+            // Centre the natural-width glyph inside its narrower slot
+            // so the same amount of bearing is trimmed from each side.
+            ctx.textAlign = "center";
+            ctx.fillText(run.text, cursor + run.advance / 2, baselineY);
+          } else {
+            ctx.textAlign = "left";
+            ctx.fillText(run.text, cursor, baselineY);
+          }
+          cursor += run.advance;
+        }
       }
 
       const texture = new THREE.CanvasTexture(canvas);
