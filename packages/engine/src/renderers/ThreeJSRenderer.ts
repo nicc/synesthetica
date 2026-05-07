@@ -497,6 +497,50 @@ export class ThreeJSRenderer implements IRenderer {
   }
 
   /**
+   * Render a slot tick mark at a scale-degree position on the
+   * diatonic ring. data.{innerRadius,outerRadius} are normalized
+   * fractions; data.angleDeg is measured clockwise from 12 o'clock.
+   */
+  private updateProgressionSlotTick(entity: Entity): void {
+    if (!this.scene) return;
+
+    let line = this.entityObjects.get(entity.id) as THREE.Line | undefined;
+
+    if (!line) {
+      const geometry = new THREE.BufferGeometry();
+      const material = new THREE.LineBasicMaterial({ transparent: true });
+      line = new THREE.Line(geometry, material);
+      this.scene.add(line);
+      this.entityObjects.set(entity.id, line);
+    }
+
+    const cx = (entity.position?.x ?? 0.5) * this.config.worldWidth;
+    const cy = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
+
+    const angleDeg = (entity.data?.angleDeg as number | undefined) ?? 0;
+    const innerR = ((entity.data?.innerRadius as number | undefined) ?? 0.1) *
+      this.config.worldWidth;
+    const outerR = ((entity.data?.outerRadius as number | undefined) ?? 0.1) *
+      this.config.worldWidth;
+    // Same angle convention as connection strips: 0° at top, clockwise,
+    // y-flipped sin to match Three.js y-up.
+    const angleRad = ((angleDeg - 90) * Math.PI) / 180;
+    const rx = Math.cos(angleRad);
+    const ry = -Math.sin(angleRad);
+
+    const points = [
+      new THREE.Vector3(cx + innerR * rx, cy + innerR * ry, 0),
+      new THREE.Vector3(cx + outerR * rx, cy + outerR * ry, 0),
+    ];
+    (line.geometry as THREE.BufferGeometry).setFromPoints(points);
+
+    const material = line.material as THREE.LineBasicMaterial;
+    const color = entity.style.color ?? { h: 0, s: 0, v: 0.55 };
+    material.color.copy(this.hsvToThreeColor(color));
+    material.opacity = entity.style.opacity ?? 0.18;
+  }
+
+  /**
    * Render a functional connection strip pair (SPEC 011). The entity
    * carries source + target strip geometries; each strip is a thin
    * tangent-oriented rectangle with a radial gradient — chord hue at
@@ -774,6 +818,8 @@ export class ThreeJSRenderer implements IRenderer {
       this.updateRomanNumeral(entity);
     } else if (glyphType === "progression-guide-ring") {
       this.updateProgressionGuideRing(entity);
+    } else if (glyphType === "progression-slot-tick") {
+      this.updateProgressionSlotTick(entity);
     } else if (glyphType === "connection-strip") {
       this.updateConnectionStrip(entity);
     } else {

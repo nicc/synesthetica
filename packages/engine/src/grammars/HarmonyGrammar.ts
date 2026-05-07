@@ -89,9 +89,11 @@ const STROKE_WIDTH_FRESH = 2;
 /** Stroke width (pixels) at full fade — chunky, blocky */
 const STROKE_WIDTH_FADED = 8;
 
-/** Clock radius as fraction of cell size — sized so clock diameter is
- *  2× the chord glyph diameter (SPEC 011 cell-sizing). */
-const CLOCK_RADIUS_FRACTION = 0.475;
+/** Clock radius as fraction of cell size. Sized so the outer guide ring
+ *  fits within the cell vertically (worldHeight < worldWidth, so a
+ *  larger fraction would clip the cell vertically and overlap the
+ *  chord glyph above). */
+const CLOCK_RADIUS_FRACTION = 0.35;
 
 /**
  * Layout fractions of clock radius (SPEC 011). Three guide rings anchor
@@ -99,15 +101,16 @@ const CLOCK_RADIUS_FRACTION = 0.475;
  *   - Inner guide  (0.32) — outer edge of chord-label area
  *   - Middle guide (0.62) — between diatonic and borrowed numerals
  *   - Outer guide  (1.00) — clock outer edge
- * Numeral rings:
- *   - Diatonic (0.45) — biased inward of band centre for label breathing room
- *   - Borrowed (0.80) — near band centre
+ * Numeral rings sit at the radial centres of their bands so they read
+ * as "centred between guide rings".
  */
-const DIATONIC_GLYPH_RADIUS_FRACTION = 0.45;
-const BORROWED_GLYPH_RADIUS_FRACTION = 0.80;
 const GUIDE_RING_INNER_FRACTION = 0.32;
 const GUIDE_RING_MIDDLE_FRACTION = 0.62;
 const GUIDE_RING_OUTER_FRACTION = 1.00;
+const DIATONIC_GLYPH_RADIUS_FRACTION =
+  (GUIDE_RING_INNER_FRACTION + GUIDE_RING_MIDDLE_FRACTION) / 2; // 0.47
+const BORROWED_GLYPH_RADIUS_FRACTION =
+  (GUIDE_RING_MIDDLE_FRACTION + GUIDE_RING_OUTER_FRACTION) / 2; // 0.81
 
 /** Glyph size in world units (height of uppercase numeral). Sized to
  *  remain visually proportional to the larger clock (SPEC 011 layout).
@@ -374,9 +377,17 @@ export class HarmonyGrammar implements IVisualGrammar {
     }
 
     // --- Progression clock (bottom cell) ---
-    // Only renders when a key is prescribed and there's progression data
     const key = input.prescribedKey;
     const progression = input.harmonicContext.functionalProgression;
+
+    // Guide rings + slot ticks render whenever a key is prescribed,
+    // even with no progression data — they hold the spatial structure
+    // visually so the clock doesn't blink in/out as chords come and go.
+    if (key) {
+      entities.push(
+        ...this.createClockStructure(t, part),
+      );
+    }
 
     if (key && progression.length > 0) {
       // Compute fade window: bars if tempo set, seconds otherwise
@@ -433,22 +444,16 @@ export class HarmonyGrammar implements IVisualGrammar {
    * Each functional chord in the progression becomes a Roman numeral glyph
    * positioned at its pitch-class angle, coloured by root hue, fading with age.
    */
-  private createProgressionClock(
-    progression: FunctionalChord[],
-    t: number,
-    part: string,
-    tonicPc: PitchClass,
-    mode: ModeId,
-    fadeMs: number,
-  ): Entity[] {
+  /**
+   * Always-on structural elements of the harmony clock — three guide
+   * rings + seven slot tick marks at the diatonic ring. Renders
+   * whenever a key is prescribed, regardless of whether any chord is
+   * currently being played, so the clock holds its shape.
+   */
+  private createClockStructure(t: number, part: string): Entity[] {
     const entities: Entity[] = [];
     const clockRadius = HARMONY_CELL_SIZE * CLOCK_RADIUS_FRACTION;
-    const diatonicRadius = clockRadius * DIATONIC_GLYPH_RADIUS_FRACTION;
-    const borrowedRadius = clockRadius * BORROWED_GLYPH_RADIUS_FRACTION;
 
-    // Guide rings — three subtle grey circles that bound the two
-    // annular glyph bands. Each numeral sits at the radial centre of
-    // its band. Opacity is constant; they do not fade with activity.
     for (const [suffix, fraction] of [
       ["inner", GUIDE_RING_INNER_FRACTION],
       ["middle", GUIDE_RING_MIDDLE_FRACTION],
@@ -474,6 +479,51 @@ export class HarmonyGrammar implements IVisualGrammar {
         },
       });
     }
+
+    // Slot tick marks at each diatonic-ring scale-degree position.
+    // Held the spatial structure when the diatonic ring is empty.
+    const diatonicRadius = clockRadius * DIATONIC_GLYPH_RADIUS_FRACTION;
+    const tickHalf = clockRadius * 0.04; // half-length of each tick
+    for (let deg = 1; deg <= 7; deg++) {
+      const angleDeg = degreeAngle(deg);
+      entities.push({
+        id: `${this.id}:slot-tick-${deg}`,
+        part,
+        kind: "glyph",
+        createdAt: t,
+        updatedAt: t,
+        position: {
+          x: HARMONY_PROGRESSION_CENTER_X,
+          y: HARMONY_PROGRESSION_CENTER_Y,
+        },
+        style: {
+          color: { h: 0, s: 0, v: 0.55, a: 1 },
+          opacity: 0.18,
+        },
+        data: {
+          type: "progression-slot-tick",
+          angleDeg,
+          innerRadius: diatonicRadius - tickHalf,
+          outerRadius: diatonicRadius + tickHalf,
+        },
+      });
+    }
+
+    return entities;
+  }
+
+  private createProgressionClock(
+    progression: FunctionalChord[],
+    t: number,
+    part: string,
+    tonicPc: PitchClass,
+    mode: ModeId,
+    fadeMs: number,
+  ): Entity[] {
+    const entities: Entity[] = [];
+    const clockRadius = HARMONY_CELL_SIZE * CLOCK_RADIUS_FRACTION;
+    const diatonicRadius = clockRadius * DIATONIC_GLYPH_RADIUS_FRACTION;
+    const borrowedRadius = clockRadius * BORROWED_GLYPH_RADIUS_FRACTION;
 
     for (let i = 0; i < progression.length; i++) {
       const fc = progression[i];
