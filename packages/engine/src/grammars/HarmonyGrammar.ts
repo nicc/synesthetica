@@ -146,7 +146,7 @@ const VIEWPORT_ASPECT = 100 / 75;
 /** Opacity for the always-on structural elements of the harmony clock
  *  (guide rings + slot ticks). Matches DynamicsGrammar's OUTLINE_OPACITY
  *  so the structural cues across grammars share a consistent weight. */
-const STRUCTURE_OPACITY = 0.4;
+const STRUCTURE_OPACITY = 0.25;
 
 /** Colour for the always-on structural elements of the harmony clock.
  *  Matches DynamicsGrammar's OUTLINE_COLOR (cool muted grey) so the
