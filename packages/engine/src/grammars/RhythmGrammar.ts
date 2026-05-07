@@ -74,6 +74,13 @@ const STREAK_COUNT = 3;
 import { NOTE_STRIP_BASE_WIDTH } from "./layout";
 const NOTE_STRIP_WIDTH = NOTE_STRIP_BASE_WIDTH;
 
+/** Half-width of the horizontal reference line drawn at the nearest
+ * beat subdivision through each note strip. Kept in sync with the
+ * value computed locally in createNoteWithStreaks so the NOW line can
+ * extend to align with the outer edges of the leftmost/rightmost
+ * reference lines. (1.5 × strip × 0.75 from earlier shrink tweak.) */
+const REFERENCE_LINE_HALF_WIDTH = NOTE_STRIP_WIDTH * 1.5 * 0.75;
+
 /** Minimum note strip height in normalized coordinates */
 const MIN_NOTE_STRIP_HEIGHT = 0.008;
 
@@ -343,8 +350,11 @@ export class RhythmGrammar implements IVisualGrammar {
       },
       data: {
         type: "now-line",
-        xLeft: PITCH_MARGIN_LEFT - NOTE_STRIP_WIDTH / 2,
-        xRight: 1 - PITCH_MARGIN_RIGHT + NOTE_STRIP_WIDTH / 2,
+        // Extend to align with the outer edges of the leftmost/rightmost
+        // reference lines so the NOW line frames the reference-line span,
+        // not just the note-strip span.
+        xLeft: PITCH_MARGIN_LEFT - REFERENCE_LINE_HALF_WIDTH,
+        xRight: 1 - PITCH_MARGIN_RIGHT + REFERENCE_LINE_HALF_WIDTH,
       },
     };
   }
@@ -398,8 +408,11 @@ export class RhythmGrammar implements IVisualGrammar {
         data: {
           type: "beat-line",
           beatTime,
-          xLeft: PITCH_MARGIN_LEFT,
-          xRight: 1 - PITCH_MARGIN_RIGHT,
+          // Extend by half a note-strip width on each side so the
+          // beat line aligns with the outer edges of the leftmost
+          // and rightmost note strips.
+          xLeft: PITCH_MARGIN_LEFT - NOTE_STRIP_WIDTH / 2,
+          xRight: 1 - PITCH_MARGIN_RIGHT + NOTE_STRIP_WIDTH / 2,
         },
       });
     }
@@ -456,8 +469,11 @@ export class RhythmGrammar implements IVisualGrammar {
         data: {
           type: "bar-line",
           barTime,
-          xLeft: PITCH_MARGIN_LEFT,
-          xRight: 1 - PITCH_MARGIN_RIGHT,
+          // Extend by half a note-strip width on each side so the
+          // bar line aligns with the outer edges of the leftmost
+          // and rightmost note strips.
+          xLeft: PITCH_MARGIN_LEFT - NOTE_STRIP_WIDTH / 2,
+          xRight: 1 - PITCH_MARGIN_RIGHT + NOTE_STRIP_WIDTH / 2,
         },
       });
     }
