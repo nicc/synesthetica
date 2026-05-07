@@ -525,10 +525,9 @@ export class RhythmGrammar implements IVisualGrammar {
       );
 
       if (refLineY >= 0 && refLineY <= 1) {
-        const barWidth = NOTE_STRIP_WIDTH * (0.5 + (note.velocity / 127) * 0.5);
         // Reference line is a horizontal trail centered on the note.
         // velocity gives it visible width (trail renders from pos to pos+vel).
-        const refHalfWidth = barWidth * 1.5;
+        const refHalfWidth = NOTE_STRIP_WIDTH * 1.5;
         entities.push({
           id: this.entityId(`ref-line-${note.id}`),
           part,
@@ -539,7 +538,7 @@ export class RhythmGrammar implements IVisualGrammar {
           velocity: { x: refHalfWidth * 2, y: 0 },
           style: {
             color: GRID_COLORS.referenceLine,
-            size: barWidth * 1000 * 3, // Wider than note strip
+            size: NOTE_STRIP_WIDTH * 1000 * 3, // Wider than note strip
             opacity: refOpacity,
           },
           data: {
@@ -551,12 +550,11 @@ export class RhythmGrammar implements IVisualGrammar {
 
       // Add streak lines if there's drift beyond tight tolerance
       if (Math.abs(driftInfo.driftMs) > TIGHT_TOLERANCE_MS) {
-        const barWidth = NOTE_STRIP_WIDTH * (0.5 + (note.velocity / 127) * 0.5);
         const streaks = this.createStreakLines(
           note.id,
           x,
           onsetY, // Use onset Y (top of bar) for streak anchor
-          barWidth,
+          NOTE_STRIP_WIDTH,
           driftInfo.driftMs,
           visual.palette.primary,
           refOpacity, // Use reference window opacity
@@ -584,9 +582,6 @@ export class RhythmGrammar implements IVisualGrammar {
       barHeight = MIN_NOTE_STRIP_HEIGHT;
       barTop = Math.max(endY - MIN_NOTE_STRIP_HEIGHT, 0);
     }
-
-    // Width based on velocity
-    const barWidth = NOTE_STRIP_WIDTH * (0.5 + (note.velocity / 127) * 0.5);
 
     // Phase-based base opacity
     let baseOpacity: number;
@@ -622,7 +617,7 @@ export class RhythmGrammar implements IVisualGrammar {
       position: { x, y: barTop },
       style: {
         color: visual.palette.primary,
-        size: barWidth * 1000, // Scale for renderer (will be divided by 1000)
+        size: NOTE_STRIP_WIDTH * 1000, // Scale for renderer (will be divided by 1000)
         opacity: bottomOpacity, // Overall opacity for non-shader renderers
       },
       data: {
