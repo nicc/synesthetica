@@ -1387,14 +1387,23 @@ export class ThreeJSRenderer implements IRenderer {
     const text = entity.data?.text as string | undefined;
     if (!text) return;
 
-    // Height of the label in world units. Keeps text small relative to
-    // the harmony cell (~30 world units wide) so it reads as a label
-    // rather than a headline.
-    const LABEL_HEIGHT_WORLD = 3.5;
+    // Per-line height in world units. Slash chords (e.g. "EbM/G") split
+    // across two lines with the slash on the second line, so total mesh
+    // height is lineHeight × number of lines.
+    const LINE_HEIGHT_WORLD = 1.75;
     const CANVAS_TEXT_PX = 72;
+    const LINE_GAP_FRACTION = 0.1; // Tight gap between stacked slash lines
     // Thin sans — matches the hand-drawn aesthetic without joining the
     // blocky Roman numeral family.
     const CANVAS_FONT = `200 ${CANVAS_TEXT_PX}px "Helvetica Neue", -apple-system, "Segoe UI", sans-serif`;
+
+    // Slash chord split: "EbM/G" → ["EbM", "/G"]. Single slash only;
+    // anything else renders on one line.
+    const slashIdx = text.indexOf("/");
+    const lines =
+      slashIdx > 0 && slashIdx < text.length - 1
+        ? [text.slice(0, slashIdx), text.slice(slashIdx)]
+        : [text];
 
     let mesh = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
     const existingText = mesh?.userData?.chordLabelText as string | undefined;
@@ -1406,40 +1415,52 @@ export class ThreeJSRenderer implements IRenderer {
         this.disposeObject(mesh);
       }
 
-      // Measure text to size the canvas with tight bounds
+      // Measure each line, take the widest for canvas width
       const measureCanvas = document.createElement("canvas");
       const measureCtx = measureCanvas.getContext("2d");
       if (!measureCtx) return;
       measureCtx.font = CANVAS_FONT;
-      const metrics = measureCtx.measureText(text);
-      const padding = 16;
-      const textWidth = Math.ceil(metrics.width);
-      const ascent = metrics.actualBoundingBoxAscent || CANVAS_TEXT_PX * 0.75;
-      const descent = metrics.actualBoundingBoxDescent || CANVAS_TEXT_PX * 0.25;
-      const textHeight = Math.ceil(ascent + descent);
 
+      const lineMetrics = lines.map((line) => measureCtx.measureText(line));
+      const maxLineWidth = Math.ceil(
+        Math.max(...lineMetrics.map((m) => m.width)),
+      );
+      const ascent =
+        lineMetrics[0].actualBoundingBoxAscent || CANVAS_TEXT_PX * 0.75;
+      const descent =
+        lineMetrics[0].actualBoundingBoxDescent || CANVAS_TEXT_PX * 0.25;
+      const lineHeightPx = Math.ceil(ascent + descent);
+      const lineGapPx = Math.round(lineHeightPx * LINE_GAP_FRACTION);
+      const totalTextHeight =
+        lineHeightPx * lines.length + lineGapPx * (lines.length - 1);
+
+      const padding = 16;
       const canvas = document.createElement("canvas");
-      canvas.width = textWidth + padding * 2;
-      canvas.height = textHeight + padding * 2;
+      canvas.width = maxLineWidth + padding * 2;
+      canvas.height = totalTextHeight + padding * 2;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // Transparent background, white text
+      // Transparent background, white text — centre each line horizontally
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.font = CANVAS_FONT;
       ctx.fillStyle = "#ffffff";
       ctx.textBaseline = "alphabetic";
-      ctx.textAlign = "left";
-      ctx.fillText(text, padding, padding + ascent);
+      ctx.textAlign = "center";
+      const centerX = canvas.width / 2;
+      for (let i = 0; i < lines.length; i++) {
+        const baselineY = padding + ascent + i * (lineHeightPx + lineGapPx);
+        ctx.fillText(lines[i], centerX, baselineY);
+      }
 
       const texture = new THREE.CanvasTexture(canvas);
       texture.minFilter = THREE.LinearFilter;
       texture.magFilter = THREE.LinearFilter;
       texture.needsUpdate = true;
 
+      const planeH = LINE_HEIGHT_WORLD * lines.length;
       const aspect = canvas.width / canvas.height;
-      const planeW = LABEL_HEIGHT_WORLD * aspect;
-      const planeH = LABEL_HEIGHT_WORLD;
+      const planeW = planeH * aspect;
 
       const geometry = new THREE.PlaneGeometry(planeW, planeH);
       const material = new THREE.MeshBasicMaterial({
