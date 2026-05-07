@@ -292,27 +292,30 @@ export class ChordShapeBuilder {
   }
 
   /**
-   * Even zigzag along the hub for power (5) chords. Peaks sit at
-   * angular half-steps in from the spoke bases so every segment —
-   * including the first and last — has the same slope magnitude:
-   * the first/last segment spans half a step radially +/- amp; the
-   * internal segments span a full step radially ±2*amp. This makes
-   * the line look like a continuous zigzag uninterrupted by the
-   * spoke bases.
+   * Globally-aligned zigzag for power (5) chords. Teeth sit at
+   * angles (k + 0.5) * step around the FULL circle, where step =
+   * BASE_WIDTH / 2. Each spoke covers exactly two tooth positions
+   * (which therefore aren't drawn). The visible teeth in every hub
+   * arc come from the same global pattern, so the wave wraps around
+   * cleanly: if the spokes were removed, the zigzag would join up
+   * without missing a beat. The total tooth count (360/step) is
+   * always even, so the +amp/-amp alternation wraps correctly too.
    */
   private svgZigzagArc(startAngle: number, arcSpan: number): string {
-    const teeth = Math.max(3, Math.round(arcSpan / 20));
+    const step = BASE_WIDTH / 2;
     const amp = 4;
+    const endAbs = startAngle + arcSpan;
     let path = "";
 
-    for (let k = 1; k <= teeth; k++) {
-      const t = (2 * k - 1) / (2 * teeth);
-      const angle = startAngle + arcSpan * t;
-      const r = this.hubR + (k % 2 === 1 ? amp : -amp);
+    let k = Math.ceil(startAngle / step - 0.5);
+    while ((k + 0.5) * step <= startAngle) k++;
+    for (; (k + 0.5) * step < endAbs; k++) {
+      const angle = (k + 0.5) * step;
+      const r = this.hubR + (k % 2 === 0 ? amp : -amp);
       const pt = this.polarToXY(angle, r);
       path += ` L ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`;
     }
-    const endPt = this.polarToXY(startAngle + arcSpan, this.hubR);
+    const endPt = this.polarToXY(endAbs, this.hubR);
     path += ` L ${endPt.x.toFixed(1)} ${endPt.y.toFixed(1)}`;
 
     return path;
@@ -514,25 +517,28 @@ export class ChordShapeBuilder {
   }
 
   /**
-   * Even zigzag along the hub for power (5) chords. See svgZigzagArc
-   * for the half-step rationale.
+   * Globally-aligned zigzag for power (5) chords. See svgZigzagArc
+   * for the rationale — teeth at globally consistent positions so
+   * the wave wraps around the hub cleanly across all arcs.
    */
   private threeZigzagArc(
     shape: THREE.Shape,
     startAngle: number,
     arcSpan: number,
   ): void {
-    const teeth = Math.max(3, Math.round(arcSpan / 20));
+    const step = BASE_WIDTH / 2;
     const amp = 0.4;
+    const endAbs = startAngle + arcSpan;
 
-    for (let k = 1; k <= teeth; k++) {
-      const t = (2 * k - 1) / (2 * teeth);
-      const angle = startAngle + arcSpan * t;
-      const r = this.hubR + (k % 2 === 1 ? amp : -amp);
+    let k = Math.ceil(startAngle / step - 0.5);
+    while ((k + 0.5) * step <= startAngle) k++;
+    for (; (k + 0.5) * step < endAbs; k++) {
+      const angle = (k + 0.5) * step;
+      const r = this.hubR + (k % 2 === 0 ? amp : -amp);
       const pt = this.polarToThree(angle, r);
       shape.lineTo(pt.x, pt.y);
     }
-    const endPt = this.polarToThree(startAngle + arcSpan, this.hubR);
+    const endPt = this.polarToThree(endAbs, this.hubR);
     shape.lineTo(endPt.x, endPt.y);
   }
 
@@ -676,19 +682,23 @@ export class ChordShapeBuilder {
           points.push(this.polarToThree(angle, r));
         }
       } else if (this.margin === "zigzag") {
-        // Even zigzag with peaks at half-steps so every segment has
-        // the same slope magnitude (start and end segments span
-        // half a step radially ±amp; internal segments span a full
-        // step radially ±2*amp).
-        const teeth = Math.max(3, Math.round(arcSpan / 20));
+        // Globally-aligned teeth so the wave wraps around the hub
+        // cleanly: teeth at (k + 0.5) * step around the full circle,
+        // step = BASE_WIDTH / 2. Each spoke covers exactly two
+        // hidden tooth positions, and the first/last visible teeth
+        // in every arc sit half-a-step in from the spoke base — so
+        // every segment matches the internal slope.
+        const step = BASE_WIDTH / 2;
         const amp = 0.4;
-        for (let k = 1; k <= teeth; k++) {
-          const t = (2 * k - 1) / (2 * teeth);
-          const angle = startAngle + arcSpan * t;
-          const r = this.hubR + (k % 2 === 1 ? amp : -amp);
+        const endAbs = startAngle + arcSpan;
+        let k = Math.ceil(startAngle / step - 0.5);
+        while ((k + 0.5) * step <= startAngle) k++;
+        for (; (k + 0.5) * step < endAbs; k++) {
+          const angle = (k + 0.5) * step;
+          const r = this.hubR + (k % 2 === 0 ? amp : -amp);
           points.push(this.polarToThree(angle, r));
         }
-        points.push(this.polarToThree(startAngle + arcSpan, this.hubR));
+        points.push(this.polarToThree(endAbs, this.hubR));
       } else {
         // straight / dash-short / dash-long: circular arc
         const segments = Math.max(8, Math.ceil(arcSpan / 3));
