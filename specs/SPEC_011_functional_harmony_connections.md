@@ -65,20 +65,18 @@ Small radial ticks at each of the seven diatonic-ring slot angles, sized to mark
 
 ## Connection Strip Visual Model
 
-### Pair Structure
+### Strip Structure
 
-Each functional edge produces a **pair of short gradient strips**, one at the source chord and one at the target chord. Both strips carry the same source ↔ target hue gradient — only the orientation relative to each strip's chord differs. Pairs are not physically connected; the shared palette is what links them visually.
+Each functional edge produces **one short gradient strip at the target chord's slot**. The source chord doesn't get its own strip — the source numeral itself is the visible originator of the relationship; an additional "from" strip duplicated information without adding meaning.
 
 ### Strip Directionality
 
-The "from" strip sits **inward** of the source numeral; the "to" strip sits **outward** of the target numeral. This convention is relative to the numeral itself, not relative to the centre of the clock. The strip's anchored end — the side held at maximum opacity — sits on the adjacent guide ring on the appropriate side of its numeral:
+The target strip sits **outward** of the target numeral (relative to the numeral itself, not the centre of the clock). The strip's anchored end — the side held at maximum opacity — sits on the adjacent guide ring on the side facing outward from the numeral:
 
-| Chord on | Role | Strip side | Anchored at |
-|---|---|---|---|
-| Diatonic ring | source (from) | inward of numeral | inner guide ring (0.32) |
-| Diatonic ring | target (to) | outward of numeral | middle guide ring (0.62) |
-| Borrowed ring | source (from) | inward of numeral | middle guide ring (0.62) |
-| Borrowed ring | target (to) | outward of numeral | outer guide ring (1.00) |
+| Target on | Anchored at |
+|---|---|
+| Diatonic ring | middle guide ring (between diatonic and borrowed) |
+| Borrowed ring | outer guide ring |
 
 ### Ring Topology
 
@@ -94,10 +92,10 @@ Each strip is a curved arc segment (a sector of an annulus) that sits snug again
 
 ### Gradient
 
-Each strip carries the full **source ↔ target hue gradient**, oriented so the strip's chord-side end shows that strip's own chord-hue:
+The target strip carries the full **source ↔ target hue gradient**:
 
-- **Source strip**: target hue at the guide-ring side (anchored, full opacity); source hue at the source-numeral side (fading toward zero).
-- **Target strip**: source hue at the guide-ring side (anchored, full opacity); target hue at the target-numeral side (fading toward zero).
+- **Source hue** at the guide-ring side (anchored, full opacity) — gestures back toward the originating chord.
+- **Target hue** at the target-numeral side (fading toward zero) — anchors the strip to the chord whose slot it marks.
 
 There is **no synthetic midpoint hue** — every colour visible on a strip is one of the two pitch-class hues that actually participate in the relationship. This avoids implying a third note that isn't part of the music.
 
@@ -137,18 +135,18 @@ The stabilizer graph carries a relationship-type tag (secondary dominant, subdom
 Connection strips are tied to the **source chord's lifecycle**. There is no separate resolution-tracking state.
 
 - When a source chord is detected, the stabilizer emits one or more outgoing edges from the RELATIONSHIPS table.
-- Each edge produces a pair of strips (source + target).
-- Both strips are visible while the source chord is active, and fade with the source chord's fade trail (existing brightness step-down + linear decay model).
-- When the source chord's fade trail expires, both strips expire.
+- Each edge produces a single target strip at the target chord's slot.
+- The strip is visible while the source chord is active, and fades with the source chord's fade trail (existing brightness step-down + linear decay model).
+- When the source chord's fade trail expires, the strip expires.
 
-The **target chord** plays no role in strip lifecycle. If the player plays the target chord, its numeral appears at the slot the target strip already marks — and the viewer perceives resolution from this co-presence. If they don't, the strips fade unresolved.
+The **target chord** plays no role in strip lifecycle. If the player plays the target chord, its numeral appears at the slot the strip already marks — and the viewer perceives resolution from this co-presence. If they don't, the strip fades unresolved.
 
 This is consistent with Principle 4 (Perceptual Honesty): the system shows "this chord has structural paths to these targets" — not "this chord resolved" or "this chord will resolve."
 
 ### Resolved vs Unresolved (Perceptual)
 
-- **Unresolved**: source numeral + paired strips, no target numeral. The viewer reads expectation.
-- **Resolved**: source numeral + paired strips + target numeral at the marked slot. The viewer reads resolution.
+- **Unresolved**: source numeral + target strip at an empty slot. The viewer reads expectation.
+- **Resolved**: source numeral + target strip + target numeral at the marked slot. The viewer reads resolution.
 
 Both cases are produced by the same data. The difference is whether the target chord happens to be played within the fade window.
 

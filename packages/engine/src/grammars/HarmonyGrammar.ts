@@ -229,21 +229,6 @@ function modalWheelAngle(semitones: number, mode: ModeId): number {
   return lowerAngle + (upperAngle - lowerAngle) * frac;
 }
 
-/**
- * Circular midpoint of two hues on the 360° wheel. Takes the shorter
- * arc so e.g. midpoint(350, 10) = 0, not 180. Used for the shared
- * gradient endpoint colour on connection strip pairs (SPEC 011).
- */
-function circularMidpointHue(h1: number, h2: number): number {
-  let diff = h2 - h1;
-  if (diff > 180) diff -= 360;
-  if (diff < -180) diff += 360;
-  let mid = h1 + diff / 2;
-  if (mid < 0) mid += 360;
-  if (mid >= 360) mid -= 360;
-  return mid;
-}
-
 // ============================================================================
 // Configuration
 // ============================================================================
@@ -696,18 +681,17 @@ export class HarmonyGrammar implements IVisualGrammar {
       const overallOpacity = fadeOpacity * edge.weight * MAX_STRIP_OPACITY;
       if (overallOpacity < 0.01) continue;
 
-      // Source: always borrowed (only borrowed chords emit edges).
-      // Strip is inward of the source numeral; midpoint anchored at
-      // the middle guide ring.
-      const sourceSemitones = (sourceChord.rootPc - tonicPc + 12) % 12;
-      const sourceAngleDeg = modalWheelAngle(sourceSemitones, mode);
-      const sourceMidR = clockRadius * GUIDE_RING_MIDDLE_FRACTION;
-      const sourceChordR = sourceMidR + stripRadialHeight;
-
-      // Target: diatonic or borrowed depending on edge.targetDiatonic.
-      // Strip is outward of the target numeral.
-      //   - Diatonic target: anchor at middle guide ring (cross-ring case)
-      //   - Borrowed target: anchor at outer guide ring (within-ring case)
+      // Only the target strip is rendered. The previous design also
+      // emitted a "from" strip at the source chord; user feedback was
+      // that it duplicated information already conveyed by the source
+      // numeral itself, so we now show only the target side of the
+      // relationship.
+      //
+      // Target strip sits OUTWARD of the target numeral; midpoint
+      // anchored at the adjacent guide ring on the side facing
+      // outward from the numeral:
+      //   - Diatonic target: anchor at middle guide ring (cross-ring)
+      //   - Borrowed target: anchor at outer guide ring (within-ring)
       const targetSemitones = (edge.targetPc - tonicPc + 12) % 12;
       const targetAngleDeg = modalWheelAngle(targetSemitones, mode);
       const targetAnchorFraction = edge.targetDiatonic
@@ -716,13 +700,9 @@ export class HarmonyGrammar implements IVisualGrammar {
       const targetMidR = clockRadius * targetAnchorFraction;
       const targetChordR = targetMidR - stripRadialHeight;
 
-      // Hues
       const sourceHue = pcToHue(sourceChord.rootPc, DEFAULT_HUE_INVARIANT);
       const targetHue = pcToHue(edge.targetPc, DEFAULT_HUE_INVARIANT);
-      const midpointHue = circularMidpointHue(sourceHue, targetHue);
 
-      // Borrowed-ring strips scale arc width down (matches numeral scale).
-      const sourceArcWidth = STRIP_ARC_WIDTH * BORROWED_SCALE; // source is always borrowed
       const targetArcWidth = edge.targetDiatonic
         ? STRIP_ARC_WIDTH
         : STRIP_ARC_WIDTH * BORROWED_SCALE;
@@ -742,20 +722,12 @@ export class HarmonyGrammar implements IVisualGrammar {
         },
         data: {
           type: "connection-strip",
-          // Source strip
-          sourceAngleDeg,
-          sourceMidR,
-          sourceChordR,
-          sourceArcWidth,
-          // Target strip
           targetAngleDeg,
           targetMidR,
           targetChordR,
           targetArcWidth,
-          // Hues
           sourceHue,
           targetHue,
-          midpointHue,
         },
       });
     }

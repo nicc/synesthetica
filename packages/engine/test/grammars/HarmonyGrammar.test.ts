@@ -304,14 +304,15 @@ describe("HarmonyGrammar", () => {
 
       expect(stripEntities).toHaveLength(1);
       const strip = stripEntities[0];
-      // Carries source + target geometry and three hues
-      expect(strip.data?.sourceAngleDeg).toBeDefined();
+      // Carries target-strip geometry and both chord hues (the
+      // gradient runs from source hue at the guide-ring side to
+      // target hue at the chord-side edge).
       expect(strip.data?.targetAngleDeg).toBeDefined();
+      expect(strip.data?.targetMidR).toBeDefined();
+      expect(strip.data?.targetChordR).toBeDefined();
+      expect(strip.data?.targetArcWidth).toBeDefined();
       expect(strip.data?.sourceHue).toBeDefined();
       expect(strip.data?.targetHue).toBeDefined();
-      expect(strip.data?.midpointHue).toBeDefined();
-      // Cross-ring: both anchors at middle guide ring (same midR)
-      expect(strip.data?.sourceMidR).toBeCloseTo(strip.data?.targetMidR as number);
       // Opacity scaled by edge weight × MAX_STRIP_OPACITY (0.8)
       expect(strip.style.opacity).toBeCloseTo(0.85 * 0.8, 2);
     });

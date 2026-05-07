@@ -30,7 +30,7 @@ A Roman numeral rendered as geometric line segments and arcs (not text). Carries
 The radial wedge/line shape in the top-right cell showing a chord's interval structure. Distinct from chord numerals on the harmony clock.
 
 **Connection strip**
-A short gradient arc sitting on the radial edge of a chord numeral or slot on the harmony clock. Connection strips appear in pairs — one at the source chord, one at the target chord — and each strip carries the full source ↔ target hue gradient (no synthetic midpoint colour). The chord's own hue sits at the strip's chord-side edge, fading to zero opacity; the other chord's hue sits at the guide-ring-anchored edge at full opacity. Strips indicate a functional relationship between chords without drawing lines across the clock face. Strip intensity scales with the connection's conventional weight.
+A short gradient arc sitting on the outward radial edge of a target chord's slot on the harmony clock. The strip carries the full source ↔ target hue gradient (no synthetic midpoint colour): source hue sits at the guide-ring-anchored edge at full opacity, target hue at the chord-side edge fading to zero. Strips indicate a functional relationship between chords without drawing lines across the clock face — only one strip per edge, at the target slot; the source numeral itself signals the originating chord. Strip intensity scales with the connection's conventional weight.
 
 **Fade trail**
 The visual afterimage of a released chord on the harmony clock. On release, brightness drops by a step, then decays linearly over the fade window. Stroke width grows as opacity falls, producing a chunky-to-transparent progression.
