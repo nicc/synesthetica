@@ -490,12 +490,16 @@ export class HarmonyGrammar implements IVisualGrammar {
       });
     }
 
-    // Slot tick marks at each diatonic-ring scale-degree position.
-    // Held the spatial structure when the diatonic ring is empty.
+    // Slot tick marks act as dividers BETWEEN adjacent scale-degree
+    // slots — placed at the angular midpoints, not at the numeral
+    // positions. Held the spatial structure when the diatonic ring
+    // is empty.
     const diatonicRadius = clockRadius * DIATONIC_GLYPH_RADIUS_FRACTION;
     const tickHalf = clockRadius * 0.04; // half-length of each tick
+    const SLOT_HALF_WIDTH = 360 / 7 / 2; // half-slot offset to land between degrees
     for (let deg = 1; deg <= 7; deg++) {
-      const angleDeg = degreeAngle(deg);
+      // Tick between `deg` and `deg + 1` (wraps from 7 → 1).
+      const angleDeg = degreeAngle(deg) + SLOT_HALF_WIDTH;
       entities.push({
         id: `${this.id}:slot-tick-${deg}`,
         part,
