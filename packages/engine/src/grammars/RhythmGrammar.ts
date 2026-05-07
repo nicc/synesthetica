@@ -40,7 +40,7 @@ import type {
  * and harmony columns. See layout.ts for the three-column system.
  */
 import { RHYTHM_LEFT, RHYTHM_RIGHT } from "./layout";
-import { NOW_LINE_Y, timeToY } from "./timeMapping";
+import { NOW_LINE_Y, timeToY, timeToYUniform } from "./timeMapping";
 const PITCH_MARGIN_LEFT = RHYTHM_LEFT;
 const PITCH_MARGIN_RIGHT = 1 - RHYTHM_RIGHT;
 
@@ -341,9 +341,9 @@ export class RhythmGrammar implements IVisualGrammar {
     // Find first beat in our window
     const firstBeat = Math.ceil(historyStart / beatMs) * beatMs;
 
-    // Generate beat lines
+    // Generate beat lines (uniform scroll rate — no future compression)
     for (let beatTime = firstBeat; beatTime <= futureEnd; beatTime += beatMs) {
-      const y = timeToY(beatTime, t);
+      const y = timeToYUniform(beatTime, t);
 
       // Skip if outside visible range
       if (y < 0 || y > 1) continue;
@@ -401,9 +401,9 @@ export class RhythmGrammar implements IVisualGrammar {
     // Find first bar in our window
     const firstBar = Math.ceil(historyStart / barMs) * barMs;
 
-    // Generate bar lines
+    // Generate bar lines (uniform scroll rate — no future compression)
     for (let barTime = firstBar; barTime <= futureEnd; barTime += barMs) {
-      const y = timeToY(barTime, t);
+      const y = timeToYUniform(barTime, t);
 
       if (y < 0 || y > 1) continue;
 

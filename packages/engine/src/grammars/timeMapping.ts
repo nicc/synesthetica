@@ -18,6 +18,12 @@ export const TIME_HORIZON_FUTURE_MS = 2000;
  * Map an event timestamp to a normalized Y coordinate.
  * NOW is at NOW_LINE_Y; past (age > 0) is above; future (age < 0) below.
  * Values < 0 or > 1 indicate the event has scrolled off screen.
+ *
+ * Past and future use different rates: past covers TIME_HORIZON_HISTORY_MS
+ * over NOW_LINE_Y of screen, future covers TIME_HORIZON_FUTURE_MS over
+ * the remaining 1 - NOW_LINE_Y. So future events scroll more slowly
+ * per millisecond below NOW than past events do above. Used for note
+ * strips, where the slower future zone reads as a "preview" build-up.
  */
 export function timeToY(eventTime: number, now: number): number {
   const age = now - eventTime;
@@ -27,4 +33,18 @@ export function timeToY(eventTime: number, now: number): number {
   }
   const normalizedFuture = Math.min(-age / TIME_HORIZON_FUTURE_MS, 1);
   return NOW_LINE_Y + normalizedFuture * (1 - NOW_LINE_Y);
+}
+
+/**
+ * Map an event timestamp to a normalized Y coordinate using a single
+ * uniform scroll rate (the past rate) for both past and future. Future
+ * events scroll at the same speed as past events, which means they sit
+ * lower on screen earlier — the visible future window is correspondingly
+ * shorter. Used for grid lines (beats and bars) where consistent
+ * scrolling reads as a metronomic timeline rather than a tempo-changing
+ * one.
+ */
+export function timeToYUniform(eventTime: number, now: number): number {
+  const age = now - eventTime;
+  return NOW_LINE_Y - (age / TIME_HORIZON_HISTORY_MS) * NOW_LINE_Y;
 }
