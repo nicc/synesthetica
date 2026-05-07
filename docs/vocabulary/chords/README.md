@@ -64,8 +64,11 @@ Base width: 30° (arms sit firmly on hub)
 | Augmented | Convex | Hub curves outward from center |
 | Sus2 | Dashed (short) | Hub arcs dashed, arms solid |
 | Sus4 | Dashed (long) | Hub arcs dashed, arms solid |
+| Power (5) | Zigzag | Sharp angular peaks alternating outward/inward; quality-ambiguous (no third) |
 
 All arms have straight edges and pointed tips. Hub style applies only to the central hub arcs, not the arm edges.
+
+The zigzag teeth are placed on a globally-aligned grid (`(k + 0.5) × BASE_WIDTH/2` for `k = 0, 1, …, 23`) so the wave wraps cleanly around the full circle: each spoke covers exactly two hidden tooth positions, and the visible teeth in each hub arc match peaks in adjacent arcs.
 
 ### Rendering Rules
 
@@ -102,6 +105,7 @@ Shapes are root-independent — they encode interval relationships, not specific
 | Augmented | Unified shape; 3 arms at 0°, 120°, 240°; convex hub |
 | Sus2 | Unified shape; 3 arms at 0°, 60°, 210°; dashed hub (short arm for 2nd) |
 | Sus4 | Unified shape; 3 arms at 0°, 150°, 210°; dashed hub (short arm for 4th) |
+| Power (5) | Unified shape; 2 arms at 0°, 210° (no third); zigzag hub |
 
 ### Seventh Chords
 

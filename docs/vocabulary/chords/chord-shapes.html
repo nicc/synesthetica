@@ -110,6 +110,7 @@
       <div class="legend-item">Pinched inward: diminished (tense, unstable)</div>
       <div class="legend-item">Bulging outward: augmented (expansive, unresolved)</div>
       <div class="legend-item">Dashed edge: suspended (seeking resolution)</div>
+      <div class="legend-item">Zigzag edge: power chord (no third, quality-ambiguous)</div>
     </div>
     <hr style="border: none; border-top: 1px solid #444; margin: 1rem 0;">
     <h4 style="margin: 0 0 0.5rem 0;">Chromatic Alterations</h4>
@@ -159,6 +160,7 @@
         case "aug": return "convex";
         case "sus2": return "dash-short";
         case "sus4": return "dash-long";
+        case "5": return "zigzag";
         default: return "straight";
       }
     }
@@ -321,6 +323,26 @@
 
         // sweep=1 curves outward (arc center inside/behind the shape)
         return ` A ${convexR.toFixed(1)} ${convexR.toFixed(1)} 0 0 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+      }
+
+      if (style === "zigzag") {
+        // Globally-aligned teeth at (k+0.5)*step around the full circle.
+        // step = BASE_WIDTH / 2 means each spoke covers exactly two
+        // hidden tooth positions, and the wave wraps around cleanly.
+        const step = BASE_WIDTH / 2;
+        const amp = 4;
+        const endAbs = startAngle + arcSpan;
+        let path = "";
+        let k = Math.ceil(startAngle / step - 0.5);
+        while ((k + 0.5) * step <= startAngle) k++;
+        for (; (k + 0.5) * step < endAbs; k++) {
+          const angle = (k + 0.5) * step;
+          const r = hubR + (k % 2 === 0 ? amp : -amp);
+          const pt = polarToXY(cx, cy, angle, r);
+          path += ` L ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`;
+        }
+        path += ` L ${end.x.toFixed(1)} ${end.y.toFixed(1)}`;
+        return path;
       }
 
       const largeArc = arcSpan > 180 ? 1 : 0;
@@ -517,7 +539,8 @@
         min: "minor", min7: "minor",
         dim: "diminished", dim7: "diminished", hdim7: "diminished",
         aug: "augmented",
-        sus2: "sus2", sus4: "sus4"
+        sus2: "sus2", sus4: "sus4",
+        "5": "power"
       };
       parts.push(triadMap[chord.quality] || chord.quality);
 
@@ -553,6 +576,8 @@
         intervals: [{semitones: 0}, {semitones: 2}, {semitones: 7}] },
       { name: "Sus4", notes: "1-4-5", quality: "sus4",
         intervals: [{semitones: 0}, {semitones: 5}, {semitones: 7}] },
+      { name: "Power (5)", notes: "1-5", quality: "5",
+        intervals: [{semitones: 0}, {semitones: 7}] },
 
       // Seventh chords
       { section: "Seventh Chords" },
