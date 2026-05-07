@@ -96,21 +96,22 @@ const STROKE_WIDTH_FADED = 8;
 const CLOCK_RADIUS_FRACTION = 0.35;
 
 /**
- * Layout fractions of clock radius (SPEC 011). Three guide rings anchor
- * to layout boundaries (label edge, between-rings, clock edge):
+ * Layout fractions of clock radius (SPEC 011). Three guide rings,
+ * defining two equal-width annular bands (one for each numeral ring):
  *   - Inner guide  (0.32) — outer edge of chord-label area
  *   - Middle guide (0.62) — between diatonic and borrowed numerals
- *   - Outer guide  (1.00) — clock outer edge
+ *   - Outer guide  (0.92) — outer bound of borrowed band; bands are
+ *     0.30 wide each so diatonic and borrowed read as the same width
  * Numeral rings sit at the radial centres of their bands so they read
  * as "centred between guide rings".
  */
 const GUIDE_RING_INNER_FRACTION = 0.32;
 const GUIDE_RING_MIDDLE_FRACTION = 0.62;
-const GUIDE_RING_OUTER_FRACTION = 1.00;
+const GUIDE_RING_OUTER_FRACTION = 0.92;
 const DIATONIC_GLYPH_RADIUS_FRACTION =
   (GUIDE_RING_INNER_FRACTION + GUIDE_RING_MIDDLE_FRACTION) / 2; // 0.47
 const BORROWED_GLYPH_RADIUS_FRACTION =
-  (GUIDE_RING_MIDDLE_FRACTION + GUIDE_RING_OUTER_FRACTION) / 2; // 0.81
+  (GUIDE_RING_MIDDLE_FRACTION + GUIDE_RING_OUTER_FRACTION) / 2; // 0.77
 
 /** Glyph size in world units (height of uppercase diatonic numeral). */
 const GLYPH_SIZE = 2.4;
