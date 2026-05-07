@@ -292,20 +292,23 @@ export class ChordShapeBuilder {
   }
 
   /**
-   * Even zigzag along the hub for power (5) chords. Straight lines
-   * connect evenly-spaced points whose radii alternate between
-   * hubR+amp and hubR-amp; the start and end sit at hubR so the
-   * spokes join cleanly.
+   * Even zigzag along the hub for power (5) chords. Peaks sit at
+   * angular half-steps in from the spoke bases so every segment —
+   * including the first and last — has the same slope magnitude:
+   * the first/last segment spans half a step radially +/- amp; the
+   * internal segments span a full step radially ±2*amp. This makes
+   * the line look like a continuous zigzag uninterrupted by the
+   * spoke bases.
    */
   private svgZigzagArc(startAngle: number, arcSpan: number): string {
     const teeth = Math.max(3, Math.round(arcSpan / 20));
     const amp = 4;
     let path = "";
 
-    for (let i = 1; i <= teeth; i++) {
-      const t = i / (teeth + 1);
+    for (let k = 1; k <= teeth; k++) {
+      const t = (2 * k - 1) / (2 * teeth);
       const angle = startAngle + arcSpan * t;
-      const r = this.hubR + (i % 2 === 1 ? amp : -amp);
+      const r = this.hubR + (k % 2 === 1 ? amp : -amp);
       const pt = this.polarToXY(angle, r);
       path += ` L ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`;
     }
@@ -511,10 +514,8 @@ export class ChordShapeBuilder {
   }
 
   /**
-   * Even zigzag along the hub for power (5) chords. Straight lines
-   * connect evenly-spaced points whose radii alternate between
-   * hubR+amp and hubR-amp; the start and end sit at hubR so the
-   * spokes join cleanly.
+   * Even zigzag along the hub for power (5) chords. See svgZigzagArc
+   * for the half-step rationale.
    */
   private threeZigzagArc(
     shape: THREE.Shape,
@@ -524,10 +525,10 @@ export class ChordShapeBuilder {
     const teeth = Math.max(3, Math.round(arcSpan / 20));
     const amp = 0.4;
 
-    for (let i = 1; i <= teeth; i++) {
-      const t = i / (teeth + 1);
+    for (let k = 1; k <= teeth; k++) {
+      const t = (2 * k - 1) / (2 * teeth);
       const angle = startAngle + arcSpan * t;
-      const r = this.hubR + (i % 2 === 1 ? amp : -amp);
+      const r = this.hubR + (k % 2 === 1 ? amp : -amp);
       const pt = this.polarToThree(angle, r);
       shape.lineTo(pt.x, pt.y);
     }
@@ -675,15 +676,16 @@ export class ChordShapeBuilder {
           points.push(this.polarToThree(angle, r));
         }
       } else if (this.margin === "zigzag") {
-        // Evenly-spaced zigzag: straight lines between alternating
-        // outward/inward points at uniform angular spacing. Endpoints
-        // sit at hubR so the outline meets the spoke base cleanly.
+        // Even zigzag with peaks at half-steps so every segment has
+        // the same slope magnitude (start and end segments span
+        // half a step radially ±amp; internal segments span a full
+        // step radially ±2*amp).
         const teeth = Math.max(3, Math.round(arcSpan / 20));
         const amp = 0.4;
-        for (let s = 1; s <= teeth; s++) {
-          const t = s / (teeth + 1);
+        for (let k = 1; k <= teeth; k++) {
+          const t = (2 * k - 1) / (2 * teeth);
           const angle = startAngle + arcSpan * t;
-          const r = this.hubR + (s % 2 === 1 ? amp : -amp);
+          const r = this.hubR + (k % 2 === 1 ? amp : -amp);
           points.push(this.polarToThree(angle, r));
         }
         points.push(this.polarToThree(startAngle + arcSpan, this.hubR));
