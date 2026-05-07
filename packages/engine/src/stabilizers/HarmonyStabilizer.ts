@@ -267,6 +267,11 @@ function formatRoman(
   } else if (chordQuality === "sus4") {
     base = numeral;
     suffix = "sus4";
+  } else if (chordQuality === "5") {
+    // Power chord — uppercase numeral by convention (no third to be
+    // minor); "5" suffix indicates the power-chord quality.
+    base = numeral;
+    suffix = "5";
   }
 
   return prefix + base + suffix;
@@ -355,6 +360,15 @@ function qualityMatchesDiatonic(
 ): boolean {
   // Suspensions accepted at any diatonic root.
   if (chordQuality === "sus2" || chordQuality === "sus4") return true;
+
+  // Power chord (root + perfect fifth, no third) is quality-ambiguous.
+  // Accepted at any maj or min diatonic slot — both notes are scale
+  // tones. NOT accepted at dim or aug slots: those don't have a
+  // perfect fifth in the scale, so a 5 chord at e.g. vii° in major
+  // (B5 = B + F♯) would contain a non-scale tone.
+  if (chordQuality === "5") {
+    return diatonicQuality === "maj" || diatonicQuality === "min";
+  }
 
   const triadCore = extractTriadCore(chordQuality);
   if (triadCore !== null && triadCore === diatonicQuality) return true;

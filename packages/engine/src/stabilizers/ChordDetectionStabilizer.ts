@@ -728,6 +728,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
         augmented: "aug",
         "suspended second": "sus2",
         "suspended fourth": "sus4",
+        fifth: "5", // power chord — root + perfect fifth only
         "major seventh": "maj7",
         "minor seventh": "min7",
         "dominant seventh": "dom7",

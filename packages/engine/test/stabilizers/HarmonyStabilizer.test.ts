@@ -321,6 +321,52 @@ describe("HarmonyStabilizer", () => {
       expect(result.harmonicContext?.currentFunction?.roman).toBe("V7");
     });
 
+    it("treats C5 (power chord) in C major as diatonic (I5)", () => {
+      // C + G — both notes are scale tones at maj-quality slot.
+      const raw = createTestRawFrame(1000);
+      const chord = createChord(0 as PitchClass, "5", [
+        { pc: 0 as PitchClass, octave: 3 },
+        { pc: 7 as PitchClass, octave: 3 },
+      ]);
+      const upstream = createUpstreamFrame(1000, [chord], cMajor);
+      const result = stabilizer.apply(raw, upstream);
+
+      expect(result.harmonicContext?.currentFunction?.degree).toBe(1);
+      expect(result.harmonicContext?.currentFunction?.borrowed).toBe(false);
+      expect(result.harmonicContext?.currentFunction?.roman).toBe("I5");
+    });
+
+    it("treats D5 in C major as diatonic (II5 at minor slot)", () => {
+      // D + A — at degree 2 (ii is min). 5 chord is quality-ambiguous,
+      // both notes are scale tones, so it's diatonic.
+      const raw = createTestRawFrame(1000);
+      const chord = createChord(2 as PitchClass, "5", [
+        { pc: 2 as PitchClass, octave: 3 },
+        { pc: 9 as PitchClass, octave: 3 },
+      ]);
+      const upstream = createUpstreamFrame(1000, [chord], cMajor);
+      const result = stabilizer.apply(raw, upstream);
+
+      expect(result.harmonicContext?.currentFunction?.degree).toBe(2);
+      expect(result.harmonicContext?.currentFunction?.borrowed).toBe(false);
+      expect(result.harmonicContext?.currentFunction?.roman).toBe("II5");
+    });
+
+    it("treats B5 in C major as borrowed (P5 above vii° lands outside scale)", () => {
+      // B + F♯ — P5 above the leading tone is F♯, which isn't in
+      // C major. So B5 is non-diatonic even though B is a scale tone.
+      const raw = createTestRawFrame(1000);
+      const chord = createChord(11 as PitchClass, "5", [
+        { pc: 11 as PitchClass, octave: 3 },
+        { pc: 6 as PitchClass, octave: 4 },
+      ]);
+      const upstream = createUpstreamFrame(1000, [chord], cMajor);
+      const result = stabilizer.apply(raw, upstream);
+
+      expect(result.harmonicContext?.currentFunction?.degree).toBe(7);
+      expect(result.harmonicContext?.currentFunction?.borrowed).toBe(true);
+    });
+
     it("marks C7 in C major as borrowed (V/IV — dom7 only diatonic at V)", () => {
       // C7 — root is C (diatonic I) but quality is dom7. dom7 is only
       // diatonic at V; here it's V/IV (the dominant of IV).

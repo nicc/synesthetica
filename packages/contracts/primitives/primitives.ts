@@ -29,6 +29,7 @@ export type ChordQuality =
   | "aug"
   | "sus2"
   | "sus4"
+  | "5" // power chord — root + perfect fifth, no third (quality-ambiguous)
   | "maj7"
   | "min7"
   | "dom7"
