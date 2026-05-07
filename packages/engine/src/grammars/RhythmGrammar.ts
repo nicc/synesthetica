@@ -57,6 +57,13 @@ const MIN_NOTE_HISTORY_BEATS = 1;
 /** Reference window (streaks + reference lines) lingers longer than notes (multiplier) */
 const DEFAULT_REFERENCE_LINGER_MULTIPLIER = 1.3;
 
+/** NOW-line beat pulse: exponential decay time constant (ms) */
+const PULSE_DECAY_MS = 120;
+/** Peak opacity boost added on the beat (decays to zero) */
+const PULSE_OPACITY_BOOST = 0.4;
+/** Peak HSV value boost added on the beat (decays to zero) */
+const PULSE_VALUE_BOOST = 0.2;
+
 /** Drift tolerance in ms - within this, note is considered "tight" and shows reference line */
 const TIGHT_TOLERANCE_MS = 30;
 
@@ -172,7 +179,7 @@ export class RhythmGrammar implements IVisualGrammar {
     const windows = this.calculateWindows(prescribed);
 
     // Always render NOW line
-    entities.push(this.createNowLine(t, part));
+    entities.push(this.createNowLine(t, part, prescribed));
 
     // Render grid lines (visibility controlled by horizon)
     if (tier >= 2) {
@@ -299,7 +306,29 @@ export class RhythmGrammar implements IVisualGrammar {
   // NOW Line
   // ============================================================================
 
-  private createNowLine(t: number, part: string): Entity {
+  private createNowLine(
+    t: number,
+    part: string,
+    prescribed: PrescribedContext,
+  ): Entity {
+    // Beat pulse: when a beat passes through the NOW line (every beatMs),
+    // briefly brighten and increase opacity. Decays exponentially over
+    // PULSE_DECAY_MS so it reads as a "light pulsing inside the line"
+    // — present but never distracting. Skipped when no tempo is known
+    // (free-time mode), since there's nothing to sync to.
+    const tempo = this.getEffectiveTempo(prescribed);
+    let pulse = 0;
+    if (tempo !== null) {
+      const beatMs = 60000 / tempo;
+      const phase = ((t % beatMs) + beatMs) % beatMs;
+      pulse = Math.exp(-phase / PULSE_DECAY_MS);
+    }
+
+    const baseOpacity = GRID_COLORS.nowLine.a ?? 0.6;
+    const baseV = GRID_COLORS.nowLine.v;
+    const opacity = Math.min(1, baseOpacity + pulse * PULSE_OPACITY_BOOST);
+    const v = Math.min(1, baseV + pulse * PULSE_VALUE_BOOST);
+
     return {
       id: this.entityId("now-line"),
       part,
@@ -308,9 +337,9 @@ export class RhythmGrammar implements IVisualGrammar {
       updatedAt: t,
       position: { x: 0.5, y: NOW_LINE_Y },
       style: {
-        color: GRID_COLORS.nowLine,
+        color: { ...GRID_COLORS.nowLine, v, a: opacity },
         size: 100, // Full width line
-        opacity: GRID_COLORS.nowLine.a ?? 0.6,
+        opacity,
       },
       data: {
         type: "now-line",
