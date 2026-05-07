@@ -8,7 +8,9 @@
  * Glyph coordinates are in a local unit system:
  * - Origin at bottom-left of the baseline
  * - Y-up (0 = baseline, positive = above)
- * - Uppercase height = 1.0, lowercase height = 0.65
+ * - Uppercase height = 1.0, lowercase height = 0.55 (standard
+ *   typographic x-height ratio — Helvetica is ~0.52, so 0.55
+ *   reads as a clear lowercase relative to the uppercase forms)
  *
  * The builder parses Roman numeral strings (e.g. "vii°7", "IV", "♭III")
  * and composes the appropriate base + suffix geometry.
@@ -36,8 +38,11 @@ interface GlyphSegment {
 /** Height of uppercase glyphs */
 const UPPER_H = 1.0;
 
-/** Height of lowercase glyphs */
-const LOWER_H = 0.65;
+/** Height of lowercase glyphs (x-height as fraction of cap height).
+ *  ~0.55 matches standard typographic x-height proportions so
+ *  lowercase numerals read as visibly lowercase rather than just
+ *  slightly-shrunk uppercase. */
+const LOWER_H = 0.55;
 
 /** Stroke width between vertical strokes (I, i spacing) */
 const STROKE_GAP = 0.2;
