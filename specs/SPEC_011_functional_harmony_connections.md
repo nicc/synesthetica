@@ -9,7 +9,7 @@ Source: RFC 010
 Defines:
 
 1. The redesigned **harmony clock** layout that supports functional connection strips (revised cell sizing, ring radii, guide-ring anchoring).
-2. The visual model for **connection strips** — paired gradient marks linked by a shared midpoint hue — and the directed graph of weighted functional edges emitted by the HarmonyStabilizer.
+2. The visual model for **connection strips** — paired gradient arcs that each carry the full source ↔ target hue gradient — and the directed graph of weighted functional edges emitted by the HarmonyStabilizer.
 3. The seed **RELATIONSHIPS** table the stabilizer uses to determine when an edge exists.
 
 ## Overview
@@ -67,20 +67,18 @@ Small radial ticks at each of the seven diatonic-ring slot angles, sized to mark
 
 ### Pair Structure
 
-Each functional edge produces a **pair of short gradient strips**, one at the source chord and one at the target chord. The strips are colour-linked but not physically connected — the viewer's eye matches pairs by colour, not proximity. This avoids lines crossing the clock face.
+Each functional edge produces a **pair of short gradient strips**, one at the source chord and one at the target chord. Both strips carry the same source ↔ target hue gradient — only the orientation relative to each strip's chord differs. Pairs are not physically connected; the shared palette is what links them visually.
 
 ### Strip Directionality
 
-The "from" strip sits **inward** of the source numeral; the "to" strip sits **outward** of the target numeral. This convention is relative to the numeral itself, not relative to the centre of the clock. Each strip's midpoint-coloured end anchors to the adjacent guide ring on the appropriate side of its numeral:
+The "from" strip sits **inward** of the source numeral; the "to" strip sits **outward** of the target numeral. This convention is relative to the numeral itself, not relative to the centre of the clock. The strip's anchored end — the side held at maximum opacity — sits on the adjacent guide ring on the appropriate side of its numeral:
 
-| Chord on | Role | Strip side | Midpoint anchored at |
+| Chord on | Role | Strip side | Anchored at |
 |---|---|---|---|
 | Diatonic ring | source (from) | inward of numeral | inner guide ring (0.32) |
 | Diatonic ring | target (to) | outward of numeral | middle guide ring (0.62) |
 | Borrowed ring | source (from) | inward of numeral | middle guide ring (0.62) |
 | Borrowed ring | target (to) | outward of numeral | outer guide ring (1.00) |
-
-For cross-ring connections (the common case — source on borrowed, target on diatonic), both strips' midpoint ends land on the middle guide ring, producing a continuous-gradient feel if the two strips were aligned. For within-ring connections, the strips anchor to different guide rings; the visual link is purely chromatic via the shared midpoint hue.
 
 ### Ring Topology
 
@@ -88,25 +86,24 @@ Within-ring connections arise as a natural consequence of collapsing all non-dia
 
 ### Strip Geometry
 
-Each strip is a thin tangent-oriented polygon:
+Each strip is a curved arc segment (a sector of an annulus) that sits snug against its anchored guide ring:
 
 - **Arc width**: matches the numeral's effective rendered arc-width (full glyph scale on the diatonic ring; glyph scale × 1/φ on the borrowed ring).
 - **Radial height**: short — enough to read as a coloured accent mark without crowding the band.
-- **Position**: the midpoint-coloured end sits exactly on the anchor guide ring; the chord-coloured end extends radially toward (but does not touch) the numeral.
+- **Position**: the anchored end sits exactly on the adjacent guide ring; the chord-side edge extends radially toward (but does not touch) the numeral.
 
 ### Gradient
 
-The gradient runs along the strip's radial axis:
+Each strip carries the full **source ↔ target hue gradient**, oriented so the strip's chord-side end shows that strip's own chord-hue:
 
-- 0%: midpoint hue at full opacity (anchor guide ring side)
-- 90%: chord pitch-class hue at full opacity
-- 100%: chord pitch-class hue at 0% opacity (numeral side, soft fade)
+- **Source strip**: target hue at the guide-ring side (anchored, full opacity); source hue at the source-numeral side (fading toward zero).
+- **Target strip**: source hue at the guide-ring side (anchored, full opacity); target hue at the target-numeral side (fading toward zero).
 
-The 10% fade at the numeral-facing end keeps the strip visually distinct from the numeral while still attributing the strip's identity via the chord hue.
+There is **no synthetic midpoint hue** — every colour visible on a strip is one of the two pitch-class hues that actually participate in the relationship. This avoids implying a third note that isn't part of the music.
 
-### Midpoint Hue
+### Opacity Curve
 
-The midpoint hue is the perceptual average of the source and target pitch-class hues, computed via circular interpolation on the hue wheel (so e.g. midpoint(350°, 10°) = 0°, not 180°).
+Opacity is anchored at the guide-ring side and falls non-linearly toward the chord-side edge: `α(t) = 1 − t⁴`, where `t = 0` at the guide-ring side and `t = 1` at the chord-side edge. The curve holds near full opacity across the inner two-thirds of the strip, then drops rapidly through the final third — so the strip reads as anchored to the guide ring and reaching toward (but not touching) the numeral.
 
 ### Visual Intensity
 
@@ -249,19 +246,18 @@ Detection notes:
 
 The following term is in the grammar glossary (already added):
 
-**Connection strip** — A short gradient mark sitting on the radial edge of a chord numeral or slot on the harmony clock. Connection strips appear in pairs — one at the source chord, one at the target chord — linked by a shared midpoint pitch-class hue. They indicate a functional relationship between chords without drawing lines across the clock face.
+**Connection strip** — A short gradient arc sitting on the radial edge of a chord numeral or slot on the harmony clock. Connection strips appear in pairs — one at the source chord, one at the target chord — and each strip carries the full source ↔ target hue gradient (no synthetic midpoint colour). The chord's own hue sits at the strip's chord-side edge (fading to zero opacity); the other chord's hue sits at the guide-ring-anchored edge (full opacity). Strips indicate a functional relationship between chords without drawing lines across the clock face.
 
 ## Invariants
 
 - **I3**: Meaning lives in the stabilizer (functional edge graph); the grammar renders visual categories (strips) without inferring harmony.
 - **I4**: The grammar does not compute functional relationships.
 - **I14**: Connection strip colours derive from the pitch-class hue invariant.
-- **I20** (new): Connection strips are paired — every source strip has a corresponding target strip with the same midpoint hue. There are no unpaired strips.
+- **I20** (new): Connection strips are paired — every source strip has a corresponding target strip carrying the same source ↔ target hue gradient. There are no unpaired strips.
 
 ## What This Spec Does NOT Cover
 
 - Stabilizer detection algorithms beyond the table lookup (e.g. how V/V is recognised from a played chord — that's HarmonyStabilizer implementation detail; existing chord detection plus the RELATIONSHIPS table is sufficient).
 - Mode-specific RELATIONSHIPS tables for non-Ionian keys (the seed covers major; minor and modal variants follow the same pattern, derived as needed).
 - User control for relationship-type visual encoding.
-- Midpoint hue circular interpolation algorithm (implementation detail).
 - Animation transitions between unresolved and resolved states (none specified — both are static visual states; the grammar renders whichever state holds at frame time).

@@ -566,10 +566,16 @@ export class ThreeJSRenderer implements IRenderer {
     const data = entity.data ?? {};
     const sourceHue = data.sourceHue as number;
     const targetHue = data.targetHue as number;
-    const midpointHue = data.midpointHue as number;
     const overallOpacity = entity.style.opacity ?? 1;
 
-    // Source strip — child[0]
+    // Each strip carries the full source ↔ target gradient (no synthetic
+    // midpoint hue, which previously implied a note that wasn't actually
+    // played). The chord's own hue sits at its own chord-side end (where
+    // the strip fades toward zero opacity), and the other chord's hue
+    // sits at the guide-ring side (where opacity is highest), so each
+    // strip prominently displays the chord it's gesturing toward.
+
+    // Source strip — child[0]: target hue at guide-ring side, source at chord side
     this.upsertConnectionStripChild(
       group,
       0,
@@ -577,12 +583,12 @@ export class ThreeJSRenderer implements IRenderer {
       data.sourceMidR as number,
       data.sourceChordR as number,
       data.sourceArcWidth as number,
-      midpointHue,
+      targetHue,
       sourceHue,
       overallOpacity,
     );
 
-    // Target strip — child[1]
+    // Target strip — child[1]: source hue at guide-ring side, target at chord side
     this.upsertConnectionStripChild(
       group,
       1,
@@ -590,7 +596,7 @@ export class ThreeJSRenderer implements IRenderer {
       data.targetMidR as number,
       data.targetChordR as number,
       data.targetArcWidth as number,
-      midpointHue,
+      sourceHue,
       targetHue,
       overallOpacity,
     );
