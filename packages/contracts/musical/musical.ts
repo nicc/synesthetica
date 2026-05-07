@@ -369,12 +369,11 @@ export type FunctionalRelationType =
   | "other";
 
 /**
- * A weighted directed edge from a borrowed source chord to a target
- * slot on the harmony clock (SPEC 011). The grammar renders this as
- * a pair of connection strips at the source and target positions,
- * linked by a shared midpoint pitch-class hue. The target chord may
- * or may not have been played — resolution is perceptual, not
- * tracked as state.
+ * A weighted directed edge from a source chord to a target slot on
+ * the harmony clock (SPEC 011). The grammar renders this as a single
+ * connection strip at the target slot, carrying the full source ↔
+ * target hue gradient. The target chord may or may not have been
+ * played — resolution is perceptual, not tracked as state.
  */
 export interface FunctionalEdge {
   /** Source chord ID (the chord whose detection triggered this edge) */

@@ -47,12 +47,12 @@ All radii expressed as fractions of clock radius. The clock radius equals half t
 |---|---|---|
 | Chord label area | 0.00 → 0.32 | Chord-name text fits within this circle |
 | Inner guide ring | **0.32** | Outer edge of label area |
-| Diatonic numeral ring | **0.45** | Inner band, biased inward (label breathing room) |
+| Diatonic numeral ring | **0.47** | Centre of diatonic band |
 | Middle guide ring | **0.62** | Between diatonic and borrowed numerals |
-| Borrowed numeral ring | **0.80** | Outer band, near band centre |
-| Outer guide ring | **1.00** | Clock outer edge |
+| Borrowed numeral ring | **0.77** | Centre of borrowed band |
+| Outer guide ring | **0.92** | Outer bound of borrowed band |
 
-Guide rings anchor to layout boundaries (label edge, between-rings boundary, clock edge) rather than being derived from numeral positions. The diatonic ring is biased slightly inward to give the chord label more breathing room.
+Three guide rings define two equal-width annular bands (each 0.30 wide). Numeral rings sit at the radial centre of each band, so diatonic and borrowed read as the same width with their numerals visually centred between guide rings.
 
 ### Slot Tick Marks
 
@@ -60,8 +60,10 @@ Small radial ticks at each of the seven diatonic-ring slot angles, sized to mark
 
 ### Numeral Sizing
 
-- Diatonic numeral: rendered at full glyph scale (root pitch-class hue).
+- Diatonic numeral: rendered at glyph scale × 0.8 (root pitch-class hue).
 - Borrowed numeral: rendered at glyph scale × 1/φ ≈ 0.618 (gives the outer ring lighter visual weight matching its outside-the-key status).
+
+Both scales are held independently so adjustments to one don't coincidentally resize the other.
 
 ## Connection Strip Visual Model
 
@@ -86,7 +88,7 @@ Within-ring connections arise as a natural consequence of collapsing all non-dia
 
 Each strip is a curved arc segment (a sector of an annulus) that sits snug against its anchored guide ring:
 
-- **Arc width**: matches the numeral's effective rendered arc-width (full glyph scale on the diatonic ring; glyph scale × 1/φ on the borrowed ring).
+- **Arc width**: scales with the corresponding numeral ring (diatonic strips wider than borrowed strips by the same 1/φ factor that scales borrowed numerals down).
 - **Radial height**: short — enough to read as a coloured accent mark without crowding the band.
 - **Position**: the anchored end sits exactly on the adjacent guide ring; the chord-side edge extends radially toward (but does not touch) the numeral.
 
@@ -120,9 +122,7 @@ A single source chord may have multiple outgoing edges. Two cases:
 
    When the target degree's diatonic quality is major (V/V → V, V/IV → IV), there is no ambiguity — a single edge to the diatonic target is emitted.
 
-Multiple source strips at the same chord position split the available arc width — N edges produce N stripes, each at arc-width / N, arranged side by side along the tangent.
-
-Fan-in (multiple sources targeting the same chord) produces multiple target strips at the target's slot, similarly split.
+Fan-in (multiple sources targeting the same chord slot) produces one strip per edge stacked at the target's slot. When this becomes visually congested, a future iteration may split the available arc width across the strips.
 
 ### Relationship Type
 
@@ -255,14 +255,14 @@ Detection notes:
 
 The following term is in the grammar glossary (already added):
 
-**Connection strip** — A short gradient arc sitting on the radial edge of a chord numeral or slot on the harmony clock. Connection strips appear in pairs — one at the source chord, one at the target chord — and each strip carries the full source ↔ target hue gradient (no synthetic midpoint colour). The chord's own hue sits at the strip's chord-side edge (fading to zero opacity); the other chord's hue sits at the guide-ring-anchored edge (full opacity). Strips indicate a functional relationship between chords without drawing lines across the clock face.
+**Connection strip** — A short gradient arc sitting on the outward radial edge of a target chord's slot on the harmony clock. The strip carries the full source ↔ target hue gradient (no synthetic midpoint colour): source hue sits at the guide-ring-anchored edge at full opacity, target hue at the chord-side edge fading to zero. Strips indicate a functional relationship between chords without drawing lines across the clock face — only one strip per edge, at the target slot; the source numeral itself signals the originating chord. Strip intensity scales with the connection's conventional weight.
 
 ## Invariants
 
 - **I3**: Meaning lives in the stabilizer (functional edge graph); the grammar renders visual categories (strips) without inferring harmony.
 - **I4**: The grammar does not compute functional relationships.
 - **I14**: Connection strip colours derive from the pitch-class hue invariant.
-- **I20** (new): Connection strips are paired — every source strip has a corresponding target strip carrying the same source ↔ target hue gradient. There are no unpaired strips.
+- **I20** (new): Each functional edge produces exactly one connection strip — at the target slot, carrying the full source ↔ target hue gradient. There is no separate source strip; the source numeral itself signals the originating chord.
 
 ## What This Spec Does NOT Cover
 

@@ -637,15 +637,16 @@ export class HarmonyGrammar implements IVisualGrammar {
 
   /**
    * Create entities for functional connection strips. Each FunctionalEdge
-   * produces one entity carrying both source and target strip geometries.
-   * Strips fade with their source chord's lifecycle (no separate
-   * resolution-tracking state).
+   * produces one entity — a single strip at the target slot — and fades
+   * with the source chord's lifecycle (no separate resolution-tracking
+   * state).
    *
    * Strip directionality (SPEC 011):
-   *   - "from" strip sits INWARD of source numeral
-   *   - "to"   strip sits OUTWARD of target numeral
-   *   - Each strip's midpoint-coloured end anchors to the adjacent
-   *     guide ring on the appropriate side of its numeral.
+   *   - The strip sits OUTWARD of the target numeral.
+   *   - Its anchored end (full opacity, source hue) sits on the
+   *     adjacent guide ring on the side facing outward from the
+   *     numeral; the chord-side edge (target hue, fading to zero)
+   *     extends radially toward but not touching the numeral.
    */
   private createConnectionStrips(
     edges: FunctionalEdge[],
