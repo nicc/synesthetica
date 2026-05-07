@@ -480,7 +480,11 @@ export class ThreeJSRenderer implements IRenderer {
     let ring = this.entityObjects.get(entity.id) as Line2 | undefined;
 
     if (!ring) {
-      const segments = 96;
+      // High segment count smooths out the small notches that appear
+      // where Line2's per-segment tessellated quads meet at each join
+      // (visible as casuarina-like indentations at lower segment counts
+      // and higher opacity).
+      const segments = 360;
       const positions: number[] = [];
       for (let i = 0; i <= segments; i++) {
         const angle = (i / segments) * Math.PI * 2;
