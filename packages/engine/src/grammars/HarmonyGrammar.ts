@@ -148,6 +148,11 @@ const VIEWPORT_ASPECT = 100 / 75;
  *  so the structural cues across grammars share a consistent weight. */
 const STRUCTURE_OPACITY = 0.4;
 
+/** Colour for the always-on structural elements of the harmony clock.
+ *  Matches DynamicsGrammar's OUTLINE_COLOR (cool muted grey) so the
+ *  structural cues across grammars look identical, not just similar. */
+const STRUCTURE_COLOR: ColorHSVA = { h: 200, s: 0.2, v: 0.4, a: 1 };
+
 // ============================================================================
 // Connection Strip Constants (SPEC 011)
 // ============================================================================
@@ -484,7 +489,7 @@ export class HarmonyGrammar implements IVisualGrammar {
           y: HARMONY_PROGRESSION_CENTER_Y,
         },
         style: {
-          color: { h: 0, s: 0, v: 0.55, a: 1 },
+          color: STRUCTURE_COLOR,
           opacity: STRUCTURE_OPACITY,
         },
         data: {
@@ -515,7 +520,7 @@ export class HarmonyGrammar implements IVisualGrammar {
           y: HARMONY_PROGRESSION_CENTER_Y,
         },
         style: {
-          color: { h: 0, s: 0, v: 0.55, a: 1 },
+          color: STRUCTURE_COLOR,
           opacity: STRUCTURE_OPACITY,
         },
         data: {
