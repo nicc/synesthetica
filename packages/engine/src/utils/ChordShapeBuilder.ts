@@ -292,27 +292,25 @@ export class ChordShapeBuilder {
   }
 
   /**
-   * Sharp-angled zigzag along the hub. Like wavy but with straight
-   * line segments to alternating outward/inward peaks instead of
-   * smooth quadratic curves. Used for power chords (5).
+   * Even zigzag along the hub for power (5) chords. Straight lines
+   * connect evenly-spaced points whose radii alternate between
+   * hubR+amp and hubR-amp; the start and end sit at hubR so the
+   * spokes join cleanly.
    */
   private svgZigzagArc(startAngle: number, arcSpan: number): string {
-    const steps = Math.max(3, Math.floor(arcSpan / 20));
+    const teeth = Math.max(3, Math.round(arcSpan / 20));
     const amp = 4;
     let path = "";
 
-    for (let i = 0; i < steps; i++) {
-      const tEnd = (i + 1) / steps;
-      const tMid = (i + 0.5) / steps;
-      const angleEnd = startAngle + arcSpan * tEnd;
-      const angleMid = startAngle + arcSpan * tMid;
-
-      const peakR = this.hubR + (i % 2 === 0 ? amp : -amp);
-      const peak = this.polarToXY(angleMid, peakR);
-      const endPt = this.polarToXY(angleEnd, this.hubR);
-
-      path += ` L ${peak.x.toFixed(1)} ${peak.y.toFixed(1)} L ${endPt.x.toFixed(1)} ${endPt.y.toFixed(1)}`;
+    for (let i = 1; i <= teeth; i++) {
+      const t = i / (teeth + 1);
+      const angle = startAngle + arcSpan * t;
+      const r = this.hubR + (i % 2 === 1 ? amp : -amp);
+      const pt = this.polarToXY(angle, r);
+      path += ` L ${pt.x.toFixed(1)} ${pt.y.toFixed(1)}`;
     }
+    const endPt = this.polarToXY(startAngle + arcSpan, this.hubR);
+    path += ` L ${endPt.x.toFixed(1)} ${endPt.y.toFixed(1)}`;
 
     return path;
   }
@@ -512,28 +510,29 @@ export class ChordShapeBuilder {
     }
   }
 
-  /** Sharp-angled zigzag along the hub for power (5) chords. */
+  /**
+   * Even zigzag along the hub for power (5) chords. Straight lines
+   * connect evenly-spaced points whose radii alternate between
+   * hubR+amp and hubR-amp; the start and end sit at hubR so the
+   * spokes join cleanly.
+   */
   private threeZigzagArc(
     shape: THREE.Shape,
     startAngle: number,
     arcSpan: number,
   ): void {
-    const steps = Math.max(3, Math.floor(arcSpan / 20));
+    const teeth = Math.max(3, Math.round(arcSpan / 20));
     const amp = 0.4;
 
-    for (let i = 0; i < steps; i++) {
-      const tEnd = (i + 1) / steps;
-      const tMid = (i + 0.5) / steps;
-      const angleEnd = startAngle + arcSpan * tEnd;
-      const angleMid = startAngle + arcSpan * tMid;
-
-      const peakR = this.hubR + (i % 2 === 0 ? amp : -amp);
-      const peak = this.polarToThree(angleMid, peakR);
-      const endPt = this.polarToThree(angleEnd, this.hubR);
-
-      shape.lineTo(peak.x, peak.y);
-      shape.lineTo(endPt.x, endPt.y);
+    for (let i = 1; i <= teeth; i++) {
+      const t = i / (teeth + 1);
+      const angle = startAngle + arcSpan * t;
+      const r = this.hubR + (i % 2 === 1 ? amp : -amp);
+      const pt = this.polarToThree(angle, r);
+      shape.lineTo(pt.x, pt.y);
     }
+    const endPt = this.polarToThree(startAngle + arcSpan, this.hubR);
+    shape.lineTo(endPt.x, endPt.y);
   }
 
   // ==========================================================================
@@ -676,19 +675,18 @@ export class ChordShapeBuilder {
           points.push(this.polarToThree(angle, r));
         }
       } else if (this.margin === "zigzag") {
-        // Sharp angular peaks alternating outward/inward — same
-        // step/amp as the body so the outline tracks the fill.
-        const steps = Math.max(3, Math.floor(arcSpan / 20));
+        // Evenly-spaced zigzag: straight lines between alternating
+        // outward/inward points at uniform angular spacing. Endpoints
+        // sit at hubR so the outline meets the spoke base cleanly.
+        const teeth = Math.max(3, Math.round(arcSpan / 20));
         const amp = 0.4;
-        for (let s = 0; s < steps; s++) {
-          const tEnd = (s + 1) / steps;
-          const tMid = (s + 0.5) / steps;
-          const angleEnd = startAngle + arcSpan * tEnd;
-          const angleMid = startAngle + arcSpan * tMid;
-          const peakR = this.hubR + (s % 2 === 0 ? amp : -amp);
-          points.push(this.polarToThree(angleMid, peakR));
-          points.push(this.polarToThree(angleEnd, this.hubR));
+        for (let s = 1; s <= teeth; s++) {
+          const t = s / (teeth + 1);
+          const angle = startAngle + arcSpan * t;
+          const r = this.hubR + (s % 2 === 1 ? amp : -amp);
+          points.push(this.polarToThree(angle, r));
         }
+        points.push(this.polarToThree(startAngle + arcSpan, this.hubR));
       } else {
         // straight / dash-short / dash-long: circular arc
         const segments = Math.max(8, Math.ceil(arcSpan / 3));
