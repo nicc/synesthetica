@@ -1454,13 +1454,27 @@ export class ThreeJSRenderer implements IRenderer {
       }
 
       const texture = new THREE.CanvasTexture(canvas);
-      texture.minFilter = THREE.LinearFilter;
+      // Mipmaps + anisotropic filtering preserve thin vertical strokes
+      // (e.g. the legs of "m") when the canvas downsamples to screen
+      // size at small chord-label scales. Without these, LinearFilter
+      // alone aliases sub-pixel strokes away intermittently.
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
       texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = true;
+      const maxAnisotropy =
+        this.renderer?.capabilities?.getMaxAnisotropy?.() ?? 1;
+      texture.anisotropy = maxAnisotropy;
       texture.needsUpdate = true;
 
-      const planeH = LINE_HEIGHT_WORLD * lines.length;
-      const aspect = canvas.width / canvas.height;
-      const planeW = planeH * aspect;
+      // Scale plane so one canvas pixel of text = a constant world size.
+      // Previously planeH = LINE_HEIGHT_WORLD × lines, but canvas height
+      // includes padding + line gaps that don't scale linearly with line
+      // count, so 2-line slash labels rendered ~10% larger than 1-line
+      // labels. Tying world size directly to the per-line pixel count
+      // keeps text height constant regardless of layout.
+      const pxToWorld = LINE_HEIGHT_WORLD / lineHeightPx;
+      const planeH = canvas.height * pxToWorld;
+      const planeW = canvas.width * pxToWorld;
 
       const geometry = new THREE.PlaneGeometry(planeW, planeH);
       const material = new THREE.MeshBasicMaterial({
