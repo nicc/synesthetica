@@ -527,7 +527,7 @@ export class RhythmGrammar implements IVisualGrammar {
       if (refLineY >= 0 && refLineY <= 1) {
         // Reference line is a horizontal trail centered on the note.
         // velocity gives it visible width (trail renders from pos to pos+vel).
-        const refHalfWidth = NOTE_STRIP_WIDTH * 1.5;
+        const refHalfWidth = NOTE_STRIP_WIDTH * 1.5 * 0.75;
         entities.push({
           id: this.entityId(`ref-line-${note.id}`),
           part,
