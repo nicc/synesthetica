@@ -482,9 +482,20 @@ const SECONDARY_DOMINANT_WEIGHTS: Record<number, number> = {
  * conventional reading (e.g. ♭VII reads as subdominant, not as
  * V of E♭).
  */
+/**
+ * Conventional weight applied to the chain interpretation when a
+ * secondary dominant target is ambiguous (i.e. the diatonic quality
+ * at the target degree isn't major). The conventional V/X→diatonic-X
+ * edge gets its usual weight from SECONDARY_DOMINANT_WEIGHTS; the
+ * chain edge (V/X→borrowed-major-X, which itself is V of the next
+ * degree) is rendered alongside at this lower weight.
+ */
+const CHAIN_RESOLUTION_WEIGHT = 0.7;
+
 function emitFunctionalEdges(
   fc: FunctionalChord,
   key: PrescribedKey,
+  diatonicTable: DiatonicEntry[],
 ): FunctionalEdge[] {
   if (!fc.borrowed) return [];
 
@@ -509,7 +520,10 @@ function emitFunctionalEdges(
     if (targetDegreeIdx >= 0) {
       const targetDegree = targetDegreeIdx + 1;
       const weight = SECONDARY_DOMINANT_WEIGHTS[targetDegree] ?? 0.85;
-      return [
+      const targetDiatonicQuality = diatonicTable[targetDegreeIdx].quality;
+
+      const edges: FunctionalEdge[] = [
+        // Conventional V/X → diatonic X
         {
           sourceChordId: fc.chordId,
           targetDegree,
@@ -519,6 +533,27 @@ function emitFunctionalEdges(
           type: "secondary-dominant",
         },
       ];
+
+      // Chain interpretation: when the target degree's diatonic
+      // quality isn't major, the player may instead play the target
+      // as a major-quality borrowed chord (itself a V of the next
+      // degree), forming a chain like V/V/V → V/V → V. We can't
+      // predict which the player intends from the source alone, so
+      // we emit both edges and let the actual resolution clarify.
+      // (Targets with diatonic major quality are unambiguous —
+      // V/V → V, V/IV → IV — so no chain edge there.)
+      if (targetDiatonicQuality !== "maj") {
+        edges.push({
+          sourceChordId: fc.chordId,
+          targetDegree,
+          targetPc,
+          targetDiatonic: false,
+          weight: CHAIN_RESOLUTION_WEIGHT,
+          type: "secondary-dominant",
+        });
+      }
+
+      return edges;
     }
   }
 
@@ -595,10 +630,11 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
 
     let currentFunction: FunctionalChord | null = null;
     let keyAware = false;
+    let diatonicTable: DiatonicEntry[] | null = null;
 
     if (key) {
       keyAware = true;
-      const diatonicTable = buildDiatonicTable(key);
+      diatonicTable = buildDiatonicTable(key);
       const activeChord = upstream.chords.find((c) => c.phase === "active");
 
       if (activeChord) {
@@ -649,9 +685,12 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
     // the progression. Recomputed each frame from the progression list,
     // so edges automatically expire when a chord falls out of the
     // window via pruneProgression().
-    const functionalEdges: FunctionalEdge[] = key
-      ? this.progression.flatMap((fc) => emitFunctionalEdges(fc, key))
-      : [];
+    const functionalEdges: FunctionalEdge[] =
+      key && diatonicTable
+        ? this.progression.flatMap((fc) =>
+            emitFunctionalEdges(fc, key, diatonicTable!),
+          )
+        : [];
 
     const harmonicContext: HarmonicContext = {
       tension,

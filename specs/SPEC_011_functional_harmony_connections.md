@@ -111,9 +111,20 @@ Strip opacity scales with the edge's conventional weight (0–1). High-weight co
 
 ### Fan-Out
 
-A single source chord may have multiple outgoing edges (e.g. ♭VI → ii AND ♭VI → IV). Multiple source strips at the same chord position split the available arc width — N edges produce N stripes, each at arc-width / N, arranged side by side along the tangent.
+A single source chord may have multiple outgoing edges. Two cases:
 
-Fan-in (multiple sources targeting the same diatonic chord) produces multiple target strips at the target's slot, similarly split.
+1. **Multi-target modal interchange** — e.g. ♭VI in major has plausible resolutions to both ii and IV; the modal interchange table emits both edges with their respective weights. Each edge targets a different diatonic position.
+
+2. **Ambiguous secondary-dominant target** — when a major-quality borrowed chord's target degree has a non-major diatonic quality (V/ii, V/iii, V/vi, V/vii in major), the resolution is ambiguous in real time:
+   - **Conventional reading**: V/X → diatonic X (e.g. V/ii → ii in C major = A → Dm).
+   - **Chain reading**: V/X is itself the dominant of a V-chain step, so X is played as a borrowed major chord (e.g. V/V/V → V/V in A♭ major = F → B♭, where B♭ is borrowed).
+   The stabilizer emits **both** edges from the same source — one to the diatonic target (`targetDiatonic: true`, conventional weight), one to the borrowed target at the same pc (`targetDiatonic: false`, chain-weight ≈ 0.7). Both target strips are visible until the player's actual resolution chord arrives at the target pc, at which point co-presence resolves the ambiguity perceptually.
+
+   When the target degree's diatonic quality is major (V/V → V, V/IV → IV), there is no ambiguity — a single edge to the diatonic target is emitted.
+
+Multiple source strips at the same chord position split the available arc width — N edges produce N stripes, each at arc-width / N, arranged side by side along the tangent.
+
+Fan-in (multiple sources targeting the same chord) produces multiple target strips at the target's slot, similarly split.
 
 ### Relationship Type
 

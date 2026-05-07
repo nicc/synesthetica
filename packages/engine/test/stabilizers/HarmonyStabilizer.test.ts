@@ -395,6 +395,54 @@ describe("HarmonyStabilizer", () => {
       expect(edges[0].weight).toBeGreaterThan(0.9);
     });
 
+    it("emits both diatonic + chain edges for V/ii (fan-out)", () => {
+      // A major in C major. Target is D (degree 2), whose diatonic
+      // quality is minor. The conventional reading is V/ii → ii
+      // (diatonic D minor); the chain reading is V/V/V → V/V (D
+      // played as borrowed major, itself a V of V). Both are emitted.
+      const raw = createTestRawFrame(1000);
+      const chord = createChord(9 as PitchClass, "maj", [
+        { pc: 9 as PitchClass, octave: 3 },
+        { pc: 1 as PitchClass, octave: 4 }, // C#
+        { pc: 4 as PitchClass, octave: 4 },
+      ]);
+      const upstream = createUpstreamFrame(1000, [chord], cMajor);
+      const result = stabilizer.apply(raw, upstream);
+
+      const edges = result.harmonicContext?.functionalEdges ?? [];
+      expect(edges).toHaveLength(2);
+      // Both edges target the same degree/pc (D, degree 2)
+      for (const e of edges) {
+        expect(e.targetDegree).toBe(2);
+        expect(e.targetPc).toBe(2);
+        expect(e.type).toBe("secondary-dominant");
+      }
+      // One goes to diatonic ring, the other to borrowed
+      const rings = edges.map((e) => e.targetDiatonic).sort();
+      expect(rings).toEqual([false, true]);
+      // Conventional edge has higher weight than chain edge
+      const diatonicEdge = edges.find((e) => e.targetDiatonic)!;
+      const chainEdge = edges.find((e) => !e.targetDiatonic)!;
+      expect(diatonicEdge.weight).toBeGreaterThan(chainEdge.weight);
+    });
+
+    it("does NOT fan out when target's diatonic quality is major (V/V)", () => {
+      // D major in C major → target G (degree 5), diatonic quality
+      // major. No chain ambiguity — single edge to diatonic V.
+      const raw = createTestRawFrame(1000);
+      const chord = createChord(2 as PitchClass, "maj", [
+        { pc: 2 as PitchClass, octave: 3 },
+        { pc: 6 as PitchClass, octave: 3 },
+        { pc: 9 as PitchClass, octave: 3 },
+      ]);
+      const upstream = createUpstreamFrame(1000, [chord], cMajor);
+      const result = stabilizer.apply(raw, upstream);
+
+      const edges = result.harmonicContext?.functionalEdges ?? [];
+      expect(edges).toHaveLength(1);
+      expect(edges[0].targetDiatonic).toBe(true);
+    });
+
     it("emits V/IV → IV edge from C7", () => {
       // C7 in C major — V/IV (the dominant of IV)
       const raw = createTestRawFrame(1000);
