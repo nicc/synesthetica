@@ -222,6 +222,10 @@ export class ChordShapeBuilder {
       return this.svgWavyArc(startAngle, arcSpan);
     }
 
+    if (this.margin === "zigzag") {
+      return this.svgZigzagArc(startAngle, arcSpan);
+    }
+
     if (this.margin === "convex") {
       // Larger-radius arc creates a gentler curve than the hub circle.
       // The hub boundary dips slightly inward between arms, giving a
@@ -282,6 +286,32 @@ export class ChordShapeBuilder {
       const ctrl = this.polarToXY(midAngle, waveR);
 
       path += ` Q ${ctrl.x.toFixed(1)} ${ctrl.y.toFixed(1)} ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
+    }
+
+    return path;
+  }
+
+  /**
+   * Sharp-angled zigzag along the hub. Like wavy but with straight
+   * line segments to alternating outward/inward peaks instead of
+   * smooth quadratic curves. Used for power chords (5).
+   */
+  private svgZigzagArc(startAngle: number, arcSpan: number): string {
+    const steps = Math.max(3, Math.floor(arcSpan / 20));
+    const amp = 4;
+    let path = "";
+
+    for (let i = 0; i < steps; i++) {
+      const tEnd = (i + 1) / steps;
+      const tMid = (i + 0.5) / steps;
+      const angleEnd = startAngle + arcSpan * tEnd;
+      const angleMid = startAngle + arcSpan * tMid;
+
+      const peakR = this.hubR + (i % 2 === 0 ? amp : -amp);
+      const peak = this.polarToXY(angleMid, peakR);
+      const endPt = this.polarToXY(angleEnd, this.hubR);
+
+      path += ` L ${peak.x.toFixed(1)} ${peak.y.toFixed(1)} L ${endPt.x.toFixed(1)} ${endPt.y.toFixed(1)}`;
     }
 
     return path;
@@ -397,6 +427,11 @@ export class ChordShapeBuilder {
       return;
     }
 
+    if (this.margin === "zigzag") {
+      this.threeZigzagArc(shape, startAngle, arcSpan);
+      return;
+    }
+
     if (this.margin === "convex") {
       // Replicate the SVG arc behavior: a larger-radius arc creates a
       // gentler curve than the hub circle, so the hub boundary dips
@@ -474,6 +509,30 @@ export class ChordShapeBuilder {
       const ctrl = this.polarToThree(midAngle, waveR);
 
       shape.quadraticCurveTo(ctrl.x, ctrl.y, p1.x, p1.y);
+    }
+  }
+
+  /** Sharp-angled zigzag along the hub for power (5) chords. */
+  private threeZigzagArc(
+    shape: THREE.Shape,
+    startAngle: number,
+    arcSpan: number,
+  ): void {
+    const steps = Math.max(3, Math.floor(arcSpan / 20));
+    const amp = 0.4;
+
+    for (let i = 0; i < steps; i++) {
+      const tEnd = (i + 1) / steps;
+      const tMid = (i + 0.5) / steps;
+      const angleEnd = startAngle + arcSpan * tEnd;
+      const angleMid = startAngle + arcSpan * tMid;
+
+      const peakR = this.hubR + (i % 2 === 0 ? amp : -amp);
+      const peak = this.polarToThree(angleMid, peakR);
+      const endPt = this.polarToThree(angleEnd, this.hubR);
+
+      shape.lineTo(peak.x, peak.y);
+      shape.lineTo(endPt.x, endPt.y);
     }
   }
 

@@ -249,6 +249,8 @@ function getMarginStyle(quality: ChordQuality): MarginStyle {
       return "dash-short";
     case "sus4":
       return "dash-long";
+    case "5":
+      return "zigzag";
     default:
       return "straight"; // Default for unknown
   }

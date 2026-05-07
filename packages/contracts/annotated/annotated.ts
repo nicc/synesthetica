@@ -179,7 +179,8 @@ export type MarginStyle =
   | "concave" // Diminished
   | "convex" // Augmented
   | "dash-short" // Sus2
-  | "dash-long"; // Sus4
+  | "dash-long" // Sus4
+  | "zigzag"; // Power chord (5) — quality-ambiguous, no third
 
 /**
  * Complete chord shape geometry.
