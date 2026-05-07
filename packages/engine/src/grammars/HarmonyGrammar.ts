@@ -134,6 +134,11 @@ const BORROWED_SCALE = 1 / 1.618033988749895;
  */
 const VIEWPORT_ASPECT = 100 / 75;
 
+/** Opacity for the always-on structural elements of the harmony clock
+ *  (guide rings + slot ticks). Matches DynamicsGrammar's OUTLINE_OPACITY
+ *  so the structural cues across grammars share a consistent weight. */
+const STRUCTURE_OPACITY = 0.4;
+
 // ============================================================================
 // Connection Strip Constants (SPEC 011)
 // ============================================================================
@@ -486,7 +491,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         },
         style: {
           color: { h: 0, s: 0, v: 0.55, a: 1 },
-          opacity: 0.18,
+          opacity: STRUCTURE_OPACITY,
         },
         data: {
           type: "progression-guide-ring",
@@ -517,7 +522,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         },
         style: {
           color: { h: 0, s: 0, v: 0.55, a: 1 },
-          opacity: 0.18,
+          opacity: STRUCTURE_OPACITY,
         },
         data: {
           type: "progression-slot-tick",
