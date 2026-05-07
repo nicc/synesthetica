@@ -76,10 +76,19 @@ export const CHORD_STRIP_BAR_WIDTH = NOTE_STRIP_BASE_WIDTH * 0.382;
  * Wider than the bar so the glyph has room. */
 export const CHORD_STRIP_WIDTH = 0.02;
 
-/** Offset from rhythm column's right edge to the strip's left edge.
- * Smaller now that GAP_RIGHT has shrunk (centring the rhythm column);
- * still leaves breathing room on both sides of the strip. */
-export const CHORD_STRIP_LEFT_OFFSET_FROM_GAP = 0.015;
+/**
+ * Offset from rhythm column's right edge to the strip's left edge.
+ *
+ * Sits the chord strip so the gap between the NOW line's right edge
+ * and the strip's left edge equals the gap between the beat-line
+ * outer edge and the NOW-line outer edge. Both gaps =
+ * NOTE_STRIP_BASE_WIDTH × 0.625 — derived from the NOW line
+ * extending NOTE_STRIP_BASE_WIDTH × 1.125 past the rhythm right
+ * edge and the beat lines extending NOTE_STRIP_BASE_WIDTH × 0.5,
+ * so the difference is × 0.625. Adding that gap on top of the
+ * NOW-line extension gives × 1.75.
+ */
+export const CHORD_STRIP_LEFT_OFFSET_FROM_GAP = NOTE_STRIP_BASE_WIDTH * 1.75;
 
 // ============================================================================
 // Harmony Column (right)
