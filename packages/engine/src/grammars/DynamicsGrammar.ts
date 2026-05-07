@@ -64,7 +64,7 @@ const OUTLINE_OPACITY = 0.4;
 const TICK_OPACITY = 0.25;
 
 /** Outline stroke thickness in normalized coords */
-const OUTLINE_THICKNESS = 0.001;
+export const OUTLINE_THICKNESS = 0.001;
 
 // ============================================================================
 // Colors
@@ -158,13 +158,17 @@ export class DynamicsGrammar implements IVisualGrammar {
       // Clamp top/bottom independently so notes at the edges still
       // render — the rect extends inward from the edge rather than
       // being symmetrically squashed to zero.
+      // Indicators inset by the outline thickness on all four sides
+      // so they sit flush with the inner edge of the border without
+      // overlapping it (which would brighten the border at indicator
+      // positions).
       const ageFraction = age / FADE_MS;
       const rawHalfH =
         (INDICATOR_THICKNESS_MIN +
           (INDICATOR_THICKNESS_MAX - INDICATOR_THICKNESS_MIN) * ageFraction) /
         2;
-      const top = Math.max(centerY - rawHalfH, BAR_TOP);
-      const bottom = Math.min(centerY + rawHalfH, BAR_BOTTOM);
+      const top = Math.max(centerY - rawHalfH, BAR_TOP + ot);
+      const bottom = Math.min(centerY + rawHalfH, BAR_BOTTOM - ot);
 
       entities.push({
         id: `${this.id}:ind:${i}`,
@@ -178,9 +182,9 @@ export class DynamicsGrammar implements IVisualGrammar {
         },
         data: {
           type: "dynamics-indicator",
-          x: BAR_LEFT,
+          x: BAR_LEFT + ot,
           y: top,
-          w: BAR_WIDTH,
+          w: BAR_WIDTH - 2 * ot,
           h: bottom - top,
         },
       });

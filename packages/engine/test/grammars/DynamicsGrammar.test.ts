@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { DynamicsGrammar } from "../../src/grammars/DynamicsGrammar";
+import {
+  DynamicsGrammar,
+  OUTLINE_THICKNESS,
+} from "../../src/grammars/DynamicsGrammar";
 import type {
   GrammarContext,
   DynamicsState,
@@ -171,8 +174,8 @@ describe("DynamicsGrammar", () => {
       const ind = indicators(scene.entities)[0];
 
       expect(ind.data?.type).toBe("dynamics-indicator");
-      expect(ind.data?.x).toBeCloseTo(BAR_LEFT, 3);
-      expect(ind.data?.w).toBeCloseTo(BAR_WIDTH, 3);
+      expect(ind.data?.x).toBeCloseTo(BAR_LEFT + OUTLINE_THICKNESS, 4);
+      expect(ind.data?.w).toBeCloseTo(BAR_WIDTH - 2 * OUTLINE_THICKNESS, 4);
       expect(typeof ind.data?.y).toBe("number");
       expect(typeof ind.data?.h).toBe("number");
     });
@@ -188,8 +191,8 @@ describe("DynamicsGrammar", () => {
       const scene = grammar.update(frame, null);
       const ind = indicators(scene.entities)[0];
 
-      expect(ind.data?.x).toBeCloseTo(BAR_LEFT, 3);
-      expect(ind.data?.w).toBeCloseTo(BAR_WIDTH, 3);
+      expect(ind.data?.x).toBeCloseTo(BAR_LEFT + OUTLINE_THICKNESS, 4);
+      expect(ind.data?.w).toBeCloseTo(BAR_WIDTH - 2 * OUTLINE_THICKNESS, 4);
     });
 
     it("rect stays within BAR_TOP..BAR_BOTTOM vertically", () => {
