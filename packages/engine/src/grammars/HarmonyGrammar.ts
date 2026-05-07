@@ -146,6 +146,11 @@ const STRIP_RADIAL_FRACTION = 0.08;
  *  rendered height; borrowed strips scale by 1/φ to match borrowed numerals. */
 const STRIP_ARC_WIDTH = GLYPH_SIZE * 1.5;
 
+/** Max overall strip opacity at full edge weight. Caps the brightness
+ *  of even the strongest functional connections so they remain a
+ *  background structural cue rather than competing with the numerals. */
+const MAX_STRIP_OPACITY = 0.8;
+
 // ============================================================================
 // Scrolling Chord Strip Constants
 // ============================================================================
@@ -674,7 +679,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         fadeOpacity = 1 - ageSinceRelease / fadeMs;
       }
 
-      const overallOpacity = fadeOpacity * edge.weight;
+      const overallOpacity = fadeOpacity * edge.weight * MAX_STRIP_OPACITY;
       if (overallOpacity < 0.01) continue;
 
       // Source: always borrowed (only borrowed chords emit edges).

@@ -312,8 +312,8 @@ describe("HarmonyGrammar", () => {
       expect(strip.data?.midpointHue).toBeDefined();
       // Cross-ring: both anchors at middle guide ring (same midR)
       expect(strip.data?.sourceMidR).toBeCloseTo(strip.data?.targetMidR as number);
-      // Opacity scaled by edge weight
-      expect(strip.style.opacity).toBeCloseTo(0.85, 1);
+      // Opacity scaled by edge weight × MAX_STRIP_OPACITY (0.8)
+      expect(strip.style.opacity).toBeCloseTo(0.85 * 0.8, 2);
     });
 
     it("emits no strip entities when no edges exist", () => {

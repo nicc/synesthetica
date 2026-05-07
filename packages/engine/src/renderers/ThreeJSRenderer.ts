@@ -554,9 +554,6 @@ export class ThreeJSRenderer implements IRenderer {
     let group = this.entityObjects.get(entity.id) as THREE.Group | undefined;
     if (!group) {
       group = new THREE.Group();
-      // Two child meshes: source strip + target strip
-      group.add(this.makeConnectionStripMesh());
-      group.add(this.makeConnectionStripMesh());
       this.scene.add(group);
       this.entityObjects.set(entity.id, group);
     }
@@ -572,9 +569,10 @@ export class ThreeJSRenderer implements IRenderer {
     const midpointHue = data.midpointHue as number;
     const overallOpacity = entity.style.opacity ?? 1;
 
-    // Update source strip
-    this.updateConnectionStripChild(
-      group.children[0] as THREE.Mesh,
+    // Source strip — child[0]
+    this.upsertConnectionStripChild(
+      group,
+      0,
       data.sourceAngleDeg as number,
       data.sourceMidR as number,
       data.sourceChordR as number,
@@ -584,9 +582,10 @@ export class ThreeJSRenderer implements IRenderer {
       overallOpacity,
     );
 
-    // Update target strip
-    this.updateConnectionStripChild(
-      group.children[1] as THREE.Mesh,
+    // Target strip — child[1]
+    this.upsertConnectionStripChild(
+      group,
+      1,
       data.targetAngleDeg as number,
       data.targetMidR as number,
       data.targetChordR as number,
@@ -597,22 +596,17 @@ export class ThreeJSRenderer implements IRenderer {
     );
   }
 
-  /** Build a connection-strip mesh (4 vertices, 2 triangles, ShaderMaterial). */
-  private makeConnectionStripMesh(): THREE.Mesh {
-    const geometry = new THREE.BufferGeometry();
-    // 4 vertices, positions updated per-frame
-    const positions = new Float32Array(4 * 3);
-    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    // UVs encode position along the radial axis (UV.x: 0=midR side, 1=chordR side)
-    const uvs = new Float32Array([0, 0, 0, 1, 1, 1, 1, 0]);
-    geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
-    geometry.setIndex([0, 1, 2, 0, 2, 3]);
-
-    const material = new THREE.ShaderMaterial({
+  /** Build the ShaderMaterial used by both connection-strip arcs. */
+  private makeConnectionStripMaterial(): THREE.ShaderMaterial {
+    return new THREE.ShaderMaterial({
       uniforms: {
         midColor: { value: new THREE.Color(1, 1, 1) },
         chordColor: { value: new THREE.Color(1, 1, 1) },
         overallOpacity: { value: 1 },
+        // RingGeometry's UV.x runs 0=inner→1=outer. Whether "mid"
+        // colour is at inner or outer depends on the strip direction.
+        // 1.0 = mid at inner, 0.0 = mid at outer.
+        midAtInner: { value: 1.0 },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -626,8 +620,10 @@ export class ThreeJSRenderer implements IRenderer {
         uniform vec3 midColor;
         uniform vec3 chordColor;
         uniform float overallOpacity;
+        uniform float midAtInner;
         void main() {
-          float t = vUv.x;
+          // t = 0 at midR side (full midColor) → 1 at chord side (chord with fade).
+          float t = midAtInner > 0.5 ? vUv.x : (1.0 - vUv.x);
           vec3 color;
           float alpha;
           if (t < 0.9) {
@@ -642,14 +638,21 @@ export class ThreeJSRenderer implements IRenderer {
       `,
       transparent: true,
       depthWrite: false,
+      side: THREE.DoubleSide,
     });
-
-    return new THREE.Mesh(geometry, material);
   }
 
-  /** Update one connection-strip child mesh's geometry and uniforms. */
-  private updateConnectionStripChild(
-    mesh: THREE.Mesh,
+  /**
+   * Insert or update one connection-strip child mesh as a curved arc
+   * (THREE.RingGeometry). The arc is a sector of an annulus from
+   * innerR=min(midR,chordR) to outerR=max(midR,chordR), centred on
+   * angleDeg with angular extent derived from arcWidth at the mean
+   * radius. Geometry is rebuilt whenever the strip's angular/radial
+   * inputs change.
+   */
+  private upsertConnectionStripChild(
+    group: THREE.Group,
+    childIndex: number,
     angleDeg: number,
     midR: number,
     chordR: number,
@@ -658,48 +661,43 @@ export class ThreeJSRenderer implements IRenderer {
     chordHue: number,
     overallOpacity: number,
   ): void {
-    // Convert normalized radii to world units (matches existing
-    // updateProgressionGuideRing convention).
     const midRWorld = midR * this.config.worldWidth;
     const chordRWorld = chordR * this.config.worldWidth;
+    const innerR = Math.min(midRWorld, chordRWorld);
+    const outerR = Math.max(midRWorld, chordRWorld);
+    const midAtInner = midRWorld <= chordRWorld;
 
-    // Angle: 0° at top (12 o'clock), clockwise. Three.js y-up, so
-    // negate sin to keep the visual orientation consistent.
-    const angleRad = ((angleDeg - 90) * Math.PI) / 180;
-    const cosA = Math.cos(angleRad);
-    const sinA = Math.sin(angleRad);
+    // arcWidth is in world units. Convert to angular extent at the
+    // strip's mean radius so its visible arc length matches arcWidth.
+    const meanR = (innerR + outerR) / 2;
+    const arcRad = arcWidth / Math.max(meanR, 0.001);
 
-    // Radial unit vector (pointing outward from clock center)
-    const rx = cosA;
-    const ry = -sinA; // y-up flip
+    // Convert clock-face angle (0=top, clockwise) to Three.js theta
+    // (0=+X, counterclockwise): theta = π/2 − clockAngle (radians).
+    const thetaCenter = Math.PI / 2 - (angleDeg * Math.PI) / 180;
+    const thetaStart = thetaCenter - arcRad / 2;
+    const thetaLength = arcRad;
 
-    // Tangent unit vector (perpendicular to radial)
-    const tx = sinA;
-    const ty = cosA;
+    // Tag stored on the mesh's userData so we only rebuild geometry
+    // when the inputs change. Cheap to compute, big saving on resize.
+    const geomKey = `${innerR.toFixed(3)}|${outerR.toFixed(3)}|${thetaStart.toFixed(4)}|${thetaLength.toFixed(4)}`;
 
-    const halfW = arcWidth / 2;
-
-    // 4 corners (in group-local coords; group is positioned at clock center)
-    // Index → UV mapping (set in geometry above):
-    //   0: (0,0) — midR side, -tangent
-    //   1: (0,1) — midR side, +tangent
-    //   2: (1,1) — chordR side, +tangent
-    //   3: (1,0) — chordR side, -tangent
-    const positions = (mesh.geometry.attributes.position as THREE.BufferAttribute);
-    const arr = positions.array as Float32Array;
-    arr[0] = midRWorld * rx - halfW * tx;
-    arr[1] = midRWorld * ry - halfW * ty;
-    arr[2] = 0;
-    arr[3] = midRWorld * rx + halfW * tx;
-    arr[4] = midRWorld * ry + halfW * ty;
-    arr[5] = 0;
-    arr[6] = chordRWorld * rx + halfW * tx;
-    arr[7] = chordRWorld * ry + halfW * ty;
-    arr[8] = 0;
-    arr[9] = chordRWorld * rx - halfW * tx;
-    arr[10] = chordRWorld * ry - halfW * ty;
-    arr[11] = 0;
-    positions.needsUpdate = true;
+    let mesh = group.children[childIndex] as THREE.Mesh | undefined;
+    if (!mesh) {
+      mesh = new THREE.Mesh(
+        new THREE.RingGeometry(innerR, outerR, 32, 1, thetaStart, thetaLength),
+        this.makeConnectionStripMaterial(),
+      );
+      mesh.frustumCulled = false;
+      mesh.userData.geomKey = geomKey;
+      group.add(mesh);
+    } else if (mesh.userData.geomKey !== geomKey) {
+      mesh.geometry.dispose();
+      mesh.geometry = new THREE.RingGeometry(
+        innerR, outerR, 32, 1, thetaStart, thetaLength,
+      );
+      mesh.userData.geomKey = geomKey;
+    }
 
     const material = mesh.material as THREE.ShaderMaterial;
     (material.uniforms.midColor.value as THREE.Color).copy(
@@ -709,6 +707,7 @@ export class ThreeJSRenderer implements IRenderer {
       this.hsvToThreeColor({ h: chordHue, s: 0.7, v: 0.9 }),
     );
     material.uniforms.overallOpacity.value = overallOpacity;
+    material.uniforms.midAtInner.value = midAtInner ? 1.0 : 0.0;
   }
 
   /**
