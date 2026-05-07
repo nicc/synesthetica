@@ -112,10 +112,8 @@ const DIATONIC_GLYPH_RADIUS_FRACTION =
 const BORROWED_GLYPH_RADIUS_FRACTION =
   (GUIDE_RING_MIDDLE_FRACTION + GUIDE_RING_OUTER_FRACTION) / 2; // 0.81
 
-/** Glyph size in world units (height of uppercase numeral). Sized to
- *  remain visually proportional to the larger clock (SPEC 011 layout).
- */
-const GLYPH_SIZE = 4;
+/** Glyph size in world units (height of uppercase diatonic numeral). */
+const GLYPH_SIZE = 2.4;
 
 /**
  * Scale factor applied to borrowed-ring glyphs (size + stroke). 1/φ ≈ 0.618
@@ -123,6 +121,18 @@ const GLYPH_SIZE = 4;
  * status.
  */
 const BORROWED_SCALE = 1 / 1.618033988749895;
+
+/**
+ * Viewport aspect ratio (worldWidth / worldHeight from the default
+ * ThreeJSRenderer config). Used to compensate for the renderer's
+ * asymmetric x/y scaling when computing radial positions on the
+ * harmony clock — the renderer scales entity position.x by worldWidth
+ * (100) and position.y by worldHeight (75), so a circular position in
+ * normalized coords would render as an ellipse without this fix.
+ * Rings and connection strips are immune because the renderer draws
+ * them in world units using worldWidth for both axes.
+ */
+const VIEWPORT_ASPECT = 100 / 75;
 
 // ============================================================================
 // Connection Strip Constants (SPEC 011)
@@ -565,10 +575,15 @@ export class HarmonyGrammar implements IVisualGrammar {
       const radius = fc.borrowed ? borrowedRadius : diatonicRadius;
       const scale = fc.borrowed ? BORROWED_SCALE : 1;
 
-      // Position on the clock, centered on progression cell
-      // Normalized y is top-down, so +sin moves downward (clockwise)
+      // Position on the clock, centered on progression cell.
+      // y is multiplied by VIEWPORT_ASPECT to compensate for the
+      // renderer's worldHeight < worldWidth — without this, numerals
+      // at 12/6 o'clock fall short of their ring (the ring uses
+      // worldWidth for both axes, the position scales y by worldHeight).
       const x = HARMONY_PROGRESSION_CENTER_X + radius * Math.cos(angleRad);
-      const y = HARMONY_PROGRESSION_CENTER_Y + radius * Math.sin(angleRad);
+      const y =
+        HARMONY_PROGRESSION_CENTER_Y +
+        radius * VIEWPORT_ASPECT * Math.sin(angleRad);
 
       // Colour from root pitch class
       const hue = pcToHue(fc.rootPc, DEFAULT_HUE_INVARIANT);
