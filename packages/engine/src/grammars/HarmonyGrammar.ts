@@ -117,9 +117,17 @@ const BORROWED_GLYPH_RADIUS_FRACTION =
 const GLYPH_SIZE = 2.4;
 
 /**
+ * Scale factor applied to diatonic-ring glyphs (size + stroke). Diatonic
+ * numerals were initially rendered at GLYPH_SIZE × 1; reduced to 0.8 to
+ * sit more comfortably within the diatonic band.
+ */
+const DIATONIC_SCALE = 0.8;
+
+/**
  * Scale factor applied to borrowed-ring glyphs (size + stroke). 1/φ ≈ 0.618
  * gives the outer ring a lighter visual weight matching its outside-the-key
- * status.
+ * status. Held independent of DIATONIC_SCALE so adjustments to one don't
+ * coincidentally resize the other.
  */
 const BORROWED_SCALE = 1 / 1.618033988749895;
 
@@ -588,7 +596,7 @@ export class HarmonyGrammar implements IVisualGrammar {
       const angleDeg = modalWheelAngle(semitonesFromTonic, mode);
       const angleRad = ((angleDeg - 90) * Math.PI) / 180; // -90 puts 0° at top
       const radius = fc.borrowed ? borrowedRadius : diatonicRadius;
-      const scale = fc.borrowed ? BORROWED_SCALE : 1;
+      const scale = fc.borrowed ? BORROWED_SCALE : DIATONIC_SCALE;
 
       // Position on the clock, centered on progression cell.
       // y is multiplied by VIEWPORT_ASPECT to compensate for the
