@@ -140,7 +140,7 @@ const VIEWPORT_ASPECT = 100 / 75;
 
 /** Strip radial extent as fraction of clock radius. Short — strips are
  *  accent marks, not bars spanning the band. */
-const STRIP_RADIAL_FRACTION = 0.08;
+const STRIP_RADIAL_FRACTION = 0.068;
 
 /** Strip arc width in world units. Roughly matches the numeral's
  *  rendered height; borrowed strips scale by 1/φ to match borrowed numerals. */

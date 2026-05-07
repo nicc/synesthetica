@@ -596,6 +596,30 @@ export class ThreeJSRenderer implements IRenderer {
     );
   }
 
+  /**
+   * Three.js's RingGeometry assigns UVs based on bounding-box position
+   * ((vertex.x / radius + 1) / 2 etc.), which doesn't map to radial
+   * distance for our gradient. Replace UV.x with the actual radial
+   * fraction (0 at innerR → 1 at outerR) so the connection-strip
+   * shader can read radial position from vUv.x.
+   */
+  private remapRingGeometryUVsToRadial(
+    geom: THREE.BufferGeometry,
+    innerR: number,
+    outerR: number,
+  ): void {
+    const positions = geom.attributes.position as THREE.BufferAttribute;
+    const uvs = geom.attributes.uv as THREE.BufferAttribute;
+    const span = outerR - innerR || 1;
+    for (let i = 0; i < positions.count; i++) {
+      const vx = positions.getX(i);
+      const vy = positions.getY(i);
+      const r = Math.sqrt(vx * vx + vy * vy);
+      uvs.setXY(i, (r - innerR) / span, 0);
+    }
+    uvs.needsUpdate = true;
+  }
+
   /** Build the ShaderMaterial used by both connection-strip arcs. */
   private makeConnectionStripMaterial(): THREE.ShaderMaterial {
     return new THREE.ShaderMaterial({
@@ -684,18 +708,21 @@ export class ThreeJSRenderer implements IRenderer {
 
     let mesh = group.children[childIndex] as THREE.Mesh | undefined;
     if (!mesh) {
-      mesh = new THREE.Mesh(
-        new THREE.RingGeometry(innerR, outerR, 32, 1, thetaStart, thetaLength),
-        this.makeConnectionStripMaterial(),
+      const geom = new THREE.RingGeometry(
+        innerR, outerR, 32, 1, thetaStart, thetaLength,
       );
+      this.remapRingGeometryUVsToRadial(geom, innerR, outerR);
+      mesh = new THREE.Mesh(geom, this.makeConnectionStripMaterial());
       mesh.frustumCulled = false;
       mesh.userData.geomKey = geomKey;
       group.add(mesh);
     } else if (mesh.userData.geomKey !== geomKey) {
       mesh.geometry.dispose();
-      mesh.geometry = new THREE.RingGeometry(
+      const geom = new THREE.RingGeometry(
         innerR, outerR, 32, 1, thetaStart, thetaLength,
       );
+      this.remapRingGeometryUVsToRadial(geom, innerR, outerR);
+      mesh.geometry = geom;
       mesh.userData.geomKey = geomKey;
     }
 
