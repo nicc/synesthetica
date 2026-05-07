@@ -1472,11 +1472,17 @@ export class ThreeJSRenderer implements IRenderer {
       );
       const maxLineWidth = Math.ceil(Math.max(...lineWidths));
 
-      const firstLineMetric = measureCtx.measureText(lines[0]);
+      // actualBoundingBox metrics are per-content (the rendered ink's
+      // top/bottom pixels), so "Fm" and "F5" produce different ascents
+      // and descents — which made pxToWorld vary and chord labels
+      // render at slightly different sizes. Measure a fixed reference
+      // string covering cap height, descender, and accidentals so the
+      // text-to-world ratio stays constant across chords.
+      const refMetric = measureCtx.measureText("Hg♭♯");
       const ascent =
-        firstLineMetric.actualBoundingBoxAscent || CANVAS_TEXT_PX * 0.75;
+        refMetric.actualBoundingBoxAscent || CANVAS_TEXT_PX * 0.75;
       const descent =
-        firstLineMetric.actualBoundingBoxDescent || CANVAS_TEXT_PX * 0.25;
+        refMetric.actualBoundingBoxDescent || CANVAS_TEXT_PX * 0.25;
       const lineHeightPx = Math.ceil(ascent + descent);
       const lineGapPx = Math.round(lineHeightPx * LINE_GAP_FRACTION);
       const totalTextHeight =
