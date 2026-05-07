@@ -454,15 +454,5 @@ keyModeSelect.addEventListener("change", applyKeySettings);
 clearKeyBtn.addEventListener("click", clearKey);
 toggleChordModeBtn.addEventListener("click", toggleChordMode);
 
-// Initialize on load. Wait for DejaVu Sans ExtraLight to load before
-// continuing — the chord-label canvas pulls glyphs synchronously and
-// would otherwise rasterise the first chord with a fallback font.
-async function init() {
-  try {
-    await document.fonts.load("200 16px 'DejaVu Sans ExtraLight'");
-  } catch (err) {
-    console.warn("Font preload failed; chord labels may flash on first render:", err);
-  }
-  await initMidi();
-}
-init();
+// Initialize on load
+initMidi();

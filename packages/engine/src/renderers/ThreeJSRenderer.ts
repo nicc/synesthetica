@@ -1393,11 +1393,12 @@ export class ThreeJSRenderer implements IRenderer {
     const LINE_HEIGHT_WORLD = 1.75;
     const CANVAS_TEXT_PX = 72;
     const LINE_GAP_FRACTION = 0.1; // Tight gap between stacked slash lines
-    // DejaVu Sans ExtraLight — loaded via @font-face in the web app.
-    // Used for the chord-label text. Music accidentals (♭, ♯) aren't in
-    // ExtraLight's glyph table so we don't request them — we draw them
-    // as paths below at the same stroke weight as the body letters.
-    const CANVAS_FONT = `200 ${CANVAS_TEXT_PX}px "DejaVu Sans ExtraLight", "DejaVu Sans", sans-serif`;
+    // Lucida Sans family — humanist sans that natively contains music
+    // accidentals (U+266D ♭, U+266F ♯) so the whole chord label
+    // renders in one font with consistent metrics. Lucida Sans Unicode
+    // ships on Windows; Lucida Grande on macOS; both have music
+    // symbols. sans-serif as last-resort fallback.
+    const CANVAS_FONT = `${CANVAS_TEXT_PX}px "Lucida Sans Unicode", "Lucida Grande", "Lucida Sans", sans-serif`;
 
     // Slash chord split: "EbM/G" → ["EbM", "/G"]. Single slash only;
     // anything else renders on one line.
@@ -1417,73 +1418,20 @@ export class ThreeJSRenderer implements IRenderer {
         this.disposeObject(mesh);
       }
 
-      // Measure each line as a sequence of runs (text spans + ♭/♯
-      // accidentals). Accidentals are drawn as paths at the same weight
-      // as ExtraLight body strokes; their natural advance widths are
-      // computed from the cap height to read as proper glyphs without
-      // the wide side-bearings of a music-symbol fallback font.
+      // Measure each line, take the widest for canvas width.
       const measureCanvas = document.createElement("canvas");
       const measureCtx = measureCanvas.getContext("2d");
       if (!measureCtx) return;
       measureCtx.font = CANVAS_FONT;
 
-      // Cap-height proxy. We use a known uppercase letter's bounding box
-      // ascent rather than the line's metric, since whitespace and
-      // music-symbol fallbacks can perturb actualBoundingBoxAscent.
-      const capMetric = measureCtx.measureText("H");
-      const capHeight =
-        capMetric.actualBoundingBoxAscent || CANVAS_TEXT_PX * 0.72;
-      // ExtraLight body stroke width approximated as a fraction of cap
-      // height. 0.06 reads as a thin sans without anti-alias dropout.
-      const accidentalStroke = capHeight * 0.06;
-      const flatWidth = capHeight * 0.5;
-      const sharpWidth = capHeight * 0.6;
-
-      type Run =
-        | { kind: "text"; text: string; width: number }
-        | { kind: "flat" | "sharp"; width: number };
-
-      const tokenize = (line: string): Run[] => {
-        const runs: Run[] = [];
-        let buf = "";
-        const flushBuf = () => {
-          if (buf) {
-            runs.push({
-              kind: "text",
-              text: buf,
-              width: measureCtx.measureText(buf).width,
-            });
-            buf = "";
-          }
-        };
-        for (const ch of line) {
-          if (ch === "♭") {
-            flushBuf();
-            runs.push({ kind: "flat", width: flatWidth });
-          } else if (ch === "♯") {
-            flushBuf();
-            runs.push({ kind: "sharp", width: sharpWidth });
-          } else {
-            buf += ch;
-          }
-        }
-        flushBuf();
-        return runs;
-      };
-
-      const lineRuns = lines.map(tokenize);
-      const lineWidths = lineRuns.map((runs) =>
-        runs.reduce((sum, r) => sum + r.width, 0),
+      const lineMetrics = lines.map((line) => measureCtx.measureText(line));
+      const maxLineWidth = Math.ceil(
+        Math.max(...lineMetrics.map((m) => m.width)),
       );
-      const maxLineWidth = Math.ceil(Math.max(...lineWidths));
-
-      // Ascent/descent from the first text-bearing line so cap-height
-      // and baselines match what fillText draws.
-      const firstLineMetric = measureCtx.measureText(lines[0]);
       const ascent =
-        firstLineMetric.actualBoundingBoxAscent || CANVAS_TEXT_PX * 0.75;
+        lineMetrics[0].actualBoundingBoxAscent || CANVAS_TEXT_PX * 0.75;
       const descent =
-        firstLineMetric.actualBoundingBoxDescent || CANVAS_TEXT_PX * 0.25;
+        lineMetrics[0].actualBoundingBoxDescent || CANVAS_TEXT_PX * 0.25;
       const lineHeightPx = Math.ceil(ascent + descent);
       const lineGapPx = Math.round(lineHeightPx * LINE_GAP_FRACTION);
       const totalTextHeight =
@@ -1496,84 +1444,16 @@ export class ThreeJSRenderer implements IRenderer {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // Transparent background, white text. Each line is rendered run
-      // by run from a left-aligned cursor, centred within the canvas.
+      // Transparent background, white text — centre each line horizontally.
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.font = CANVAS_FONT;
       ctx.fillStyle = "#ffffff";
-      ctx.strokeStyle = "#ffffff";
       ctx.textBaseline = "alphabetic";
-      ctx.textAlign = "left";
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-
-      const drawFlat = (x: number, baselineY: number) => {
-        const stemX = x + accidentalStroke / 2;
-        const top = baselineY - capHeight;
-        const stemBottom = baselineY;
-        const bowlTop = baselineY - capHeight * 0.5;
-        const bowlBottom = baselineY - capHeight * 0.04;
-        const bowlPeakX = stemX + flatWidth - accidentalStroke;
-        ctx.lineWidth = accidentalStroke;
-        // Stem
-        ctx.beginPath();
-        ctx.moveTo(stemX, top);
-        ctx.lineTo(stemX, stemBottom);
-        ctx.stroke();
-        // Bowl: filled teardrop loop from stem out and back to stem
-        ctx.beginPath();
-        ctx.moveTo(stemX, bowlTop);
-        ctx.bezierCurveTo(
-          bowlPeakX,
-          bowlTop + capHeight * 0.05,
-          bowlPeakX,
-          bowlBottom - capHeight * 0.05,
-          stemX,
-          bowlBottom,
-        );
-        ctx.stroke();
-      };
-
-      const drawSharp = (x: number, baselineY: number) => {
-        const top = baselineY - capHeight;
-        // Sharp extends slightly above cap height and below baseline so
-        // it reads as a proper accidental rather than a hash sign.
-        const overshoot = capHeight * 0.1;
-        const v1 = x + sharpWidth * 0.3;
-        const v2 = x + sharpWidth * 0.7;
-        const hLow = baselineY - capHeight * 0.28;
-        const hHigh = baselineY - capHeight * 0.62;
-        const slant = capHeight * 0.05;
-        ctx.lineWidth = accidentalStroke;
-        // Two vertical strokes
-        ctx.beginPath();
-        ctx.moveTo(v1, top - overshoot);
-        ctx.lineTo(v1, baselineY + overshoot);
-        ctx.moveTo(v2, top - overshoot);
-        ctx.lineTo(v2, baselineY + overshoot);
-        // Two horizontals, slightly slanted up to the right
-        ctx.moveTo(x, hLow + slant);
-        ctx.lineTo(x + sharpWidth, hLow - slant);
-        ctx.moveTo(x, hHigh + slant);
-        ctx.lineTo(x + sharpWidth, hHigh - slant);
-        ctx.stroke();
-      };
-
+      ctx.textAlign = "center";
       const centerX = canvas.width / 2;
       for (let i = 0; i < lines.length; i++) {
-        const runs = lineRuns[i];
         const baselineY = padding + ascent + i * (lineHeightPx + lineGapPx);
-        let cursor = centerX - lineWidths[i] / 2;
-        for (const run of runs) {
-          if (run.kind === "text") {
-            ctx.fillText(run.text, cursor, baselineY);
-          } else if (run.kind === "flat") {
-            drawFlat(cursor, baselineY);
-          } else {
-            drawSharp(cursor, baselineY);
-          }
-          cursor += run.width;
-        }
+        ctx.fillText(lines[i], centerX, baselineY);
       }
 
       const texture = new THREE.CanvasTexture(canvas);
