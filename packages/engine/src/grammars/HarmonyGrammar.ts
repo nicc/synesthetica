@@ -368,14 +368,16 @@ export class HarmonyGrammar implements IVisualGrammar {
       // Chord label (center of progression wheel). Uses Tonal's chord
       // name directly — already includes slash notation for inversions
       // (e.g. "EbM/G"). Mode selects harmonic vs bass-led reading.
-      // Replace ASCII flats (e.g. "Bb") with the Unicode flat symbol
-      // (♭) so labels match the visual register of musical notation.
+      // Replace ASCII accidentals (e.g. "Bb", "F#") with their Unicode
+      // music-symbol equivalents so labels read as proper musical
+      // notation. The renderer draws ♭/♯ as path glyphs to keep them
+      // in-register with the body font.
       const rawName =
         input.chordInterpretation === "bass-led"
           ? chord.chord.bassLed.name
           : chord.chord.harmonic.name;
       const labelName = rawName
-        ? rawName.replace(/([A-G])b/g, "$1♭")
+        ? rawName.replace(/([A-G])b/g, "$1♭").replace(/([A-G])#/g, "$1♯")
         : rawName;
       if (labelName) {
         entities.push({
