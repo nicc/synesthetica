@@ -675,6 +675,20 @@ export class ChordShapeBuilder {
           const r = this.hubR + (arcMidDist - this.hubR) * profile;
           points.push(this.polarToThree(angle, r));
         }
+      } else if (this.margin === "zigzag") {
+        // Sharp angular peaks alternating outward/inward — same
+        // step/amp as the body so the outline tracks the fill.
+        const steps = Math.max(3, Math.floor(arcSpan / 20));
+        const amp = 0.4;
+        for (let s = 0; s < steps; s++) {
+          const tEnd = (s + 1) / steps;
+          const tMid = (s + 0.5) / steps;
+          const angleEnd = startAngle + arcSpan * tEnd;
+          const angleMid = startAngle + arcSpan * tMid;
+          const peakR = this.hubR + (s % 2 === 0 ? amp : -amp);
+          points.push(this.polarToThree(angleMid, peakR));
+          points.push(this.polarToThree(angleEnd, this.hubR));
+        }
       } else {
         // straight / dash-short / dash-long: circular arc
         const segments = Math.max(8, Math.ceil(arcSpan / 3));
