@@ -646,17 +646,15 @@ export class ThreeJSRenderer implements IRenderer {
         uniform float overallOpacity;
         uniform float midAtInner;
         void main() {
-          // t = 0 at midR side (full midColor) → 1 at chord side (chord with fade).
+          // t = 0 at midR side (guide ring, full opacity)
+          // t = 1 at chord side (numeral edge, zero opacity)
           float t = midAtInner > 0.5 ? vUv.x : (1.0 - vUv.x);
-          vec3 color;
-          float alpha;
-          if (t < 0.9) {
-            color = mix(midColor, chordColor, t / 0.9);
-            alpha = 1.0;
-          } else {
-            color = chordColor;
-            alpha = 1.0 - (t - 0.9) / 0.1;
-          }
+          // Linear hue blend across the strip's radial axis.
+          vec3 color = mix(midColor, chordColor, t);
+          // Non-linear opacity falloff: 1 - t^4 keeps the strip near
+          // full opacity for the inner two-thirds, then drops rapidly
+          // toward the chord-side edge.
+          float alpha = 1.0 - pow(t, 4.0);
           gl_FragColor = vec4(color, alpha * overallOpacity);
         }
       `,
