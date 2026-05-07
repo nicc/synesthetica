@@ -48,12 +48,14 @@ export const DYNAMICS_BAR_WIDTH = DYNAMICS_BAR_RIGHT - DYNAMICS_BAR_LEFT;
 // Gaps
 // ============================================================================
 
-/** Gap between dynamics and rhythm columns (wider — visual breathing room) */
-export const GAP_LEFT = 0.03;
+/** Gap between dynamics and rhythm columns. Equal to GAP_RIGHT so the
+ * rhythm column sits visually centred between the dynamics bar and
+ * the harmony column. */
+export const GAP_LEFT = 0.05;
 
-/** Gap between rhythm and harmony columns. Houses the chord strip
- * plus breathing room on both sides. */
-export const GAP_RIGHT = 0.07;
+/** Gap between rhythm and harmony columns. Houses the chord strip;
+ * narrower than before so the rhythm column itself centres. */
+export const GAP_RIGHT = 0.05;
 
 // ============================================================================
 // Chord Strip (sits in GAP_RIGHT between rhythm and harmony)
@@ -75,9 +77,9 @@ export const CHORD_STRIP_BAR_WIDTH = NOTE_STRIP_BASE_WIDTH * 0.382;
 export const CHORD_STRIP_WIDTH = 0.02;
 
 /** Offset from rhythm column's right edge to the strip's left edge.
- * Generous spacing so the strip reads as a midground, not crammed
- * against the note strips. */
-export const CHORD_STRIP_LEFT_OFFSET_FROM_GAP = 0.0375;
+ * Smaller now that GAP_RIGHT has shrunk (centring the rhythm column);
+ * still leaves breathing room on both sides of the strip. */
+export const CHORD_STRIP_LEFT_OFFSET_FROM_GAP = 0.015;
 
 // ============================================================================
 // Harmony Column (right)
