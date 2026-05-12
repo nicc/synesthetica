@@ -1,8 +1,8 @@
 # SPEC 012: Polyphonic Audio Input via Basic Pitch
 
 Status: Approved
-Date: 2026-05-12
-Source: design conversation (May 2026); supersedes the Meyda evaluation captured in synesthetica-y7q
+Date: 2026-05-12 (amended same day after spike findings)
+Source: design conversation (May 2026); supersedes the Meyda evaluation captured in synesthetica-y7q. Architecture amended per docs/learnings/2026-05-12-basic-pitch-spike.md (synesthetica-w1z).
 
 ## Summary
 
@@ -13,7 +13,7 @@ A second adapter for monophonic continuous-pitch input (voice, single instrument
 ## Goals
 
 1. Live microphone → polyphonic note events through the existing pipeline.
-2. End-to-end latency target ≤ 150 ms typical, 200 ms ceiling, measured from note onset at the microphone to the corresponding visual change on screen.
+2. End-to-end latency target ≤ 150 ms typical, 250 ms ceiling, measured from note onset at the microphone to the corresponding visual change on screen. (Original spec stated 200 ms ceiling; revised after synesthetica-w1z spike — see Latency Budget.)
 3. Confidence values are first-class — every audio-derived event carries a confidence; downstream grammars and stabilizers may filter, weight, or visually modulate based on it.
 4. MIDI and audio inputs are mutually exclusive. Only one input source is active per session.
 5. The audio path is opt-in — MIDI-only users do not pay the Basic Pitch download cost.
@@ -140,17 +140,22 @@ Three threads, isolated behind one adapter:
 
 ### Ring buffer
 
-A `SharedArrayBuffer` carrying a Float32 sample ring plus two `Uint32Array` indices (head, tail) accessed with `Atomics.load` / `Atomics.store`. Single producer (worklet) writes samples and bumps head; single consumer (worker) reads samples and bumps tail. No locks. Size chosen to hold ~1 second of audio at 22.05 kHz (≈ 22050 samples = 88 KB) — generous enough to absorb scheduling jitter, small enough to keep memory pressure trivial.
+A `SharedArrayBuffer` carrying a Float32 sample ring plus two `Uint32Array` indices (head, tail) accessed with `Atomics.load` / `Atomics.store`. Single producer (worklet) writes samples and bumps head; single consumer (worker) reads samples and bumps tail. No locks. Size chosen to hold ~2.5 seconds of audio at 22.05 kHz (≈ 55,125 samples = 220 KB) — the model's window is 2 s and we want a safety margin for scheduling jitter.
 
 The ring buffer implementation lives in `packages/adapters/src/audio/AudioRing.ts` and is unit-tested without the audio context (writes from one fake "producer", reads from a fake "consumer").
 
 ### Sliding-window inference
 
 - **Sample rate**: 22.05 kHz (Basic Pitch native rate). Resampling happens in the worklet (linear or polyphase; benchmark later).
-- **Window**: 250 ms (≈ 5512 samples). The model receives this as one inference input.
-- **Right-context within window**: ~100 ms. The model emits onsets that lag the actual onset by at most this much, since it needs to see a bit of the future to confirm.
-- **Hop**: 30 ms. The worker runs inference every 30 ms on the newest 250 ms of audio.
-- **Deduplication**: each window overlaps the previous by ~220 ms; the same note may be detected in several consecutive windows. The adapter facade keeps a short-term cache keyed by `(pitch, onset_time_quantised_to_~50ms)` and only emits a given onset once.
+- **Window**: **2 seconds (43,844 samples = 22050 × 2 − FFT_HOP).** This is a *hard architectural constraint* of the Basic Pitch model — the TF.js graph expects exactly this input size. We cannot shrink the window. Confirmed empirically in synesthetica-w1z by reading `AUDIO_WINDOW_LENGTH_SECONDS` in the package source.
+- **Post-onset audio required for reliable detection**: ~50–100 ms. The 2-second window does *not* impose 2-second latency — the model produces predictions for every output frame inside the window, and frames near the END of the window are usable once they have ~50–100 ms of post-onset audio. The rest of the window can be earlier audio or silence; the model doesn't require its full 2 s of right-context.
+- **Hop**: 30–50 ms. The worker runs inference every 30–50 ms on the latest 2 seconds of audio.
+- **Deduplication**: consecutive windows overlap by 95+%; the same note is detected in many consecutive windows. The adapter facade keeps a short-term cache keyed by `(pitch, onset_time_quantised_to_~50ms)` and only emits a given onset once.
+- **Onset thresholding and adjacency suppression**: the model's onset posteriors are noisy at low confidences and tend to spread across adjacent pitches. The inference worker applies:
+  1. A confidence threshold (start at 0.5, tunable).
+  2. Adjacency suppression — within a single time frame, if multiple adjacent pitches both pass threshold, keep only the highest-confidence pitch.
+
+  Both run in the worker, before events are posted to the main thread.
 - **Note-off coherence**: the model predicts both onset and offset for each note. We follow option (a) from the design discussion: emit `AudioNoteOff` when the model confirms an offset, even if that means the release is a few hops later than a fast RMS-decay detector would emit. This favours coherence with the model's own view; if it turns out to feel laggy, the fallback is a separate fast-decay note-off detector.
 
 ### Velocity derivation
@@ -165,27 +170,29 @@ Marked as derived in the contract; downstream consumers know it is not absolute.
 
 ## Latency Budget
 
-End-to-end, from mic onset to corresponding visual:
+End-to-end, from mic onset to corresponding visual. Revised after spike (synesthetica-w1z):
 
 | Stage | Budget | Notes |
 |---|---|---|
 | Microphone → AudioWorklet | 5–15 ms | depends on browser audio backend; can't be controlled |
 | Worklet resample + ring write | < 1 ms | per buffer |
-| Wait for next inference tick (hop) | 0–30 ms (avg 15 ms) | governed by hop length |
-| Model right-context | 60–100 ms | needs future audio to confirm onset |
-| Inference time | 10–40 ms | Basic Pitch is a small CNN; runs in WASM or WebGL backend |
+| Wait for next inference tick (hop 30–50 ms) | 0–50 ms | governed by hop length |
+| Post-onset audio accumulation | 50–100 ms | model wants this much past-onset audio for confident detection |
+| Inference time (browser WebGL) | 30–60 ms | measured at 116 ms in Node WASM (synesthetica-w1z); WebGL in browser is typically 2–3× faster |
 | Worker → main thread post | < 5 ms | postMessage |
 | Pipeline + render | ~16 ms | next frame |
-| **Total typical** | **~140 ms** | |
-| **Total ceiling** | **~200 ms** | the worklet driver may add jitter; rare worst-case |
+| **Total typical** | **~150 ms** | |
+| **Total ceiling (acceptable)** | **~250 ms** | degraded conditions; revised up from 200 ms after spike |
 
-If measurements show consistent latency above 200 ms, options:
+If measurements show consistent latency above 250 ms, options:
 
 - Drop hop length to 20 ms (more frequent inference, more compute).
-- Reduce window from 250 ms to 180 ms (less right-context; accuracy may degrade).
-- Run on WebGPU backend rather than WASM (if available).
+- Run on WebGPU backend rather than WebGL (if available; typically 1.5–2× faster again).
+- Lower onset confidence threshold to emit earlier (at the cost of more false positives downstream).
 
-These knobs are exposed in adapter config, not hardcoded.
+Hop length, confidence threshold, and adjacency-suppression behaviour are exposed in adapter config, not hardcoded. The 2-second window length is *not* tunable — it's a model architectural constraint.
+
+**Caveat**: the original spec proposed a 200 ms ceiling. Spike findings revise that to 250 ms in degraded conditions. Worth flagging to the user before final integration; if 250 ms feels disconnected, we'd need to either pick a different model or accept that the audio path will lag MIDI noticeably.
 
 ## Cross-Origin Isolation
 

@@ -1,0 +1,13 @@
+{
+  "name": "synesthetica-spike-audio-latency",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Spike: validate Basic Pitch latency and accuracy under sliding-window inference (synesthetica-w1z).",
+  "scripts": {
+    "spike": "node run.cjs"
+  },
+  "dependencies": {
+    "@spotify/basic-pitch": "^1.0.1",
+    "@tensorflow/tfjs-backend-wasm": "^3.21.0"
+  }
+}
