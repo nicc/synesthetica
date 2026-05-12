@@ -37,6 +37,24 @@ export type NotePhase = "attack" | "sustain" | "release";
 export type NoteId = string;
 
 /**
+ * A single sample of continuous pitch deviation, attached to a note
+ * by membership in that note's `pitchTrajectory` array (SPEC 012).
+ *
+ * Empty / absent for MIDI input (note pitch is discrete and fixed
+ * for the note's lifetime). Populated by stabilizers reading audio-
+ * derived events whose underlying analyser produces continuous pitch
+ * (Basic Pitch for poly, CREPE for the future mono path).
+ *
+ * `semitones` is signed deviation from the note's nominal pitch
+ * (i.e. the Note's `pitch` field). Zero means right on nominal.
+ */
+export interface PitchSample {
+  t: Ms;
+  semitones: number;
+  confidence: Confidence;
+}
+
+/**
  * A musical note - the proper abstraction for a sounding pitch.
  * Not a pair of on/off messages, but a single entity with duration.
  */
@@ -50,6 +68,11 @@ export interface Note {
   phase: NotePhase;
   confidence: Confidence; // 1.0 for MIDI, variable for audio
   provenance: Provenance;
+  /**
+   * Per-note continuous pitch deviation samples, time-sorted (SPEC 012).
+   * Absent for MIDI; populated by stabilizers consuming audio events.
+   */
+  pitchTrajectory?: PitchSample[];
 }
 
 /**

@@ -1,8 +1,22 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { NoteTrackingStabilizer } from "../../src/stabilizers/NoteTrackingStabilizer";
-import type { RawInputFrame, MidiNoteOn, MidiNoteOff } from "@synesthetica/contracts";
+import type {
+  RawInputFrame,
+  MidiNoteOn,
+  MidiNoteOff,
+  AudioNoteOn,
+  AudioNoteOff,
+  AudioPitchBend,
+} from "@synesthetica/contracts";
 
-function makeFrame(t: number, inputs: (MidiNoteOn | MidiNoteOff)[]): RawInputFrame {
+type AnyInput =
+  | MidiNoteOn
+  | MidiNoteOff
+  | AudioNoteOn
+  | AudioNoteOff
+  | AudioPitchBend;
+
+function makeFrame(t: number, inputs: AnyInput[]): RawInputFrame {
   return {
     t,
     source: "midi",
@@ -17,6 +31,29 @@ function noteOn(note: number, velocity: number, t: number, channel = 0): MidiNot
 
 function noteOff(note: number, t: number, channel = 0): MidiNoteOff {
   return { type: "midi_note_off", note, t, channel };
+}
+
+function audioOn(
+  noteId: string,
+  pitch: number,
+  velocity: number,
+  confidence: number,
+  t: number,
+): AudioNoteOn {
+  return { type: "audio_note_on", t, noteId, pitch, velocity, confidence };
+}
+
+function audioOff(noteId: string, t: number, confidence = 0.9): AudioNoteOff {
+  return { type: "audio_note_off", t, noteId, confidence };
+}
+
+function audioBend(
+  noteId: string,
+  semitones: number,
+  t: number,
+  confidence = 0.7,
+): AudioPitchBend {
+  return { type: "audio_pitch_bend", t, noteId, semitones, confidence };
 }
 
 describe("NoteTrackingStabilizer", () => {
@@ -326,6 +363,117 @@ describe("NoteTrackingStabilizer", () => {
 
       expect(ch0Note?.phase).toBe("release");
       expect(ch1Note?.phase).toBe("sustain");
+    });
+  });
+
+  describe("audio events (SPEC 012)", () => {
+    it("creates a note from audio_note_on with adapter-supplied noteId", () => {
+      const result = stabilizer.apply(
+        makeFrame(100, [audioOn("audio-0", 60, 0.5, 0.85, 100)]),
+        null,
+      );
+      expect(result.notes).toHaveLength(1);
+      const note = result.notes[0];
+      // pitch 60 → C, octave 4 (60/12 - 1)
+      expect(note.pitch.pc).toBe(0);
+      expect(note.pitch.octave).toBe(4);
+      // velocity 0..1 input → 0..127 contract (0.5 → 63.5)
+      expect(note.velocity).toBeCloseTo(63.5, 1);
+      // confidence is propagated, not hardcoded to 1.0
+      expect(note.confidence).toBeCloseTo(0.85, 5);
+    });
+
+    it("releases an audio note when audio_note_off arrives with matching noteId", () => {
+      stabilizer.apply(
+        makeFrame(100, [audioOn("audio-7", 67, 0.6, 0.9, 100)]),
+        null,
+      );
+      const result = stabilizer.apply(
+        makeFrame(500, [audioOff("audio-7", 500)]),
+        null,
+      );
+      const note = result.notes[0];
+      expect(note.release).toBe(500);
+      expect(note.phase).toBe("release");
+    });
+
+    it("ignores audio_note_off for unknown noteId without crashing", () => {
+      const result = stabilizer.apply(
+        makeFrame(200, [audioOff("audio-never-existed", 200)]),
+        null,
+      );
+      expect(result.notes).toHaveLength(0);
+    });
+
+    it("accumulates pitch bend samples onto the matching note", () => {
+      stabilizer.apply(
+        makeFrame(100, [audioOn("audio-3", 69, 0.4, 0.8, 100)]),
+        null,
+      );
+      stabilizer.apply(
+        makeFrame(150, [
+          audioBend("audio-3", 0.1, 110, 0.7),
+          audioBend("audio-3", 0.3, 120, 0.75),
+          audioBend("audio-3", 0.2, 130, 0.7),
+        ]),
+        null,
+      );
+      const result = stabilizer.apply(makeFrame(200, []), null);
+      const note = result.notes[0];
+      expect(note.pitchTrajectory).toBeDefined();
+      expect(note.pitchTrajectory).toHaveLength(3);
+      expect(note.pitchTrajectory![1].semitones).toBeCloseTo(0.3, 5);
+      expect(note.pitchTrajectory![1].t).toBe(120);
+    });
+
+    it("omits pitchTrajectory when no bend samples were received", () => {
+      stabilizer.apply(
+        makeFrame(100, [audioOn("audio-9", 72, 0.5, 0.9, 100)]),
+        null,
+      );
+      const result = stabilizer.apply(makeFrame(110, []), null);
+      const note = result.notes[0];
+      expect(note.pitchTrajectory).toBeUndefined();
+    });
+
+    it("drops pitch bend samples that arrive after release", () => {
+      stabilizer.apply(
+        makeFrame(100, [audioOn("audio-4", 64, 0.5, 0.9, 100)]),
+        null,
+      );
+      stabilizer.apply(makeFrame(200, [audioOff("audio-4", 200)]), null);
+      stabilizer.apply(
+        makeFrame(210, [audioBend("audio-4", 0.5, 210)]),
+        null,
+      );
+      const result = stabilizer.apply(makeFrame(220, []), null);
+      const note = result.notes[0];
+      // No bends accumulated — the bend arrived after release.
+      expect(note.pitchTrajectory).toBeUndefined();
+    });
+
+    it("MIDI notes do not get a pitchTrajectory field", () => {
+      const result = stabilizer.apply(
+        makeFrame(100, [noteOn(60, 100, 100)]),
+        null,
+      );
+      expect(result.notes[0].pitchTrajectory).toBeUndefined();
+      expect(result.notes[0].confidence).toBe(1.0);
+    });
+
+    it("clamps audio velocity above 1.0 to 127 and at 0 to 0", () => {
+      stabilizer.apply(
+        makeFrame(100, [audioOn("a1", 60, 2.5, 0.9, 100)]),
+        null,
+      );
+      stabilizer.apply(
+        makeFrame(110, [audioOn("a2", 61, -0.3, 0.9, 110)]),
+        null,
+      );
+      const result = stabilizer.apply(makeFrame(120, []), null);
+      const byPitch = new Map(result.notes.map((n) => [n.pitch.pc, n.velocity]));
+      expect(byPitch.get(0)).toBe(127);
+      expect(byPitch.get(1)).toBe(0);
     });
   });
 });

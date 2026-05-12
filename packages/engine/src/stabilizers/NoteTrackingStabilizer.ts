@@ -21,6 +21,8 @@ import type {
   Ms,
   Provenance,
   MidiNoteNumber,
+  Confidence,
+  PitchSample,
 } from "@synesthetica/contracts";
 
 import { createNoteId, createEmptyMusicalFrame } from "@synesthetica/contracts";
@@ -53,7 +55,10 @@ const DEFAULT_CONFIG: Required<Omit<NoteTrackingConfig, "partId">> = {
 };
 
 /**
- * Internal tracking state for an active note.
+ * Internal tracking state for an active note. Sources can be MIDI
+ * (paired note_on/note_off with midiNote + channel) or audio
+ * (transcription model emitting audio_note_on/off + pitch_bend with
+ * an opaque noteId from the adapter).
  */
 interface TrackedNote {
   id: NoteId;
@@ -61,8 +66,12 @@ interface TrackedNote {
   velocity: Velocity;
   onset: Ms;
   releaseTime: Ms | null;
-  midiNote: MidiNoteNumber;
-  channel: number;
+  confidence: Confidence;
+  /** MIDI-specific tracking fields. Null for audio-sourced notes. */
+  midiNote: MidiNoteNumber | null;
+  channel: number | null;
+  /** Per-note pitch deviation samples (audio only). */
+  pitchTrajectory: PitchSample[] | null;
 }
 
 /**
@@ -118,8 +127,25 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
         this.handleNoteOn(input.note, input.velocity, input.channel, input.t);
       } else if (input.type === "midi_note_off") {
         this.handleNoteOff(input.note, input.channel, input.t);
+      } else if (input.type === "audio_note_on") {
+        this.handleAudioNoteOn(
+          input.noteId,
+          input.pitch,
+          input.velocity,
+          input.confidence,
+          input.t,
+        );
+      } else if (input.type === "audio_note_off") {
+        this.handleAudioNoteOff(input.noteId, input.t);
+      } else if (input.type === "audio_pitch_bend") {
+        this.handleAudioPitchBend(
+          input.noteId,
+          input.semitones,
+          input.confidence,
+          input.t,
+        );
       }
-      // CC and audio inputs ignored for now
+      // CC ignored for now
     }
 
     // Build the list of notes with current state
@@ -162,8 +188,10 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
       velocity,
       onset: t,
       releaseTime: null,
+      confidence: 1.0,
       midiNote,
       channel,
+      pitchTrajectory: null,
     };
 
     this.activeNotes.set(key, tracked);
@@ -179,6 +207,87 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
 
     if (tracked && tracked.releaseTime === null) {
       tracked.releaseTime = t;
+    }
+  }
+
+  /**
+   * Audio note-on handler (SPEC 012).
+   *
+   * Audio notes are tracked by adapter-supplied noteId rather than
+   * (midiNote, channel). Velocity arrives as 0..1 (derived from
+   * audio amplitude); we scale to the 0..127 convention used
+   * throughout the engine so downstream code reads it uniformly.
+   * Confidence is propagated from the input event.
+   */
+  private handleAudioNoteOn(
+    noteId: string,
+    fractionalPitch: number,
+    velocity01: number,
+    confidence: Confidence,
+    t: Ms,
+  ): void {
+    const midiInteger = Math.round(fractionalPitch);
+    const pitch = this.midiNoteToPitch(midiInteger);
+    const id = createNoteId(this.config.partId, t, pitch);
+    const key = noteId;
+
+    // Re-trigger on the same audio noteId: shift the old one to a
+    // release tracking key so its release tail can render, then
+    // start fresh. (Realistically the InferenceWorker already emits
+    // note-off before a new noteId at the same pitch, but this is
+    // defensive.)
+    if (this.activeNotes.has(key)) {
+      const existing = this.activeNotes.get(key)!;
+      if (existing.releaseTime === null) {
+        existing.releaseTime = t;
+      }
+      const releaseKey = `release-${releaseCounter++}`;
+      this.activeNotes.set(releaseKey, existing);
+      this.activeNotes.delete(key);
+    }
+
+    const tracked: TrackedNote = {
+      id,
+      pitch,
+      velocity: Math.max(0, Math.min(127, velocity01 * 127)),
+      onset: t,
+      releaseTime: null,
+      confidence,
+      midiNote: null,
+      channel: null,
+      pitchTrajectory: [],
+    };
+
+    this.activeNotes.set(key, tracked);
+  }
+
+  /** Audio note-off handler (SPEC 012). */
+  private handleAudioNoteOff(noteId: string, t: Ms): void {
+    const tracked = this.activeNotes.get(noteId);
+    if (tracked && tracked.releaseTime === null) {
+      tracked.releaseTime = t;
+    }
+  }
+
+  /**
+   * Audio pitch-bend handler (SPEC 012).
+   *
+   * Appends a sample to the matching active note's pitch trajectory.
+   * Silently drops samples that arrive after the note has been
+   * released, and samples for unknown noteIds (the worker can
+   * occasionally emit a bend slightly after the corresponding
+   * note-off in degenerate cases — preferable to crashing).
+   */
+  private handleAudioPitchBend(
+    noteId: string,
+    semitones: number,
+    confidence: Confidence,
+    t: Ms,
+  ): void {
+    const tracked = this.activeNotes.get(noteId);
+    if (!tracked || tracked.releaseTime !== null) return;
+    if (tracked.pitchTrajectory) {
+      tracked.pitchTrajectory.push({ t, semitones, confidence });
     }
   }
 
@@ -199,8 +308,11 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
         duration,
         release: tracked.releaseTime,
         phase,
-        confidence: 1.0, // MIDI is definitive
+        confidence: tracked.confidence,
         provenance: this.provenance,
+        ...(tracked.pitchTrajectory && tracked.pitchTrajectory.length > 0
+          ? { pitchTrajectory: tracked.pitchTrajectory }
+          : {}),
       };
 
       notes.push(note);
