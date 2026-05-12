@@ -241,6 +241,22 @@ export interface RomanNumeralGlyph {
 // ============================================================================
 
 /**
+ * A single sample of per-note continuous pitch deviation (SPEC 012).
+ *
+ * Sampled at the analyser's frame rate while the note is sounding.
+ * `semitones` is signed deviation from the note's nominal pitch
+ * (i.e. Note.pitch). Zero means right on the nominal pitch.
+ */
+export interface PitchSample {
+  /** Time of this sample (session-relative). */
+  t: Ms;
+  /** Signed deviation from nominal pitch in semitones. */
+  semitones: number;
+  /** Analyser's confidence in this sample. */
+  confidence: number;
+}
+
+/**
  * A note with visual annotations.
  * The note data comes from stabilizers; annotations come from vocabulary.
  */
@@ -256,6 +272,17 @@ export interface AnnotatedNote {
 
   /** Phase-derived properties (Invariant I17) */
   phaseState: PhaseAnnotation;
+
+  /**
+   * Per-note continuous pitch deviation samples, time-sorted (SPEC 012).
+   *
+   * Empty / absent for MIDI input (note pitch is discrete and fixed
+   * for the note's lifetime). Populated by audio adapters whose
+   * underlying analyser produces continuous pitch — e.g. Basic Pitch
+   * for polyphonic audio, CREPE for monophonic. Grammars that don't
+   * care about pitch trajectory may ignore this field.
+   */
+  pitchTrajectory?: PitchSample[];
 }
 
 /**

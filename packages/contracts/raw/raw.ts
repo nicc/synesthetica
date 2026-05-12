@@ -49,7 +49,9 @@ export interface MidiCC {
 }
 
 /**
- * Audio onset detection event.
+ * Audio onset detection event. Feature-style — not tied to a note.
+ * Reserved for future feature-extraction adapters; not produced by
+ * the polyphonic audio adapter (SPEC 012).
  */
 export interface AudioOnset {
   type: "audio_onset";
@@ -59,7 +61,9 @@ export interface AudioOnset {
 }
 
 /**
- * Audio pitch estimation event.
+ * Audio pitch estimation event. Feature-style — not tied to a note.
+ * Reserved for future feature-extraction adapters; not produced by
+ * the polyphonic audio adapter (SPEC 012).
  */
 export interface AudioPitch {
   type: "audio_pitch";
@@ -69,12 +73,70 @@ export interface AudioPitch {
 }
 
 /**
- * Audio loudness measurement.
+ * Audio loudness measurement. Feature-style — not tied to a note.
+ * Reserved for future feature-extraction adapters; not produced by
+ * the polyphonic audio adapter (SPEC 012).
  */
 export interface AudioLoudness {
   type: "audio_loudness";
   t: Ms;
   db: number;
+  confidence: Confidence;
+}
+
+/**
+ * Audio note onset detected by a transcription model (SPEC 012).
+ *
+ * Differs from MidiNoteOn in that:
+ *   - `velocity` is `0..1` (not 0..127) — it's derived from audio
+ *     analysis (e.g. RMS), not measured directly. Use it relative to
+ *     itself within a session; do not treat as absolute loudness.
+ *   - `pitch` is a fractional MIDI note number — supports non-12TET
+ *     sources (microtonal music, untempered intonation).
+ *   - `noteId` is the adapter-assigned identifier used to match
+ *     subsequent AudioNoteOff and AudioPitchBend events to this note.
+ *     Opaque to consumers.
+ *   - `confidence` reflects the model's certainty in the onset.
+ */
+export interface AudioNoteOn {
+  type: "audio_note_on";
+  t: Ms;
+  noteId: string;
+  pitch: number; // MIDI note number; may be fractional
+  velocity: number; // 0..1, derived
+  confidence: Confidence;
+}
+
+/**
+ * Audio note release. Matches an earlier AudioNoteOn by noteId.
+ */
+export interface AudioNoteOff {
+  type: "audio_note_off";
+  t: Ms;
+  noteId: string;
+  confidence: Confidence;
+}
+
+/**
+ * Continuous pitch deviation sample for an active audio note.
+ *
+ * One sample per analyser frame, tied to a note by noteId. Designed
+ * once and applied to three cases (SPEC 012):
+ *   1. Polyphonic audio — per-note pitch contour from Basic Pitch
+ *      (vibrato, slides, intonation drift)
+ *   2. Future monophonic audio — pitch trajectory of the single
+ *      voice, sampled at the analyser's frame rate
+ *   3. Future MIDI MPE pitch bend — per-note bend value
+ *
+ * `semitones` is signed deviation from the note's nominal pitch
+ * (the value carried on the matching AudioNoteOn). Zero means "right
+ * on the nominal pitch."
+ */
+export interface AudioPitchBend {
+  type: "audio_pitch_bend";
+  t: Ms;
+  noteId: string;
+  semitones: number;
   confidence: Confidence;
 }
 
@@ -87,7 +149,10 @@ export type RawInput =
   | MidiCC
   | AudioOnset
   | AudioPitch
-  | AudioLoudness;
+  | AudioLoudness
+  | AudioNoteOn
+  | AudioNoteOff
+  | AudioPitchBend;
 
 /**
  * Frame of raw input from an adapter.
