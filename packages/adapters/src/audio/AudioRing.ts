@@ -80,6 +80,17 @@ export class AudioRing {
     return (head - tail) >>> 0;
   }
 
+  /**
+   * Current head value (total samples written, modulo 2^32). The
+   * inference worker uses this to translate frame indices inside a
+   * peeked window to absolute sample indices since audio start. Used
+   * alongside `peekLatest`: read the head right after the peek so the
+   * last sample of the peeked buffer corresponds to `head - 1`.
+   */
+  head(): number {
+    return Atomics.load(this.meta, HEAD_INDEX);
+  }
+
   /** Capacity in samples. */
   getCapacity(): number {
     return this.capacity;

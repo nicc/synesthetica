@@ -16,7 +16,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@synesthetica/contracts": "*"
+    "@spotify/basic-pitch": "^1.0.1",
+    "@synesthetica/contracts": "*",
+    "@tensorflow/tfjs": "^3.21.0"
   },
   "devDependencies": {
     "typescript": "^5.3.0",
