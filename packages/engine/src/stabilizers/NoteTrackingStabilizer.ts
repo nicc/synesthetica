@@ -53,6 +53,20 @@ const DEFAULT_CONFIG: Required<Omit<NoteTrackingConfig, "partId">> = {
 };
 
 /**
+ * MIDI CC controller number for the sustain pedal.
+ */
+const SUSTAIN_PEDAL_CC = 64;
+
+/**
+ * Threshold at which the sustain pedal is considered "down". MIDI
+ * spec convention: values 0–63 are "up", 64–127 are "down". Most
+ * digital pianos output exactly 0 or 127, so this threshold is
+ * mostly nominal — but we honour the spec so partial-pedal
+ * controllers still behave (binary at the threshold, not graduated).
+ */
+const SUSTAIN_PEDAL_THRESHOLD = 64;
+
+/**
  * Internal tracking state for an active note.
  */
 interface TrackedNote {
@@ -63,6 +77,13 @@ interface TrackedNote {
   releaseTime: Ms | null;
   midiNote: MidiNoteNumber;
   channel: number;
+  /**
+   * True iff a note_off has been received for this MIDI note while
+   * the sustain pedal was down. The note keeps `releaseTime = null`
+   * (so phase stays `sustain`) until the pedal lifts, at which
+   * point `releaseTime` is set to the pedal-up time.
+   */
+  pedalRelease: boolean;
 }
 
 /**
@@ -83,6 +104,13 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
 
   private config: Required<NoteTrackingConfig>;
   private activeNotes: Map<string, TrackedNote> = new Map();
+  /**
+   * Per-channel sustain-pedal state. A channel's entry is true while
+   * the pedal is down (CC64 ≥ threshold) and absent or false while
+   * up. MIDI CC64 is per-channel, so a pedal hold on channel 0
+   * doesn't sustain notes on channel 1.
+   */
+  private pedalDown: Map<number, boolean> = new Map();
   private provenance: Provenance;
 
   constructor(config: NoteTrackingConfig) {
@@ -96,14 +124,17 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
 
   init(): void {
     this.activeNotes.clear();
+    this.pedalDown.clear();
   }
 
   dispose(): void {
     this.activeNotes.clear();
+    this.pedalDown.clear();
   }
 
   reset(): void {
     this.activeNotes.clear();
+    this.pedalDown.clear();
   }
 
   apply(raw: RawInputFrame, _previous: MusicalFrame | null): MusicalFrame {
@@ -118,8 +149,13 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
         this.handleNoteOn(input.note, input.velocity, input.channel, input.t);
       } else if (input.type === "midi_note_off") {
         this.handleNoteOff(input.note, input.channel, input.t);
+      } else if (
+        input.type === "midi_cc" &&
+        input.controller === SUSTAIN_PEDAL_CC
+      ) {
+        this.handleSustainPedal(input.channel, input.value, input.t);
       }
-      // CC and audio inputs ignored for now
+      // Other CC and audio inputs ignored for now
     }
 
     // Build the list of notes with current state
@@ -164,6 +200,7 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
       releaseTime: null,
       midiNote,
       channel,
+      pedalRelease: false,
     };
 
     this.activeNotes.set(key, tracked);
@@ -176,9 +213,51 @@ export class NoteTrackingStabilizer implements IMusicalStabilizer {
   ): void {
     const key = this.noteKey(midiNote, channel);
     const tracked = this.activeNotes.get(key);
+    if (!tracked || tracked.releaseTime !== null) return;
 
-    if (tracked && tracked.releaseTime === null) {
-      tracked.releaseTime = t;
+    // Sustain pedal: while the pedal is down on this channel, keep
+    // the note in `sustain` phase (releaseTime stays null) and just
+    // record that the key has been released. The pedal-up handler
+    // will finalise releaseTime for all such notes at once.
+    if (this.pedalDown.get(channel)) {
+      tracked.pedalRelease = true;
+      return;
+    }
+
+    tracked.releaseTime = t;
+  }
+
+  /**
+   * Sustain pedal (CC64) handler. Binary threshold at value 64:
+   * 0–63 = up, 64–127 = down. Per-channel — a pedal hold on one
+   * channel does not sustain notes on another.
+   *
+   * On the rising edge (up → down): record state. Existing notes
+   * carry on as they were.
+   *
+   * On the falling edge (down → up): for every tracked note on this
+   * channel that has a key-released-but-pedal-held flag set, set
+   * releaseTime = pedal-up time. Those notes now enter `release`
+   * phase and fade as normal.
+   */
+  private handleSustainPedal(channel: number, value: number, t: Ms): void {
+    const isDown = value >= SUSTAIN_PEDAL_THRESHOLD;
+    const wasDown = this.pedalDown.get(channel) === true;
+    if (isDown === wasDown) return; // no state change
+
+    this.pedalDown.set(channel, isDown);
+    if (isDown) return; // rising edge — no notes to release
+
+    // Falling edge: release every pending note on this channel.
+    for (const tracked of this.activeNotes.values()) {
+      if (
+        tracked.channel === channel &&
+        tracked.pedalRelease &&
+        tracked.releaseTime === null
+      ) {
+        tracked.releaseTime = t;
+        tracked.pedalRelease = false;
+      }
     }
   }
 
