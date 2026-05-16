@@ -9,6 +9,7 @@ import { RawMidiAdapter, WebMidiSource } from "@synesthetica/adapters";
 import {
   VisualPipeline,
   ThreeJSRenderer,
+  GhibliRenderer,
   NoteTrackingStabilizer,
   ChordDetectionStabilizer,
   HarmonyStabilizer,
@@ -20,6 +21,13 @@ import {
   IdentityCompositor,
   Metronome,
 } from "@synesthetica/engine";
+
+/** Renderer selection via URL param. ?renderer=ghibli flips to the
+ *  experimental painterly renderer on the ghibli-render branch. */
+const RENDERER_CHOICE =
+  new URLSearchParams(window.location.search).get("renderer") === "ghibli"
+    ? "ghibli"
+    : "three";
 
 // UI elements
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
@@ -40,7 +48,7 @@ const toggleChordModeBtn = document.getElementById("toggle-chord-mode") as HTMLB
 // App state
 let midiSource: WebMidiSource | null = null;
 let pipeline: VisualPipeline | null = null;
-let renderer: ThreeJSRenderer | null = null;
+let renderer: ThreeJSRenderer | GhibliRenderer | null = null;
 let metronome: Metronome | null = null;
 let chordMode: ChordInterpretationMode = "harmonic";
 
@@ -168,10 +176,12 @@ function startSession(midiInput: MidiInputInfo): void {
     pipeline.addGrammar(new DynamicsGrammar());
     pipeline.setCompositor(new IdentityCompositor());
 
-    // Create renderer
-    renderer = new ThreeJSRenderer({
-      backgroundColor: 0x000000,
-    });
+    // Create renderer. Default = Three.js; ?renderer=ghibli flips to
+    // the experimental painterly renderer (ghibli-render branch).
+    renderer =
+      RENDERER_CHOICE === "ghibli"
+        ? new GhibliRenderer()
+        : new ThreeJSRenderer({ backgroundColor: 0x000000 });
     renderer.attach(canvas);
 
     // Reset pipeline (initializes stabilizers, sets T=0)
