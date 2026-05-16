@@ -149,7 +149,6 @@ export class GhibliRenderer extends ThreeJSRenderer {
    *  the bloom texture on top, then applies grain. Renders to screen. */
   private finalComposer: EffectComposer | null = null;
   private grainPass: ShaderPass | null = null;
-  private combinePass: ShaderPass | null = null;
   private skyMesh: THREE.Mesh | null = null;
   private skyMaterial: THREE.ShaderMaterial | null = null;
   private moteSystem: THREE.Points | null = null;
@@ -186,7 +185,6 @@ export class GhibliRenderer extends ThreeJSRenderer {
     this.bloomComposer = null;
     this.finalComposer = null;
     this.grainPass = null;
-    this.combinePass = null;
     if (this.skyMesh) {
       this.scene?.remove(this.skyMesh);
       this.skyMesh.geometry.dispose();
@@ -490,7 +488,6 @@ export class GhibliRenderer extends ThreeJSRenderer {
     const combine = new ShaderPass(CombineShader);
     (combine.uniforms.bloomTexture as { value: THREE.Texture | null }).value =
       this.bloomComposer.renderTarget2.texture;
-    this.combinePass = combine;
     this.finalComposer.addPass(combine);
 
     const grain = new ShaderPass(GrainShader);
