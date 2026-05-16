@@ -31,9 +31,13 @@ import { ThreeJSRenderer, type ThreeJSRendererConfig } from "./ThreeJSRenderer";
 // Tunables
 // ============================================================================
 
-const BLOOM_STRENGTH = 0.5;
+// Bloom params. The sky is excluded from the bloom pass entirely
+// (it's hidden during the bloom render), so we don't need a high
+// threshold to protect it — keep threshold low so subtle entity
+// highlights still glow.
+const BLOOM_STRENGTH = 0.55;
 const BLOOM_RADIUS = 0.4;
-const BLOOM_THRESHOLD = 0.0; // bloom everything, gently
+const BLOOM_THRESHOLD = 0.0;
 
 /** Warm cast applied to every colour. Mixes the colour with this hue. */
 const WARM_TINT_R = 1.0;
@@ -90,6 +94,36 @@ const GrainShader = {
   `,
 };
 
+/**
+ * Combine shader: reads the full scene (sky + entities) and adds the
+ * bloom texture (entities-only-bloomed) on top. The bloom texture is
+ * computed in a parallel composer where the sky is hidden, so its
+ * RGB contains only the soft glows around bright entity pixels.
+ */
+const CombineShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    bloomTexture: { value: null as THREE.Texture | null },
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform sampler2D bloomTexture;
+    varying vec2 vUv;
+    void main() {
+      vec4 base = texture2D(tDiffuse, vUv);
+      vec4 bloom = texture2D(bloomTexture, vUv);
+      gl_FragColor = vec4(base.rgb + bloom.rgb, base.a);
+    }
+  `,
+};
+
 // ============================================================================
 // GhibliRenderer
 // ============================================================================
@@ -108,8 +142,14 @@ export interface GhibliRendererConfig extends ThreeJSRendererConfig {
 export class GhibliRenderer extends ThreeJSRenderer {
   readonly id = "ghibli";
 
-  private composer: EffectComposer | null = null;
+  /** Bloom pass: renders scene with sky hidden, then blooms.
+   *  Its output texture is sampled by the final composer. */
+  private bloomComposer: EffectComposer | null = null;
+  /** Final composer: renders the full scene (sky visible), composites
+   *  the bloom texture on top, then applies grain. Renders to screen. */
+  private finalComposer: EffectComposer | null = null;
   private grainPass: ShaderPass | null = null;
+  private combinePass: ShaderPass | null = null;
   private skyMesh: THREE.Mesh | null = null;
   private skyMaterial: THREE.ShaderMaterial | null = null;
   private moteSystem: THREE.Points | null = null;
@@ -141,9 +181,12 @@ export class GhibliRenderer extends ThreeJSRenderer {
   }
 
   detach(): void {
-    this.composer?.dispose?.();
-    this.composer = null;
+    this.bloomComposer?.dispose?.();
+    this.finalComposer?.dispose?.();
+    this.bloomComposer = null;
+    this.finalComposer = null;
     this.grainPass = null;
+    this.combinePass = null;
     if (this.skyMesh) {
       this.scene?.remove(this.skyMesh);
       this.skyMesh.geometry.dispose();
@@ -163,12 +206,10 @@ export class GhibliRenderer extends ThreeJSRenderer {
 
   resize(width: number, height: number): void {
     super.resize(width, height);
-    if (this.composer) {
-      const dpr = this.renderer?.getPixelRatio?.() ?? 1;
-      this.composer.setSize(width * dpr, height * dpr);
-    }
+    const dpr = this.renderer?.getPixelRatio?.() ?? 1;
+    this.bloomComposer?.setSize(width * dpr, height * dpr);
+    this.finalComposer?.setSize(width * dpr, height * dpr);
     if (this.skyMaterial && this.scene && this.camera) {
-      // Sky covers the whole world; resize the quad to match.
       this.skyMaterial.uniforms.resolution.value.set(width, height);
     }
   }
@@ -187,7 +228,7 @@ export class GhibliRenderer extends ThreeJSRenderer {
     this.driftMotes(t);
 
     // Run the parent's entity update loop, but suppress its render
-    // call so we can run the composer instead.
+    // call so we can drive the composers instead.
     const realRenderer = this.renderer;
     const noopRenderer = realRenderer as unknown as {
       render: (...args: unknown[]) => void;
@@ -202,12 +243,23 @@ export class GhibliRenderer extends ThreeJSRenderer {
       noopRenderer.render = savedRender;
     }
 
-    // Now actually present, via the composer (RenderPass +
-    // UnrealBloomPass + GrainPass). If composer isn't built yet for
-    // some reason, fall back to a direct render so we don't show a
-    // blank screen.
-    if (this.composer) {
-      this.composer.render();
+    if (this.bloomComposer && this.finalComposer) {
+      // Pass 1: hide the sky and motes (they shouldn't bloom — the
+      // bright sky would dominate, the motes are already glowing via
+      // additive blending) then render scene → bloom. Output lives
+      // on bloomComposer.renderTarget2.texture and is read by
+      // CombineShader below.
+      const skyWasVisible = this.skyMesh?.visible ?? true;
+      const motesWereVisible = this.moteSystem?.visible ?? true;
+      if (this.skyMesh) this.skyMesh.visible = false;
+      if (this.moteSystem) this.moteSystem.visible = false;
+      this.bloomComposer.render();
+      if (this.skyMesh) this.skyMesh.visible = skyWasVisible;
+      if (this.moteSystem) this.moteSystem.visible = motesWereVisible;
+
+      // Pass 2: render the full scene (sky + motes + entities), add
+      // the bloom texture on top, then film grain. Renders to screen.
+      this.finalComposer.render();
     } else {
       realRenderer.render(this.scene, this.camera);
     }
@@ -373,23 +425,39 @@ export class GhibliRenderer extends ThreeJSRenderer {
     const dpr = this.renderer.getPixelRatio?.() ?? 1;
     const cssW = canvas.clientWidth || canvas.width;
     const cssH = canvas.clientHeight || canvas.height;
+    const size = new THREE.Vector2(cssW * dpr, cssH * dpr);
 
-    this.composer = new EffectComposer(this.renderer);
-    this.composer.setSize(cssW * dpr, cssH * dpr);
-
-    this.composer.addPass(new RenderPass(this.scene, this.camera));
-
-    const bloom = new UnrealBloomPass(
-      new THREE.Vector2(cssW * dpr, cssH * dpr),
-      this.bloomStrength,
-      this.bloomRadius,
-      BLOOM_THRESHOLD,
+    // Bloom-only composer. Renders the scene (with sky/motes hidden by
+    // the render() method before invoking) and applies bloom. Output
+    // is consumed as a texture by the final composer, not drawn to
+    // screen directly.
+    this.bloomComposer = new EffectComposer(this.renderer);
+    this.bloomComposer.renderToScreen = false;
+    this.bloomComposer.setSize(cssW * dpr, cssH * dpr);
+    this.bloomComposer.addPass(new RenderPass(this.scene, this.camera));
+    this.bloomComposer.addPass(
+      new UnrealBloomPass(
+        size,
+        this.bloomStrength,
+        this.bloomRadius,
+        BLOOM_THRESHOLD,
+      ),
     );
-    this.composer.addPass(bloom);
+
+    // Final composer: full scene → combine with bloom texture → grain.
+    this.finalComposer = new EffectComposer(this.renderer);
+    this.finalComposer.setSize(cssW * dpr, cssH * dpr);
+    this.finalComposer.addPass(new RenderPass(this.scene, this.camera));
+
+    const combine = new ShaderPass(CombineShader);
+    (combine.uniforms.bloomTexture as { value: THREE.Texture | null }).value =
+      this.bloomComposer.renderTarget2.texture;
+    this.combinePass = combine;
+    this.finalComposer.addPass(combine);
 
     const grain = new ShaderPass(GrainShader);
     (grain.uniforms.amount as { value: number }).value = this.grainAmount;
     this.grainPass = grain;
-    this.composer.addPass(grain);
+    this.finalComposer.addPass(grain);
   }
 }
