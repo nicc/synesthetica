@@ -244,18 +244,15 @@ export class GhibliRenderer extends ThreeJSRenderer {
     }
 
     if (this.bloomComposer && this.finalComposer) {
-      // Pass 1: hide the sky and motes (they shouldn't bloom — the
-      // bright sky would dominate, the motes are already glowing via
-      // additive blending) then render scene → bloom. Output lives
-      // on bloomComposer.renderTarget2.texture and is read by
-      // CombineShader below.
+      // Pass 1: hide only the SKY (the bright gradient would dominate
+      // the bright-pass and wash out the whole bloom). Motes stay
+      // visible so they pick up the subtle glow even at low bloom
+      // strength — they're point-of-light particles, glow is what
+      // makes them read as "dust catching the light."
       const skyWasVisible = this.skyMesh?.visible ?? true;
-      const motesWereVisible = this.moteSystem?.visible ?? true;
       if (this.skyMesh) this.skyMesh.visible = false;
-      if (this.moteSystem) this.moteSystem.visible = false;
       this.bloomComposer.render();
       if (this.skyMesh) this.skyMesh.visible = skyWasVisible;
-      if (this.moteSystem) this.moteSystem.visible = motesWereVisible;
 
       // Pass 2: render the full scene (sky + motes + entities), add
       // the bloom texture on top, then film grain. Renders to screen.
@@ -358,15 +355,24 @@ export class GhibliRenderer extends ThreeJSRenderer {
     this.moteData = [];
     const worldW = this.config.worldWidth;
     const worldH = this.config.worldHeight;
+    // Per-mote size (in world units), driven into the sized-attribute
+    // below so motes can vary individually rather than via a single
+    // PointsMaterial.size.
+    const sizes = new Float32Array(this.moteCount);
     for (let i = 0; i < this.moteCount; i++) {
       positions[i * 3 + 0] = Math.random() * worldW;
       positions[i * 3 + 1] = Math.random() * worldH;
       positions[i * 3 + 2] = -20 - Math.random() * 20;
-      // Slight per-mote colour variation around warm white
-      const warmth = 0.85 + Math.random() * 0.15;
-      colors[i * 3 + 0] = warmth;
-      colors[i * 3 + 1] = warmth * (0.82 + Math.random() * 0.1);
-      colors[i * 3 + 2] = warmth * (0.65 + Math.random() * 0.15);
+      // Near-white with a slightly cool tint (slight blue lift) so
+      // motes contrast against the warm peach sky. The bloom pass
+      // gives them a soft halo on top of this.
+      const v = 0.92 + Math.random() * 0.08;
+      colors[i * 3 + 0] = v * (0.96 + Math.random() * 0.04);
+      colors[i * 3 + 1] = v * (0.96 + Math.random() * 0.04);
+      colors[i * 3 + 2] = v;
+      // Size variation: most motes small (~0.4 units), occasional
+      // larger ones (~1.0 units) for visual texture.
+      sizes[i] = 0.4 + Math.pow(Math.random(), 3) * 1.4;
       // Gentle drift
       const angle = Math.random() * Math.PI * 2;
       const speed = (0.3 + Math.random() * 0.7) * MOTE_DRIFT_SPEED;
@@ -378,16 +384,48 @@ export class GhibliRenderer extends ThreeJSRenderer {
     const geom = new THREE.BufferGeometry();
     geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geom.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    const mat = new THREE.PointsMaterial({
-      size: 0.3,
-      vertexColors: true,
+    geom.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+
+    // Custom shader so motes render as soft circular gaussians (a
+    // PointsMaterial without a map gives square dots, which read as
+    // "pixel art" rather than "dust in light"). Per-mote size via
+    // the aSize attribute. Additive blending keeps the "catching
+    // light" feel.
+    const mat = new THREE.ShaderMaterial({
       transparent: true,
-      opacity: 0.6,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
+      vertexShader: /* glsl */ `
+        attribute float aSize;
+        varying vec3 vColor;
+        void main() {
+          vColor = color;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          // gl_PointSize is in pixels; scale aSize (world units) by
+          // canvas height / near-plane heuristic so it stays roughly
+          // size-stable across viewports. The 320.0 factor is tuned
+          // empirically — bigger numbers give larger motes.
+          gl_PointSize = aSize * (320.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        varying vec3 vColor;
+        void main() {
+          // gl_PointCoord is (0,0)..(1,1) across the point quad.
+          vec2 d = gl_PointCoord - vec2(0.5);
+          float r = length(d) * 2.0;
+          if (r > 1.0) discard;
+          // Soft gaussian falloff: bright centre, dim edges.
+          float alpha = exp(-r * r * 4.0);
+          gl_FragColor = vec4(vColor, alpha);
+        }
+      `,
+      vertexColors: true,
     });
+
     const points = new THREE.Points(geom, mat);
-    points.renderOrder = -500; // behind everything else
+    points.renderOrder = -500;
     this.scene.add(points);
     this.moteSystem = points;
   }
