@@ -35,8 +35,8 @@ import { ThreeJSRenderer, type ThreeJSRendererConfig } from "./ThreeJSRenderer";
 // (it's hidden during the bloom render), so we don't need a high
 // threshold to protect it — keep threshold low so subtle entity
 // highlights still glow.
-const BLOOM_STRENGTH = 0.55;
-const BLOOM_RADIUS = 0.4;
+const BLOOM_STRENGTH = 0.05;
+const BLOOM_RADIUS = 0.2;
 const BLOOM_THRESHOLD = 0.0;
 
 /** Warm cast applied to every colour. Mixes the colour with this hue. */
