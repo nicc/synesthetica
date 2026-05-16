@@ -9,6 +9,7 @@ import { RawMidiAdapter, WebMidiSource } from "@synesthetica/adapters";
 import {
   VisualPipeline,
   ThreeJSRenderer,
+  AsciiRenderer,
   NoteTrackingStabilizer,
   ChordDetectionStabilizer,
   HarmonyStabilizer,
@@ -20,6 +21,13 @@ import {
   IdentityCompositor,
   Metronome,
 } from "@synesthetica/engine";
+
+/** Renderer selection. ?renderer=ascii enables the experimental
+ *  character-grid renderer (ascii branch). Default = three. */
+const RENDERER_CHOICE =
+  new URLSearchParams(window.location.search).get("renderer") === "ascii"
+    ? "ascii"
+    : "three";
 
 // UI elements
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
@@ -40,7 +48,7 @@ const toggleChordModeBtn = document.getElementById("toggle-chord-mode") as HTMLB
 // App state
 let midiSource: WebMidiSource | null = null;
 let pipeline: VisualPipeline | null = null;
-let renderer: ThreeJSRenderer | null = null;
+let renderer: ThreeJSRenderer | AsciiRenderer | null = null;
 let metronome: Metronome | null = null;
 let chordMode: ChordInterpretationMode = "harmonic";
 
@@ -168,11 +176,18 @@ function startSession(midiInput: MidiInputInfo): void {
     pipeline.addGrammar(new DynamicsGrammar());
     pipeline.setCompositor(new IdentityCompositor());
 
-    // Create renderer
-    renderer = new ThreeJSRenderer({
-      backgroundColor: 0x000000,
-    });
-    renderer.attach(canvas);
+    // Create renderer. Default = Three.js; ?renderer=ascii flips to
+    // the experimental character-grid renderer (ascii branch).
+    if (RENDERER_CHOICE === "ascii") {
+      renderer = new AsciiRenderer();
+      renderer.attach(canvas.parentElement ?? document.body);
+      canvas.style.display = "none";
+    } else {
+      renderer = new ThreeJSRenderer({
+        backgroundColor: 0x000000,
+      });
+      renderer.attach(canvas);
+    }
 
     // Reset pipeline (initializes stabilizers, sets T=0)
     pipeline.reset();

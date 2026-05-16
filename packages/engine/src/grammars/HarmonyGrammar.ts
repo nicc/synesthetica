@@ -627,6 +627,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         },
         data: {
           type: "roman-numeral",
+          text: fc.roman,
           polylines: glyph.polylines,
           arcs: glyph.arcs,
           width: glyph.width,
@@ -837,6 +838,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         style: { color, opacity: glyphOpacity, size: STRIP_GLYPH_SIZE },
         data: {
           type: "roman-numeral",
+          text: fc.roman,
           polylines: glyph.polylines,
           arcs: glyph.arcs,
           width: glyph.width,
