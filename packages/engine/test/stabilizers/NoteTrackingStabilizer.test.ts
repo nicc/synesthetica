@@ -4,6 +4,7 @@ import type {
   RawInputFrame,
   MidiNoteOn,
   MidiNoteOff,
+  MidiCC,
   AudioNoteOn,
   AudioNoteOff,
   AudioPitchBend,
@@ -12,6 +13,7 @@ import type {
 type AnyInput =
   | MidiNoteOn
   | MidiNoteOff
+  | MidiCC
   | AudioNoteOn
   | AudioNoteOff
   | AudioPitchBend;
@@ -31,6 +33,10 @@ function noteOn(note: number, velocity: number, t: number, channel = 0): MidiNot
 
 function noteOff(note: number, t: number, channel = 0): MidiNoteOff {
   return { type: "midi_note_off", note, t, channel };
+}
+
+function pedal(value: number, t: number, channel = 0): MidiCC {
+  return { type: "midi_cc", controller: 64, value, t, channel };
 }
 
 function audioOn(
@@ -474,6 +480,140 @@ describe("NoteTrackingStabilizer", () => {
       const byPitch = new Map(result.notes.map((n) => [n.pitch.pc, n.velocity]));
       expect(byPitch.get(0)).toBe(127);
       expect(byPitch.get(1)).toBe(0);
+    });
+  });
+
+  describe("sustain pedal (CC64)", () => {
+    it("holds a note in sustain phase when note_off arrives with pedal down", () => {
+      stabilizer.apply(makeFrame(100, [pedal(127, 100)]), null);
+      stabilizer.apply(makeFrame(110, [noteOn(60, 100, 110)]), null);
+      stabilizer.apply(makeFrame(200, [noteOff(60, 200)]), null);
+      // 100 ms later, still no pedal release — note should NOT be in release phase.
+      const result = stabilizer.apply(makeFrame(300, []), null);
+      expect(result.notes).toHaveLength(1);
+      expect(result.notes[0].release).toBeNull();
+      expect(result.notes[0].phase).toBe("sustain");
+    });
+
+    it("releases the note when the pedal lifts", () => {
+      stabilizer.apply(makeFrame(100, [pedal(127, 100)]), null);
+      stabilizer.apply(makeFrame(110, [noteOn(60, 100, 110)]), null);
+      stabilizer.apply(makeFrame(200, [noteOff(60, 200)]), null);
+      const result = stabilizer.apply(makeFrame(400, [pedal(0, 400)]), null);
+      expect(result.notes[0].release).toBe(400);
+      expect(result.notes[0].phase).toBe("release");
+    });
+
+    it("releases immediately when pedal is up and note_off arrives", () => {
+      stabilizer.apply(makeFrame(100, [noteOn(60, 100, 100)]), null);
+      const result = stabilizer.apply(makeFrame(200, [noteOff(60, 200)]), null);
+      // No pedal events ever. Should behave as before.
+      expect(result.notes[0].release).toBe(200);
+    });
+
+    it("does not affect notes whose note_off arrived BEFORE the pedal went down", () => {
+      stabilizer.apply(makeFrame(100, [noteOn(60, 100, 100)]), null);
+      stabilizer.apply(makeFrame(150, [noteOff(60, 150)]), null);
+      // Pedal goes down AFTER the release — should not retroactively
+      // un-release the note.
+      stabilizer.apply(makeFrame(200, [pedal(127, 200)]), null);
+      const result = stabilizer.apply(makeFrame(300, []), null);
+      const stillReleased = result.notes.find((n) => n.release === 150);
+      expect(stillReleased).toBeDefined();
+    });
+
+    it("is per-channel — pedal on channel 0 does not hold channel 1 notes", () => {
+      stabilizer.apply(makeFrame(100, [pedal(127, 100, 0)]), null);
+      stabilizer.apply(makeFrame(110, [noteOn(60, 100, 110, 1)]), null);
+      const result = stabilizer.apply(
+        makeFrame(200, [noteOff(60, 200, 1)]),
+        null,
+      );
+      // Channel 1 has no pedal down — note should release normally.
+      expect(result.notes[0].release).toBe(200);
+    });
+
+    it("releases multiple pending notes simultaneously when pedal lifts", () => {
+      stabilizer.apply(makeFrame(100, [pedal(127, 100)]), null);
+      stabilizer.apply(
+        makeFrame(110, [
+          noteOn(60, 100, 110),
+          noteOn(64, 100, 110),
+          noteOn(67, 100, 110),
+        ]),
+        null,
+      );
+      stabilizer.apply(
+        makeFrame(200, [noteOff(60, 200), noteOff(64, 200), noteOff(67, 200)]),
+        null,
+      );
+      const result = stabilizer.apply(makeFrame(400, [pedal(0, 400)]), null);
+      for (const note of result.notes) {
+        expect(note.release).toBe(400);
+      }
+    });
+
+    it("notes pressed AFTER pedal-down also hold past their note_off", () => {
+      stabilizer.apply(makeFrame(100, [pedal(127, 100)]), null);
+      // Multi-step playing while pedal stays down
+      stabilizer.apply(makeFrame(150, [noteOn(60, 100, 150)]), null);
+      stabilizer.apply(makeFrame(200, [noteOff(60, 200)]), null);
+      stabilizer.apply(makeFrame(250, [noteOn(64, 100, 250)]), null);
+      stabilizer.apply(makeFrame(300, [noteOff(64, 300)]), null);
+      const beforeLift = stabilizer.apply(makeFrame(400, []), null);
+      // Both notes still sounding (sustain phase).
+      expect(beforeLift.notes.every((n) => n.release === null)).toBe(true);
+      const result = stabilizer.apply(makeFrame(500, [pedal(0, 500)]), null);
+      expect(result.notes.every((n) => n.release === 500)).toBe(true);
+    });
+
+    it("threshold is binary at 64 — values 0-63 are 'up', 64-127 are 'down'", () => {
+      stabilizer.apply(makeFrame(100, [pedal(63, 100)]), null); // up
+      stabilizer.apply(makeFrame(110, [noteOn(60, 100, 110)]), null);
+      const releasedNormally = stabilizer.apply(
+        makeFrame(200, [noteOff(60, 200)]),
+        null,
+      );
+      expect(releasedNormally.notes[0].release).toBe(200);
+
+      // Reset and try threshold value
+      stabilizer.reset();
+      stabilizer.apply(makeFrame(300, [pedal(64, 300)]), null); // down
+      stabilizer.apply(makeFrame(310, [noteOn(62, 100, 310)]), null);
+      const heldByPedal = stabilizer.apply(
+        makeFrame(400, [noteOff(62, 400)]),
+        null,
+      );
+      expect(heldByPedal.notes[0].release).toBeNull();
+    });
+
+    it("re-triggering a pedal-held note releases the old one and starts fresh", () => {
+      stabilizer.apply(makeFrame(100, [pedal(127, 100)]), null);
+      stabilizer.apply(makeFrame(110, [noteOn(60, 100, 110)]), null);
+      stabilizer.apply(makeFrame(200, [noteOff(60, 200)]), null);
+      // Note still sustaining via pedal. Press the same note again.
+      stabilizer.apply(makeFrame(250, [noteOn(60, 80, 250)]), null);
+      const result = stabilizer.apply(makeFrame(300, []), null);
+      // Should have two notes: the released old one (velocity 100)
+      // and the still-active new one (velocity 80).
+      expect(result.notes).toHaveLength(2);
+      const oldNote = result.notes.find((n) => n.velocity === 100);
+      const newNote = result.notes.find((n) => n.velocity === 80);
+      expect(oldNote?.release).toBe(250);
+      expect(newNote?.release).toBeNull();
+    });
+
+    it("reset clears pedal state", () => {
+      stabilizer.apply(makeFrame(100, [pedal(127, 100)]), null);
+      stabilizer.reset();
+      // After reset, pedal must be considered up — a note_off here
+      // should release immediately.
+      stabilizer.apply(makeFrame(200, [noteOn(60, 100, 200)]), null);
+      const result = stabilizer.apply(
+        makeFrame(300, [noteOff(60, 300)]),
+        null,
+      );
+      expect(result.notes[0].release).toBe(300);
     });
   });
 });
