@@ -65,7 +65,10 @@ const DEFAULT_CONFIG: Required<ThreeJSRendererConfig> = {
 // ============================================================================
 
 export class ThreeJSRenderer implements IRenderer {
-  readonly id = "threejs";
+  // Typed as `string` (not the literal "threejs") so experimental
+  // subclasses like GhibliRenderer can override with a different
+  // identifier without TypeScript narrowing complaints.
+  readonly id: string = "threejs";
 
   // Exposed as `protected` so experimental subclasses (e.g.
   // GhibliRenderer) can inject post-processing, modify the scene, or
