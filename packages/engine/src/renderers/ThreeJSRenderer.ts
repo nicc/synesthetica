@@ -65,12 +65,17 @@ const DEFAULT_CONFIG: Required<ThreeJSRendererConfig> = {
 // ============================================================================
 
 export class ThreeJSRenderer implements IRenderer {
-  readonly id = "threejs";
+  // Typed as `string` (not the literal "threejs") so experimental
+  // subclasses can declare a different identifier.
+  readonly id: string = "threejs";
 
-  private config: Required<ThreeJSRendererConfig>;
-  private renderer: THREE.WebGLRenderer | null = null;
-  private scene: THREE.Scene | null = null;
-  private camera: THREE.PerspectiveCamera | null = null;
+  // Exposed as `protected` so experimental subclasses (e.g.
+  // IRobotRenderer) can inject post-processing, modify the scene, or
+  // hook into the render call without duplicating the whole class.
+  protected config: Required<ThreeJSRendererConfig>;
+  protected renderer: THREE.WebGLRenderer | null = null;
+  protected scene: THREE.Scene | null = null;
+  protected camera: THREE.PerspectiveCamera | null = null;
 
   // Entity object pools (keyed by entity id)
   private entityObjects: Map<string, THREE.Object3D> = new Map();
@@ -1689,7 +1694,7 @@ export class ThreeJSRenderer implements IRenderer {
    * The previous approach (setHSL with v/2) was an incorrect approximation
    * that made everything too dark and over-saturated.
    */
-  private hsvToThreeColor(hsv: { h: number; s: number; v: number }): THREE.Color {
+  protected hsvToThreeColor(hsv: { h: number; s: number; v: number }): THREE.Color {
     const { h, s, v } = hsv;
     const c = v * s;
     const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
