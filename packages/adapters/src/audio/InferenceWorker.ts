@@ -238,28 +238,30 @@ async function runInference() {
       ? state.activeByNoteId.get(state.activeByPitch.get(pitch)!)
       : undefined;
 
-    // Dedup by pitch alone. Basic Pitch runs on rolling 2s windows
-    // and its predicted onset for a held note is NOT stable across
-    // passes — the same held note can shift by tens of ms as more
-    // context arrives. An onset-time window check here was
-    // producing spurious note-off/note-on pairs and cascading drift
-    // markers whenever the shift crossed the window. Instead, treat
-    // any detection at an already-tracked pitch as a continuation
-    // of the same note, and rely on the note-off-timeout below to
-    // end notes when the model actually stops detecting them. The
-    // trade-off: a very fast re-strike at the same pitch (faster
-    // than noteOffTimeoutMs, default 200ms) will be missed as a
-    // new note. That's rare enough to accept for v1.
-    // Re-strike detection: a new detection at a tracked pitch whose
-    // onset is meaningfully LATER than the tracked note's onset is
-    // a re-strike, not a continuation. Below the threshold, it's
-    // held-note jitter (Basic Pitch shifts its predicted onset by
-    // tens of ms across passes). Above it, the user has struck the
-    // note again. When we detect a re-strike, close the old note
-    // and fall through to open a new one.
+    // Re-strike detection. A new detection at a tracked pitch is a
+    // re-strike only if BOTH:
+    //   (a) its onset is meaningfully LATER than the tracked note's
+    //       onset (onsetGap > restrikeGapSamples), and
+    //   (b) its onset is FRESH — within freshOnsetMaxAgeSamples of
+    //       "now".
+    //
+    // The freshness check is essential. Basic Pitch's 2-second
+    // window means that once a note is older than ~2s, the model
+    // can no longer see its true onset; it reports the note as
+    // starting at the *start of the current window*, which slides
+    // forward every pass. Without the freshness gate, this window-
+    // slide crosses restrikeGap after ~150ms and fires a spurious
+    // re-strike — closing the note. The "new" onset is stale
+    // (older than freshOnsetMaxAgeSamples) so the new-note path
+    // below drops it. Net effect: notes truncate at ~2s and never
+    // restart. With the freshness gate, the sliding reported onset
+    // is treated as continuation and the note keeps going.
     if (active) {
       const onsetGap = (absoluteOnsetSample - active.onsetSampleIndex) | 0;
-      const isRestrike = onsetGap > cfg.restrikeGapSamples;
+      const onsetAgeSamples = (headAfter - absoluteOnsetSample) >>> 0;
+      const isLaterThanTracked = onsetGap > cfg.restrikeGapSamples;
+      const isFreshEnough = onsetAgeSamples <= cfg.freshOnsetMaxAgeSamples;
+      const isRestrike = isLaterThanTracked && isFreshEnough;
       if (!isRestrike) {
         // Continuation. Extend lastSeen (max, so late passes can't
         // regress it).
@@ -268,7 +270,7 @@ async function runInference() {
         }
         continue;
       }
-      // Re-strike: close the old note at its last-seen position.
+      // Real re-strike: close the old note at its last-seen position.
       post({
         type: "audio_note_off",
         sampleIndex: active.lastSeenSampleIndex,
