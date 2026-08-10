@@ -308,14 +308,24 @@ async function runInference() {
   }
 }
 
-self.onmessage = (event: MessageEvent<MainToWorker>) => {
-  const msg = event.data;
-  switch (msg.type) {
-    case "init":
-      void init(msg);
-      break;
-    case "stop":
-      stop();
-      break;
-  }
-};
+/**
+ * Wire this worker's onmessage handler into the current Worker global
+ * scope. Call this from a worker entry file loaded via
+ * `new Worker(new URL('./entry.ts', import.meta.url), { type: 'module' })`.
+ * Wrapping in a function (rather than assigning at module top-level)
+ * lets the module be imported for its types from a non-worker
+ * context without side effects.
+ */
+export function installInferenceWorker(): void {
+  self.onmessage = (event: MessageEvent<MainToWorker>) => {
+    const msg = event.data;
+    switch (msg.type) {
+      case "init":
+        void init(msg);
+        break;
+      case "stop":
+        stop();
+        break;
+    }
+  };
+}

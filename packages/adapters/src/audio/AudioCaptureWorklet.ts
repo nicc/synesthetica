@@ -45,50 +45,61 @@ declare function registerProcessor(
   processor: new (options?: { processorOptions?: unknown }) => AudioWorkletProcessorBase,
 ): void;
 
-class AudioCaptureProcessor
-  extends AudioWorkletProcessor
-  implements AudioWorkletProcessorBase
-{
-  private ring: AudioRing;
-  /** Reusable mono buffer; sized to the worklet's render quantum (128). */
-  private monoBuffer: Float32Array;
-  /** Set to true on stop message; final process() then returns false. */
-  private stopped = false;
+/**
+ * Register the AudioCaptureProcessor with the current AudioWorklet
+ * global scope. Call this from a worklet entry file loaded via
+ * `audioContext.audioWorklet.addModule(...)`. Do not call from
+ * anywhere else — `AudioWorkletProcessor` is only defined in worklet
+ * scope, so the class body throws at eval time if run in a normal
+ * document context. Wrapping in a function defers class evaluation
+ * to worklet-scope call time.
+ */
+export function installAudioCaptureProcessor(): void {
+  class AudioCaptureProcessor
+    extends AudioWorkletProcessor
+    implements AudioWorkletProcessorBase
+  {
+    private ring: AudioRing;
+    /** Reusable mono buffer; sized to the worklet's render quantum (128). */
+    private monoBuffer: Float32Array;
+    /** Set to true on stop message; final process() then returns false. */
+    private stopped = false;
 
-  constructor(options?: { processorOptions?: unknown }) {
-    super(options);
-    const opts = (options?.processorOptions ?? {}) as Partial<AudioCaptureProcessorOptions>;
-    if (!opts.ring) {
-      throw new Error("AudioCaptureProcessor: processorOptions.ring is required");
-    }
-    this.ring = new AudioRing(opts.ring);
-    // 128 is the standard render quantum. We size for it; if the
-    // browser ever changes it, the buffer is resized lazily in
-    // process(). (Allocations inside process() are not strictly
-    // forbidden — they're discouraged. A one-time resize on first
-    // call is acceptable.)
-    this.monoBuffer = new Float32Array(128);
-
-    this.port.onmessage = (event: MessageEvent) => {
-      if (event.data?.type === "stop") {
-        this.stopped = true;
+    constructor(options?: { processorOptions?: unknown }) {
+      super(options);
+      const opts = (options?.processorOptions ?? {}) as Partial<AudioCaptureProcessorOptions>;
+      if (!opts.ring) {
+        throw new Error("AudioCaptureProcessor: processorOptions.ring is required");
       }
-    };
-  }
+      this.ring = new AudioRing(opts.ring);
+      // 128 is the standard render quantum. We size for it; if the
+      // browser ever changes it, the buffer is resized lazily in
+      // process(). (Allocations inside process() are not strictly
+      // forbidden — they're discouraged. A one-time resize on first
+      // call is acceptable.)
+      this.monoBuffer = new Float32Array(128);
 
-  process(inputs: Float32Array[][]): boolean {
-    if (this.stopped) return false;
-    const input = inputs[0];
-    if (!input || input.length === 0) return true;
-    const channel0 = input[0];
-    if (!channel0 || channel0.length === 0) return true;
-    if (this.monoBuffer.length !== channel0.length) {
-      this.monoBuffer = new Float32Array(channel0.length);
+      this.port.onmessage = (event: MessageEvent) => {
+        if (event.data?.type === "stop") {
+          this.stopped = true;
+        }
+      };
     }
-    downmixInPlace(input, this.monoBuffer);
-    this.ring.write(this.monoBuffer);
-    return true;
-  }
-}
 
-registerProcessor("audio-capture", AudioCaptureProcessor);
+    process(inputs: Float32Array[][]): boolean {
+      if (this.stopped) return false;
+      const input = inputs[0];
+      if (!input || input.length === 0) return true;
+      const channel0 = input[0];
+      if (!channel0 || channel0.length === 0) return true;
+      if (this.monoBuffer.length !== channel0.length) {
+        this.monoBuffer = new Float32Array(channel0.length);
+      }
+      downmixInPlace(input, this.monoBuffer);
+      this.ring.write(this.monoBuffer);
+      return true;
+    }
+  }
+
+  registerProcessor("audio-capture", AudioCaptureProcessor);
+}

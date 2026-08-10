@@ -5,7 +5,11 @@ import type {
   ModeId,
   ChordInterpretationMode,
 } from "@synesthetica/contracts";
-import { RawMidiAdapter, WebMidiSource } from "@synesthetica/adapters";
+import {
+  RawMidiAdapter,
+  WebMidiSource,
+  AudioInputAdapter,
+} from "@synesthetica/adapters";
 import {
   VisualPipeline,
   ThreeJSRenderer,
@@ -20,6 +24,27 @@ import {
   IdentityCompositor,
   Metronome,
 } from "@synesthetica/engine";
+
+/**
+ * URLs for the audio worker + worklet. The `?worker&url` suffix
+ * tells vite to bundle each entry file as an ES-module worker chunk
+ * (following all of its imports, including into the adapters package)
+ * and to return the URL string of the emitted asset. Without the
+ * `?worker&` part vite would just emit the raw .ts file, whose
+ * imports the browser can't resolve.
+ *
+ * Audio worklets aren't Web Workers technically, but vite's bundling
+ * path is the same; `?worker&url` works for both.
+ */
+import INFERENCE_WORKER_URL from "./audio/inference-worker-entry.ts?worker&url";
+import AUDIO_CAPTURE_WORKLET_URL from "./audio/audio-capture-worklet-entry.ts?worker&url";
+
+/**
+ * Basic Pitch model URL. Files live under public/models/basic-pitch/
+ * (copied from the @spotify/basic-pitch package) so vite serves them
+ * as static assets. tfjs fetches the .bin weights alongside model.json.
+ */
+const BASIC_PITCH_MODEL_URL = "/models/basic-pitch/model.json";
 
 // UI elements
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
@@ -36,6 +61,8 @@ const keyRootSelect = document.getElementById("key-root") as HTMLSelectElement;
 const keyModeSelect = document.getElementById("key-mode") as HTMLSelectElement;
 const clearKeyBtn = document.getElementById("clear-key") as HTMLButtonElement;
 const toggleChordModeBtn = document.getElementById("toggle-chord-mode") as HTMLButtonElement;
+const toggleAudioBtn = document.getElementById("toggle-audio") as HTMLButtonElement;
+const audioStatusDiv = document.getElementById("audio-status") as HTMLDivElement;
 
 // App state
 let midiSource: WebMidiSource | null = null;
@@ -43,6 +70,16 @@ let pipeline: VisualPipeline | null = null;
 let renderer: ThreeJSRenderer | null = null;
 let metronome: Metronome | null = null;
 let chordMode: ChordInterpretationMode = "harmonic";
+/**
+ * Currently active audio adapter, if any. Held here so we can tear
+ * it down on session switch. Null when audio input is not active.
+ */
+let audioAdapter: AudioInputAdapter | null = null;
+/**
+ * Which input path is currently driving the session. Enforces the
+ * mutex called for by SPEC 012 — MIDI and audio are exclusive.
+ */
+let activeInputMode: "none" | "midi" | "audio" = "none";
 
 // Resize canvas to fill viewport
 function resizeCanvas() {
@@ -123,10 +160,44 @@ function handleDeviceSelection(): void {
 }
 
 /**
+ * Build the pipeline + renderer + start the render loop. Adapter is
+ * passed in — MIDI or audio, doesn't matter, both produce
+ * RawInputFrames the pipeline consumes uniformly.
+ */
+function buildAndStartPipeline(
+  adapter: RawMidiAdapter | AudioInputAdapter,
+): void {
+  const partId = "main";
+  pipeline = new VisualPipeline({
+    canvasSize: { width: canvas.width, height: canvas.height },
+    rngSeed: Date.now(),
+    partId,
+  });
+
+  pipeline.addAdapter(adapter);
+  pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+  pipeline.addStabilizerFactory(() => new DynamicsStabilizer({ partId }));
+  pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
+  pipeline.addStabilizerFactory(() => new HarmonyStabilizer({ partId }));
+  pipeline.setVocabulary(new MusicalVisualVocabulary());
+  pipeline.addGrammar(new RhythmGrammar());
+  pipeline.addGrammar(new HarmonyGrammar());
+  pipeline.addGrammar(new DynamicsGrammar());
+  pipeline.setCompositor(new IdentityCompositor());
+
+  renderer = new ThreeJSRenderer({ backgroundColor: 0x000000 });
+  renderer.attach(canvas);
+
+  pipeline.reset();
+  applyTempoMeterSettings();
+  startRenderLoop();
+}
+
+/**
  * Start a session with the given MIDI input
  */
 function startSession(midiInput: MidiInputInfo): void {
-  // Stop any existing session
+  // Stop any existing session (audio or MIDI)
   stopSession();
 
   statusDiv.textContent = `Starting session with ${midiInput.name}...`;
@@ -136,52 +207,15 @@ function startSession(midiInput: MidiInputInfo): void {
       throw new Error("MIDI source not initialized");
     }
 
-    // Set session start time
     sessionStartTime = performance.now();
 
-    // Create adapter
     const adapter = new RawMidiAdapter(midiSource, {
       sessionStart: sessionStartTime,
     });
-
-    // Start listening to MIDI
     adapter.start();
 
-    // Create pipeline with RFC 005 components
-    const partId = "main";
-    pipeline = new VisualPipeline({
-      canvasSize: { width: canvas.width, height: canvas.height },
-      rngSeed: Date.now(),
-      partId,
-    });
-
-    // Wire up components
-    pipeline.addAdapter(adapter);
-    pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
-    pipeline.addStabilizerFactory(() => new DynamicsStabilizer({ partId }));
-    pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
-    pipeline.addStabilizerFactory(() => new HarmonyStabilizer({ partId }));
-    pipeline.setVocabulary(new MusicalVisualVocabulary());
-    // Use grammars - they'll be composited together
-    pipeline.addGrammar(new RhythmGrammar());
-    pipeline.addGrammar(new HarmonyGrammar());
-    pipeline.addGrammar(new DynamicsGrammar());
-    pipeline.setCompositor(new IdentityCompositor());
-
-    // Create renderer
-    renderer = new ThreeJSRenderer({
-      backgroundColor: 0x000000,
-    });
-    renderer.attach(canvas);
-
-    // Reset pipeline (initializes stabilizers, sets T=0)
-    pipeline.reset();
-
-    // Apply any existing tempo/meter settings
-    applyTempoMeterSettings();
-
-    // Start render loop
-    startRenderLoop();
+    buildAndStartPipeline(adapter);
+    activeInputMode = "midi";
 
     statusDiv.textContent = `Session active: ${midiInput.name}`;
     statusDiv.className = "success";
@@ -194,7 +228,74 @@ function startSession(midiInput: MidiInputInfo): void {
 }
 
 /**
- * Stop the current session
+ * Start a session with microphone audio input via Basic Pitch.
+ *
+ * Loads the model, requests mic permission, and wires the audio
+ * adapter into the pipeline. Any active MIDI session is torn down
+ * first — MIDI and audio are exclusive per SPEC 012.
+ */
+async function startAudioSession(): Promise<void> {
+  stopSession();
+
+  toggleAudioBtn.disabled = true;
+  toggleAudioBtn.textContent = "Loading model…";
+  audioStatusDiv.textContent = "Fetching Basic Pitch model + requesting mic…";
+  statusDiv.textContent = "Starting audio session…";
+  statusDiv.className = "";
+
+  try {
+    sessionStartTime = performance.now();
+
+    // `?audio-debug=1` on the URL turns on per-event console logging
+    // in the adapter. Useful when the visualisation looks quiet and
+    // we need to confirm whether the model is producing events at all.
+    const audioDebug =
+      new URLSearchParams(window.location.search).get("audio-debug") === "1";
+
+    audioAdapter = new AudioInputAdapter({
+      sessionStart: sessionStartTime,
+      modelUrl: BASIC_PITCH_MODEL_URL,
+      workerUrl: INFERENCE_WORKER_URL,
+      workletUrl: AUDIO_CAPTURE_WORKLET_URL,
+      debug: audioDebug,
+    });
+
+    // Kicks off getUserMedia (permission prompt), audio context
+    // creation, worklet + worker init, and model load. Resolves
+    // when the worker reports "ready".
+    await audioAdapter.start();
+
+    buildAndStartPipeline(audioAdapter);
+    activeInputMode = "audio";
+
+    toggleAudioBtn.textContent = "Disable microphone";
+    toggleAudioBtn.disabled = false;
+    audioStatusDiv.textContent = "Listening (Basic Pitch)";
+    statusDiv.textContent = "Session active: microphone";
+    statusDiv.className = "success";
+
+    // Deselect MIDI so the UI reflects reality.
+    if (midiSelect.value) midiSelect.value = "";
+  } catch (err) {
+    console.error("Failed to start audio session:", err);
+    toggleAudioBtn.textContent = "Enable microphone";
+    toggleAudioBtn.disabled = false;
+    audioStatusDiv.textContent =
+      err instanceof Error ? `Error: ${err.message}` : "Failed to start audio";
+    statusDiv.textContent = "Audio session failed — see below";
+    statusDiv.className = "error";
+    if (audioAdapter) {
+      await audioAdapter.stop().catch(() => {
+        /* best effort */
+      });
+      audioAdapter = null;
+    }
+    activeInputMode = "none";
+  }
+}
+
+/**
+ * Stop the current session — handles both MIDI and audio adapters.
  */
 function stopSession(): void {
   if (animationFrameId !== null) {
@@ -212,10 +313,38 @@ function stopSession(): void {
     renderer = null;
   }
 
+  // Audio adapter cleanup — releases mic, closes AudioContext,
+  // terminates the inference worker. Fire-and-forget the promise;
+  // stop() is best-effort on teardown.
+  if (audioAdapter) {
+    void audioAdapter.stop().catch(() => {
+      /* best effort */
+    });
+    audioAdapter = null;
+    toggleAudioBtn.textContent = "Enable microphone";
+    toggleAudioBtn.disabled = false;
+    audioStatusDiv.textContent = "";
+  }
+
+  activeInputMode = "none";
+
   if (statusDiv.className === "success") {
     statusDiv.textContent = "Session stopped";
     statusDiv.className = "";
   }
+}
+
+/**
+ * Toggle the microphone session — enable if off, disable if on.
+ * Fires on user gesture (click), which is required by browsers for
+ * getUserMedia and AudioContext instantiation.
+ */
+function toggleAudio(): void {
+  if (activeInputMode === "audio") {
+    stopSession();
+    return;
+  }
+  void startAudioSession();
 }
 
 // Debug counter for throttled logging
@@ -453,6 +582,7 @@ keyRootSelect.addEventListener("change", applyKeySettings);
 keyModeSelect.addEventListener("change", applyKeySettings);
 clearKeyBtn.addEventListener("click", clearKey);
 toggleChordModeBtn.addEventListener("click", toggleChordMode);
+toggleAudioBtn.addEventListener("click", toggleAudio);
 
 // Initialize on load
 initMidi();

@@ -107,6 +107,15 @@ export interface AudioInputAdapterConfig {
 
   /** Note-off timeout in ms. @default 200 */
   noteOffTimeoutMs?: number;
+
+  /**
+   * When true, log every incoming worker event (note-on / note-off /
+   * pitch-bend) to `console.debug`. Off by default — useful for
+   * verifying the model is producing events at all when the visual
+   * pipeline seems quiet. Toggle from the web app via a URL param.
+   * @default false
+   */
+  debug?: boolean;
 }
 
 const DEFAULT_CONFIG = {
@@ -118,6 +127,7 @@ const DEFAULT_CONFIG = {
   minNoteLengthFrames: DEFAULT_MIN_NOTE_LENGTH_FRAMES,
   dedupWindowMs: DEFAULT_DEDUP_WINDOW_MS,
   noteOffTimeoutMs: DEFAULT_NOTE_OFF_TIMEOUT_MS,
+  debug: false,
 };
 
 export class AudioInputAdapter implements IRawSourceAdapter {
@@ -290,6 +300,14 @@ export class AudioInputAdapter implements IRawSourceAdapter {
   }
 
   private onWorkerEvent(event: WorkerToMain): void {
+    if (
+      this.config.debug &&
+      event.type !== "ready" &&
+      event.type !== "error"
+    ) {
+      // eslint-disable-next-line no-console
+      console.debug("[audio-adapter]", event);
+    }
     switch (event.type) {
       case "ready":
       case "error":

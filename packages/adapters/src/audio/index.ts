@@ -2,6 +2,8 @@ export { AudioRing } from "./AudioRing";
 export type { AudioRingHandles } from "./AudioRing";
 export { AudioInputAdapter } from "./AudioInputAdapter";
 export type { AudioInputAdapterConfig } from "./AudioInputAdapter";
+export { installAudioCaptureProcessor } from "./AudioCaptureWorklet";
+export { installInferenceWorker } from "./InferenceWorker";
 export type {
   MainToWorker,
   WorkerToMain,
