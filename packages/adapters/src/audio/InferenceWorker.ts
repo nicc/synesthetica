@@ -43,6 +43,13 @@
  */
 
 import * as tf from "@tensorflow/tfjs";
+// WASM backend registers itself as a side effect of import. Required
+// in this worker: WebGL backend depends on OffscreenCanvas plumbing
+// and touches `window` during tensor readback, which throws in
+// DedicatedWorkerGlobalScope. WASM is a clean fit — no DOM, ~115ms
+// inference per the synesthetica-w1z spike.
+import { setWasmPaths } from "@tensorflow/tfjs-backend-wasm";
+import "@tensorflow/tfjs-backend-wasm";
 import {
   BasicPitch,
   outputToNotesPoly,
@@ -121,11 +128,12 @@ async function init(message: Extract<MainToWorker, { type: "init" }>) {
       noteOffTimeoutSamples: message.noteOffTimeoutSamples,
     };
 
-    // Try WebGL backend first (fastest in browsers), fall back to
-    // CPU. WASM would also work; left as a future option. We
-    // intentionally do NOT crash if WebGL is unavailable.
+    // WASM backend. Point tfjs at the .wasm binaries served
+    // alongside the model files by the web app. Falls back to CPU
+    // (pure JS, ~10× slower) if WASM init fails for any reason.
     try {
-      await tf.setBackend("webgl");
+      setWasmPaths("/models/tfjs-wasm/");
+      await tf.setBackend("wasm");
       await tf.ready();
     } catch {
       await tf.setBackend("cpu");
