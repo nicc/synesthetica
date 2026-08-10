@@ -87,6 +87,7 @@ interface WorkerState {
     minNoteLengthFrames: number;
     dedupWindowSamples: number;
     noteOffTimeoutSamples: number;
+    freshOnsetMaxAgeSamples: number;
   } | null;
   activeByNoteId: Map<string, ActiveNote>;
   activeByPitch: Map<number, string>; // pitch midi → noteId
@@ -126,6 +127,7 @@ async function init(message: Extract<MainToWorker, { type: "init" }>) {
       minNoteLengthFrames: message.minNoteLengthFrames,
       dedupWindowSamples: message.dedupWindowSamples,
       noteOffTimeoutSamples: message.noteOffTimeoutSamples,
+      freshOnsetMaxAgeSamples: message.freshOnsetMaxAgeSamples,
     };
 
     // WASM backend. Point tfjs at the .wasm binaries served
@@ -254,7 +256,17 @@ async function runInference() {
         active.lastSeenSampleIndex = absoluteLastSeenSample;
       }
     } else {
-      // First detection at this pitch — new note.
+      // First detection at this pitch. Basic Pitch's 2-second window
+      // returns notes with onsets anywhere in the window — including
+      // 1+ seconds ago. If this "new" note's onset is too old, it's
+      // either (a) something we already emitted and dropped from the
+      // tracked set, or (b) a stray detection in the historical part
+      // of the window. Either way, backfilling a note-on with a past
+      // timestamp puts a retroactive marker on the note strip. Skip.
+      const onsetAgeSamples = (headAfter - absoluteOnsetSample) >>> 0;
+      if (onsetAgeSamples > cfg.freshOnsetMaxAgeSamples) {
+        continue;
+      }
       const newNoteId = mintNoteId();
       const newActive: ActiveNote = {
         noteId: newNoteId,

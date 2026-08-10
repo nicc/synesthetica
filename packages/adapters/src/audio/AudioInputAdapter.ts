@@ -50,6 +50,11 @@ const DEFAULT_FRAME_THRESHOLD = 0.3;
 const DEFAULT_MIN_NOTE_LENGTH_FRAMES = 5; // ~58 ms
 const DEFAULT_DEDUP_WINDOW_MS = 50;
 const DEFAULT_NOTE_OFF_TIMEOUT_MS = 200;
+/** Only emit a fresh note-on if the model's reported onset is
+ *  within this many ms of the current audio "now". Suppresses
+ *  retroactive note-on events for stale detections in the older
+ *  part of the model's 2s window. */
+const DEFAULT_FRESH_ONSET_MAX_AGE_MS = 300;
 
 export interface AudioInputAdapterConfig {
   /**
@@ -109,6 +114,15 @@ export interface AudioInputAdapterConfig {
   noteOffTimeoutMs?: number;
 
   /**
+   * Max age (ms) of a detected onset for it to be emitted as a
+   * fresh note-on. Basic Pitch's 2-second window returns notes
+   * with onsets anywhere in the window; without this guard, a
+   * brief dropout followed by re-detection surfaces as a
+   * retroactive marker on the note strip. @default 300
+   */
+  freshOnsetMaxAgeMs?: number;
+
+  /**
    * When true, log every incoming worker event (note-on / note-off /
    * pitch-bend) to `console.debug`. Off by default — useful for
    * verifying the model is producing events at all when the visual
@@ -127,6 +141,7 @@ const DEFAULT_CONFIG = {
   minNoteLengthFrames: DEFAULT_MIN_NOTE_LENGTH_FRAMES,
   dedupWindowMs: DEFAULT_DEDUP_WINDOW_MS,
   noteOffTimeoutMs: DEFAULT_NOTE_OFF_TIMEOUT_MS,
+  freshOnsetMaxAgeMs: DEFAULT_FRESH_ONSET_MAX_AGE_MS,
   debug: false,
 };
 
@@ -239,6 +254,7 @@ export class AudioInputAdapter implements IRawSourceAdapter {
       windowSamples: WINDOW_SAMPLES,
       dedupWindowSamples: msToSamples(this.config.dedupWindowMs),
       noteOffTimeoutSamples: msToSamples(this.config.noteOffTimeoutMs),
+      freshOnsetMaxAgeSamples: msToSamples(this.config.freshOnsetMaxAgeMs),
     };
     this.worker.postMessage(initMessage);
 

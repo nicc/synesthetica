@@ -46,6 +46,16 @@ export interface WorkerInitMessage {
   /** If a tracked active note hasn't been re-detected within this many
    *  samples, emit note-off and remove from active set. */
   noteOffTimeoutSamples: number;
+  /**
+   * Only emit a fresh note-on if the detected onset is within this
+   * many samples of the current audio head. Basic Pitch's 2-second
+   * inference window returns notes with onsets anywhere in the
+   * window — including 1+ seconds in the past. Without this guard,
+   * a note the model briefly drops and re-detects gets a new note-on
+   * with an onset in the past, appearing as a retroactive marker on
+   * the note strip.
+   */
+  freshOnsetMaxAgeSamples: number;
 }
 
 export interface WorkerStopMessage {
