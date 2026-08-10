@@ -46,14 +46,20 @@ const RING_CAPACITY = 65536;
 // ---- Tunable defaults ----
 const DEFAULT_HOP_MS = 50;
 const DEFAULT_ONSET_THRESHOLD = 0.5;
-const DEFAULT_FRAME_THRESHOLD = 0.3;
+/** Lowered from 0.3 — voice (unlike piano) has variable spectral
+ *  content mid-note (breath, vibrato) that can dip below the model's
+ *  per-frame confidence. Dropouts below the threshold were causing
+ *  sustained voice notes to split into multiple visible segments as
+ *  the note-off timeout fired mid-note. 0.2 lets the model track
+ *  through borderline frames without becoming a noise magnet. */
+const DEFAULT_FRAME_THRESHOLD = 0.2;
 const DEFAULT_MIN_NOTE_LENGTH_FRAMES = 5; // ~58 ms
 const DEFAULT_DEDUP_WINDOW_MS = 50;
 /** Reduced from 200ms — 200 felt laggy on release, especially with
  *  instruments that have long decay tails. Re-strike detection now
  *  covers the case where a brief model dropout would otherwise be
  *  misread as a note end. */
-const DEFAULT_NOTE_OFF_TIMEOUT_MS = 120;
+const DEFAULT_NOTE_OFF_TIMEOUT_MS = 160;
 /** Only emit a fresh note-on if the model's reported onset is
  *  within this many ms of the current audio "now". Suppresses
  *  retroactive note-on events for stale detections in the older
