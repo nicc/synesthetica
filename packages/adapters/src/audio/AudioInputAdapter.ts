@@ -49,12 +49,23 @@ const DEFAULT_ONSET_THRESHOLD = 0.5;
 const DEFAULT_FRAME_THRESHOLD = 0.3;
 const DEFAULT_MIN_NOTE_LENGTH_FRAMES = 5; // ~58 ms
 const DEFAULT_DEDUP_WINDOW_MS = 50;
-const DEFAULT_NOTE_OFF_TIMEOUT_MS = 200;
+/** Reduced from 200ms — 200 felt laggy on release, especially with
+ *  instruments that have long decay tails. Re-strike detection now
+ *  covers the case where a brief model dropout would otherwise be
+ *  misread as a note end. */
+const DEFAULT_NOTE_OFF_TIMEOUT_MS = 120;
 /** Only emit a fresh note-on if the model's reported onset is
  *  within this many ms of the current audio "now". Suppresses
  *  retroactive note-on events for stale detections in the older
  *  part of the model's 2s window. */
 const DEFAULT_FRESH_ONSET_MAX_AGE_MS = 300;
+/** A new detection at a tracked pitch is treated as a re-strike
+ *  (rather than continuation) when its onset is at least this many
+ *  ms later than the tracked note's onset. Below the threshold,
+ *  it's held-note jitter (Basic Pitch shifts predicted onset by
+ *  tens of ms across passes on the same held note). Above it, the
+ *  user has struck the note again. */
+const DEFAULT_RESTRIKE_GAP_MS = 120;
 
 export interface AudioInputAdapterConfig {
   /**
@@ -110,7 +121,7 @@ export interface AudioInputAdapterConfig {
   /** Onset dedup window in ms. @default 50 */
   dedupWindowMs?: number;
 
-  /** Note-off timeout in ms. @default 200 */
+  /** Note-off timeout in ms. @default 120 */
   noteOffTimeoutMs?: number;
 
   /**
@@ -121,6 +132,15 @@ export interface AudioInputAdapterConfig {
    * retroactive marker on the note strip. @default 300
    */
   freshOnsetMaxAgeMs?: number;
+
+  /**
+   * Minimum onset gap (ms) between a tracked note and a new
+   * detection at the same pitch for the new detection to be treated
+   * as a re-strike (rather than continuation of the tracked note).
+   * Below this, it's Basic Pitch's within-pass onset jitter. Above,
+   * the user has struck again. @default 120
+   */
+  restrikeGapMs?: number;
 
   /**
    * When true, log every incoming worker event (note-on / note-off /
@@ -142,6 +162,7 @@ const DEFAULT_CONFIG = {
   dedupWindowMs: DEFAULT_DEDUP_WINDOW_MS,
   noteOffTimeoutMs: DEFAULT_NOTE_OFF_TIMEOUT_MS,
   freshOnsetMaxAgeMs: DEFAULT_FRESH_ONSET_MAX_AGE_MS,
+  restrikeGapMs: DEFAULT_RESTRIKE_GAP_MS,
   debug: false,
 };
 
@@ -255,6 +276,7 @@ export class AudioInputAdapter implements IRawSourceAdapter {
       dedupWindowSamples: msToSamples(this.config.dedupWindowMs),
       noteOffTimeoutSamples: msToSamples(this.config.noteOffTimeoutMs),
       freshOnsetMaxAgeSamples: msToSamples(this.config.freshOnsetMaxAgeMs),
+      restrikeGapSamples: msToSamples(this.config.restrikeGapMs),
     };
     this.worker.postMessage(initMessage);
 

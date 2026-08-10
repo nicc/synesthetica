@@ -56,6 +56,16 @@ export interface WorkerInitMessage {
    * the note strip.
    */
   freshOnsetMaxAgeSamples: number;
+  /**
+   * A new detection at a tracked pitch is treated as a RE-STRIKE
+   * (rather than continuation of the tracked note) when its onset
+   * sits at least this many samples later than the tracked note's
+   * onset. Below the threshold, it's held-note jitter — Basic Pitch
+   * shifts its predicted onset by tens of ms across inference
+   * passes on the same held note. Above it, the user has genuinely
+   * struck the note again.
+   */
+  restrikeGapSamples: number;
 }
 
 export interface WorkerStopMessage {

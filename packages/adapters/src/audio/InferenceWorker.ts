@@ -88,6 +88,7 @@ interface WorkerState {
     dedupWindowSamples: number;
     noteOffTimeoutSamples: number;
     freshOnsetMaxAgeSamples: number;
+    restrikeGapSamples: number;
   } | null;
   activeByNoteId: Map<string, ActiveNote>;
   activeByPitch: Map<number, string>; // pitch midi → noteId
@@ -128,6 +129,7 @@ async function init(message: Extract<MainToWorker, { type: "init" }>) {
       dedupWindowSamples: message.dedupWindowSamples,
       noteOffTimeoutSamples: message.noteOffTimeoutSamples,
       freshOnsetMaxAgeSamples: message.freshOnsetMaxAgeSamples,
+      restrikeGapSamples: message.restrikeGapSamples,
     };
 
     // WASM backend. Point tfjs at the .wasm binaries served
@@ -248,21 +250,43 @@ async function runInference() {
     // trade-off: a very fast re-strike at the same pitch (faster
     // than noteOffTimeoutMs, default 200ms) will be missed as a
     // new note. That's rare enough to accept for v1.
+    // Re-strike detection: a new detection at a tracked pitch whose
+    // onset is meaningfully LATER than the tracked note's onset is
+    // a re-strike, not a continuation. Below the threshold, it's
+    // held-note jitter (Basic Pitch shifts its predicted onset by
+    // tens of ms across passes). Above it, the user has struck the
+    // note again. When we detect a re-strike, close the old note
+    // and fall through to open a new one.
     if (active) {
-      // Continuation of an existing tracked note. Extend lastSeen.
-      // Use max() because on windows that overlap heavily, the same
-      // note's predicted end can regress slightly.
-      if (absoluteLastSeenSample > active.lastSeenSampleIndex) {
-        active.lastSeenSampleIndex = absoluteLastSeenSample;
+      const onsetGap = (absoluteOnsetSample - active.onsetSampleIndex) | 0;
+      const isRestrike = onsetGap > cfg.restrikeGapSamples;
+      if (!isRestrike) {
+        // Continuation. Extend lastSeen (max, so late passes can't
+        // regress it).
+        if (absoluteLastSeenSample > active.lastSeenSampleIndex) {
+          active.lastSeenSampleIndex = absoluteLastSeenSample;
+        }
+        continue;
       }
-    } else {
-      // First detection at this pitch. Basic Pitch's 2-second window
-      // returns notes with onsets anywhere in the window — including
-      // 1+ seconds ago. If this "new" note's onset is too old, it's
-      // either (a) something we already emitted and dropped from the
-      // tracked set, or (b) a stray detection in the historical part
-      // of the window. Either way, backfilling a note-on with a past
-      // timestamp puts a retroactive marker on the note strip. Skip.
+      // Re-strike: close the old note at its last-seen position.
+      post({
+        type: "audio_note_off",
+        sampleIndex: active.lastSeenSampleIndex,
+        noteId: active.noteId,
+        confidence: 0.7,
+      });
+      state.activeByNoteId.delete(active.noteId);
+      state.activeByPitch.delete(pitch);
+      active = undefined;
+      // Fall through to the new-note path below.
+    }
+
+    {
+      // New note (either first detection at this pitch, or the
+      // re-strike branch above). Skip if the onset is too far in
+      // the past — Basic Pitch's 2-second window returns notes with
+      // onsets anywhere in it, and backfilling a note-on with a
+      // stale timestamp puts a retroactive marker on the note strip.
       const onsetAgeSamples = (headAfter - absoluteOnsetSample) >>> 0;
       if (onsetAgeSamples > cfg.freshOnsetMaxAgeSamples) {
         continue;
