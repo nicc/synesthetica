@@ -1,8 +1,8 @@
 # SPEC 012: Polyphonic Audio Input via Basic Pitch
 
 Status: Approved
-Date: 2026-05-12 (amended same day after spike findings)
-Source: design conversation (May 2026); supersedes the Meyda evaluation captured in synesthetica-y7q. Architecture amended per docs/learnings/2026-05-12-basic-pitch-spike.md (synesthetica-w1z).
+Date: 2026-05-12 (spike findings amended same day; note-tracking behaviour amended 2026-08-10 after piece-5 integration)
+Source: design conversation (May 2026); supersedes the Meyda evaluation captured in synesthetica-y7q. Architecture amended per docs/learnings/2026-05-12-basic-pitch-spike.md (synesthetica-w1z). Note-tracking constraints and worker logic clarified after live testing surfaced the model window's effect on held notes.
 
 ## Summary
 
@@ -147,16 +147,32 @@ The ring buffer implementation lives in `packages/adapters/src/audio/AudioRing.t
 ### Sliding-window inference
 
 - **Sample rate**: 22.05 kHz (Basic Pitch native rate). Resampling happens in the worklet (linear or polyphase; benchmark later).
-- **Window**: **2 seconds (43,844 samples = 22050 × 2 − FFT_HOP).** This is a *hard architectural constraint* of the Basic Pitch model — the TF.js graph expects exactly this input size. We cannot shrink the window. Confirmed empirically in synesthetica-w1z by reading `AUDIO_WINDOW_LENGTH_SECONDS` in the package source.
+- **Window**: **2 seconds (43,844 samples = 22050 × 2 − FFT_HOP).** This is a *hard architectural constraint* of the Basic Pitch model — the TF.js graph expects exactly this input size. We cannot shrink the window. Confirmed empirically in synesthetica-w1z by reading `AUDIO_WINDOW_LENGTH_SECONDS` in the package source. See "Model window constraint" below for the consequences on our note-tracking logic.
 - **Post-onset audio required for reliable detection**: ~50–100 ms. The 2-second window does *not* impose 2-second latency — the model produces predictions for every output frame inside the window, and frames near the END of the window are usable once they have ~50–100 ms of post-onset audio. The rest of the window can be earlier audio or silence; the model doesn't require its full 2 s of right-context.
 - **Hop**: 30–50 ms. The worker runs inference every 30–50 ms on the latest 2 seconds of audio.
-- **Deduplication**: consecutive windows overlap by 95+%; the same note is detected in many consecutive windows. The adapter facade keeps a short-term cache keyed by `(pitch, onset_time_quantised_to_~50ms)` and only emits a given onset once.
-- **Onset thresholding and adjacency suppression**: the model's onset posteriors are noisy at low confidences and tend to spread across adjacent pitches. The inference worker applies:
-  1. A confidence threshold (start at 0.5, tunable).
-  2. Adjacency suppression — within a single time frame, if multiple adjacent pitches both pass threshold, keep only the highest-confidence pitch.
-
-  Both run in the worker, before events are posted to the main thread.
 - **Note-off coherence**: the model predicts both onset and offset for each note. We follow option (a) from the design discussion: emit `AudioNoteOff` when the model confirms an offset, even if that means the release is a few hops later than a fast RMS-decay detector would emit. This favours coherence with the model's own view; if it turns out to feel laggy, the fallback is a separate fast-decay note-off detector.
+
+### Model window constraint
+
+The 2-second inference window has non-obvious consequences for how the worker translates model output into note events. In brief:
+
+- **The model reports onsets relative to the current window.** For a note whose true onset lies inside the window (i.e. it started within the last ~2 s), the model reports a stable onset time that closely matches the true onset. For a note whose true onset lies *outside* the window (older than ~2 s), the model can no longer see it and reports the onset as sitting at the *start of the current window*. That reported onset then slides forward at ~one hop per pass as the window slides.
+- **Overlapping windows detect the same note many times.** With a 30–50 ms hop and a 2 s window, consecutive inferences overlap by 95%+. Every held note is re-detected on every pass. The worker's job is to fold those repeated detections into a stable stream of note-on / note-off / pitch-bend events.
+
+The worker's per-pass logic to do that is documented below rather than in code comments because the interactions between the several thresholds are hard to hold in your head from source alone.
+
+For each note the model reports in a pass, at pitch P with reported onset O and predicted end E:
+
+1. **If pitch P has no tracked note**, this is a candidate new note. Only emit `AudioNoteOn` if O is *fresh* — within `freshOnsetMaxAgeMs` (default 300 ms) of the current audio "now". Stale onsets are dropped rather than backfilled retroactively onto the note strip.
+2. **If pitch P has a tracked note with onset T**, this is *either* a continuation of the tracked note *or* a re-strike. It's classified as a re-strike only if BOTH:
+   - O is meaningfully later than T (O − T ≥ `restrikeGapMs`, default 120–150 ms), AND
+   - O is fresh (`now − O ≤ freshOnsetMaxAgeMs`).
+   Otherwise it's continuation. The freshness gate on the re-strike check is essential — without it, the sliding reported onset of a note held past 2 s would eventually cross `restrikeGapMs`, fire a spurious re-strike, and the note would die because the "new" onset (stale) can't open a fresh note. With the gate, held notes past 2 s are treated as continuation and can extend indefinitely.
+3. **Continuation** extends the tracked note's `lastSeen` to `max(current, E)`.
+4. **Re-strike** closes the tracked note at its current `lastSeen` and opens a new one at O. Follows path (1) internally.
+5. **Note-off timeout**: on each pass, any tracked note whose `lastSeen` is older than `noteOffTimeoutMs` (default 120–160 ms) has never been re-detected and is closed. This handles both real note ends and model dropouts too long to bridge.
+
+Result: notes track continuously as long as the model keeps seeing them, no matter how long that is; re-strikes are recognised as long as they're at least `restrikeGapMs` apart; retroactive markers don't appear on the note strip; brief model dropouts (< `noteOffTimeoutMs`) don't fragment a held note.
 
 ### Velocity derivation
 
