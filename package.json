@@ -10,7 +10,8 @@
     "build": "npm run build -ws",
     "clean": "npm run clean -ws",
     "lint": "eslint . --ext .ts",
-    "lint:fix": "eslint . --ext .ts --fix"
+    "lint:fix": "eslint . --ext .ts --fix",
+    "dev": "npm run build -w @synesthetica/contracts -w @synesthetica/adapters -w @synesthetica/engine && npm run dev:chrome -w @synesthetica/web-app"
   },
   "devDependencies": {
     "@types/webmidi": "^2.1.0",
