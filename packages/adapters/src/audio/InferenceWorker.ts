@@ -234,27 +234,27 @@ async function runInference() {
       ? state.activeByNoteId.get(state.activeByPitch.get(pitch)!)
       : undefined;
 
-    // Dedup: same pitch + onset close to a known active note ⇒ same note.
-    if (
-      active &&
-      Math.abs((absoluteOnsetSample - active.onsetSampleIndex) | 0) <=
-        cfg.dedupWindowSamples
-    ) {
-      // Continue tracking the existing note. Update last-seen.
-      active.lastSeenSampleIndex = absoluteLastSeenSample;
-    } else {
-      // If a note at this pitch was already active but the new onset
-      // is well separated, close out the old note before opening a new one.
-      if (active) {
-        post({
-          type: "audio_note_off",
-          sampleIndex: active.lastSeenSampleIndex,
-          noteId: active.noteId,
-          confidence: 0.7,
-        });
-        state.activeByNoteId.delete(active.noteId);
-        state.activeByPitch.delete(pitch);
+    // Dedup by pitch alone. Basic Pitch runs on rolling 2s windows
+    // and its predicted onset for a held note is NOT stable across
+    // passes — the same held note can shift by tens of ms as more
+    // context arrives. An onset-time window check here was
+    // producing spurious note-off/note-on pairs and cascading drift
+    // markers whenever the shift crossed the window. Instead, treat
+    // any detection at an already-tracked pitch as a continuation
+    // of the same note, and rely on the note-off-timeout below to
+    // end notes when the model actually stops detecting them. The
+    // trade-off: a very fast re-strike at the same pitch (faster
+    // than noteOffTimeoutMs, default 200ms) will be missed as a
+    // new note. That's rare enough to accept for v1.
+    if (active) {
+      // Continuation of an existing tracked note. Extend lastSeen.
+      // Use max() because on windows that overlap heavily, the same
+      // note's predicted end can regress slightly.
+      if (absoluteLastSeenSample > active.lastSeenSampleIndex) {
+        active.lastSeenSampleIndex = absoluteLastSeenSample;
       }
+    } else {
+      // First detection at this pitch — new note.
       const newNoteId = mintNoteId();
       const newActive: ActiveNote = {
         noteId: newNoteId,
@@ -277,23 +277,29 @@ async function runInference() {
         confidence: cfg.onsetThreshold, // conservative — model emits a binary above threshold
       });
       active = newActive;
-    }
 
-    // Emit any new pitch-bend samples since this note's last emission.
-    if (note.pitchBends && active) {
-      const bends = note.pitchBends;
-      for (let i = active.lastEmittedBendFrameIdx + 1; i < bends.length; i++) {
-        const bendSampleIndex =
-          (absoluteOnsetSample + i * FFT_HOP) >>> 0;
-        post({
-          type: "audio_pitch_bend",
-          sampleIndex: bendSampleIndex,
-          noteId: active.noteId,
-          semitones: bends[i],
-          confidence: cfg.frameThreshold,
-        });
+      // Emit initial pitch-bend samples for this fresh note. We do
+      // NOT emit additional bends on subsequent passes for the same
+      // note — the `bends` array is relative to *this pass's*
+      // predicted onset, which drifts across passes, so re-emitting
+      // wouldn't align to consistent timestamps. Late bend evolution
+      // is lost; the initial trajectory is captured. Improve later
+      // if pitch-bend fidelity matters more than simplicity.
+      if (note.pitchBends) {
+        const bends = note.pitchBends;
+        for (let i = 0; i < bends.length; i++) {
+          const bendSampleIndex =
+            (absoluteOnsetSample + i * FFT_HOP) >>> 0;
+          post({
+            type: "audio_pitch_bend",
+            sampleIndex: bendSampleIndex,
+            noteId: newNoteId,
+            semitones: bends[i],
+            confidence: cfg.frameThreshold,
+          });
+        }
+        active.lastEmittedBendFrameIdx = bends.length - 1;
       }
-      active.lastEmittedBendFrameIdx = bends.length - 1;
     }
   }
 
