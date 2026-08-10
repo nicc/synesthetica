@@ -26,18 +26,22 @@ import {
 } from "@synesthetica/engine";
 
 /**
- * URLs for the audio worker + worklet. The `?worker&url` suffix
- * tells vite to bundle each entry file as an ES-module worker chunk
- * (following all of its imports, including into the adapters package)
- * and to return the URL string of the emitted asset. Without the
- * `?worker&` part vite would just emit the raw .ts file, whose
- * imports the browser can't resolve.
- *
- * Audio worklets aren't Web Workers technically, but vite's bundling
- * path is the same; `?worker&url` works for both.
+ * InferenceWorker URL — vite's `?worker&url` bundles the entry file
+ * as an ES-module Web Worker chunk (following all its imports,
+ * including into the adapters package) and returns the emitted URL.
+ * This works cleanly for Web Workers.
  */
 import INFERENCE_WORKER_URL from "./audio/inference-worker-entry.ts?worker&url";
-import AUDIO_CAPTURE_WORKLET_URL from "./audio/audio-capture-worklet-entry.ts?worker&url";
+
+/**
+ * AudioCaptureProcessor URL — hand-written vanilla-JS worklet in
+ * public/. Vite serves it verbatim (no bundling, no import
+ * resolution). The `?worker&url` pattern that works for Web Workers
+ * does NOT reliably work for AudioWorklets — the emitted chunk
+ * doesn't call registerProcessor in worklet scope. See the file
+ * itself for the full explanation.
+ */
+const AUDIO_CAPTURE_WORKLET_URL = "/audio-capture-worklet.js";
 
 /**
  * Basic Pitch model URL. Files live under public/models/basic-pitch/
