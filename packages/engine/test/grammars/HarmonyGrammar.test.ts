@@ -338,10 +338,11 @@ describe("HarmonyGrammar", () => {
     });
 
     it("emits a connector arc alongside each edge (mid-animation gates the strip)", () => {
-      // Same setup as the earlier strip test, but sampled BEFORE the
-      // 500ms connector animation completes. Expect the arc entity,
+      // Same setup as the earlier strip test, but sampled AT t=onset
+      // so progress=0 regardless of CONNECTOR_ANIMATION_MS's value.
+      // Expect the arc entity to be emitted (with zero sweep so far),
       // but no strip yet.
-      const frame = createTestAnnotatedFrame(700, "main", {
+      const frame = createTestAnnotatedFrame(500, "main", {
         prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
         harmonicContext: {
           tension: 0,
@@ -371,17 +372,57 @@ describe("HarmonyGrammar", () => {
       );
 
       expect(arcs).toHaveLength(1);
-      expect(strips).toHaveLength(0); // gated: progress = 200/500 = 0.4
+      expect(strips).toHaveLength(0); // gated: progress = 0
 
       const arc = arcs[0];
       expect(arc.data?.startAngleDeg).toBeDefined();
       expect(arc.data?.sweepDeg).toBeDefined();
       expect(arc.data?.radius).toBeDefined();
       expect(arc.data?.hue).toBeDefined();
-      // Sweep at t=700 (200ms in) is 40% of the full arc.
-      const arcSweep = arc.data?.sweepDeg as number;
-      expect(Math.abs(arcSweep)).toBeGreaterThan(0);
-      expect(Math.abs(arcSweep)).toBeLessThan(180);
+    });
+
+    it("shortens the arc sweep to stop flush with the strip's near edge", () => {
+      // ♭VII → IV in C major: source at ~283°, target IV at ~154°.
+      // Natural short sweep ≈ -128.6° (counter-clockwise).
+      // Emitted sweep should be shorter in magnitude by roughly the
+      // strip's angular half-width (~12° for a diatonic target) so the
+      // arc stops at the strip's near edge, not its center. Sampled at
+      // full progress so the emitted sweep equals the shortened one.
+      const frame = createTestAnnotatedFrame(5000, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500 },
+          ],
+          functionalEdges: [
+            {
+              sourceChordId: "bvii",
+              targetDegree: 4,
+              targetPc: 5 as PitchClass,
+              targetDiatonic: true,
+              weight: 0.85,
+              type: "subdominant-borrowing",
+            },
+          ],
+        },
+      });
+      const scene = grammar.update(frame, null);
+      const arc = scene.entities.find(
+        (e) => e.data?.type === "connection-arc",
+      )!;
+      const emittedSweep = arc.data?.sweepDeg as number;
+
+      // The natural (pre-shortening) sweep magnitude is ~128.6°.
+      // After shortening by ~12° it should be roughly ~116° in
+      // magnitude — meaningfully less than the natural, still
+      // recognisably the same arc direction.
+      const NATURAL_ABS_SWEEP = 128.57;
+      expect(Math.abs(emittedSweep)).toBeLessThan(NATURAL_ABS_SWEEP - 5);
+      expect(Math.abs(emittedSweep)).toBeGreaterThan(NATURAL_ABS_SWEEP - 20);
+      expect(Math.sign(emittedSweep)).toBe(-1); // natural direction preserved
     });
 
     it("strip appears once the connector animation completes", () => {

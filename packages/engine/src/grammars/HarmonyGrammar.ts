@@ -188,6 +188,17 @@ const CONNECTOR_ANIMATION_MS = 100;
  *  (STRIP_RADIAL_FRACTION * clockRadius ≈ 0.01 normalized). */
 const CONNECTOR_HALF_THICKNESS_NORMALIZED = 0.001;
 
+/**
+ * Assumed renderer worldWidth. The strip renderer uses worldWidth to
+ * convert normalized radial coords to world units, and its angular
+ * width (strip_arc_width / mean_radius_world) then depends on that
+ * assumption. The grammar needs the same assumption to compute where
+ * the arc should stop flush with the strip's near edge. Kept as a
+ * named constant rather than magic 100 so this coupling is legible.
+ * If the renderer's worldWidth ever changes, update this too.
+ */
+const ASSUMED_WORLD_WIDTH = 100;
+
 /** Opacity multiplier applied to the connector arc's edge-weight-scaled
  *  opacity. Independent knob from MAX_STRIP_OPACITY so the pathway
  *  reads at the right strength without dragging the strip along. */
@@ -780,10 +791,27 @@ export class HarmonyGrammar implements IVisualGrammar {
       const arcOpacity =
         fadeOpacity * edge.weight * MAX_STRIP_OPACITY * CONNECTOR_OPACITY_MULTIPLIER;
 
+      // Stop the arc flush with the strip's near edge instead of at
+      // its centerline, so the two don't overlap and composite into a
+      // doubled-alpha band. Strip's angular width matches the
+      // renderer's math: arcWidth / meanRadius_world, halved for the
+      // near-edge offset from centerline.
+      const targetArcWidth = edge.targetDiatonic
+        ? STRIP_ARC_WIDTH
+        : STRIP_ARC_WIDTH * BORROWED_SCALE;
+      const meanRingWorld =
+        ((targetMidR + targetChordR) / 2) * ASSUMED_WORLD_WIDTH;
+      const stripAngularHalfWidthDeg =
+        (targetArcWidth / meanRingWorld / 2) * (180 / Math.PI);
+      const absSweep = Math.abs(sweepDeg);
+      const shortenedAbsSweep = Math.max(0, absSweep - stripAngularHalfWidthDeg);
+      const shortenedSweep = Math.sign(sweepDeg) * shortenedAbsSweep;
+
       // Connector arc: emit whenever the source is alive (even at
       // progress=0 it's a zero-length arc so the renderer no-ops
       // gracefully). The renderer sweeps from sourceAngleDeg by
-      // sweepDeg × progress.
+      // (shortenedSweep × progress) so the arc stops at the strip's
+      // near edge, not its center.
       if (arcOpacity >= 0.01) {
         entities.push({
           id: `${this.id}:edge-connector:${sourceChord.chordId}:${edge.targetDegree}:${edge.targetDiatonic ? "d" : "b"}`,
@@ -802,7 +830,7 @@ export class HarmonyGrammar implements IVisualGrammar {
             type: "connection-arc",
             radius: targetMidR,
             startAngleDeg: sourceAngleDeg,
-            sweepDeg: sweepDeg * progress,
+            sweepDeg: shortenedSweep * progress,
             hue: sourceHue,
             halfThickness: CONNECTOR_HALF_THICKNESS_NORMALIZED,
           },
@@ -817,10 +845,6 @@ export class HarmonyGrammar implements IVisualGrammar {
 
       const stripOpacity = fadeOpacity * edge.weight * MAX_STRIP_OPACITY;
       if (stripOpacity < 0.01) continue;
-
-      const targetArcWidth = edge.targetDiatonic
-        ? STRIP_ARC_WIDTH
-        : STRIP_ARC_WIDTH * BORROWED_SCALE;
 
       entities.push({
         id: `${this.id}:edge:${sourceChord.chordId}:${edge.targetDegree}:${edge.targetDiatonic ? "d" : "b"}`,
