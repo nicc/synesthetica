@@ -644,66 +644,83 @@ export class ThreeJSRenderer implements IRenderer {
     const worldRadius = normalizedRadius * this.config.worldWidth;
     const startAngleDeg = (data.startAngleDeg as number | undefined) ?? 0;
     const sweepDeg = (data.sweepDeg as number | undefined) ?? 0;
-    const lineWidth = (data.lineWidth as number | undefined) ?? 2;
+    const halfThickness = (data.halfThickness as number | undefined) ?? 0.002;
     const hue = (data.hue as number | undefined) ?? 0;
     const cx = (entity.position?.x ?? 0.5) * this.config.worldWidth;
     const cy = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
     const opacity = entity.style.opacity ?? 1;
 
-    // Skip near-zero sweeps to avoid degenerate LineGeometry (would
-    // otherwise emit a single-vertex line that WebGL rejects).
+    // Skip near-zero sweeps to avoid degenerate ring geometry.
     const absSweep = Math.abs(sweepDeg);
     if (absSweep < 0.5) {
-      const existing = this.entityObjects.get(entity.id) as Line2 | undefined;
+      const existing = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
       if (existing) {
-        (existing.material as LineMaterial).opacity = 0;
+        (existing.material as THREE.MeshBasicMaterial).opacity = 0;
       }
       return;
     }
 
-    // Sample the arc from startAngleDeg to (startAngleDeg + sweepDeg).
-    // Segment density scales with arc length so short arcs aren't
-    // over-tessellated and long arcs aren't chunky.
-    const segments = Math.max(4, Math.ceil(absSweep / 3));
-    const positions: number[] = [];
-    for (let i = 0; i <= segments; i++) {
-      const angleDeg = startAngleDeg + (sweepDeg * i) / segments;
-      // Same angle convention as slot ticks / strips: 0° at top,
-      // clockwise, y-flipped sin for Three.js y-up.
-      const angleRad = ((angleDeg - 90) * Math.PI) / 180;
-      positions.push(
-        cx + worldRadius * Math.cos(angleRad),
-        cy - worldRadius * Math.sin(angleRad),
-        0,
-      );
-    }
+    // Ring segment: thin annulus from (worldRadius − halfWidth) to
+    // (worldRadius + halfWidth), spanning `sweepDeg` degrees starting
+    // at `startAngleDeg`. RingGeometry works in Three.js theta
+    // (0 = +X axis, CCW positive), so we convert from our clock-face
+    // angle convention (0 = 12 o'clock, CW positive):
+    //   theta = π/2 − clockAngle
+    // and negate the sweep to turn CW into CCW.
+    const halfWidth = halfThickness * this.config.worldWidth;
+    const innerR = Math.max(0.01, worldRadius - halfWidth);
+    const outerR = worldRadius + halfWidth;
+    const thetaStart = Math.PI / 2 - (startAngleDeg * Math.PI) / 180;
+    const thetaLength = -(sweepDeg * Math.PI) / 180;
+    const thetaSegments = Math.max(4, Math.ceil(absSweep / 3));
 
     const threeColor = this.hsvToThreeColor({ h: hue, s: 0.7, v: 0.9 });
 
-    let line = this.entityObjects.get(entity.id) as Line2 | undefined;
-    if (!line) {
-      const geometry = new LineGeometry();
-      geometry.setPositions(positions);
-      const material = new LineMaterial({
-        color: threeColor.getHex(),
-        linewidth: lineWidth,
+    // Rebuild geometry when the shape changes (sweep grows during the
+    // animation, or startAngle changes on reuse). Keyed on the same
+    // fields as connection-strip's geomKey for consistency.
+    const geomKey = `${innerR.toFixed(3)}|${outerR.toFixed(3)}|${thetaStart.toFixed(4)}|${thetaLength.toFixed(4)}|${thetaSegments}`;
+
+    let mesh = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
+    if (!mesh) {
+      const geom = new THREE.RingGeometry(
+        innerR,
+        outerR,
+        thetaSegments,
+        1,
+        thetaStart,
+        thetaLength,
+      );
+      const material = new THREE.MeshBasicMaterial({
+        color: threeColor,
         transparent: true,
         opacity,
-        resolution: new THREE.Vector2(this.resolution.x, this.resolution.y),
+        side: THREE.DoubleSide,
+        depthWrite: false,
       });
-      line = new Line2(geometry, material);
-      line.computeLineDistances();
-      this.scene.add(line);
-      this.entityObjects.set(entity.id, line);
+      mesh = new THREE.Mesh(geom, material);
+      mesh.position.set(cx, cy, 0);
+      mesh.frustumCulled = false;
+      mesh.userData.geomKey = geomKey;
+      this.scene.add(mesh);
+      this.entityObjects.set(entity.id, mesh);
     } else {
-      const geom = line.geometry as LineGeometry;
-      geom.setPositions(positions);
-      const mat = line.material as LineMaterial;
+      if (mesh.userData.geomKey !== geomKey) {
+        mesh.geometry.dispose();
+        mesh.geometry = new THREE.RingGeometry(
+          innerR,
+          outerR,
+          thetaSegments,
+          1,
+          thetaStart,
+          thetaLength,
+        );
+        mesh.userData.geomKey = geomKey;
+      }
+      mesh.position.set(cx, cy, 0);
+      const mat = mesh.material as THREE.MeshBasicMaterial;
       mat.color.copy(threeColor);
       mat.opacity = opacity;
-      mat.linewidth = lineWidth;
-      mat.resolution.set(this.resolution.x, this.resolution.y);
-      line.computeLineDistances();
     }
   }
 

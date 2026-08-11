@@ -180,10 +180,13 @@ const MAX_STRIP_OPACITY = 0.8;
  *  a drawn line rather than a snap. Tune to taste. */
 const CONNECTOR_ANIMATION_MS = 500;
 
-/** Connector arc line width in the renderer's pixel units. Twice the
- *  guide ring linewidth so the connector reads as a distinct pathway
- *  rather than blending into the ring it rides on. */
-const CONNECTOR_LINE_WIDTH = 3;
+/** Connector arc radial half-thickness as a normalized fraction of
+ *  worldWidth. The renderer draws the arc as a thin annular segment
+ *  from (radius − halfThickness) to (radius + halfThickness), so
+ *  full stroke thickness is 2×. Chosen to read as ~2× the guide ring
+ *  stroke while staying much thinner than the strip's radial extent
+ *  (STRIP_RADIAL_FRACTION * clockRadius ≈ 0.01 normalized). */
+const CONNECTOR_HALF_THICKNESS_NORMALIZED = 0.002;
 
 /** Opacity multiplier applied to the connector arc's edge-weight-scaled
  *  opacity. Independent knob from MAX_STRIP_OPACITY so the pathway
@@ -801,7 +804,7 @@ export class HarmonyGrammar implements IVisualGrammar {
             startAngleDeg: sourceAngleDeg,
             sweepDeg: sweepDeg * progress,
             hue: sourceHue,
-            lineWidth: CONNECTOR_LINE_WIDTH,
+            halfThickness: CONNECTOR_HALF_THICKNESS_NORMALIZED,
           },
         });
       }
