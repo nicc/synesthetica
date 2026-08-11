@@ -337,6 +337,269 @@ describe("HarmonyGrammar", () => {
       expect(stripEntities).toHaveLength(0);
     });
 
+    it("emits a connector arc alongside each edge (mid-animation gates the strip)", () => {
+      // Same setup as the earlier strip test, but sampled BEFORE the
+      // 500ms connector animation completes. Expect the arc entity,
+      // but no strip yet.
+      const frame = createTestAnnotatedFrame(700, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500 },
+          ],
+          functionalEdges: [
+            {
+              sourceChordId: "bvii",
+              targetDegree: 4,
+              targetPc: 5 as PitchClass,
+              targetDiatonic: true,
+              weight: 0.85,
+              type: "subdominant-borrowing",
+            },
+          ],
+        },
+      });
+      const scene = grammar.update(frame, null);
+      const arcs = scene.entities.filter(
+        (e) => e.data?.type === "connection-arc",
+      );
+      const strips = scene.entities.filter(
+        (e) => e.data?.type === "connection-strip",
+      );
+
+      expect(arcs).toHaveLength(1);
+      expect(strips).toHaveLength(0); // gated: progress = 200/500 = 0.4
+
+      const arc = arcs[0];
+      expect(arc.data?.startAngleDeg).toBeDefined();
+      expect(arc.data?.sweepDeg).toBeDefined();
+      expect(arc.data?.radius).toBeDefined();
+      expect(arc.data?.hue).toBeDefined();
+      // Sweep at t=700 (200ms in) is 40% of the full arc.
+      const arcSweep = arc.data?.sweepDeg as number;
+      expect(Math.abs(arcSweep)).toBeGreaterThan(0);
+      expect(Math.abs(arcSweep)).toBeLessThan(180);
+    });
+
+    it("strip appears once the connector animation completes", () => {
+      // t=1000, onset=500 → age=500 = CONNECTOR_ANIMATION_MS → progress=1.
+      const frame = createTestAnnotatedFrame(1000, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500 },
+          ],
+          functionalEdges: [
+            {
+              sourceChordId: "bvii",
+              targetDegree: 4,
+              targetPc: 5 as PitchClass,
+              targetDiatonic: true,
+              weight: 0.85,
+              type: "subdominant-borrowing",
+            },
+          ],
+        },
+      });
+      const scene = grammar.update(frame, null);
+      expect(scene.entities.filter((e) => e.data?.type === "connection-arc")).toHaveLength(1);
+      expect(scene.entities.filter((e) => e.data?.type === "connection-strip")).toHaveLength(1);
+    });
+
+    it("released chord snaps connector progress to 1 (strip visible during fade)", () => {
+      // Chord onset=1000, released at t=1050 (only 50ms into the 500ms
+      // connector animation). Rendered at t=1100 — still within fade
+      // window. The connector should have snapped to complete, so the
+      // strip should be visible even though only 100ms of real time
+      // has elapsed since onset.
+      const frame = createTestAnnotatedFrame(1100, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 1000, releaseTime: 1050 },
+          ],
+          functionalEdges: [
+            {
+              sourceChordId: "bvii",
+              targetDegree: 4,
+              targetPc: 5 as PitchClass,
+              targetDiatonic: true,
+              weight: 0.85,
+              type: "subdominant-borrowing",
+            },
+          ],
+        },
+      });
+      const scene = grammar.update(frame, null);
+      expect(scene.entities.filter((e) => e.data?.type === "connection-strip")).toHaveLength(1);
+    });
+
+    it("preserves natural direction when two edges on the same ring don't collide", () => {
+      // Real-world case: ♭VI in C major fans to ii AND IV, both on
+      // the diatonic (middle) ring. In practice these already go in
+      // opposite directions naturally — ii sits ~180° from ♭VI, IV
+      // sits -77°. So the fan-out logic should preserve both natural
+      // sweeps here, not force a flip. This documents the actual
+      // production behaviour of the only real fan-out we currently
+      // emit.
+      const frame = createTestAnnotatedFrame(1500, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 6, roman: "♭VI", quality: "maj", rootPc: 8 as PitchClass, borrowed: true, chordId: "bvi", onset: 500 },
+          ],
+          functionalEdges: [
+            {
+              sourceChordId: "bvi",
+              targetDegree: 2,
+              targetPc: 2 as PitchClass,
+              targetDiatonic: true,
+              weight: 0.55,
+              type: "subdominant-borrowing",
+            },
+            {
+              sourceChordId: "bvi",
+              targetDegree: 4,
+              targetPc: 5 as PitchClass,
+              targetDiatonic: true,
+              weight: 0.50,
+              type: "subdominant-borrowing",
+            },
+          ],
+        },
+      });
+      const scene = grammar.update(frame, null);
+      const arcs = scene.entities.filter(
+        (e) => e.data?.type === "connection-arc",
+      );
+      expect(arcs).toHaveLength(2);
+      const sweeps = arcs.map((a) => a.data?.sweepDeg as number);
+      // Natural directions are already opposite — no flip needed.
+      expect(Math.sign(sweeps[0])).not.toBe(Math.sign(sweeps[1]));
+      // Both sweeps should be ≤ 180° in magnitude (no forced long arc).
+      expect(Math.abs(sweeps[0])).toBeLessThanOrEqual(180);
+      expect(Math.abs(sweeps[1])).toBeLessThanOrEqual(180);
+    });
+
+    it("flips the lower-weight edge when two same-ring edges collide direction", () => {
+      // Synthetic scenario: a source with two edges whose target
+      // degrees are both clockwise-adjacent (degrees 2 and 3 in C
+      // major). Both natural short-arc sweeps are positive
+      // (clockwise), so they'd overlap on the same side of the wheel.
+      // The lower-weight edge should get flipped to the longer arc.
+      //
+      // ♭II is at ≈ 25.7°, ii at ≈ 51.4°, iii at ≈ 102.9°.
+      // ♭II → ii natural sweep ≈ +25.7°, ♭II → iii natural sweep
+      // ≈ +77.1°. Same sign → collision → flip the lower-weight one.
+      const frame = createTestAnnotatedFrame(1500, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 2, roman: "♭II", quality: "maj", rootPc: 1 as PitchClass, borrowed: true, chordId: "bII", onset: 500 },
+          ],
+          functionalEdges: [
+            // Higher weight — keeps natural direction.
+            {
+              sourceChordId: "bII",
+              targetDegree: 2,
+              targetPc: 2 as PitchClass,
+              targetDiatonic: true,
+              weight: 0.80,
+              type: "modal-interchange",
+            },
+            // Lower weight — should be flipped to the longer arc.
+            {
+              sourceChordId: "bII",
+              targetDegree: 3,
+              targetPc: 4 as PitchClass,
+              targetDiatonic: true,
+              weight: 0.50,
+              type: "modal-interchange",
+            },
+          ],
+        },
+      });
+      const scene = grammar.update(frame, null);
+      const arcs = scene.entities.filter(
+        (e) => e.data?.type === "connection-arc",
+      );
+      expect(arcs).toHaveLength(2);
+
+      const byDegree: Record<string, number> = {};
+      for (const a of arcs) {
+        if (a.id.endsWith(":2:d")) byDegree.ii = a.data?.sweepDeg as number;
+        if (a.id.endsWith(":3:d")) byDegree.iii = a.data?.sweepDeg as number;
+      }
+      // Higher-weight (ii) kept the short natural arc — positive.
+      expect(byDegree.ii).toBeGreaterThan(0);
+      expect(Math.abs(byDegree.ii)).toBeLessThan(180);
+      // Lower-weight (iii) got flipped — negative sign, longer magnitude.
+      expect(byDegree.iii).toBeLessThan(0);
+      expect(Math.abs(byDegree.iii)).toBeGreaterThan(180);
+    });
+
+    it("distinct edge IDs for chain edges at the same target degree", () => {
+      // A secondary dominant emits both a diatonic and a chain
+      // (borrowed) edge at the same target degree. Their entity IDs
+      // must not collide, or the renderer treats them as a single
+      // object.
+      const frame = createTestAnnotatedFrame(1500, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 2, roman: "V/ii", quality: "maj", rootPc: 9 as PitchClass, borrowed: true, chordId: "vofii", onset: 500 },
+          ],
+          functionalEdges: [
+            {
+              sourceChordId: "vofii",
+              targetDegree: 2,
+              targetPc: 2 as PitchClass,
+              targetDiatonic: true,
+              weight: 0.88,
+              type: "secondary-dominant",
+            },
+            {
+              sourceChordId: "vofii",
+              targetDegree: 2,
+              targetPc: 2 as PitchClass,
+              targetDiatonic: false,
+              weight: 0.70,
+              type: "secondary-dominant",
+            },
+          ],
+        },
+      });
+      const scene = grammar.update(frame, null);
+      const arcIds = scene.entities
+        .filter((e) => e.data?.type === "connection-arc")
+        .map((e) => e.id);
+      expect(arcIds).toHaveLength(2);
+      expect(new Set(arcIds).size).toBe(2); // distinct
+      const stripIds = scene.entities
+        .filter((e) => e.data?.type === "connection-strip")
+        .map((e) => e.id);
+      expect(stripIds).toHaveLength(2);
+      expect(new Set(stripIds).size).toBe(2); // distinct
+    });
+
     it("omits chords past the fade window", () => {
       const frame = createTestAnnotatedFrame(10000, "main", {
         prescribedKey: { root: 0 as PitchClass, mode: "ionian" },

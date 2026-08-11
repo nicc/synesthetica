@@ -629,6 +629,85 @@ export class ThreeJSRenderer implements IRenderer {
   }
 
   /**
+   * Render a directional connector arc — a partial ring rendered as a
+   * Line2 stroke that grows from `startAngleDeg` by `sweepDeg` along a
+   * ring at `radius` (normalized clockRadius fraction of worldWidth).
+   * `sweepDeg` is signed: positive = clockwise, negative = counter-
+   * clockwise. Same angle convention as connection strips and slot
+   * ticks — 0° at 12 o'clock, clockwise positive.
+   */
+  private updateConnectionArc(entity: Entity): void {
+    if (!this.scene) return;
+
+    const data = entity.data ?? {};
+    const normalizedRadius = (data.radius as number | undefined) ?? 0.1;
+    const worldRadius = normalizedRadius * this.config.worldWidth;
+    const startAngleDeg = (data.startAngleDeg as number | undefined) ?? 0;
+    const sweepDeg = (data.sweepDeg as number | undefined) ?? 0;
+    const lineWidth = (data.lineWidth as number | undefined) ?? 2;
+    const hue = (data.hue as number | undefined) ?? 0;
+    const cx = (entity.position?.x ?? 0.5) * this.config.worldWidth;
+    const cy = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
+    const opacity = entity.style.opacity ?? 1;
+
+    // Skip near-zero sweeps to avoid degenerate LineGeometry (would
+    // otherwise emit a single-vertex line that WebGL rejects).
+    const absSweep = Math.abs(sweepDeg);
+    if (absSweep < 0.5) {
+      const existing = this.entityObjects.get(entity.id) as Line2 | undefined;
+      if (existing) {
+        (existing.material as LineMaterial).opacity = 0;
+      }
+      return;
+    }
+
+    // Sample the arc from startAngleDeg to (startAngleDeg + sweepDeg).
+    // Segment density scales with arc length so short arcs aren't
+    // over-tessellated and long arcs aren't chunky.
+    const segments = Math.max(4, Math.ceil(absSweep / 3));
+    const positions: number[] = [];
+    for (let i = 0; i <= segments; i++) {
+      const angleDeg = startAngleDeg + (sweepDeg * i) / segments;
+      // Same angle convention as slot ticks / strips: 0° at top,
+      // clockwise, y-flipped sin for Three.js y-up.
+      const angleRad = ((angleDeg - 90) * Math.PI) / 180;
+      positions.push(
+        cx + worldRadius * Math.cos(angleRad),
+        cy - worldRadius * Math.sin(angleRad),
+        0,
+      );
+    }
+
+    const threeColor = this.hsvToThreeColor({ h: hue, s: 0.7, v: 0.9 });
+
+    let line = this.entityObjects.get(entity.id) as Line2 | undefined;
+    if (!line) {
+      const geometry = new LineGeometry();
+      geometry.setPositions(positions);
+      const material = new LineMaterial({
+        color: threeColor.getHex(),
+        linewidth: lineWidth,
+        transparent: true,
+        opacity,
+        resolution: new THREE.Vector2(this.resolution.x, this.resolution.y),
+      });
+      line = new Line2(geometry, material);
+      line.computeLineDistances();
+      this.scene.add(line);
+      this.entityObjects.set(entity.id, line);
+    } else {
+      const geom = line.geometry as LineGeometry;
+      geom.setPositions(positions);
+      const mat = line.material as LineMaterial;
+      mat.color.copy(threeColor);
+      mat.opacity = opacity;
+      mat.linewidth = lineWidth;
+      mat.resolution.set(this.resolution.x, this.resolution.y);
+      line.computeLineDistances();
+    }
+  }
+
+  /**
    * Three.js's RingGeometry assigns UVs based on bounding-box position
    * ((vertex.x / radius + 1) / 2 etc.), which doesn't map to radial
    * distance for our gradient. Replace UV.x with the actual radial
@@ -878,6 +957,8 @@ export class ThreeJSRenderer implements IRenderer {
       this.updateProgressionSlotTick(entity);
     } else if (glyphType === "connection-strip") {
       this.updateConnectionStrip(entity);
+    } else if (glyphType === "connection-arc") {
+      this.updateConnectionArc(entity);
     } else {
       // Default glyph: circle
       this.updateParticle(entity);

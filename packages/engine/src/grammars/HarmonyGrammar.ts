@@ -171,6 +171,26 @@ const STRIP_ARC_WIDTH = GLYPH_SIZE * 1.5;
 const MAX_STRIP_OPACITY = 0.8;
 
 // ============================================================================
+// Edge Connector Arc Constants
+// ============================================================================
+
+/** Duration (ms) of the directional connector arc that grows from the
+ *  source chord's angular position along its target ring toward the
+ *  target strip. Short enough to feel snappy, long enough to read as
+ *  a drawn line rather than a snap. Tune to taste. */
+const CONNECTOR_ANIMATION_MS = 500;
+
+/** Connector arc line width in the renderer's pixel units. Twice the
+ *  guide ring linewidth so the connector reads as a distinct pathway
+ *  rather than blending into the ring it rides on. */
+const CONNECTOR_LINE_WIDTH = 3;
+
+/** Opacity multiplier applied to the connector arc's edge-weight-scaled
+ *  opacity. Independent knob from MAX_STRIP_OPACITY so the pathway
+ *  reads at the right strength without dragging the strip along. */
+const CONNECTOR_OPACITY_MULTIPLIER = 1.0;
+
+// ============================================================================
 // Scrolling Chord Strip Constants
 // ============================================================================
 
@@ -232,6 +252,26 @@ function modalWheelAngle(semitones: number, mode: ModeId): number {
 
   const frac = (semitones - lowerSemi) / (upperSemi - lowerSemi);
   return lowerAngle + (upperAngle - lowerAngle) * frac;
+}
+
+/**
+ * Signed shortest arc (degrees) from `from` to `to` on a 360° wheel.
+ * Positive = clockwise, negative = counter-clockwise. Range (−180, 180].
+ * The exact-180° case resolves to +180 (arbitrary but consistent).
+ */
+function shorterSignedArc(fromDeg: number, toDeg: number): number {
+  const diff = ((toDeg - fromDeg) % 360 + 540) % 360 - 180;
+  return diff === -180 ? 180 : diff;
+}
+
+/**
+ * The longer arc's signed sweep given the shorter arc. If shorter is
+ * +P (0 < P ≤ 180) the longer is −(360 − P); if shorter is −P the
+ * longer is +(360 − P). The two together always cover a full circle.
+ */
+function longerSignedArc(shorterSweep: number): number {
+  const absLonger = 360 - Math.abs(shorterSweep);
+  return -Math.sign(shorterSweep) * absLonger;
 }
 
 // ============================================================================
@@ -440,7 +480,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         ),
       );
       entities.push(
-        ...this.createConnectionStrips(
+        ...this.createEdgeVisuals(
           input.harmonicContext.functionalEdges ?? [],
           progression,
           t,
@@ -644,19 +684,31 @@ export class HarmonyGrammar implements IVisualGrammar {
   // ==========================================================================
 
   /**
-   * Create entities for functional connection strips. Each FunctionalEdge
-   * produces one entity — a single strip at the target slot — and fades
-   * with the source chord's lifecycle (no separate resolution-tracking
-   * state).
+   * Create entities for each functional edge:
+   *   1. A directional connector arc that grows from the source chord's
+   *      angular position along the target's guide ring toward the
+   *      target strip, over CONNECTOR_ANIMATION_MS from the source
+   *      chord's onset. Snaps to complete on release.
+   *   2. A connection strip at the target slot (SPEC 011), emitted
+   *      only once the connector arc has reached the target.
    *
-   * Strip directionality (SPEC 011):
+   * Both fade with the source chord's lifecycle — same model as the
+   * chord numeral, so numeral / connector / strip fade together.
+   *
+   * Fan-out handling: when a source has two edges on the same target
+   * ring (both diatonic or both borrowed), the connectors are routed
+   * in opposite directions along the ring so they don't overlap. The
+   * higher-weight edge keeps its natural (shorter) arc; the
+   * lower-weight edge takes the flipped (longer) arc.
+   *
+   * Strip directionality (SPEC 011, unchanged):
    *   - The strip sits OUTWARD of the target numeral.
    *   - Its anchored end (full opacity, source hue) sits on the
    *     adjacent guide ring on the side facing outward from the
    *     numeral; the chord-side edge (target hue, fading to zero)
    *     extends radially toward but not touching the numeral.
    */
-  private createConnectionStrips(
+  private createEdgeVisuals(
     edges: FunctionalEdge[],
     progression: FunctionalChord[],
     t: number,
@@ -675,13 +727,21 @@ export class HarmonyGrammar implements IVisualGrammar {
     const chordsById = new Map<string, FunctionalChord>();
     for (const fc of progression) chordsById.set(fc.chordId, fc);
 
+    // Resolve arc direction (signed sweep degrees) per edge. Fan-out
+    // rule: if a source has two edges on the same target ring whose
+    // natural (shorter-arc) directions collide, the lower-weight edge
+    // is flipped to the longer arc so the two connectors travel
+    // opposite ways along the ring.
+    const sweepByEdge = this.resolveEdgeSweeps(edges, chordsById, tonicPc, mode);
+
     for (const edge of edges) {
       const sourceChord = chordsById.get(edge.sourceChordId);
       if (!sourceChord) continue;
 
       // Fade follows the source chord's lifecycle — same model as the
-      // chord numeral, so strips and numerals fade together.
-      // releaseTime can be null OR undefined (older fixture shape) — both mean "still held".
+      // chord numeral, so numeral / connector / strip fade together.
+      // releaseTime can be null OR undefined (older fixture shape) —
+      // both mean "still held".
       const releaseTime = sourceChord.releaseTime ?? null;
       let fadeOpacity: number;
       if (releaseTime === null) {
@@ -692,22 +752,18 @@ export class HarmonyGrammar implements IVisualGrammar {
         fadeOpacity = 1 - ageSinceRelease / fadeMs;
       }
 
-      const overallOpacity = fadeOpacity * edge.weight * MAX_STRIP_OPACITY;
-      if (overallOpacity < 0.01) continue;
+      // Animation progress. Snaps to 1 on release so mid-animation
+      // releases don't leave the pathway drawing during the fade.
+      const progress =
+        releaseTime !== null
+          ? 1
+          : Math.min(1, Math.max(0, (t - sourceChord.onset) / CONNECTOR_ANIMATION_MS));
 
-      // Only the target strip is rendered. The previous design also
-      // emitted a "from" strip at the source chord; user feedback was
-      // that it duplicated information already conveyed by the source
-      // numeral itself, so we now show only the target side of the
-      // relationship.
-      //
-      // Target strip sits OUTWARD of the target numeral; midpoint
-      // anchored at the adjacent guide ring on the side facing
-      // outward from the numeral:
-      //   - Diatonic target: anchor at middle guide ring (cross-ring)
-      //   - Borrowed target: anchor at outer guide ring (within-ring)
+      const sourceSemitones = (sourceChord.rootPc - tonicPc + 12) % 12;
+      const sourceAngleDeg = modalWheelAngle(sourceSemitones, mode);
       const targetSemitones = (edge.targetPc - tonicPc + 12) % 12;
       const targetAngleDeg = modalWheelAngle(targetSemitones, mode);
+
       const targetAnchorFraction = edge.targetDiatonic
         ? GUIDE_RING_MIDDLE_FRACTION
         : GUIDE_RING_OUTER_FRACTION;
@@ -717,12 +773,54 @@ export class HarmonyGrammar implements IVisualGrammar {
       const sourceHue = pcToHue(sourceChord.rootPc, DEFAULT_HUE_INVARIANT);
       const targetHue = pcToHue(edge.targetPc, DEFAULT_HUE_INVARIANT);
 
+      const sweepDeg = sweepByEdge.get(edge) ?? 0;
+      const arcOpacity =
+        fadeOpacity * edge.weight * MAX_STRIP_OPACITY * CONNECTOR_OPACITY_MULTIPLIER;
+
+      // Connector arc: emit whenever the source is alive (even at
+      // progress=0 it's a zero-length arc so the renderer no-ops
+      // gracefully). The renderer sweeps from sourceAngleDeg by
+      // sweepDeg × progress.
+      if (arcOpacity >= 0.01) {
+        entities.push({
+          id: `${this.id}:edge-connector:${sourceChord.chordId}:${edge.targetDegree}:${edge.targetDiatonic ? "d" : "b"}`,
+          part,
+          kind: "glyph",
+          createdAt: sourceChord.onset,
+          updatedAt: t,
+          position: {
+            x: HARMONY_PROGRESSION_CENTER_X,
+            y: HARMONY_PROGRESSION_CENTER_Y,
+          },
+          style: {
+            opacity: arcOpacity,
+          },
+          data: {
+            type: "connection-arc",
+            radius: targetMidR,
+            startAngleDeg: sourceAngleDeg,
+            sweepDeg: sweepDeg * progress,
+            hue: sourceHue,
+            lineWidth: CONNECTOR_LINE_WIDTH,
+          },
+        });
+      }
+
+      // Connection strip: only visible once the connector has landed.
+      // Held-chord case: strip appears at t = onset + CONNECTOR_ANIMATION_MS.
+      // Released mid-animation: strip snaps to visible on release (via
+      // progress=1) and fades from there.
+      if (progress < 1) continue;
+
+      const stripOpacity = fadeOpacity * edge.weight * MAX_STRIP_OPACITY;
+      if (stripOpacity < 0.01) continue;
+
       const targetArcWidth = edge.targetDiatonic
         ? STRIP_ARC_WIDTH
         : STRIP_ARC_WIDTH * BORROWED_SCALE;
 
       entities.push({
-        id: `${this.id}:edge:${sourceChord.chordId}:${edge.targetDegree}`,
+        id: `${this.id}:edge:${sourceChord.chordId}:${edge.targetDegree}:${edge.targetDiatonic ? "d" : "b"}`,
         part,
         kind: "glyph",
         createdAt: sourceChord.onset,
@@ -732,7 +830,7 @@ export class HarmonyGrammar implements IVisualGrammar {
           y: HARMONY_PROGRESSION_CENTER_Y,
         },
         style: {
-          opacity: overallOpacity,
+          opacity: stripOpacity,
         },
         data: {
           type: "connection-strip",
@@ -747,6 +845,66 @@ export class HarmonyGrammar implements IVisualGrammar {
     }
 
     return entities;
+  }
+
+  /**
+   * Compute the signed sweep (degrees, +cw / −ccw) for each edge's
+   * connector arc. Default is the shorter arc from source to target
+   * angle; when two edges from the same source ride the same target
+   * ring in the same natural direction, the lower-weight edge is
+   * flipped to the longer arc so the pair fans in opposite directions.
+   */
+  private resolveEdgeSweeps(
+    edges: FunctionalEdge[],
+    chordsById: Map<string, FunctionalChord>,
+    tonicPc: PitchClass,
+    mode: ModeId,
+  ): Map<FunctionalEdge, number> {
+    const sweepByEdge = new Map<FunctionalEdge, number>();
+
+    // Group edges by (sourceChordId, target ring) so we only compare
+    // co-riding edges when deciding whether to flip a direction.
+    const groups = new Map<string, FunctionalEdge[]>();
+    for (const edge of edges) {
+      const ringKey = edge.targetDiatonic ? "d" : "b";
+      const key = `${edge.sourceChordId}::${ringKey}`;
+      const existing = groups.get(key);
+      if (existing) existing.push(edge);
+      else groups.set(key, [edge]);
+    }
+
+    for (const group of groups.values()) {
+      // Compute natural (shorter-arc) sweep for each edge in the group.
+      const natural = group.map((edge) => {
+        const sourceChord = chordsById.get(edge.sourceChordId);
+        if (!sourceChord) return { edge, sweep: 0 };
+        const sourceSemi = (sourceChord.rootPc - tonicPc + 12) % 12;
+        const targetSemi = (edge.targetPc - tonicPc + 12) % 12;
+        const sourceAngle = modalWheelAngle(sourceSemi, mode);
+        const targetAngle = modalWheelAngle(targetSemi, mode);
+        return { edge, sweep: shorterSignedArc(sourceAngle, targetAngle) };
+      });
+
+      // Fan-out collision check: if the group has multiple edges whose
+      // natural sweeps share a sign, flip all but the highest-weight
+      // one to the longer arc. In practice max fan on a single ring
+      // is 2 (per the interchange table + secondary-dominant chain),
+      // so this reduces to "flip the lower-weight edge."
+      if (natural.length > 1) {
+        natural.sort((a, b) => b.edge.weight - a.edge.weight);
+        const keeperSign = Math.sign(natural[0].sweep) || 1;
+        for (let i = 1; i < natural.length; i++) {
+          const sameDirection = Math.sign(natural[i].sweep) === keeperSign;
+          if (sameDirection) {
+            natural[i].sweep = longerSignedArc(natural[i].sweep);
+          }
+        }
+      }
+
+      for (const { edge, sweep } of natural) sweepByEdge.set(edge, sweep);
+    }
+
+    return sweepByEdge;
   }
 
   // ==========================================================================
