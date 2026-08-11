@@ -313,8 +313,8 @@ describe("HarmonyGrammar", () => {
       expect(strip.data?.targetArcWidth).toBeDefined();
       expect(strip.data?.sourceHue).toBeDefined();
       expect(strip.data?.targetHue).toBeDefined();
-      // Opacity scaled by edge weight × MAX_STRIP_OPACITY (0.8)
-      expect(strip.style.opacity).toBeCloseTo(0.85 * 0.8, 2);
+      // Opacity scaled by edge weight × MAX_STRIP_OPACITY (1.0)
+      expect(strip.style.opacity).toBeCloseTo(0.85 * 1.0, 2);
     });
 
     it("emits no strip entities when no edges exist", () => {
@@ -381,13 +381,14 @@ describe("HarmonyGrammar", () => {
       expect(arc.data?.hue).toBeDefined();
     });
 
-    it("shortens the arc sweep to stop flush with the strip's near edge", () => {
+    it("extends the arc sweep past the strip's far edge", () => {
       // ♭VII → IV in C major: source at ~283°, target IV at ~154°.
       // Natural short sweep ≈ -128.6° (counter-clockwise).
-      // Emitted sweep should be shorter in magnitude by roughly the
+      // Emitted sweep should be LONGER in magnitude by roughly the
       // strip's angular half-width (~12° for a diatonic target) so the
-      // arc stops at the strip's near edge, not its center. Sampled at
-      // full progress so the emitted sweep equals the shortened one.
+      // arc runs through the strip and terminates at its far edge.
+      // Sampled at full progress so the emitted sweep equals the
+      // extended one.
       const frame = createTestAnnotatedFrame(5000, "main", {
         prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
         harmonicContext: {
@@ -415,13 +416,13 @@ describe("HarmonyGrammar", () => {
       )!;
       const emittedSweep = arc.data?.sweepDeg as number;
 
-      // The natural (pre-shortening) sweep magnitude is ~128.6°.
-      // After shortening by ~12° it should be roughly ~116° in
-      // magnitude — meaningfully less than the natural, still
+      // The natural (pre-extension) sweep magnitude is ~128.6°.
+      // After extension by ~12° it should be roughly ~140° in
+      // magnitude — meaningfully more than the natural, still
       // recognisably the same arc direction.
       const NATURAL_ABS_SWEEP = 128.57;
-      expect(Math.abs(emittedSweep)).toBeLessThan(NATURAL_ABS_SWEEP - 5);
-      expect(Math.abs(emittedSweep)).toBeGreaterThan(NATURAL_ABS_SWEEP - 20);
+      expect(Math.abs(emittedSweep)).toBeGreaterThan(NATURAL_ABS_SWEEP + 5);
+      expect(Math.abs(emittedSweep)).toBeLessThan(NATURAL_ABS_SWEEP + 20);
       expect(Math.sign(emittedSweep)).toBe(-1); // natural direction preserved
     });
 
@@ -529,9 +530,12 @@ describe("HarmonyGrammar", () => {
       const sweeps = arcs.map((a) => a.data?.sweepDeg as number);
       // Natural directions are already opposite — no flip needed.
       expect(Math.sign(sweeps[0])).not.toBe(Math.sign(sweeps[1]));
-      // Both sweeps should be ≤ 180° in magnitude (no forced long arc).
-      expect(Math.abs(sweeps[0])).toBeLessThanOrEqual(180);
-      expect(Math.abs(sweeps[1])).toBeLessThanOrEqual(180);
+      // Neither sweep is force-flipped to the truly-longer arc
+      // (>~270°). The 180°-natural case does exceed 180° after the
+      // strip-edge extension (~192°), which is fine — that's still
+      // the natural direction plus the extension.
+      expect(Math.abs(sweeps[0])).toBeLessThan(220);
+      expect(Math.abs(sweeps[1])).toBeLessThan(220);
     });
 
     it("flips the lower-weight edge when two same-ring edges collide direction", () => {
@@ -592,6 +596,57 @@ describe("HarmonyGrammar", () => {
       // Lower-weight (iii) got flipped — negative sign, longer magnitude.
       expect(byDegree.iii).toBeLessThan(0);
       expect(Math.abs(byDegree.iii)).toBeGreaterThan(180);
+    });
+
+    it("emits an arrow indicator at the source end of each connector arc", () => {
+      // Two edges from ♭II — one to ii (diatonic, arc rides middle
+      // ring INSIDE ♭II's borrowed ring position → arrow points
+      // OUTWARD, pointRadial=+1), and one to a hypothetical borrowed
+      // target (arc rides outer ring OUTSIDE ♭II → arrow points
+      // INWARD, pointRadial=-1). Verifies both entity emission and
+      // the radial direction depends on target ring.
+      const frame = createTestAnnotatedFrame(5000, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 2, roman: "♭II", quality: "maj", rootPc: 1 as PitchClass, borrowed: true, chordId: "bII", onset: 500 },
+          ],
+          functionalEdges: [
+            {
+              sourceChordId: "bII",
+              targetDegree: 5,
+              targetPc: 7 as PitchClass,
+              targetDiatonic: true,
+              weight: 0.80,
+              type: "modal-interchange",
+            },
+            {
+              sourceChordId: "bII",
+              targetDegree: 5,
+              targetPc: 7 as PitchClass,
+              targetDiatonic: false,
+              weight: 0.50,
+              type: "modal-interchange",
+            },
+          ],
+        },
+      });
+      const scene = grammar.update(frame, null);
+      const arrows = scene.entities.filter(
+        (e) => e.data?.type === "connection-arrow",
+      );
+      expect(arrows).toHaveLength(2);
+
+      const diatonicArrow = arrows.find((a) => a.id.endsWith(":5:d"))!;
+      const borrowedArrow = arrows.find((a) => a.id.endsWith(":5:b"))!;
+      expect(diatonicArrow.data?.pointRadial).toBe(1); // outward
+      expect(borrowedArrow.data?.pointRadial).toBe(-1); // inward
+      expect(diatonicArrow.data?.angleDeg).toBeDefined();
+      expect(diatonicArrow.data?.radius).toBeDefined();
+      expect(diatonicArrow.data?.heightNormalized).toBeGreaterThan(0);
     });
 
     it("distinct edge IDs for chain edges at the same target degree", () => {

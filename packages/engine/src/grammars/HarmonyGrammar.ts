@@ -188,6 +188,11 @@ const CONNECTOR_ANIMATION_MS = 100;
  *  (STRIP_RADIAL_FRACTION * clockRadius ≈ 0.01 normalized). */
 const CONNECTOR_HALF_THICKNESS_NORMALIZED = 0.001;
 
+/** Arrow indicator height as a multiple of the arc's full stroke
+ *  thickness. The arrow's flat base sits flush against the arc at
+ *  the source end, apex pointing at the source chord numeral. */
+const ARROW_HEIGHT_MULTIPLIER = 2;
+
 /**
  * Assumed renderer worldWidth. The strip renderer uses worldWidth to
  * convert normalized radial coords to world units, and its angular
@@ -791,11 +796,11 @@ export class HarmonyGrammar implements IVisualGrammar {
       const arcOpacity =
         fadeOpacity * edge.weight * MAX_STRIP_OPACITY * CONNECTOR_OPACITY_MULTIPLIER;
 
-      // Stop the arc flush with the strip's near edge instead of at
-      // its centerline, so the two don't overlap and composite into a
-      // doubled-alpha band. Strip's angular width matches the
-      // renderer's math: arcWidth / meanRadius_world, halved for the
-      // near-edge offset from centerline.
+      // Extend the arc past the strip's centerline out to its far
+      // edge so the arc's line remains visible along the strip's full
+      // angular extent. Strip's angular width matches the renderer's
+      // math: arcWidth / meanRadius_world, halved for the far-edge
+      // offset from centerline.
       const targetArcWidth = edge.targetDiatonic
         ? STRIP_ARC_WIDTH
         : STRIP_ARC_WIDTH * BORROWED_SCALE;
@@ -804,14 +809,14 @@ export class HarmonyGrammar implements IVisualGrammar {
       const stripAngularHalfWidthDeg =
         (targetArcWidth / meanRingWorld / 2) * (180 / Math.PI);
       const absSweep = Math.abs(sweepDeg);
-      const shortenedAbsSweep = Math.max(0, absSweep - stripAngularHalfWidthDeg);
-      const shortenedSweep = Math.sign(sweepDeg) * shortenedAbsSweep;
+      const extendedAbsSweep = absSweep + stripAngularHalfWidthDeg;
+      const extendedSweep = Math.sign(sweepDeg) * extendedAbsSweep;
 
       // Connector arc: emit whenever the source is alive (even at
       // progress=0 it's a zero-length arc so the renderer no-ops
       // gracefully). The renderer sweeps from sourceAngleDeg by
-      // (shortenedSweep × progress) so the arc stops at the strip's
-      // near edge, not its center.
+      // (extendedSweep × progress) so the arc runs through the strip
+      // and terminates at the strip's far edge.
       if (arcOpacity >= 0.01) {
         entities.push({
           id: `${this.id}:edge-connector:${sourceChord.chordId}:${edge.targetDegree}:${edge.targetDiatonic ? "d" : "b"}`,
@@ -830,9 +835,41 @@ export class HarmonyGrammar implements IVisualGrammar {
             type: "connection-arc",
             radius: targetMidR,
             startAngleDeg: sourceAngleDeg,
-            sweepDeg: shortenedSweep * progress,
+            sweepDeg: extendedSweep * progress,
             hue: sourceHue,
             halfThickness: CONNECTOR_HALF_THICKNESS_NORMALIZED,
+          },
+        });
+
+        // Arrow indicator at the arc's source end, apex pointing at
+        // the source chord numeral. Source is always borrowed (only
+        // borrowed chords emit edges), so the numeral sits at the
+        // borrowed ring — outward of the arc for diatonic targets
+        // (arc rides middle guide ring) and inward of the arc for
+        // borrowed targets (arc rides outer guide ring).
+        const pointRadial = edge.targetDiatonic ? 1 : -1;
+        entities.push({
+          id: `${this.id}:edge-arrow:${sourceChord.chordId}:${edge.targetDegree}:${edge.targetDiatonic ? "d" : "b"}`,
+          part,
+          kind: "glyph",
+          createdAt: sourceChord.onset,
+          updatedAt: t,
+          position: {
+            x: HARMONY_PROGRESSION_CENTER_X,
+            y: HARMONY_PROGRESSION_CENTER_Y,
+          },
+          style: {
+            opacity: arcOpacity,
+          },
+          data: {
+            type: "connection-arrow",
+            radius: targetMidR,
+            angleDeg: sourceAngleDeg,
+            pointRadial,
+            heightNormalized:
+              ARROW_HEIGHT_MULTIPLIER * 2 * CONNECTOR_HALF_THICKNESS_NORMALIZED,
+            arcHalfThicknessNormalized: CONNECTOR_HALF_THICKNESS_NORMALIZED,
+            hue: sourceHue,
           },
         });
       }

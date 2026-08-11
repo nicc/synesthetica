@@ -701,6 +701,10 @@ export class ThreeJSRenderer implements IRenderer {
       mesh = new THREE.Mesh(geom, material);
       mesh.position.set(cx, cy, 0);
       mesh.frustumCulled = false;
+      // Render on top of the connection strip so the arc's stroke stays
+      // visible where the two overlap (arc now extends through the strip
+      // to its far edge).
+      mesh.renderOrder = 1;
       mesh.userData.geomKey = geomKey;
       this.scene.add(mesh);
       this.entityObjects.set(entity.id, mesh);
@@ -718,6 +722,88 @@ export class ThreeJSRenderer implements IRenderer {
         mesh.userData.geomKey = geomKey;
       }
       mesh.position.set(cx, cy, 0);
+      const mat = mesh.material as THREE.MeshBasicMaterial;
+      mat.color.copy(threeColor);
+      mat.opacity = opacity;
+    }
+  }
+
+  /**
+   * Render an equilateral triangle indicator at the source end of a
+   * connector arc, apex pointing radially at the source chord numeral.
+   * The base sits flush against the arc's outer edge (on the numeral
+   * side) so the triangle reads as a natural continuation of the arc
+   * stroke pointing at the chord that emitted the edge.
+   */
+  private updateConnectionArrow(entity: Entity): void {
+    if (!this.scene) return;
+
+    const data = entity.data ?? {};
+    const normalizedRadius = (data.radius as number | undefined) ?? 0.1;
+    const angleDeg = (data.angleDeg as number | undefined) ?? 0;
+    const pointRadial = (data.pointRadial as number | undefined) ?? 1;
+    const heightNormalized = (data.heightNormalized as number | undefined) ?? 0.004;
+    const arcHalfThickness = (data.arcHalfThicknessNormalized as number | undefined) ?? 0.001;
+    const hue = (data.hue as number | undefined) ?? 0;
+    const cx = (entity.position?.x ?? 0.5) * this.config.worldWidth;
+    const cy = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
+    const opacity = entity.style.opacity ?? 1;
+
+    const worldRadius = normalizedRadius * this.config.worldWidth;
+    const height = heightNormalized * this.config.worldWidth;
+    const arcHalfWidth = arcHalfThickness * this.config.worldWidth;
+
+    // Radial + tangent unit vectors at angleDeg (clock convention:
+    // 0° = 12 o'clock, CW positive). Matches the arc renderer's math.
+    const angleRad = ((angleDeg - 90) * Math.PI) / 180;
+    const radialX = Math.cos(angleRad);
+    const radialY = -Math.sin(angleRad);
+    const tangentX = -Math.sin(angleRad);
+    const tangentY = -Math.cos(angleRad);
+
+    // Base is on the arc's edge that faces the source numeral; apex
+    // extends `height` further in the same direction.
+    const baseR = worldRadius + pointRadial * arcHalfWidth;
+    const apexR = baseR + pointRadial * height;
+    const halfBase = height / Math.sqrt(3); // equilateral: base = h × 2/√3
+
+    const baseCX = cx + baseR * radialX;
+    const baseCY = cy + baseR * radialY;
+    const apexX = cx + apexR * radialX;
+    const apexY = cy + apexR * radialY;
+    const baseAX = baseCX - halfBase * tangentX;
+    const baseAY = baseCY - halfBase * tangentY;
+    const baseBX = baseCX + halfBase * tangentX;
+    const baseBY = baseCY + halfBase * tangentY;
+
+    const threeColor = this.hsvToThreeColor({ h: hue, s: 0.7, v: 0.9 });
+    const positions = new Float32Array([
+      baseAX, baseAY, 0,
+      baseBX, baseBY, 0,
+      apexX, apexY, 0,
+    ]);
+
+    let mesh = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
+    if (!mesh) {
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      const material = new THREE.MeshBasicMaterial({
+        color: threeColor,
+        transparent: true,
+        opacity,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      mesh = new THREE.Mesh(geom, material);
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 1; // same layer as the arc
+      this.scene.add(mesh);
+      this.entityObjects.set(entity.id, mesh);
+    } else {
+      const geom = mesh.geometry as THREE.BufferGeometry;
+      const posAttr = geom.getAttribute("position") as THREE.BufferAttribute;
+      posAttr.array.set(positions);
+      posAttr.needsUpdate = true;
       const mat = mesh.material as THREE.MeshBasicMaterial;
       mat.color.copy(threeColor);
       mat.opacity = opacity;
@@ -976,6 +1062,8 @@ export class ThreeJSRenderer implements IRenderer {
       this.updateConnectionStrip(entity);
     } else if (glyphType === "connection-arc") {
       this.updateConnectionArc(entity);
+    } else if (glyphType === "connection-arrow") {
+      this.updateConnectionArrow(entity);
     } else {
       // Default glyph: circle
       this.updateParticle(entity);
