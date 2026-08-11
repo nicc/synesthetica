@@ -1,8 +1,8 @@
 # SPEC 012: Polyphonic Audio Input via Basic Pitch
 
 Status: Approved
-Date: 2026-05-12 (spike findings amended same day; note-tracking behaviour amended 2026-08-10 after piece-5 integration)
-Source: design conversation (May 2026); supersedes the Meyda evaluation captured in synesthetica-y7q. Architecture amended per docs/learnings/2026-05-12-basic-pitch-spike.md (synesthetica-w1z). Note-tracking constraints and worker logic clarified after live testing surfaced the model window's effect on held notes.
+Date: 2026-05-12 (spike findings amended same day; model-window constraint added 2026-08-10 after piece-5 integration; tightened 2026-08-11 to keep implementation detail out of the spec)
+Source: design conversation (May 2026); supersedes the Meyda evaluation captured in synesthetica-y7q. Architecture amended per docs/learnings/2026-05-12-basic-pitch-spike.md (synesthetica-w1z). The model-window constraint was clarified after live testing surfaced its effect on held notes.
 
 ## Summary
 
@@ -154,25 +154,21 @@ The ring buffer implementation lives in `packages/adapters/src/audio/AudioRing.t
 
 ### Model window constraint
 
-The 2-second inference window has non-obvious consequences for how the worker translates model output into note events. In brief:
+The 2-second inference window has non-obvious consequences for how detections must be translated into note events:
 
-- **The model reports onsets relative to the current window.** For a note whose true onset lies inside the window (i.e. it started within the last ~2 s), the model reports a stable onset time that closely matches the true onset. For a note whose true onset lies *outside* the window (older than ~2 s), the model can no longer see it and reports the onset as sitting at the *start of the current window*. That reported onset then slides forward at ~one hop per pass as the window slides.
-- **Overlapping windows detect the same note many times.** With a 30–50 ms hop and a 2 s window, consecutive inferences overlap by 95%+. Every held note is re-detected on every pass. The worker's job is to fold those repeated detections into a stable stream of note-on / note-off / pitch-bend events.
+- **The model reports onsets relative to the current window.** For a note whose true onset lies inside the window (started within the last ~2 s), the reported onset closely matches the true onset. For a note whose true onset lies *outside* the window (older than ~2 s), the model reports the onset as sitting at the *start of the current window*. That reported onset then slides forward at one hop per pass as the window slides.
+- **Overlapping windows detect the same note many times.** With a 30–50 ms hop and a 2 s window, consecutive inferences overlap by 95%+. Every held note is re-detected on every pass. Something between the model and the pipeline must fold those repeated detections into a stable stream of note-on / note-off / pitch-bend events.
 
-The worker's per-pass logic to do that is documented below rather than in code comments because the interactions between the several thresholds are hard to hold in your head from source alone.
+That folding is a translation-layer responsibility, not an interface concern. Its guarantees (below) are the spec commitment; how those guarantees are delivered is implementation.
 
-For each note the model reports in a pass, at pitch P with reported onset O and predicted end E:
+**Guarantees the translation layer must provide:**
 
-1. **If pitch P has no tracked note**, this is a candidate new note. Only emit `AudioNoteOn` if O is *fresh* — within `freshOnsetMaxAgeMs` (default 300 ms) of the current audio "now". Stale onsets are dropped rather than backfilled retroactively onto the note strip.
-2. **If pitch P has a tracked note with onset T**, this is *either* a continuation of the tracked note *or* a re-strike. It's classified as a re-strike only if BOTH:
-   - O is meaningfully later than T (O − T ≥ `restrikeGapMs`, default 120–150 ms), AND
-   - O is fresh (`now − O ≤ freshOnsetMaxAgeMs`).
-   Otherwise it's continuation. The freshness gate on the re-strike check is essential — without it, the sliding reported onset of a note held past 2 s would eventually cross `restrikeGapMs`, fire a spurious re-strike, and the note would die because the "new" onset (stale) can't open a fresh note. With the gate, held notes past 2 s are treated as continuation and can extend indefinitely.
-3. **Continuation** extends the tracked note's `lastSeen` to `max(current, E)`.
-4. **Re-strike** closes the tracked note at its current `lastSeen` and opens a new one at O. Follows path (1) internally.
-5. **Note-off timeout**: on each pass, any tracked note whose `lastSeen` is older than `noteOffTimeoutMs` (default 120–160 ms) has never been re-detected and is closed. This handles both real note ends and model dropouts too long to bridge.
+1. A held note produces exactly one `AudioNoteOn` at its true onset and one `AudioNoteOff` at its release — no matter how long it is held, and even though the model re-detects it every pass.
+2. Re-strikes at the same pitch are recognised and produce a fresh note-off / note-on pair, provided they are separated by more than a configurable minimum gap (defaults tuned per §Adapter Lifecycle).
+3. Retroactive markers do not appear on the note strip — a note-on is never emitted with a timestamp older than a configurable freshness window (e.g. 300 ms). Stale detections are dropped rather than backfilled.
+4. Brief model dropouts do not fragment a held note. A gap shorter than the configurable note-off timeout is treated as continuation, not release.
 
-Result: notes track continuously as long as the model keeps seeing them, no matter how long that is; re-strikes are recognised as long as they're at least `restrikeGapMs` apart; retroactive markers don't appear on the note strip; brief model dropouts (< `noteOffTimeoutMs`) don't fragment a held note.
+The current implementation lives in `packages/adapters/src/audio/InferenceWorker.ts`; its threshold interactions are documented inline. A cleaner design that decouples "detection stream" from "note lifecycle derivation" is captured in synesthetica-dqr, with trigger conditions for when to adopt it.
 
 ### Velocity derivation
 
