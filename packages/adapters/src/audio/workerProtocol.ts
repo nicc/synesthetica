@@ -39,10 +39,6 @@ export interface WorkerInitMessage {
   /** Window of samples used per inference. Hard-coded to the model's
    *  expected input length (22050*2 - 256). Passed for documentation. */
   windowSamples: number;
-  /** A detected onset is treated as the same note as a previous one
-   *  if it's within this many samples of an existing active note at
-   *  the same MIDI pitch. */
-  dedupWindowSamples: number;
   /** If a tracked active note hasn't been re-detected within this many
    *  samples, emit note-off and remove from active set. */
   noteOffTimeoutSamples: number;

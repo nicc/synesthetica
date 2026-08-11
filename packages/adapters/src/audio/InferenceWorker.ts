@@ -15,31 +15,13 @@
  *     timestamped to absolute sample indices.
  *
  * Behaviour every inference tick (default every hopMs = 50ms):
- *   1. Read current ring head (samples written so far).
- *   2. Peek the latest windowSamples into a pre-allocated Float32Array.
- *   3. Run BasicPitch.evaluateSingleFrame.
- *   4. Convert posteriors to notes via outputToNotesPoly +
- *      addPitchBendsToNoteEvents.
- *   5. For each note: dedup against recently-emitted onsets,
- *      emit note-on / pitch-bend events.
- *   6. For each currently-active note: if not re-detected within
- *      noteOffTimeoutSamples, emit note-off.
- *
- * Tunables (all exposed via WorkerInitMessage so they can be
- * adjusted from the main thread without recompiling):
- *   - onsetThreshold: confidence required to emit a note-on. The
- *     spike (synesthetica-w1z) suggested 0.5 as a good starting
- *     point.
- *   - frameThreshold: confidence required for a frame to count as
- *     "the note is still sounding." Lower than onsetThreshold so
- *     short fades don't trigger spurious note-off.
- *   - minNoteLengthFrames: drop notes shorter than this in the
- *     model's output (filters out blip-level false positives).
- *   - dedupWindowSamples: if a new onset is at the same pitch and
- *     within this many samples of an already-active note's onset,
- *     treat it as the same note.
- *   - noteOffTimeoutSamples: if a tracked note hasn't been re-
- *     detected for this many samples, emit note-off.
+ *   1. Peek the latest windowSamples from the ring.
+ *   2. Run BasicPitch.evaluateSingleFrame and decode to notes.
+ *   3. Hand notes + current tracked state to processDetectedNotes,
+ *      which returns the events to post and the next state
+ *      (see AudioDetectionTracker for the note-tracking logic and
+ *      SPEC 012 §"Model window constraint" for the guarantees).
+ *   4. Post events, replace tracked state.
  */
 
 import * as tf from "@tensorflow/tfjs";
@@ -57,21 +39,21 @@ import {
 } from "@spotify/basic-pitch";
 import { AudioRing } from "./AudioRing";
 import type { MainToWorker, WorkerToMain } from "./workerProtocol";
+import {
+  processDetectedNotes,
+  flushAllActiveNotes,
+  emptyTrackingState,
+  type TrackingState,
+  type TrackingConfig,
+  type DetectedNote,
+  type PitchBendSample,
+  type TrackerEvent,
+} from "./AudioDetectionTracker";
 
 // Basic Pitch constants — duplicated from the package so we don't
 // need to peek at its internals at runtime. Verified in
 // synesthetica-w1z spike.
 const FFT_HOP = 256;
-
-interface ActiveNote {
-  noteId: string;
-  pitch: number;
-  onsetSampleIndex: number;
-  /** Last sample index at which this note was confirmed re-detected. */
-  lastSeenSampleIndex: number;
-  /** Highest pitch-bend frame index already emitted for this note. */
-  lastEmittedBendFrameIdx: number;
-}
 
 interface WorkerState {
   ring: AudioRing | null;
@@ -85,15 +67,9 @@ interface WorkerState {
     onsetThreshold: number;
     frameThreshold: number;
     minNoteLengthFrames: number;
-    dedupWindowSamples: number;
-    noteOffTimeoutSamples: number;
-    freshOnsetMaxAgeSamples: number;
-    restrikeGapSamples: number;
   } | null;
-  activeByNoteId: Map<string, ActiveNote>;
-  activeByPitch: Map<number, string>; // pitch midi → noteId
-  /** Cumulative onset count, used to mint unique noteIds. */
-  nextNoteSeq: number;
+  tracking: TrackingConfig | null;
+  trackingState: TrackingState;
 }
 
 const state: WorkerState = {
@@ -102,17 +78,44 @@ const state: WorkerState = {
   basicPitch: null,
   intervalId: null,
   config: null,
-  activeByNoteId: new Map(),
-  activeByPitch: new Map(),
-  nextNoteSeq: 0,
+  tracking: null,
+  trackingState: emptyTrackingState(),
 };
 
 function post(msg: WorkerToMain) {
   (self as DedicatedWorkerGlobalScope).postMessage(msg);
 }
 
-function mintNoteId(): string {
-  return `audio-${state.nextNoteSeq++}`;
+function postTrackerEvent(event: TrackerEvent): void {
+  switch (event.type) {
+    case "note_on":
+      post({
+        type: "audio_note_on",
+        sampleIndex: event.sampleIndex,
+        noteId: event.noteId,
+        pitch: event.pitch,
+        velocity: event.velocity,
+        confidence: event.confidence,
+      });
+      return;
+    case "note_off":
+      post({
+        type: "audio_note_off",
+        sampleIndex: event.sampleIndex,
+        noteId: event.noteId,
+        confidence: event.confidence,
+      });
+      return;
+    case "pitch_bend":
+      post({
+        type: "audio_pitch_bend",
+        sampleIndex: event.sampleIndex,
+        noteId: event.noteId,
+        semitones: event.semitones,
+        confidence: event.confidence,
+      });
+      return;
+  }
 }
 
 async function init(message: Extract<MainToWorker, { type: "init" }>) {
@@ -126,11 +129,15 @@ async function init(message: Extract<MainToWorker, { type: "init" }>) {
       onsetThreshold: message.onsetThreshold,
       frameThreshold: message.frameThreshold,
       minNoteLengthFrames: message.minNoteLengthFrames,
-      dedupWindowSamples: message.dedupWindowSamples,
+    };
+    state.tracking = {
+      onsetThreshold: message.onsetThreshold,
+      frameThreshold: message.frameThreshold,
+      restrikeGapSamples: message.restrikeGapSamples,
       noteOffTimeoutSamples: message.noteOffTimeoutSamples,
       freshOnsetMaxAgeSamples: message.freshOnsetMaxAgeSamples,
-      restrikeGapSamples: message.restrikeGapSamples,
     };
+    state.trackingState = emptyTrackingState();
 
     // WASM backend. Point tfjs at the .wasm binaries served
     // alongside the model files by the web app. Falls back to CPU
@@ -168,25 +175,19 @@ function stop() {
   // downstream stabilizers can wrap them up cleanly.
   if (state.ring) {
     const head = state.ring.head();
-    for (const note of state.activeByNoteId.values()) {
-      post({
-        type: "audio_note_off",
-        sampleIndex: head,
-        noteId: note.noteId,
-        confidence: 0.5,
-      });
-    }
+    const flushEvents = flushAllActiveNotes(state.trackingState, head);
+    for (const event of flushEvents) postTrackerEvent(event);
   }
-  state.activeByNoteId.clear();
-  state.activeByPitch.clear();
+  state.trackingState = emptyTrackingState();
 }
 
 async function runInference() {
   const cfg = state.config;
+  const trackingCfg = state.tracking;
   const ring = state.ring;
   const bp = state.basicPitch;
   const buf = state.windowBuffer;
-  if (!cfg || !ring || !bp || !buf) return;
+  if (!cfg || !trackingCfg || !ring || !bp || !buf) return;
   if (ring.available() < cfg.windowSamples) return; // not enough audio yet
 
   // Snapshot the head; the peek that follows will read at-or-before
@@ -213,9 +214,8 @@ async function runInference() {
     tensor.dispose();
   }
 
-  // Decode posteriors → notes (with onset times, durations, amplitudes).
-  // outputToNotesPoly returns startFrame / endFrame in model frame
-  // indices; we'll convert to absolute sample indices.
+  // Decode posteriors → notes (with onset times, durations, amplitudes,
+  // and per-frame pitch-bend curves).
   const rawNotes = outputToNotesPoly(
     frames,
     onsets,
@@ -223,141 +223,48 @@ async function runInference() {
     cfg.frameThreshold,
     cfg.minNoteLengthFrames,
   );
-  // Attach per-frame pitch-bend curves to each note.
   const notesWithBends = addPitchBendsToNoteEvents(contours, rawNotes);
 
-  for (const note of notesWithBends) {
+  // Convert model output to absolute-sample DetectedNotes and hand
+  // to the tracker kernel. All coordinate resolution (frame → sample,
+  // window-relative → absolute) happens here so the tracker stays
+  // decoupled from Basic Pitch's frame model.
+  const detected: DetectedNote[] = notesWithBends.map((note) => {
     const onsetSampleInWindow = note.startFrame * FFT_HOP;
     const absoluteOnsetSample = (windowStartSample + onsetSampleInWindow) >>> 0;
     const endFrame = note.startFrame + note.durationFrames;
     const endSampleInWindow = endFrame * FFT_HOP;
     const absoluteLastSeenSample = (windowStartSample + endSampleInWindow) >>> 0;
-    const pitch = note.pitchMidi;
 
-    let active = state.activeByPitch.has(pitch)
-      ? state.activeByNoteId.get(state.activeByPitch.get(pitch)!)
-      : undefined;
-
-    // Re-strike detection. A new detection at a tracked pitch is a
-    // re-strike only if BOTH:
-    //   (a) its onset is meaningfully LATER than the tracked note's
-    //       onset (onsetGap > restrikeGapSamples), and
-    //   (b) its onset is FRESH — within freshOnsetMaxAgeSamples of
-    //       "now".
-    //
-    // The freshness check is essential. Basic Pitch's 2-second
-    // window means that once a note is older than ~2s, the model
-    // can no longer see its true onset; it reports the note as
-    // starting at the *start of the current window*, which slides
-    // forward every pass. Without the freshness gate, this window-
-    // slide crosses restrikeGap after ~150ms and fires a spurious
-    // re-strike — closing the note. The "new" onset is stale
-    // (older than freshOnsetMaxAgeSamples) so the new-note path
-    // below drops it. Net effect: notes truncate at ~2s and never
-    // restart. With the freshness gate, the sliding reported onset
-    // is treated as continuation and the note keeps going.
-    if (active) {
-      const onsetGap = (absoluteOnsetSample - active.onsetSampleIndex) | 0;
-      const onsetAgeSamples = (headAfter - absoluteOnsetSample) >>> 0;
-      const isLaterThanTracked = onsetGap > cfg.restrikeGapSamples;
-      const isFreshEnough = onsetAgeSamples <= cfg.freshOnsetMaxAgeSamples;
-      const isRestrike = isLaterThanTracked && isFreshEnough;
-      if (!isRestrike) {
-        // Continuation. Extend lastSeen (max, so late passes can't
-        // regress it).
-        if (absoluteLastSeenSample > active.lastSeenSampleIndex) {
-          active.lastSeenSampleIndex = absoluteLastSeenSample;
-        }
-        continue;
-      }
-      // Real re-strike: close the old note at its last-seen position.
-      post({
-        type: "audio_note_off",
-        sampleIndex: active.lastSeenSampleIndex,
-        noteId: active.noteId,
-        confidence: 0.7,
-      });
-      state.activeByNoteId.delete(active.noteId);
-      state.activeByPitch.delete(pitch);
-      active = undefined;
-      // Fall through to the new-note path below.
+    // Precompute pitch-bend timestamps. We emit these once at note-
+    // on and never again for the same note — the bends array is
+    // relative to *this pass's* predicted onset, which drifts across
+    // passes, so re-emitting wouldn't align to consistent timestamps.
+    let pitchBends: PitchBendSample[] | undefined;
+    if (note.pitchBends && note.pitchBends.length > 0) {
+      pitchBends = note.pitchBends.map((semitones, i) => ({
+        sampleIndex: (absoluteOnsetSample + i * FFT_HOP) >>> 0,
+        semitones,
+      }));
     }
 
-    {
-      // New note (either first detection at this pitch, or the
-      // re-strike branch above). Skip if the onset is too far in
-      // the past — Basic Pitch's 2-second window returns notes with
-      // onsets anywhere in it, and backfilling a note-on with a
-      // stale timestamp puts a retroactive marker on the note strip.
-      const onsetAgeSamples = (headAfter - absoluteOnsetSample) >>> 0;
-      if (onsetAgeSamples > cfg.freshOnsetMaxAgeSamples) {
-        continue;
-      }
-      const newNoteId = mintNoteId();
-      const newActive: ActiveNote = {
-        noteId: newNoteId,
-        pitch,
-        onsetSampleIndex: absoluteOnsetSample,
-        lastSeenSampleIndex: absoluteLastSeenSample,
-        lastEmittedBendFrameIdx: -1,
-      };
-      state.activeByNoteId.set(newNoteId, newActive);
-      state.activeByPitch.set(pitch, newNoteId);
-      // Basic Pitch's `amplitude` is the model's note-strength estimate
-      // (0..1). We adopt it directly as velocity. Marked derived in the
-      // contract; not comparable to MIDI 0..127 absolute.
-      post({
-        type: "audio_note_on",
-        sampleIndex: absoluteOnsetSample,
-        noteId: newNoteId,
-        pitch,
-        velocity: Math.max(0, Math.min(1, note.amplitude)),
-        confidence: cfg.onsetThreshold, // conservative — model emits a binary above threshold
-      });
-      active = newActive;
+    return {
+      pitch: note.pitchMidi,
+      absoluteOnsetSample,
+      absoluteLastSeenSample,
+      amplitude: note.amplitude,
+      pitchBends,
+    };
+  });
 
-      // Emit initial pitch-bend samples for this fresh note. We do
-      // NOT emit additional bends on subsequent passes for the same
-      // note — the `bends` array is relative to *this pass's*
-      // predicted onset, which drifts across passes, so re-emitting
-      // wouldn't align to consistent timestamps. Late bend evolution
-      // is lost; the initial trajectory is captured. Improve later
-      // if pitch-bend fidelity matters more than simplicity.
-      if (note.pitchBends) {
-        const bends = note.pitchBends;
-        for (let i = 0; i < bends.length; i++) {
-          const bendSampleIndex =
-            (absoluteOnsetSample + i * FFT_HOP) >>> 0;
-          post({
-            type: "audio_pitch_bend",
-            sampleIndex: bendSampleIndex,
-            noteId: newNoteId,
-            semitones: bends[i],
-            confidence: cfg.frameThreshold,
-          });
-        }
-        active.lastEmittedBendFrameIdx = bends.length - 1;
-      }
-    }
-  }
-
-  // Emit note-off for any tracked active note that hasn't been
-  // re-detected within the timeout.
-  for (const [noteId, active] of state.activeByNoteId) {
-    if (
-      ((headAfter - active.lastSeenSampleIndex) >>> 0) >
-      cfg.noteOffTimeoutSamples
-    ) {
-      post({
-        type: "audio_note_off",
-        sampleIndex: active.lastSeenSampleIndex,
-        noteId,
-        confidence: 0.7,
-      });
-      state.activeByNoteId.delete(noteId);
-      state.activeByPitch.delete(active.pitch);
-    }
-  }
+  const { events, next } = processDetectedNotes(
+    state.trackingState,
+    detected,
+    headAfter,
+    trackingCfg,
+  );
+  state.trackingState = next;
+  for (const event of events) postTrackerEvent(event);
 }
 
 /**

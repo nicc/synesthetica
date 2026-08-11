@@ -54,7 +54,6 @@ const DEFAULT_ONSET_THRESHOLD = 0.5;
  *  through borderline frames without becoming a noise magnet. */
 const DEFAULT_FRAME_THRESHOLD = 0.2;
 const DEFAULT_MIN_NOTE_LENGTH_FRAMES = 5; // ~58 ms
-const DEFAULT_DEDUP_WINDOW_MS = 50;
 /** Reduced from 200ms — 200 felt laggy on release, especially with
  *  instruments that have long decay tails. Re-strike detection now
  *  covers the case where a brief model dropout would otherwise be
@@ -124,9 +123,6 @@ export interface AudioInputAdapterConfig {
   /** Minimum note length in model frames. @default 5 (~58 ms) */
   minNoteLengthFrames?: number;
 
-  /** Onset dedup window in ms. @default 50 */
-  dedupWindowMs?: number;
-
   /** Note-off timeout in ms. @default 120 */
   noteOffTimeoutMs?: number;
 
@@ -165,7 +161,6 @@ const DEFAULT_CONFIG = {
   onsetThreshold: DEFAULT_ONSET_THRESHOLD,
   frameThreshold: DEFAULT_FRAME_THRESHOLD,
   minNoteLengthFrames: DEFAULT_MIN_NOTE_LENGTH_FRAMES,
-  dedupWindowMs: DEFAULT_DEDUP_WINDOW_MS,
   noteOffTimeoutMs: DEFAULT_NOTE_OFF_TIMEOUT_MS,
   freshOnsetMaxAgeMs: DEFAULT_FRESH_ONSET_MAX_AGE_MS,
   restrikeGapMs: DEFAULT_RESTRIKE_GAP_MS,
@@ -279,7 +274,6 @@ export class AudioInputAdapter implements IRawSourceAdapter {
       frameThreshold: this.config.frameThreshold,
       minNoteLengthFrames: this.config.minNoteLengthFrames,
       windowSamples: WINDOW_SAMPLES,
-      dedupWindowSamples: msToSamples(this.config.dedupWindowMs),
       noteOffTimeoutSamples: msToSamples(this.config.noteOffTimeoutMs),
       freshOnsetMaxAgeSamples: msToSamples(this.config.freshOnsetMaxAgeMs),
       restrikeGapSamples: msToSamples(this.config.restrikeGapMs),
