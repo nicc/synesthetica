@@ -178,7 +178,7 @@ const MAX_STRIP_OPACITY = 0.8;
  *  source chord's angular position along its target ring toward the
  *  target strip. Short enough to feel snappy, long enough to read as
  *  a drawn line rather than a snap. Tune to taste. */
-const CONNECTOR_ANIMATION_MS = 500;
+const CONNECTOR_ANIMATION_MS = 100;
 
 /** Connector arc radial half-thickness as a normalized fraction of
  *  worldWidth. The renderer draws the arc as a thin annular segment
@@ -186,12 +186,12 @@ const CONNECTOR_ANIMATION_MS = 500;
  *  full stroke thickness is 2×. Chosen to read as ~2× the guide ring
  *  stroke while staying much thinner than the strip's radial extent
  *  (STRIP_RADIAL_FRACTION * clockRadius ≈ 0.01 normalized). */
-const CONNECTOR_HALF_THICKNESS_NORMALIZED = 0.002;
+const CONNECTOR_HALF_THICKNESS_NORMALIZED = 0.001;
 
 /** Opacity multiplier applied to the connector arc's edge-weight-scaled
  *  opacity. Independent knob from MAX_STRIP_OPACITY so the pathway
  *  reads at the right strength without dragging the strip along. */
-const CONNECTOR_OPACITY_MULTIPLIER = 1.0;
+const CONNECTOR_OPACITY_MULTIPLIER = 0.8;
 
 // ============================================================================
 // Scrolling Chord Strip Constants
