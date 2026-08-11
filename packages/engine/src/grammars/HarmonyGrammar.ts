@@ -178,7 +178,7 @@ const MAX_STRIP_OPACITY = 1.0;
  *  source chord's angular position along its target ring toward the
  *  target strip. Short enough to feel snappy, long enough to read as
  *  a drawn line rather than a snap. Tune to taste. */
-const CONNECTOR_ANIMATION_MS = 100;
+const CONNECTOR_ANIMATION_MS = 60;
 
 /** Connector arc radial half-thickness as a normalized fraction of
  *  worldWidth. The renderer draws the arc as a thin annular segment
