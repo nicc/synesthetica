@@ -168,7 +168,7 @@ const STRIP_ARC_WIDTH = GLYPH_SIZE * 1.5;
 /** Max overall strip opacity at full edge weight. Caps the brightness
  *  of even the strongest functional connections so they remain a
  *  background structural cue rather than competing with the numerals. */
-const MAX_STRIP_OPACITY = 0.8;
+const MAX_STRIP_OPACITY = 1.0;
 
 // ============================================================================
 // Edge Connector Arc Constants
