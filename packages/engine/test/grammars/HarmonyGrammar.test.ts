@@ -384,14 +384,15 @@ describe("HarmonyGrammar", () => {
       expect(arc.data?.hue).toBeDefined();
     });
 
-    it("extends the arc sweep past the strip's far edge", () => {
+    it("stops the arc flush with the strip's near edge", () => {
       // ♭VII → IV in C major: source at ~283°, target IV at ~154°.
       // Natural short sweep ≈ -128.6° (counter-clockwise).
-      // Emitted sweep should be LONGER in magnitude by roughly the
+      // Emitted sweep should be SHORTER in magnitude by roughly the
       // strip's angular half-width (~12° for a diatonic target) so the
-      // arc runs through the strip and terminates at its far edge.
-      // Sampled at full progress so the emitted sweep equals the
-      // extended one.
+      // arc terminates at the strip's near edge — no arc/strip
+      // overlap. Sampled at full progress so the emitted sweep
+      // equals the shortened one (with a small backward angular
+      // adjustment for the arrow base extent).
       const frame = createTestAnnotatedFrame(5000, "main", {
         prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
         harmonicContext: {
@@ -419,13 +420,14 @@ describe("HarmonyGrammar", () => {
       )!;
       const emittedSweep = arc.data?.sweepDeg as number;
 
-      // The natural (pre-extension) sweep magnitude is ~128.6°.
-      // After extension by ~12° it should be roughly ~140° in
-      // magnitude — meaningfully more than the natural, still
-      // recognisably the same arc direction.
+      // The natural (pre-shortening) sweep magnitude is ~128.6°.
+      // After shortening by ~12° (strip half-width) and adding a small
+      // backward arrow adjustment (~1.5°), the arc's absolute sweep
+      // should be roughly ~118° — meaningfully less than the natural,
+      // still recognisably the same arc direction.
       const NATURAL_ABS_SWEEP = 128.57;
-      expect(Math.abs(emittedSweep)).toBeGreaterThan(NATURAL_ABS_SWEEP + 5);
-      expect(Math.abs(emittedSweep)).toBeLessThan(NATURAL_ABS_SWEEP + 20);
+      expect(Math.abs(emittedSweep)).toBeLessThan(NATURAL_ABS_SWEEP - 5);
+      expect(Math.abs(emittedSweep)).toBeGreaterThan(NATURAL_ABS_SWEEP - 20);
       expect(Math.sign(emittedSweep)).toBe(-1); // natural direction preserved
     });
 
@@ -533,12 +535,9 @@ describe("HarmonyGrammar", () => {
       const sweeps = arcs.map((a) => a.data?.sweepDeg as number);
       // Natural directions are already opposite — no flip needed.
       expect(Math.sign(sweeps[0])).not.toBe(Math.sign(sweeps[1]));
-      // Neither sweep is force-flipped to the truly-longer arc
-      // (>~270°). The 180°-natural case does exceed 180° after the
-      // strip-edge extension (~192°), which is fine — that's still
-      // the natural direction plus the extension.
-      expect(Math.abs(sweeps[0])).toBeLessThan(220);
-      expect(Math.abs(sweeps[1])).toBeLessThan(220);
+      // Neither sweep is force-flipped to the truly-longer arc (>~270°).
+      expect(Math.abs(sweeps[0])).toBeLessThan(200);
+      expect(Math.abs(sweeps[1])).toBeLessThan(200);
     });
 
     it("flips the lower-weight edge when two same-ring edges collide direction", () => {

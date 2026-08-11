@@ -801,11 +801,13 @@ export class HarmonyGrammar implements IVisualGrammar {
         fadeOpacity * edge.weight * MAX_STRIP_OPACITY * CONNECTOR_OPACITY_MULTIPLIER;
       const arcOpacity = baseOpacity;
 
-      // Extend the arc past the strip's centerline out to its far
-      // edge so the arc's line remains visible along the strip's full
-      // angular extent. Strip's angular width matches the renderer's
-      // math: arcWidth / meanRadius_world, halved for the far-edge
-      // offset from centerline.
+      // Stop the arc flush with the strip's near edge so the two
+      // don't overlap and composite into a doubled-alpha band. The
+      // strip's shader carries a plateau (see stripPlateauFraction
+      // below) that keeps the strip at the arc's opacity for the
+      // first arc-width of radial extent, so the transition from
+      // arc line to strip reads as a single continuous stroke that
+      // then curves down toward the target chord.
       const targetArcWidth = edge.targetDiatonic
         ? STRIP_ARC_WIDTH
         : STRIP_ARC_WIDTH * BORROWED_SCALE;
@@ -814,8 +816,8 @@ export class HarmonyGrammar implements IVisualGrammar {
       const stripAngularHalfWidthDeg =
         (targetArcWidth / meanRingWorld / 2) * (180 / Math.PI);
       const absSweep = Math.abs(sweepDeg);
-      const extendedAbsSweep = absSweep + stripAngularHalfWidthDeg;
-      const extendedSweep = Math.sign(sweepDeg) * extendedAbsSweep;
+      const shortenedAbsSweep = Math.max(0, absSweep - stripAngularHalfWidthDeg);
+      const shortenedSweep = Math.sign(sweepDeg) * shortenedAbsSweep;
 
       // Also extend the arc backward past the source angle so it runs
       // under the entire angular span of the source-end triangle. The
@@ -829,15 +831,16 @@ export class HarmonyGrammar implements IVisualGrammar {
       const arrowHalfBaseAngularDeg =
         (arrowHalfBaseNormalized / targetMidR) * (180 / Math.PI);
       const arcStartAngleDeg =
-        sourceAngleDeg - Math.sign(extendedSweep) * arrowHalfBaseAngularDeg;
+        sourceAngleDeg - Math.sign(shortenedSweep) * arrowHalfBaseAngularDeg;
       const arcExtendedSweep =
-        extendedSweep + Math.sign(extendedSweep) * arrowHalfBaseAngularDeg;
+        shortenedSweep + Math.sign(shortenedSweep) * arrowHalfBaseAngularDeg;
 
       // Connector arc: emit whenever the source is alive (even at
       // progress=0 it's a zero-length arc so the renderer no-ops
-      // gracefully). The renderer sweeps from sourceAngleDeg by
-      // (extendedSweep × progress) so the arc runs through the strip
-      // and terminates at the strip's far edge.
+      // gracefully). Arc terminates flush with the strip's near
+      // edge; the strip's shader plateau continues the arc's
+      // opacity through the first arc-width of the strip's radial
+      // extent.
       if (arcOpacity >= 0.01) {
         entities.push({
           id: `${this.id}:edge-connector:${sourceChord.chordId}:${edge.targetDegree}:${edge.targetDiatonic ? "d" : "b"}`,
@@ -925,6 +928,13 @@ export class HarmonyGrammar implements IVisualGrammar {
           targetArcWidth,
           sourceHue,
           targetHue,
+          // Plateau fraction: what fraction of the strip's radial
+          // extent stays at peak opacity before the fade begins.
+          // Sized to match the arc's full stroke width so the strip's
+          // inner region reads as a continuation of the arc line.
+          plateauFraction:
+            (2 * CONNECTOR_HALF_THICKNESS_NORMALIZED) /
+            (stripRadialHeight || 1),
         },
       });
     }

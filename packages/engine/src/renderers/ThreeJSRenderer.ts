@@ -625,6 +625,7 @@ export class ThreeJSRenderer implements IRenderer {
       sourceHue,
       targetHue,
       overallOpacity,
+      (data.plateauFraction as number | undefined) ?? 0.2,
     );
   }
 
@@ -761,35 +762,50 @@ export class ThreeJSRenderer implements IRenderer {
     const tangentX = -Math.sin(angleRad);
     const tangentY = -Math.cos(angleRad);
 
-    // Base sits at the arc's centerline (half the arc thickness INSIDE
-    // the outer edge on the source side). Apex still lands `height`
-    // past the arc's outer edge, so the visible triangle above the arc
-    // is unchanged; the extra overlap into the arc covers pixel-level
-    // gaps that would otherwise appear at the seam.
-    const baseR = worldRadius;
-    const apexR = worldRadius + pointRadial * (arcHalfWidth + height);
+    // Curved base: instead of a straight chord, the base follows the
+    // arc's source-facing edge exactly, so every base vertex sits on
+    // the arc. No alpha-doubling overlap, no sagitta gap. Cost is
+    // ~8 extra vertices per arrow — negligible.
     const halfBase = height / Math.sqrt(3); // equilateral: base = h × 2/√3
+    const arcSourceFacingR = worldRadius + pointRadial * arcHalfWidth;
+    const apexR = worldRadius + pointRadial * (arcHalfWidth + height);
 
-    const baseCX = cx + baseR * radialX;
-    const baseCY = cy + baseR * radialY;
-    const apexX = cx + apexR * radialX;
-    const apexY = cy + apexR * radialY;
-    const baseAX = baseCX - halfBase * tangentX;
-    const baseAY = baseCY - halfBase * tangentY;
-    const baseBX = baseCX + halfBase * tangentX;
-    const baseBY = baseCY + halfBase * tangentY;
+    // Apex + 9 base vertices distributed along the arc's source-facing
+    // edge from tangential −halfBase to +halfBase. Each base vertex
+    // sits at distance arcSourceFacingR from the wheel center.
+    const N_BASE_SEGMENTS = 8;
+    const vertexCount = 1 + N_BASE_SEGMENTS + 1; // apex + (N+1) base verts
+    const positions = new Float32Array(vertexCount * 3);
+    // Apex (vertex 0)
+    positions[0] = cx + apexR * radialX;
+    positions[1] = cy + apexR * radialY;
+    positions[2] = 0;
+    // Base vertices (indices 1..vertexCount-1)
+    for (let i = 0; i <= N_BASE_SEGMENTS; i++) {
+      const t = -halfBase + (i * 2 * halfBase) / N_BASE_SEGMENTS;
+      const localRadial = Math.sqrt(
+        arcSourceFacingR * arcSourceFacingR - t * t,
+      );
+      const worldX = cx + localRadial * radialX + t * tangentX;
+      const worldY = cy + localRadial * radialY + t * tangentY;
+      const off = (1 + i) * 3;
+      positions[off] = worldX;
+      positions[off + 1] = worldY;
+      positions[off + 2] = 0;
+    }
 
     const threeColor = this.hsvToThreeColor({ h: hue, s: 0.7, v: 0.9 });
-    const positions = new Float32Array([
-      baseAX, baseAY, 0,
-      baseBX, baseBY, 0,
-      apexX, apexY, 0,
-    ]);
 
     let mesh = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
     if (!mesh) {
       const geom = new THREE.BufferGeometry();
       geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      // Fan triangulation from apex (0) to consecutive base vertex
+      // pairs. Fixed for the fixed N_BASE_SEGMENTS, so we set once
+      // at construction and never touch again.
+      const indices: number[] = [];
+      for (let i = 1; i <= N_BASE_SEGMENTS; i++) indices.push(0, i, i + 1);
+      geom.setIndex(indices);
       const material = new THREE.MeshBasicMaterial({
         color: threeColor,
         transparent: true,
@@ -848,6 +864,11 @@ export class ThreeJSRenderer implements IRenderer {
         // colour is at inner or outer depends on the strip direction.
         // 1.0 = mid at inner, 0.0 = mid at outer.
         midAtInner: { value: 1.0 },
+        // Fraction of the strip's radial extent (from the arc-facing
+        // edge) that holds peak opacity before the fade begins. Sized
+        // to match the arc's stroke width so the strip's inner region
+        // reads as a continuation of the arc line.
+        plateauFraction: { value: 0.2 },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -862,16 +883,18 @@ export class ThreeJSRenderer implements IRenderer {
         uniform vec3 chordColor;
         uniform float overallOpacity;
         uniform float midAtInner;
+        uniform float plateauFraction;
         void main() {
           // t = 0 at midR side (guide ring, full opacity)
           // t = 1 at chord side (numeral edge, zero opacity)
           float t = midAtInner > 0.5 ? vUv.x : (1.0 - vUv.x);
           // Linear hue blend across the strip's radial axis.
           vec3 color = mix(midColor, chordColor, t);
-          // Non-linear opacity falloff: 1 - t^4 keeps the strip near
-          // full opacity for the inner two-thirds, then drops rapidly
-          // toward the chord-side edge.
-          float alpha = 1.0 - pow(t, 4.0);
+          // Opacity: soft plateau then smoothstep fade. smoothstep is
+          // C2-continuous at both bounds, so joining a flat plateau
+          // (constant 1) to a smoothstep drop reads as one smooth
+          // curve — no visible inflection at the plateau boundary.
+          float alpha = 1.0 - smoothstep(plateauFraction, 1.0, t);
           gl_FragColor = vec4(color, alpha * overallOpacity);
         }
       `,
@@ -899,6 +922,7 @@ export class ThreeJSRenderer implements IRenderer {
     midHue: number,
     chordHue: number,
     overallOpacity: number,
+    plateauFraction: number,
   ): void {
     const midRWorld = midR * this.config.worldWidth;
     const chordRWorld = chordR * this.config.worldWidth;
@@ -950,6 +974,7 @@ export class ThreeJSRenderer implements IRenderer {
     );
     material.uniforms.overallOpacity.value = overallOpacity;
     material.uniforms.midAtInner.value = midAtInner ? 1.0 : 0.0;
+    material.uniforms.plateauFraction.value = plateauFraction;
   }
 
   /**
