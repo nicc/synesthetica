@@ -313,8 +313,11 @@ describe("HarmonyGrammar", () => {
       expect(strip.data?.targetArcWidth).toBeDefined();
       expect(strip.data?.sourceHue).toBeDefined();
       expect(strip.data?.targetHue).toBeDefined();
-      // Opacity scaled by edge weight × MAX_STRIP_OPACITY (1.0)
-      expect(strip.style.opacity).toBeCloseTo(0.85 * 1.0, 2);
+      // Opacity scaled by edge weight × MAX_STRIP_OPACITY × MULTIPLIER
+      // (both arc and strip share the same base opacity now, so their
+      // colours meet at the same intensity where the arc joins the
+      // strip's inner edge).
+      expect(strip.style.opacity).toBeCloseTo(0.85 * 1.0 * 0.8, 2);
     });
 
     it("emits no strip entities when no edges exist", () => {

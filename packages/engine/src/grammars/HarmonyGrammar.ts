@@ -793,8 +793,13 @@ export class HarmonyGrammar implements IVisualGrammar {
       const targetHue = pcToHue(edge.targetPc, DEFAULT_HUE_INVARIANT);
 
       const sweepDeg = sweepByEdge.get(edge) ?? 0;
-      const arcOpacity =
+      // One base opacity shared by arc and strip so they meet at the
+      // same intensity where they join. Strip's shader still fades
+      // this from full at the inner edge (arc side) to zero at the
+      // outer edge (chord side).
+      const baseOpacity =
         fadeOpacity * edge.weight * MAX_STRIP_OPACITY * CONNECTOR_OPACITY_MULTIPLIER;
+      const arcOpacity = baseOpacity;
 
       // Extend the arc past the strip's centerline out to its far
       // edge so the arc's line remains visible along the strip's full
@@ -811,6 +816,22 @@ export class HarmonyGrammar implements IVisualGrammar {
       const absSweep = Math.abs(sweepDeg);
       const extendedAbsSweep = absSweep + stripAngularHalfWidthDeg;
       const extendedSweep = Math.sign(sweepDeg) * extendedAbsSweep;
+
+      // Also extend the arc backward past the source angle so it runs
+      // under the entire angular span of the source-end triangle. The
+      // triangle's base extends ±halfBase tangentially from the source
+      // angle; without this back-extension, the CCW side of the base
+      // sits over empty space beyond the arc's start, leaving a small
+      // visible gap between triangle and arc.
+      const arrowHeightNormalized =
+        ARROW_HEIGHT_MULTIPLIER * 2 * CONNECTOR_HALF_THICKNESS_NORMALIZED;
+      const arrowHalfBaseNormalized = arrowHeightNormalized / Math.sqrt(3);
+      const arrowHalfBaseAngularDeg =
+        (arrowHalfBaseNormalized / targetMidR) * (180 / Math.PI);
+      const arcStartAngleDeg =
+        sourceAngleDeg - Math.sign(extendedSweep) * arrowHalfBaseAngularDeg;
+      const arcExtendedSweep =
+        extendedSweep + Math.sign(extendedSweep) * arrowHalfBaseAngularDeg;
 
       // Connector arc: emit whenever the source is alive (even at
       // progress=0 it's a zero-length arc so the renderer no-ops
@@ -834,8 +855,8 @@ export class HarmonyGrammar implements IVisualGrammar {
           data: {
             type: "connection-arc",
             radius: targetMidR,
-            startAngleDeg: sourceAngleDeg,
-            sweepDeg: extendedSweep * progress,
+            startAngleDeg: arcStartAngleDeg,
+            sweepDeg: arcExtendedSweep * progress,
             hue: sourceHue,
             halfThickness: CONNECTOR_HALF_THICKNESS_NORMALIZED,
           },
@@ -880,7 +901,7 @@ export class HarmonyGrammar implements IVisualGrammar {
       // progress=1) and fades from there.
       if (progress < 1) continue;
 
-      const stripOpacity = fadeOpacity * edge.weight * MAX_STRIP_OPACITY;
+      const stripOpacity = baseOpacity;
       if (stripOpacity < 0.01) continue;
 
       entities.push({

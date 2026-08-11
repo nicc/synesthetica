@@ -761,10 +761,13 @@ export class ThreeJSRenderer implements IRenderer {
     const tangentX = -Math.sin(angleRad);
     const tangentY = -Math.cos(angleRad);
 
-    // Base is on the arc's edge that faces the source numeral; apex
-    // extends `height` further in the same direction.
-    const baseR = worldRadius + pointRadial * arcHalfWidth;
-    const apexR = baseR + pointRadial * height;
+    // Base sits at the arc's centerline (half the arc thickness INSIDE
+    // the outer edge on the source side). Apex still lands `height`
+    // past the arc's outer edge, so the visible triangle above the arc
+    // is unchanged; the extra overlap into the arc covers pixel-level
+    // gaps that would otherwise appear at the seam.
+    const baseR = worldRadius;
+    const apexR = worldRadius + pointRadial * (arcHalfWidth + height);
     const halfBase = height / Math.sqrt(3); // equilateral: base = h × 2/√3
 
     const baseCX = cx + baseR * radialX;
