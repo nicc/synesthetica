@@ -764,10 +764,16 @@ export class ThreeJSRenderer implements IRenderer {
 
     // Curved base: instead of a straight chord, the base follows the
     // arc's source-facing edge exactly, so every base vertex sits on
-    // the arc. No alpha-doubling overlap, no sagitta gap. Cost is
-    // ~8 extra vertices per arrow — negligible.
+    // (a hair inside) the arc's edge. AA_OVERLAP_WORLD nudges the
+    // base vertices INTO the arc by ~1 pixel worth of world units so
+    // the two shapes' anti-aliased edges overlap by that thin band
+    // rather than sharing a knife-edge boundary — which was leaving a
+    // 1-2 pixel dark hairline gap. Alpha-doubling in the overlap band
+    // is a fraction of a pixel wide, imperceptible.
+    const AA_OVERLAP_WORLD = 0.15;
     const halfBase = height / Math.sqrt(3); // equilateral: base = h × 2/√3
-    const arcSourceFacingR = worldRadius + pointRadial * arcHalfWidth;
+    const arcSourceFacingR =
+      worldRadius + pointRadial * arcHalfWidth - pointRadial * AA_OVERLAP_WORLD;
     const apexR = worldRadius + pointRadial * (arcHalfWidth + height);
 
     // Apex + 9 base vertices distributed along the arc's source-facing

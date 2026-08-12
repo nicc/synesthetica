@@ -384,14 +384,14 @@ describe("HarmonyGrammar", () => {
       expect(arc.data?.hue).toBeDefined();
     });
 
-    it("stops the arc flush with the strip's near edge", () => {
+    it("extends the arc sweep past the strip's far edge", () => {
       // ♭VII → IV in C major: source at ~283°, target IV at ~154°.
       // Natural short sweep ≈ -128.6° (counter-clockwise).
-      // Emitted sweep should be SHORTER in magnitude by roughly the
-      // strip's angular half-width (~12° for a diatonic target) so the
-      // arc terminates at the strip's near edge — no arc/strip
-      // overlap. Sampled at full progress so the emitted sweep
-      // equals the shortened one (with a small backward angular
+      // Emitted sweep should be LONGER in magnitude by roughly the
+      // strip's angular half-width so the arc runs the strip's full
+      // angular extent above it (arc and strip are now radially
+      // separated). Sampled at full progress so the emitted sweep
+      // equals the extended one (plus a small backward angular
       // adjustment for the arrow base extent).
       const frame = createTestAnnotatedFrame(5000, "main", {
         prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
@@ -420,14 +420,14 @@ describe("HarmonyGrammar", () => {
       )!;
       const emittedSweep = arc.data?.sweepDeg as number;
 
-      // The natural (pre-shortening) sweep magnitude is ~128.6°.
-      // After shortening by ~12° (strip half-width) and adding a small
+      // The natural (pre-extension) sweep magnitude is ~128.6°.
+      // After extending by ~12° (strip half-width) and adding a small
       // backward arrow adjustment (~1.5°), the arc's absolute sweep
-      // should be roughly ~118° — meaningfully less than the natural,
+      // should be roughly ~142° — meaningfully more than the natural,
       // still recognisably the same arc direction.
       const NATURAL_ABS_SWEEP = 128.57;
-      expect(Math.abs(emittedSweep)).toBeLessThan(NATURAL_ABS_SWEEP - 5);
-      expect(Math.abs(emittedSweep)).toBeGreaterThan(NATURAL_ABS_SWEEP - 20);
+      expect(Math.abs(emittedSweep)).toBeGreaterThan(NATURAL_ABS_SWEEP + 5);
+      expect(Math.abs(emittedSweep)).toBeLessThan(NATURAL_ABS_SWEEP + 25);
       expect(Math.sign(emittedSweep)).toBe(-1); // natural direction preserved
     });
 
@@ -642,13 +642,57 @@ describe("HarmonyGrammar", () => {
       );
       expect(arrows).toHaveLength(2);
 
-      const diatonicArrow = arrows.find((a) => a.id.endsWith(":5:d"))!;
-      const borrowedArrow = arrows.find((a) => a.id.endsWith(":5:b"))!;
+      const diatonicArrow = arrows.find((a) => a.id.endsWith(":d"))!;
+      const borrowedArrow = arrows.find((a) => a.id.endsWith(":b"))!;
       expect(diatonicArrow.data?.pointRadial).toBe(1); // outward
       expect(borrowedArrow.data?.pointRadial).toBe(-1); // inward
       expect(diatonicArrow.data?.angleDeg).toBeDefined();
       expect(diatonicArrow.data?.radius).toBeDefined();
       expect(diatonicArrow.data?.heightNormalized).toBeGreaterThan(0);
+    });
+
+    it("dedupes arrows for fan-out on the same target ring", () => {
+      // ♭VI in C major fans to ii and IV — both diatonic (same
+      // target ring). Only ONE arrow should emit; two would stack
+      // at the same source position pointing at the same numeral.
+      const frame = createTestAnnotatedFrame(5000, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 6, roman: "♭VI", quality: "maj", rootPc: 8 as PitchClass, borrowed: true, chordId: "bvi", onset: 500 },
+          ],
+          functionalEdges: [
+            {
+              sourceChordId: "bvi",
+              targetDegree: 2,
+              targetPc: 2 as PitchClass,
+              targetDiatonic: true,
+              weight: 0.55,
+              type: "subdominant-borrowing",
+            },
+            {
+              sourceChordId: "bvi",
+              targetDegree: 4,
+              targetPc: 5 as PitchClass,
+              targetDiatonic: true,
+              weight: 0.50,
+              type: "subdominant-borrowing",
+            },
+          ],
+        },
+      });
+      const scene = grammar.update(frame, null);
+      const arrows = scene.entities.filter(
+        (e) => e.data?.type === "connection-arrow",
+      );
+      // Fan-out to same ring → one arrow (dedup); two arcs still.
+      expect(arrows).toHaveLength(1);
+      expect(
+        scene.entities.filter((e) => e.data?.type === "connection-arc"),
+      ).toHaveLength(2);
     });
 
     it("distinct edge IDs for chain edges at the same target degree", () => {

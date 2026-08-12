@@ -753,6 +753,12 @@ export class HarmonyGrammar implements IVisualGrammar {
     // opposite ways along the ring.
     const sweepByEdge = this.resolveEdgeSweeps(edges, chordsById, tonicPc, mode);
 
+    // Arrows dedup by (source, ring) — a source with multiple edges
+    // to the same target ring only emits one arrow (at the source
+    // angle, pointing at the source numeral). A source with edges to
+    // both rings emits two arrows at different radial positions.
+    const arrowKeysEmitted = new Set<string>();
+
     for (const edge of edges) {
       const sourceChord = chordsById.get(edge.sourceChordId);
       if (!sourceChord) continue;
@@ -783,31 +789,30 @@ export class HarmonyGrammar implements IVisualGrammar {
       const targetSemitones = (edge.targetPc - tonicPc + 12) % 12;
       const targetAngleDeg = modalWheelAngle(targetSemitones, mode);
 
+      // Arc rides at the target's anchor ring (guide ring adjacent to
+      // the target numeral). Strip is shifted radially inward by the
+      // arc's half-thickness so its outer edge sits at the arc's
+      // inner edge — flush radial adjacency, no overlap.
       const targetAnchorFraction = edge.targetDiatonic
         ? GUIDE_RING_MIDDLE_FRACTION
         : GUIDE_RING_OUTER_FRACTION;
-      const targetMidR = clockRadius * targetAnchorFraction;
+      const arcRingR = clockRadius * targetAnchorFraction;
+      const stripShift = CONNECTOR_HALF_THICKNESS_NORMALIZED;
+      const targetMidR = arcRingR - stripShift;
       const targetChordR = targetMidR - stripRadialHeight;
 
       const sourceHue = pcToHue(sourceChord.rootPc, DEFAULT_HUE_INVARIANT);
       const targetHue = pcToHue(edge.targetPc, DEFAULT_HUE_INVARIANT);
 
       const sweepDeg = sweepByEdge.get(edge) ?? 0;
-      // One base opacity shared by arc and strip so they meet at the
-      // same intensity where they join. Strip's shader still fades
-      // this from full at the inner edge (arc side) to zero at the
-      // outer edge (chord side).
+      // One base opacity shared by arc and strip.
       const baseOpacity =
         fadeOpacity * edge.weight * MAX_STRIP_OPACITY * CONNECTOR_OPACITY_MULTIPLIER;
       const arcOpacity = baseOpacity;
 
-      // Stop the arc flush with the strip's near edge so the two
-      // don't overlap and composite into a doubled-alpha band. The
-      // strip's shader carries a plateau (see stripPlateauFraction
-      // below) that keeps the strip at the arc's opacity for the
-      // first arc-width of radial extent, so the transition from
-      // arc line to strip reads as a single continuous stroke that
-      // then curves down toward the target chord.
+      // Extend the arc angularly past the strip's far edge so the arc
+      // line runs the full length of the strip's angular extent above
+      // it (no radial overlap — arc and strip are radially adjacent).
       const targetArcWidth = edge.targetDiatonic
         ? STRIP_ARC_WIDTH
         : STRIP_ARC_WIDTH * BORROWED_SCALE;
@@ -816,24 +821,20 @@ export class HarmonyGrammar implements IVisualGrammar {
       const stripAngularHalfWidthDeg =
         (targetArcWidth / meanRingWorld / 2) * (180 / Math.PI);
       const absSweep = Math.abs(sweepDeg);
-      const shortenedAbsSweep = Math.max(0, absSweep - stripAngularHalfWidthDeg);
-      const shortenedSweep = Math.sign(sweepDeg) * shortenedAbsSweep;
+      const extendedAbsSweep = absSweep + stripAngularHalfWidthDeg;
+      const extendedSweep = Math.sign(sweepDeg) * extendedAbsSweep;
 
       // Also extend the arc backward past the source angle so it runs
-      // under the entire angular span of the source-end triangle. The
-      // triangle's base extends ±halfBase tangentially from the source
-      // angle; without this back-extension, the CCW side of the base
-      // sits over empty space beyond the arc's start, leaving a small
-      // visible gap between triangle and arc.
+      // under the entire angular span of the source-end triangle.
       const arrowHeightNormalized =
         ARROW_HEIGHT_MULTIPLIER * 2 * CONNECTOR_HALF_THICKNESS_NORMALIZED;
       const arrowHalfBaseNormalized = arrowHeightNormalized / Math.sqrt(3);
       const arrowHalfBaseAngularDeg =
-        (arrowHalfBaseNormalized / targetMidR) * (180 / Math.PI);
+        (arrowHalfBaseNormalized / arcRingR) * (180 / Math.PI);
       const arcStartAngleDeg =
-        sourceAngleDeg - Math.sign(shortenedSweep) * arrowHalfBaseAngularDeg;
+        sourceAngleDeg - Math.sign(extendedSweep) * arrowHalfBaseAngularDeg;
       const arcExtendedSweep =
-        shortenedSweep + Math.sign(shortenedSweep) * arrowHalfBaseAngularDeg;
+        extendedSweep + Math.sign(extendedSweep) * arrowHalfBaseAngularDeg;
 
       // Connector arc: emit whenever the source is alive (even at
       // progress=0 it's a zero-length arc so the renderer no-ops
@@ -857,7 +858,7 @@ export class HarmonyGrammar implements IVisualGrammar {
           },
           data: {
             type: "connection-arc",
-            radius: targetMidR,
+            radius: arcRingR,
             startAngleDeg: arcStartAngleDeg,
             sweepDeg: arcExtendedSweep * progress,
             hue: sourceHue,
@@ -865,37 +866,43 @@ export class HarmonyGrammar implements IVisualGrammar {
           },
         });
 
-        // Arrow indicator at the arc's source end, apex pointing at
+        // Arrow indicator at the source position, apex pointing at
         // the source chord numeral. Source is always borrowed (only
         // borrowed chords emit edges), so the numeral sits at the
         // borrowed ring — outward of the arc for diatonic targets
         // (arc rides middle guide ring) and inward of the arc for
-        // borrowed targets (arc rides outer guide ring).
-        const pointRadial = edge.targetDiatonic ? 1 : -1;
-        entities.push({
-          id: `${this.id}:edge-arrow:${sourceChord.chordId}:${edge.targetDegree}:${edge.targetDiatonic ? "d" : "b"}`,
-          part,
-          kind: "glyph",
-          createdAt: sourceChord.onset,
-          updatedAt: t,
-          position: {
-            x: HARMONY_PROGRESSION_CENTER_X,
-            y: HARMONY_PROGRESSION_CENTER_Y,
-          },
-          style: {
-            opacity: arcOpacity,
-          },
-          data: {
-            type: "connection-arrow",
-            radius: targetMidR,
-            angleDeg: sourceAngleDeg,
-            pointRadial,
-            heightNormalized:
-              ARROW_HEIGHT_MULTIPLIER * 2 * CONNECTOR_HALF_THICKNESS_NORMALIZED,
-            arcHalfThicknessNormalized: CONNECTOR_HALF_THICKNESS_NORMALIZED,
-            hue: sourceHue,
-          },
-        });
+        // borrowed targets (arc rides outer guide ring). Dedup by
+        // (source, ring) so fan-out to the same ring only produces
+        // one arrow at that position.
+        const arrowKey = `${sourceChord.chordId}:${edge.targetDiatonic ? "d" : "b"}`;
+        if (!arrowKeysEmitted.has(arrowKey)) {
+          arrowKeysEmitted.add(arrowKey);
+          const pointRadial = edge.targetDiatonic ? 1 : -1;
+          entities.push({
+            id: `${this.id}:edge-arrow:${arrowKey}`,
+            part,
+            kind: "glyph",
+            createdAt: sourceChord.onset,
+            updatedAt: t,
+            position: {
+              x: HARMONY_PROGRESSION_CENTER_X,
+              y: HARMONY_PROGRESSION_CENTER_Y,
+            },
+            style: {
+              opacity: arcOpacity,
+            },
+            data: {
+              type: "connection-arrow",
+              radius: arcRingR,
+              angleDeg: sourceAngleDeg,
+              pointRadial,
+              heightNormalized:
+                ARROW_HEIGHT_MULTIPLIER * 2 * CONNECTOR_HALF_THICKNESS_NORMALIZED,
+              arcHalfThicknessNormalized: CONNECTOR_HALF_THICKNESS_NORMALIZED,
+              hue: sourceHue,
+            },
+          });
+        }
       }
 
       // Connection strip: only visible once the connector has landed.
@@ -930,11 +937,11 @@ export class HarmonyGrammar implements IVisualGrammar {
           targetHue,
           // Plateau fraction: what fraction of the strip's radial
           // extent stays at peak opacity before the fade begins.
-          // Sized to match the arc's full stroke width so the strip's
-          // inner region reads as a continuation of the arc line.
-          plateauFraction:
-            (2 * CONNECTOR_HALF_THICKNESS_NORMALIZED) /
-            (stripRadialHeight || 1),
+          // With the strip now radially adjacent to (not overlapping)
+          // the arc, no plateau is needed for visual continuity —
+          // set to 0 for a full smoothstep fade across the whole
+          // strip. Kept as a data field so it remains tunable.
+          plateauFraction: 0,
         },
       });
     }
