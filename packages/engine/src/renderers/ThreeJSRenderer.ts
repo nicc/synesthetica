@@ -770,7 +770,7 @@ export class ThreeJSRenderer implements IRenderer {
     // rather than sharing a knife-edge boundary — which was leaving a
     // 1-2 pixel dark hairline gap. Alpha-doubling in the overlap band
     // is a fraction of a pixel wide, imperceptible.
-    const AA_OVERLAP_WORLD = 0.15;
+    const AA_OVERLAP_WORLD = 0.03;
     const halfBase = height / Math.sqrt(3); // equilateral: base = h × 2/√3
     const arcSourceFacingR =
       worldRadius + pointRadial * arcHalfWidth - pointRadial * AA_OVERLAP_WORLD;

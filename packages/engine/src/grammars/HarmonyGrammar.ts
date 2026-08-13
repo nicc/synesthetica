@@ -941,7 +941,7 @@ export class HarmonyGrammar implements IVisualGrammar {
           // the arc, no plateau is needed for visual continuity —
           // set to 0 for a full smoothstep fade across the whole
           // strip. Kept as a data field so it remains tunable.
-          plateauFraction: 0,
+          plateauFraction: 0.1,
         },
       });
     }
