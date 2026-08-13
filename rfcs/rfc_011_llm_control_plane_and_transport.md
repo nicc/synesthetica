@@ -30,6 +30,7 @@ RFC 004 was written in January 2026 when the pipeline was largely aspirational. 
 - **Control ops exist as a contract** (`packages/contracts/control/control_ops.ts` per SPEC 004) but no runtime receiver is wired.
 - **Annotations exist as types** (`packages/contracts/annotations/annotations.ts`) but grammar/preset/macro annotations aren't populated.
 - **The interpretive stance in SPEC 004 remains sound** — annotations as advisory, LLM as skilled operator, engine as deterministic executor. Nothing in this RFC unwinds that.
+- **A concrete inciting use case has sharpened**: single user, two instances side by side — one visualising piano input, one visualising a guitar the user is learning by ear, both driven by the same live LLM control plane. This is one of the founding motivations for the project (learn guitar by ear using the visual system as a bridge from piano) and is the simplest architectural route to it — rather than extending the app to handle multiple inputs, spawn two instances in separate browser tabs. This use case turns "how many instances does the transport support" from a deferred question into a design decision.
 
 ## The gap
 
@@ -125,7 +126,7 @@ synesthetica start --annotations ./custom  # override annotation set
 
 A skill would work — annotations get rendered into a `SKILL.md`, control ops become a tool schema, Claude Code handles the loop. Advantages: simpler to bootstrap (skill is basically prose + a schema), no MCP server to run. Disadvantages: Claude-Code-specific, less discoverable, doesn't showcase the standard integration pattern.
 
-**Skill is a viable fallback if MCP proves too heavy for the value delivered.** Not chosen as primary because portability and standardisation matter for a project meant to illustrate serious craft.
+**Skill is a viable fallback if MCP proves too heavy for the value delivered.**
 
 ## Alternative considered: bespoke WebSocket + hand-rolled protocol
 
@@ -143,7 +144,13 @@ Simplest to build (WebSocket + JSON messages), but reinvents what MCP standardis
 4. **How does the LLM know when to speak vs stay quiet?** SPEC 004's quiet/conversational posture is LLM-side, driven by system prompt. Need to define the trigger — user annotation? Session mode? Rate-limit?
 5. **Macro coverage.** HarmonyGrammar and DynamicsGrammar have no runtime macros. What's the minimum useful macro set to expose? Does this require a grammar refactor?
 6. **Error surfacing.** Control op fails (invalid preset, malformed macro value). MCP returns an error. Does the LLM retry? Ask the user? Give up silently?
-7. **Concurrency.** One MCP client per engine? Multiple? What if two people run `synesthetica start` on the same machine — different ports, or single canonical instance?
+7. **Concurrency between LLM clients.** One MCP client per engine, or multiple simultaneous? If two clients issue conflicting ops (e.g. both call `set_macro` on the same macro concurrently) — last-write-wins, or reject? Probably last-write-wins is fine given the single-user framing.
+
+8. **Single vs multi-instance for a single user** (see §Context bullet on guitar/piano use case). If we support multi-instance:
+   - Each instance needs a distinct MCP server endpoint (or the server needs to address multiple engines). The former is simpler; the latter is more MCP-idiomatic.
+   - The LLM needs to disambiguate targets in each tool call ("set the piano's horizon to 0.5" vs "set the guitar's horizon to 0.5"). Either add an `instance` parameter to every tool, or the LLM connects to N separate MCP servers and picks one per call.
+   - Instance identity: user-supplied labels (`--instance piano`) or auto-assigned (port numbers)? Labels are more legible for the LLM.
+   - State subscription: one state URI per instance, discoverable from a top-level index resource.
 
 ## Preconditions (must be true before implementation begins)
 
@@ -152,6 +159,7 @@ Simplest to build (WebSocket + JSON messages), but reinvents what MCP standardis
 - [ ] HarmonyGrammar + DynamicsGrammar macro coverage decided (either "add macros" refactor scoped, or "start with rhythm only" accepted)
 - [ ] Semantic smoke test (see below) run and passing — annotation model produces coherent LLM behaviour on ~10 test utterances
 - [ ] MCP vs skill decision formalised in a spec
+- [ ] Single vs multi-instance decision formalised in a spec (see §Plan step 5)
 
 ## Plan
 
@@ -167,8 +175,15 @@ Ordered work, with the semantic smoke test as the gate:
    - Evaluate: did it pick sensible ops? Where did it guess? What annotations are missing?
    - **Gate: if the LLM can produce coherent responses for ≥80% of utterances, proceed. If not, redesign the annotation model.**
 4. **MCP vs skill decision.** Now with real evidence from the smoke test, formalise the transport choice.
-5. **SPEC write-up** covering: MCP surface (tools/resources/prompts), annotation storage format, annotation → resource pipeline, CLI shape, state subscription model, error handling, concurrency stance. Also possibly amend SPEC 004 §What This Spec Does NOT Cover.
-6. **Implementation** — first the CLI + MCP server skeleton, then annotation manifest generator, then the control-op receiver in the engine.
+5. **Single vs multi-instance decision.** Guitar/piano side-by-side use case (see §Context) argues for multi-instance from day one. Decide: are we shipping single-instance and deferring multi (simpler now, refactor later), or building the multi-instance model up front (more work now, no refactor)? The decision affects:
+   - CLI shape (`synesthetica start` vs `synesthetica start --instance piano --port ...`)
+   - MCP server topology (one server per engine, or one server routing to multiple engines)
+   - Tool schemas (need `instance` param, or one MCP endpoint per instance)
+   - Annotation manifest (per-instance or shared)
+   - State resource shape (one state URI or per-instance)
+   Recommend the decision be small-scoped and time-boxed — not a full spec, just a design memo.
+6. **SPEC write-up** covering: MCP surface (tools/resources/prompts), annotation storage format, annotation → resource pipeline, CLI shape, state subscription model, error handling, concurrency stance, instance model (per step 5). Also possibly amend SPEC 004 §What This Spec Does NOT Cover.
+7. **Implementation** — first the CLI + MCP server skeleton, then annotation manifest generator, then the control-op receiver in the engine.
 
 ## Next-session pickup
 
@@ -186,4 +201,4 @@ Ordered work, with the semantic smoke test as the gate:
 - Speech-to-text integration — user's responsibility (Claude Code has this, other clients vary)
 - User-created annotations (leave for a later spec)
 - Explanation UI ("why did it change?") — SPEC 004 already lists as out of scope
-- Multi-user / multi-instance orchestration — single-user single-instance to start
+- **Multi-user** orchestration (multiple humans driving the same session) — single-user assumption throughout. Multi-*instance* under a single user is a real design decision (see §Plan step 5) and is NOT a non-goal.
