@@ -874,7 +874,7 @@ export class ThreeJSRenderer implements IRenderer {
         // edge) that holds peak opacity before the fade begins. Sized
         // to match the arc's stroke width so the strip's inner region
         // reads as a continuation of the arc line.
-        plateauFraction: { value: 0.2 },
+        plateauFraction: { value: 0.1 },
       },
       vertexShader: `
         varying vec2 vUv;
