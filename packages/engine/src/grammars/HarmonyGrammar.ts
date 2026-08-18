@@ -336,11 +336,27 @@ const DEFAULT_CONFIG: Required<HarmonyGrammarConfig> = {
  * Purely to smooth the hard cut — not a lingering temporal trace. */
 const CHORD_FADE_OUT_MS = 120;
 
+/** Macro parameters for the grammar. Mirrors RhythmGrammar's pattern
+ *  — grammar-local property names; the mapping from semantic macro
+ *  IDs (e.g. `harmony:linger`) to these fields happens at the
+ *  dispatcher layer. */
+interface HarmonyGrammarMacros {
+  /** Fade window value. Interpretation depends on prescribed tempo:
+   *  - With tempo set: value is in bars (default 3 bars)
+   *  - Without tempo: value is in seconds (default 3 s)
+   *  Matches PROGRESSION_FADE_VALUE's semantic. */
+  linger: number;
+}
+
 export class HarmonyGrammar implements IVisualGrammar {
   readonly id = "harmony-grammar";
 
   private config: Required<HarmonyGrammarConfig>;
   private ctx: GrammarContext | null = null;
+
+  private macros: HarmonyGrammarMacros = {
+    linger: PROGRESSION_FADE_VALUE,
+  };
 
   // Fade-out state: when no chord is active, keep rendering the most
   // recent chord at dropping opacity for CHORD_FADE_OUT_MS.
@@ -359,6 +375,15 @@ export class HarmonyGrammar implements IVisualGrammar {
     this.ctx = null;
     this.fadingChord = null;
     this.fadingChordEndTime = null;
+  }
+
+  /** Set macros. Partial — only supplied fields update. */
+  setMacros(macros: Partial<HarmonyGrammarMacros>): void {
+    this.macros = { ...this.macros, ...macros };
+  }
+
+  getMacros(): HarmonyGrammarMacros {
+    return { ...this.macros };
   }
 
   /**
@@ -474,16 +499,18 @@ export class HarmonyGrammar implements IVisualGrammar {
     }
 
     if (key && progression.length > 0) {
-      // Compute fade window: bars if tempo set, seconds otherwise
+      // Compute fade window: bars if tempo set, seconds otherwise.
+      // Base value from macros.linger (default PROGRESSION_FADE_VALUE).
       const tempo = input.prescribedTempo;
+      const lingerValue = this.macros.linger;
       let fadeMs: number;
       if (tempo !== null) {
         const beatMs = 60000 / tempo;
         const meter = input.prescribedMeter;
         const barMs = beatMs * (meter?.beatsPerBar ?? 4);
-        fadeMs = PROGRESSION_FADE_VALUE * barMs;
+        fadeMs = lingerValue * barMs;
       } else {
-        fadeMs = PROGRESSION_FADE_VALUE * 1000;
+        fadeMs = lingerValue * 1000;
       }
 
       entities.push(

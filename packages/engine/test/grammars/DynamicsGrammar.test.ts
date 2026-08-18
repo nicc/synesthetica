@@ -295,6 +295,36 @@ describe("DynamicsGrammar", () => {
     });
   });
 
+  describe("macros", () => {
+    it("setMacros({ linger }) shortens the fade window — indicators drop out earlier", () => {
+      // Event at t=800, sampled at t=2000 → age=1200 ms.
+      // Default fade is 2000 ms → indicator visible (age < fade).
+      // With linger=500 → indicator hidden (age > fade).
+      const dynamics: DynamicsState = {
+        ...EMPTY_DYNAMICS,
+        events: [{ t: 800, intensity: 0.5 }],
+      };
+      const sample = createTestFrame(2000, dynamics);
+
+      const defaultScene = grammar.update(sample, null);
+      expect(indicators(defaultScene.entities)).toHaveLength(1);
+
+      grammar.setMacros({ linger: 500 });
+      const shortScene = grammar.update(sample, null);
+      expect(indicators(shortScene.entities)).toHaveLength(0);
+    });
+
+    it("setMacros is partial — only supplied fields update", () => {
+      grammar.setMacros({ linger: 1000 });
+      expect(grammar.getMacros().linger).toBe(1000);
+
+      // A second partial set doesn't reset unrelated fields (there
+      // are none right now, but the pattern is what's under test).
+      grammar.setMacros({});
+      expect(grammar.getMacros().linger).toBe(1000);
+    });
+  });
+
   describe("entity IDs", () => {
     it("indicator IDs are index-based and stable for same event set", () => {
       const dynamics: DynamicsState = {

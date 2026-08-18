@@ -198,6 +198,22 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     };
   }
 
+  /**
+   * Update tunable config fields at runtime. Partial — only supplied
+   * fields update; `partId` is fixed and cannot be changed. Serves the
+   * harmony:arpeggio-tolerance, harmony:note-threshold, and
+   * harmony:detection-stability macros.
+   */
+  setConfig(
+    patch: Partial<Pick<ChordDetectionConfig, "pitchDecayMs" | "minPitchClasses" | "hysteresisMs" | "progressionWindowMs">>,
+  ): void {
+    this.config = { ...this.config, ...patch };
+  }
+
+  getConfig(): Required<ChordDetectionConfig> {
+    return { ...this.config };
+  }
+
   init(): void {
     this.pitchClassLastSeen.clear();
     this.displayedChord = null;

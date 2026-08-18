@@ -920,4 +920,54 @@ describe("HarmonyGrammar", () => {
     });
   });
 
+  describe("macros", () => {
+    it("setMacros({ linger }) shortens the progression fade window", () => {
+      // Chord released at t=1000, sampled at t=5000 (age = 4000ms).
+      // Default linger=3 seconds → fade window = 3000ms → past fade,
+      // numeral culled. With linger=6 seconds → fade window = 6000ms →
+      // still within fade, numeral rendered.
+      const buildFrame = (t: number) =>
+        createTestAnnotatedFrame(t, "main", {
+          prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+          harmonicContext: {
+            tension: 0,
+            keyAware: true,
+            currentFunction: null,
+            functionalProgression: [
+              { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 0, releaseTime: 1000 },
+            ],
+          },
+        });
+
+      const grammar2 = new HarmonyGrammar();
+      grammar2.init(ctx);
+
+      // Default: 3 seconds fade, age 4000 ms → past fade → 0 numerals
+      const defaultScene = grammar2.update(buildFrame(5000), null);
+      const defaultProg = defaultScene.entities.filter(
+        (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
+      );
+      expect(defaultProg).toHaveLength(0);
+
+      // Extended: 6 seconds fade → still visible
+      grammar2.setMacros({ linger: 6 });
+      const longScene = grammar2.update(buildFrame(5000), null);
+      const longProg = longScene.entities.filter(
+        (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
+      );
+      expect(longProg).toHaveLength(1);
+    });
+
+    it("getMacros returns current values; setMacros is partial", () => {
+      const grammar2 = new HarmonyGrammar();
+      const before = grammar2.getMacros();
+      grammar2.setMacros({ linger: 8 });
+      expect(grammar2.getMacros().linger).toBe(8);
+      grammar2.setMacros({});
+      expect(grammar2.getMacros().linger).toBe(8);
+      // Verify default matched PROGRESSION_FADE_VALUE (3).
+      expect(before.linger).toBe(3);
+    });
+  });
+
 });

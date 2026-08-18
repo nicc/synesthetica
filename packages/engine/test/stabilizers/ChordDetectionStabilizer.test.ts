@@ -496,4 +496,29 @@ describe("ChordDetectionStabilizer", () => {
       expect(result?.root).toBe(0); // C
     });
   });
+
+  describe("runtime setConfig", () => {
+    it("setConfig({ pitchDecayMs }) changes how long released pitches linger in the pot", () => {
+      const stab = new ChordDetectionStabilizer({ partId: "test-part" });
+      expect(stab.getConfig().pitchDecayMs).toBe(400);
+      stab.setConfig({ pitchDecayMs: 1000 });
+      expect(stab.getConfig().pitchDecayMs).toBe(1000);
+    });
+
+    it("setConfig is partial — unsupplied fields keep their prior value", () => {
+      const stab = new ChordDetectionStabilizer({ partId: "test-part" });
+      stab.setConfig({ pitchDecayMs: 1000, minPitchClasses: 3 });
+      stab.setConfig({ hysteresisMs: 200 }); // only hysteresis
+      const cfg = stab.getConfig();
+      expect(cfg.pitchDecayMs).toBe(1000);
+      expect(cfg.minPitchClasses).toBe(3);
+      expect(cfg.hysteresisMs).toBe(200);
+    });
+
+    it("setConfig cannot change partId (not in the patch type)", () => {
+      const stab = new ChordDetectionStabilizer({ partId: "test-part" });
+      stab.setConfig({ pitchDecayMs: 500 });
+      expect(stab.getConfig().partId).toBe("test-part");
+    });
+  });
 });

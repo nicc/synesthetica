@@ -4,7 +4,8 @@
  * Renders a vertical bar on the left of the screen. Each note onset appears as
  * a horizontal indicator line at the corresponding velocity position (higher =
  * louder). Lines start at an opacity proportional to their velocity and fade
- * uniformly over FADE_MS.
+ * uniformly over a fade window (default 2000 ms; overridable via
+ * the dynamics:linger macro).
  *
  * Entity types:
  * - dynamics-indicator: glyph — horizontal line per note onset, fading over time
@@ -36,8 +37,9 @@ import {
   BAR_HEIGHT,
 } from "./layout";
 
-/** How long indicator lines take to fully fade (ms) */
-const FADE_MS = 2000;
+/** Default fade window for indicator lines (ms). Overridable via
+ *  setMacros({ linger }) to serve the dynamics:linger macro. */
+const DEFAULT_FADE_MS = 2000;
 
 /**
  * Indicator thickness in normalized coords (fraction of BAR_HEIGHT).
@@ -76,8 +78,21 @@ const INDICATOR_COLOR: ColorHSVA = { h: 200, s: 0.5, v: 0.9, a: 1.0 };
 // Grammar Implementation
 // ============================================================================
 
+/** Macro parameters for the grammar. Mirrors RhythmGrammar's pattern
+ *  — grammar-local property names; the mapping from semantic macro
+ *  IDs (e.g. `dynamics:linger`) to these fields happens at the
+ *  dispatcher layer. */
+interface DynamicsGrammarMacros {
+  /** Fade window for indicator lines in ms. */
+  linger: number;
+}
+
 export class DynamicsGrammar implements IVisualGrammar {
   readonly id = "dynamics-grammar";
+
+  private macros: DynamicsGrammarMacros = {
+    linger: DEFAULT_FADE_MS,
+  };
 
   init(_ctx: GrammarContext): void {
     // Stateless — reads events directly each frame
@@ -87,11 +102,21 @@ export class DynamicsGrammar implements IVisualGrammar {
     // No resources to clean up
   }
 
+  /** Set macros. Partial — only supplied fields update. */
+  setMacros(macros: Partial<DynamicsGrammarMacros>): void {
+    this.macros = { ...this.macros, ...macros };
+  }
+
+  getMacros(): DynamicsGrammarMacros {
+    return { ...this.macros };
+  }
+
   update(input: AnnotatedMusicalFrame, _previous: SceneFrame | null): SceneFrame {
     const entities: Entity[] = [];
     const t = input.t;
     const part = input.part;
     const events = input.dynamics.dynamics.events;
+    const fadeMs = this.macros.linger;
 
     // --- Outline (four rect edges — no corner overlap) ---
     const outlineStyle = { color: OUTLINE_COLOR, opacity: OUTLINE_OPACITY };
@@ -144,9 +169,9 @@ export class DynamicsGrammar implements IVisualGrammar {
       const event = events[i];
       const age = t - event.t;
 
-      if (age >= FADE_MS) continue;
+      if (age >= fadeMs) continue;
 
-      const fadeFraction = 1 - age / FADE_MS;
+      const fadeFraction = 1 - age / fadeMs;
       const startOpacity = Math.max(event.intensity, MIN_OPACITY);
       const opacity = startOpacity * fadeFraction;
 
@@ -162,7 +187,7 @@ export class DynamicsGrammar implements IVisualGrammar {
       // so they sit flush with the inner edge of the border without
       // overlapping it (which would brighten the border at indicator
       // positions).
-      const ageFraction = age / FADE_MS;
+      const ageFraction = age / fadeMs;
       const rawHalfH =
         (INDICATOR_THICKNESS_MIN +
           (INDICATOR_THICKNESS_MAX - INDICATOR_THICKNESS_MIN) * ageFraction) /
