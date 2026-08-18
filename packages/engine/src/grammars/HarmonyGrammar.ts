@@ -34,6 +34,7 @@ import type {
   ModeId,
   PitchClass,
   ColorHSVA,
+  PitchHueInvariant,
 } from "@synesthetica/contracts";
 import { pcToHue, MODE_SCALE_INTERVALS } from "@synesthetica/contracts";
 
@@ -222,12 +223,9 @@ const STRIP_STROKE_WIDTH = 1.5;
 /** Opacity of the chord-duration bar behind each glyph */
 const STRIP_BAR_OPACITY = 0.25;
 
-/** Default pitch-hue invariant (A = red, clockwise) */
-const DEFAULT_HUE_INVARIANT = {
-  referencePc: 9 as PitchClass,
-  referenceHue: 0,
-  direction: "cw" as const,
-};
+// Pitch-hue invariant is read from the frame per SPEC 010 —
+// MusicalVisualVocabulary is the single source of truth. See
+// AnnotatedMusicalFrame.hueInvariant.
 
 // ============================================================================
 // Wheel Angle Helper
@@ -496,6 +494,7 @@ export class HarmonyGrammar implements IVisualGrammar {
           key.root,
           key.mode,
           fadeMs,
+          input.hueInvariant,
         ),
       );
       entities.push(
@@ -507,10 +506,11 @@ export class HarmonyGrammar implements IVisualGrammar {
           key.root,
           key.mode,
           fadeMs,
+          input.hueInvariant,
         ),
       );
       entities.push(
-        ...this.createScrollingRomans(progression, t, part),
+        ...this.createScrollingRomans(progression, t, part, input.hueInvariant),
       );
     }
 
@@ -609,6 +609,7 @@ export class HarmonyGrammar implements IVisualGrammar {
     tonicPc: PitchClass,
     mode: ModeId,
     fadeMs: number,
+    hueInvariant: PitchHueInvariant,
   ): Entity[] {
     const entities: Entity[] = [];
     const clockRadius = HARMONY_CELL_SIZE * CLOCK_RADIUS_FRACTION;
@@ -666,7 +667,7 @@ export class HarmonyGrammar implements IVisualGrammar {
         radius * VIEWPORT_ASPECT * Math.sin(angleRad);
 
       // Colour from root pitch class
-      const hue = pcToHue(fc.rootPc, DEFAULT_HUE_INVARIANT);
+      const hue = pcToHue(fc.rootPc, hueInvariant);
       const color: ColorHSVA = { h: hue, s: 0.7, v: 0.9, a: 1 };
 
       // Build glyph geometry
@@ -735,6 +736,7 @@ export class HarmonyGrammar implements IVisualGrammar {
     tonicPc: PitchClass,
     mode: ModeId,
     fadeMs: number,
+    hueInvariant: PitchHueInvariant,
   ): Entity[] {
     if (edges.length === 0) return [];
 
@@ -801,8 +803,8 @@ export class HarmonyGrammar implements IVisualGrammar {
       const targetMidR = arcRingR - stripShift;
       const targetChordR = targetMidR - stripRadialHeight;
 
-      const sourceHue = pcToHue(sourceChord.rootPc, DEFAULT_HUE_INVARIANT);
-      const targetHue = pcToHue(edge.targetPc, DEFAULT_HUE_INVARIANT);
+      const sourceHue = pcToHue(sourceChord.rootPc, hueInvariant);
+      const targetHue = pcToHue(edge.targetPc, hueInvariant);
 
       const sweepDeg = sweepByEdge.get(edge) ?? 0;
       // One base opacity shared by arc and strip.
@@ -1029,6 +1031,7 @@ export class HarmonyGrammar implements IVisualGrammar {
     progression: FunctionalChord[],
     t: number,
     part: string,
+    hueInvariant: PitchHueInvariant,
   ): Entity[] {
     const entities: Entity[] = [];
     const stripX = CHORD_STRIP_CENTER_X;
@@ -1043,7 +1046,7 @@ export class HarmonyGrammar implements IVisualGrammar {
       // Cull if entirely above the visible area (fully scrolled off top)
       if (onsetY < 0 && endY < 0) continue;
 
-      const hue = pcToHue(fc.rootPc, DEFAULT_HUE_INVARIANT);
+      const hue = pcToHue(fc.rootPc, hueInvariant);
       const color: ColorHSVA = { h: hue, s: 0.7, v: 0.9, a: 1 };
 
       // Duration bar: clamp so in-progress chords don't extend into

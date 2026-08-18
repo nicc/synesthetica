@@ -111,6 +111,12 @@ export function createTestAnnotatedFrame(
     prescribedTempo: overrides.prescribedTempo ?? null,
     prescribedMeter: overrides.prescribedMeter ?? null,
     prescribedKey: overrides.prescribedKey ?? null,
+    chordInterpretation: "harmonic",
+    hueInvariant: {
+      referencePc: 9, // A
+      referenceHue: 0, // red
+      direction: "cw",
+    },
     harmonicContext: overrides.harmonicContext ?? { ...EMPTY_HARMONIC_CONTEXT },
     rhythm: {
       analysis: overrides.rhythmicAnalysis ?? { ...EMPTY_RHYTHMIC_ANALYSIS },

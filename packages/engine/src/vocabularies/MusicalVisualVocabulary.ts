@@ -113,6 +113,11 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
       prescribedMeter: frame.prescribedMeter,
       prescribedKey: frame.prescribedKey,
       chordInterpretation: frame.chordInterpretation,
+      hueInvariant: {
+        referencePc: this.config.referencePc,
+        referenceHue: this.config.referenceHue,
+        direction: this.config.hueDirection,
+      },
       harmonicContext: frame.harmonicContext ?? defaultHarmonicContext,
       rhythm: this.annotateRhythm(frame.rhythmicAnalysis),
       bars: [], // No bar detection yet

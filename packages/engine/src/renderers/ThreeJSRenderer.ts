@@ -615,6 +615,16 @@ export class ThreeJSRenderer implements IRenderer {
     // at the guide-ring side (where opacity is highest), so the
     // strip prominently gestures toward the chord that originated
     // the relationship.
+    // plateauFraction is required on connection-strip entity data —
+    // no fallback. The entity contract requires the grammar to supply
+    // it; treating missing as an error surfaces contract drift
+    // immediately rather than silently rendering with a stale default.
+    const plateau = data.plateauFraction as number | undefined;
+    if (plateau === undefined) {
+      throw new Error(
+        `connection-strip entity ${entity.id} missing required plateauFraction`,
+      );
+    }
     this.upsertConnectionStripChild(
       group,
       0,
@@ -625,7 +635,7 @@ export class ThreeJSRenderer implements IRenderer {
       sourceHue,
       targetHue,
       overallOpacity,
-      (data.plateauFraction as number | undefined) ?? 0.2,
+      plateau,
     );
   }
 

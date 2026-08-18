@@ -11,7 +11,7 @@
 
 import type { Ms, Confidence } from "../core/time";
 import type { PartId } from "../parts/parts";
-import type { ColorHSVA } from "../intents/colors";
+import type { ColorHSVA, PitchHueInvariant } from "../intents/colors";
 import type {
   Note,
   NoteId,
@@ -390,6 +390,18 @@ export interface AnnotatedMusicalFrame {
 
   /** Chord interpretation mode — harmonic or bass-led. */
   chordInterpretation: ChordInterpretationMode;
+
+  /**
+   * Pitch-hue invariant applied by the vocabulary. Anchors the
+   * pipeline's colour mapping (which pitch class → which hue,
+   * which direction the wheel rotates). Any grammar that derives
+   * colours from pitch classes (HarmonyGrammar for numerals +
+   * connection strips + scrolling roman-numeral strip) MUST read
+   * this from the frame rather than holding its own copy — one
+   * source of truth per session prevents colour drift between
+   * grammars when the mapping is retuned.
+   */
+  hueInvariant: PitchHueInvariant;
 
   /**
    * Harmonic context including tension analysis.
