@@ -53,7 +53,7 @@ Progression clock:
 
 | Constant | Value | Controls | Impact | Pertinence | Class | Decision |
 |---|---|---|---|---|---|---|
-| `PROGRESSION_FADE_VALUE` | 3 | Fade window (bars if tempo set, seconds otherwise). Governs how long chords linger after release. | ⭐⭐⭐ | 🎵🎵 | dynamics | macro:harmony-linger, macro:time-horizon |
+| `PROGRESSION_FADE_VALUE` | 3 | Fade window (bars if tempo set, seconds otherwise). Governs how long chords linger after release. | ⭐⭐⭐ | 🎵🎵 | dynamics | macro:harmony:linger, macro:time-horizon |
 | `RELEASE_BRIGHTNESS_STEP` | 0.30 | Immediate brightness drop on chord release, before linear fade | ⭐⭐ | 🎵 | cosmetic | internal |
 | `WIDTH_COMPENSATION_EXPONENT` | 1.8 | Non-linear opacity compensation as strokes thicken through the fade | ⭐ | — | cosmetic | internal |
 | `STROKE_WIDTH_FRESH` | 2 | Chord numeral stroke while held or fresh | ⭐ | 🎵 | cosmetic | internal |
