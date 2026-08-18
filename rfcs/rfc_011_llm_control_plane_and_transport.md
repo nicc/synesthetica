@@ -170,8 +170,8 @@ The `session:` and `input:` namespaces likely get **their own MCP tools** (e.g. 
 - `session:tonic` — pitch class 0–11 (nullable — clearing disables key-aware analysis)
 - `session:mode` — ionian/dorian/phrygian/lydian/mixolydian/aeolian/locrian (paired with `session:tonic`)
 - `session:tempo` — BPM (nullable)
-- `session:beats-per-bar` — 1–16 (paired with `session:beat-unit`)
-- `session:beat-unit` — 1–16, typically 4
+- `session:beats-per-bar` — 1–16 (paired with `session:beat-value`)
+- `session:beat-value` — 1–16, typically 4
 - `session:chord-mode` — "harmonic" | "bass-led"
 - `session:metronome` — boolean
 

@@ -228,7 +228,7 @@ These aren't file-level constants — they're runtime values driven by the app's
 | `prescribedKey.mode` | AnnotatedMusicalFrame | Mode for functional analysis | ionian/dorian/phrygian/lydian/mixolydian/aeolian/locrian, nullable | interpretive | session:mode |
 | `prescribedTempo` | AnnotatedMusicalFrame | BPM for grid + bar-based fade windows | positive number, nullable | dynamics | session:tempo |
 | `prescribedMeter.beatsPerBar` | AnnotatedMusicalFrame | Beats per bar | 1–16, nullable | interpretive | session:beats-per-bar |
-| `prescribedMeter.beatUnit` | AnnotatedMusicalFrame | Beat unit (denominator) | 1–16, typically 4, nullable | interpretive | session:beat-unit |
+| `prescribedMeter.beatUnit` | AnnotatedMusicalFrame | Beat unit (denominator) | 1–16, typically 4, nullable | interpretive | session:beat-value |
 | `chordInterpretation` | AnnotatedMusicalFrame | How chord names are read | "harmonic" \| "bass-led" | interpretive | session:chord-mode |
 | Metronome enabled | web-app UI | Metronome audio on/off | boolean | — | session:metronome |
 | MIDI input device | web-app UI | Which MIDI input is active | device name string, or "audio" for mic mode | detection | input:source |
@@ -237,7 +237,7 @@ Notes:
 - These likely get **their own MCP tools** rather than being fanned through `set_macro` — types are precise (enums, positive numbers) rather than 0-1 dials, so a generic macro tool would have to punt on typing. SPEC 004 already anticipates `override_key`, `override_meter`, `override_tempo` as separate tools; the namespace here is for annotations and discoverability, not necessarily for a single tool endpoint.
 - All are **nullable** (clearable). "Clear the key" is a meaningful op — it toggles the pipeline between key-aware and key-agnostic analysis.
 - `session:tonic` + `session:mode` are paired — set/cleared together (a key is a root+mode). The tool signature probably takes both.
-- Same for `session:beats-per-bar` + `session:beat-unit`.
+- Same for `session:beats-per-bar` + `session:beat-value`.
 
 ---
 
