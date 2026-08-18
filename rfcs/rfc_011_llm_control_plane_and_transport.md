@@ -17,7 +17,7 @@ Date: 2026-08-13
 
 Defines the architectural shape of the LLM control plane: how a language model produces control ops that the engine executes. SPEC 004 established the *what* (annotation-driven, LLM interprets, engine executes deterministically) but left the *how* — transport, process boundary, discovery — unspecified.
 
-This RFC proposes an **external-process architecture**: the LLM runs outside the app entirely, communicating with a wrapper CLI that exposes the engine's control surface. **MCP (Model Context Protocol) is the leading candidate for the transport**, chosen preliminarily on portability (any MCP client works), technical fit (tools + resources + subscriptions map cleanly onto control ops + state), and showcase value (illustrates the emerging LLM-integration standard).
+This RFC proposes an **external-process architecture**: the LLM runs outside the app entirely, communicating with a wrapper CLI that exposes the engine's control surface. **MCP (Model Context Protocol) is the leading candidate for the transport**, chosen preliminarily on portability (any MCP client works) and technical fit (tools + resources + subscriptions map cleanly onto control ops + state).
 
 The alternative — a Claude-Code-native skill generated from annotations — is a viable fallback but is Claude-Code-specific and offers less structural leverage.
 
@@ -82,30 +82,69 @@ The user speaks (or types) to any LLM client that supports MCP. The LLM interpre
 Tentative surface (to be finalised in a subsequent SPEC):
 
 **Tools (verbs the LLM can call):**
-- `set_macro` — adjust a macro value
-- `set_grammar_config` — adjust a grammar-scoped constant that we've promoted to a macro
-- `switch_preset` — load a named preset
-- `override_key` / `override_meter` / `override_tempo` — prescribed-context overrides
-- `save_preset` — persist current state as a named preset
+- `set_macro(name, value, instance?)` — adjust any macro (system / cross-grammar / grammar-scoped). Uniform tool for all aesthetic macros; `value` type varies per macro annotation (number, discrete choice).
+- `set_key(root, mode, instance?)` — set the prescribed key. Both null to clear (disables key-aware analysis).
+- `set_tempo(bpm, instance?)` — nullable to clear.
+- `set_meter(beats_per_bar, beat_value, instance?)` — pair; both null to clear.
+- `set_chord_mode(mode, instance?)` — "harmonic" | "bass-led".
+- `set_metronome(enabled, instance?)` — boolean.
+- `set_input(source, instance?)` — MIDI device name | "audio".
+- `set_hue_for_pitch(pc, hue, instance?)` — helper: rotate the wheel so a given pitch class maps to a given hue. Server-side math so the LLM doesn't compute the rotation itself for "make C red"-type requests.
+- `switch_preset(name, instance?)` — load a named preset into the target instance.
+- `save_preset(name, instance?)` — persist current state as a named preset.
+
+Nullable args on `set_*` cover clearing (no separate `clear_*` tools). The `instance` param is optional when only one instance is running (defaults to `default`); required when multiple are.
 
 **Resources (nouns the LLM can read):**
-- `annotations://` — full annotation manifest (grammars, presets, macros) as browsable resources
-- `state://current` — current macro values, active preset, prescribed context — subscribable so the LLM sees updates
-- `state://recent-events` — recent musical activity (notes, chords, tempo estimate) if useful for context-aware decisions
+- `annotations://` — full annotation manifest (grammars, presets, macros, session controls, concepts) as browsable resources.
+- `state://<instance>/current` — current macro values, active preset, prescribed context — subscribable so the LLM sees updates.
+- `state://<instance>/recent-events` — recent musical activity (notes, chords, tempo estimate) for context-aware decisions.
+- `presets://` — available presets (list and preset spec fetch). Presets are shared across instances; load targets one.
+- `instances://` — running instance registry (labels + status). Enables the LLM to enumerate what it can control.
+- `concepts://` — terminology dictionary (see §Annotation types), structured for lookup ("what's a borrowed chord?").
 
 **Prompts (canned LLM behaviour):**
-- `posture://quiet` — system prompt fragment for quiet-performance mode (per SPEC 004)
-- `posture://conversational` — system prompt fragment for conversational mode
+- `posture://quiet` — system prompt fragment for quiet-performance mode (per SPEC 004).
+- `posture://conversational` — system prompt fragment for conversational mode.
+- `guide://system-overview` — prose narrative describing how the pipeline flows, what the visual grammars illustrate, how prescribed context and confidence work. Loaded once as context; not for lookup.
 
 ### Annotation → resource pipeline
 
-Annotations are already defined as data (`GrammarAnnotation`, `PresetAnnotation`, `MacroAnnotation`). A generator converts them into MCP resources on server startup:
+Annotations are defined as data. A generator converts them into MCP resources on server startup:
 
 - Each annotation becomes a discoverable resource with a stable URI
 - MCP client (LLM) can list, read, and cache them
 - Regenerated when annotations change (dev-time; not runtime-hot)
 
-For MCP tools, the annotation manifest also generates the tool schemas — `set_macro`'s `macro` param becomes an enum from the macro annotations, with descriptions pulled from each macro's `directionality`.
+For MCP tools, the annotation manifest also generates the tool schemas — `set_macro`'s `name` param becomes an enum drawn from the macro annotations, with descriptions and value schemas pulled from each entry.
+
+### Annotation types (extensions to SPEC 004)
+
+SPEC 004's annotation model (`GrammarAnnotation`, `PresetAnnotation`, `MacroAnnotation`) assumed all macros are numeric 0–1 dials. The tunables review exposed cases the model doesn't cover: discrete macros (e.g. `rhythm:quantise-resolution` = quarter/8th/16th), compound macros (`rhythm:difficulty` fans to multiple params), session controls (categorically distinct from aesthetic macros), and the terminology dictionary the LLM needs for semantic reasoning.
+
+Extensions this RFC proposes (to land properly in the SPEC write-up at Plan step 7):
+
+**Generalise `MacroAnnotation` with a `type` field:**
+- `type: "continuous"` — the existing shape (range + directionality)
+- `type: "discrete"` — enumerated values with labels (e.g. quarter/8th/16th, with human-readable labels for the LLM)
+- `type: "compound"` — declares the list of underlying targets the macro fans to; per-target dispatch curves are implementation detail (per §Compound-macro dispatch curves — deferred)
+
+**New `SessionControlAnnotation`** for `session:*` and `input:*` controls:
+- id, name, aliases, notes
+- `type`: `"number"` | `"enum"` | `"boolean"` | `"pair"`
+- `range` (for number), `enumValues` (for enum), `pair` (references two other control ids, e.g. `session:tonic` + `session:mode`)
+- `nullable: boolean` — clearing semantics for `set_*(null)`
+
+**New `SystemConceptAnnotation`** — the terminology dictionary:
+- `term`: canonical name (e.g. "borrowed-chord", "modal-interchange", "now-line", "note-strip")
+- `definition`: short prose
+- `related`: cross-links to other concepts
+- `examples`: optional concrete examples
+- Rendered as `concepts://<term>` for LLM lookup
+
+**System guide** (not an annotation type but a documentation artifact) — a prose narrative of the pipeline flow, grammar semantics, prescribed-context meaning, and confidence handling. Loaded as `guide://system-overview` MCP prompt. Structured docs (`SystemConceptAnnotation`) for lookup, prose for narrative — different jobs, different shapes.
+
+Annotation-type extension work tracked as a beads issue (blocks the semantic smoke test — the smoke test needs real annotations to test against, and real annotations need the extended types).
 
 ### What the CLI wrapper does
 
@@ -114,6 +153,7 @@ For MCP tools, the annotation manifest also generates the tool schemas — `set_
 - Bridges control ops from MCP tools to the running engine (WebSocket to the web app, or shared-memory, or in-process depending on how the app is embedded)
 - Exposes engine state upward as MCP resources
 - Handles lifecycle (Ctrl-C, restart, log capture)
+- Saves, stores and loads presets
 
 CLI shape (aspirational):
 
@@ -126,17 +166,24 @@ synesthetica start --annotations ./custom  # override annotation set
 
 Output of the tunables review (see `docs/tunables.md` and synesthetica-2v7). Fills in what SPEC 004 left abstract — the concrete macros the LLM will actually operate on, plus the resolution rules that make multi-macro-touching-same-param behaviour predictable.
 
-### Naming convention (three-tier + session/input)
+### Naming convention
 
 - **`system:*`** — global; applies across all instances of the app (colour mapping, audio detection). Never per-instance.
-- **`session:*`** — per-instance musical-frame settings (key, mode, tempo, meter, chord-interpretation, metronome). These aren't aesthetic macros — they set the frame the analyser reads within. Categorical/enum values, not 0-1 dials.
+- **`session:*`** — per-instance musical-frame settings (key, mode, tempo, meter, chord-interpretation, metronome). Categorical/enum values, not 0–1 dials.
 - **`input:*`** — per-instance input source management (MIDI device / audio).
-- **`<no prefix>`** (bare, e.g. `time:horizon`) — cross-grammar aesthetic macros. Per-instance-tunable.
-- **`<grammar>:*`** (e.g. `rhythm:difficulty`) — grammar-scoped aesthetic macros. Per-instance-tunable.
+- **Bare** (no prefix, e.g. `time-horizon`) — cross-cutting aesthetic macros. Per-instance-tunable.
+- **`<scope>:*`** (e.g. `rhythm:difficulty`, `harmony:linger`) — scope-specific aesthetic macros. Per-instance-tunable.
 
-Delimiter is `:` throughout for uniformity. No `macro:` prefix — the fact that it's a macro is implied by the tool that sets it.
+**Delimiter conventions:**
+- **Colons** separate namespace levels: `system:audio:note-on-threshold`, `session:beats-per-bar`, `rhythm:quantise-resolution`.
+- **Hyphens** within a single name segment: `time-horizon`, `note-on-threshold`, `arpeggio-tolerance`.
+- **Bare names** (no prefix) for cross-cutting macros.
 
-The `session:` and `input:` namespaces likely get **their own MCP tools** (e.g. `override_key(root, mode)`, `override_tempo(bpm)`, `select_input(source)`) rather than being fanned through a generic `set_macro`, because their types are precise (enums, positive numbers) rather than 0-1 dials. The namespace here is for annotations and discoverability. Aesthetic macros go through `set_macro`.
+No `macro:` prefix — the fact that it's a macro is implied by the tool that sets it.
+
+**Scope namespaces (`<scope>:*`) are not coupled to code grammars.** They're semantic groupings. `rhythm:*` today aligns with RhythmGrammar, but nothing requires that — `renderer:ascii`, `overlay:*`, or an as-yet-unnamed concept can occupy their own scope namespace without being a `Grammar` class. The namespace is a bucket for related knobs, not a class name.
+
+The `session:*` and `input:*` namespaces get **their own MCP tools** (`set_key`, `set_tempo`, `set_meter`, `set_chord_mode`, `set_metronome`, `set_input`) rather than being fanned through `set_macro` — their types are precise (enums, paired values, booleans, nullable) rather than 0–1 dials. The namespace here is for annotations and discoverability. Aesthetic macros go through `set_macro`.
 
 ### Macro list (initial set)
 
@@ -150,7 +197,7 @@ The `session:` and `input:` namespaces likely get **their own MCP tools** (e.g. 
 - `system:audio:note-repeat-stability` — minimum onset gap for re-strike vs continuation
 
 **Cross-grammar (bare):**
-- `time:horizon` — fans to RhythmGrammar.horizon + Harmony.PROGRESSION_FADE_VALUE + Dynamics.FADE_MS
+- `time-horizon` — fans to RhythmGrammar.horizon + Harmony.PROGRESSION_FADE_VALUE + Dynamics.FADE_MS
 
 **Rhythm-scoped:**
 - `rhythm:difficulty` — compound; fans to RhythmGrammar.horizon + TIGHT_TOLERANCE_MS
@@ -184,7 +231,7 @@ The `session:` and `input:` namespaces likely get **their own MCP tools** (e.g. 
 
 When multiple macros target the same underlying parameter (or a macro and a direct param-set both do), **whichever operation ran most recently wins**. No accumulation, no multiplicative composition, no priority weights.
 
-**Corollary**: a `set_macro` call is a **one-shot fanout**, not a subscription. After `set_macro("time:horizon", 0.5)`, the params it touched are not "owned" by `time:horizon` — subsequent macro sets or direct param sets overwrite freely. This is what keeps last-write-wins clean. The LLM's system prompt should reflect this so the LLM doesn't reason as if macros hold their values.
+**Corollary**: a `set_macro` call is a **one-shot fanout**, not a subscription. After `set_macro("time-horizon", 0.5)`, the params it touched are not "owned" by `time-horizon` — subsequent macro sets or direct param sets overwrite freely. This is what keeps last-write-wins clean. The LLM's system prompt should reflect this so the LLM doesn't reason as if macros hold their values.
 
 **Why not multiplicative or priority-based**: predictability. Every op is invertible (just set the target back). No hidden state accumulates. The LLM can reason "I set X → the effect is what I set" without tracking a history of composing macros.
 
@@ -198,7 +245,7 @@ Each needs a dispatch curve — how a single 0–1 dial maps to each underlying 
 
 ### Stabilizer-cap validation rule
 
-Linger-style macros (`harmony:linger`, `dynamics:linger`, `time:horizon`, `rhythm:emphasis`) touch grammar-level fade/window constants that sit under stabilizer-level tracking windows (e.g. NoteTrackingStabilizer.releaseWindowMs = 10000ms). If a macro range asks for a linger longer than its stabilizer window can supply, the visual silently clips.
+Linger-style macros (`harmony:linger`, `dynamics:linger`, `time-horizon`, `rhythm:emphasis`) touch grammar-level fade/window constants that sit under stabilizer-level tracking windows (e.g. NoteTrackingStabilizer.releaseWindowMs = 10000ms). If a macro range asks for a linger longer than its stabilizer window can supply, the visual silently clips.
 
 **Rule**: at annotation-writing time, each linger macro's declared range MUST NOT exceed the underlying stabilizer window. Either clamp with a warning, or the macro's annotation says "max ~8s" so the LLM won't request more. Enforced by validation during MCP resource generation.
 
@@ -221,9 +268,40 @@ The tunables review examined and *deliberately kept internal*:
 - `DEFAULT_HUE_INVARIANT` duplicated between HarmonyGrammar and MusicalVisualVocabulary — HarmonyGrammar should read from vocabulary
 - Hidden-param audit — for any renderer fallback default, either grammar always supplies OR the fallback IS the intentional default. Never diverging values on both sides.
 
+## Multi-instance model
+
+Decision: **one LLM controls many synesthetica instances via a single CLI-managed MCP server.** Multiple LLMs concurrently controlling the same instance is explicitly not a supported case.
+
+### Topology
+
+The CLI wrapper hosts one MCP server that aggregates multiple engine instances. The LLM connects to one endpoint and addresses instances by label. This is the MCP-idiomatic option (aggregating server, per-URI scoping) and avoids the LLM having to connect to N separate servers.
+
+### Instance labels
+
+- **First `synesthetica start`** — label defaults to `default`. LLM can omit the `instance` param on any tool call.
+- **Second+ `synesthetica start`** — label REQUIRED (e.g. `synesthetica start --instance piano`). Refuse if omitted with a helpful error message.
+- **User-supplied labels take precedence.** If the first launch specifies `--instance piano`, that becomes the label — no `default` in play.
+- **LLM-side aliasing**: if the user says "call the default one 'piano'" after launch, the LLM tracks it locally. Not the CLI's job.
+
+### Tool signatures
+
+All tools take an optional `instance` parameter. When only one instance is running, it's optional (defaults to the sole instance). When multiple are running, it's required — omitting it returns an error listing the available labels.
+
+### Resources scoped by instance
+
+State is per-instance: `state://default/current`, `state://piano/current`, `state://guitar/recent-events`. Discoverable via the top-level `instances://` resource which lists labels + status. Annotations (`annotations://`) and concepts (`concepts://`) are shared across instances since they describe the system as a whole.
+
+### Presets
+
+Presets are shared across instances (one store, per-user). Loading a preset targets one instance — `switch_preset("jazz-piano", instance="piano")`. Saving captures the current state of the target instance and stores it under a name that any instance can later load.
+
+### Concurrency scope
+
+**Not supported: multiple LLM clients concurrently driving the same instance.** The single-user framing rules out this case. If two clients ever both connect, last-write-wins is the trivial behaviour; no coordination or locking is designed for.
+
 ## Alternative considered: Claude Code skill
 
-A skill would work — annotations get rendered into a `SKILL.md`, control ops become a tool schema, Claude Code handles the loop. Advantages: simpler to bootstrap (skill is basically prose + a schema), no MCP server to run. Disadvantages: Claude-Code-specific, less discoverable, doesn't showcase the standard integration pattern.
+A skill would work — annotations get rendered into a `SKILL.md`, control ops become a tool schema, Claude Code handles the loop. Advantages: simpler to bootstrap (skill is basically prose + a schema), no MCP server to run. Disadvantages: Claude-Code-specific, less discoverable, tied to one client rather than portable across the MCP ecosystem.
 
 **Skill is a viable fallback if MCP proves too heavy for the value delivered.**
 
@@ -243,49 +321,42 @@ Simplest to build (WebSocket + JSON messages), but reinvents what MCP standardis
 4. **How does the LLM know when to speak vs stay quiet?** SPEC 004's quiet/conversational posture is LLM-side, driven by system prompt. Need to define the trigger — user annotation? Session mode? Rate-limit?
 5. **Macro coverage.** HarmonyGrammar and DynamicsGrammar have no runtime macros. What's the minimum useful macro set to expose? Does this require a grammar refactor?
 6. **Error surfacing.** Control op fails (invalid preset, malformed macro value). MCP returns an error. Does the LLM retry? Ask the user? Give up silently?
-7. **Concurrency between LLM clients.** One MCP client per engine, or multiple simultaneous? If two clients issue conflicting ops (e.g. both call `set_macro` on the same macro concurrently) — last-write-wins, or reject? Probably last-write-wins is fine given the single-user framing.
+7. ~~Concurrency between LLM clients~~ — RESOLVED: not supported (see §Multi-instance model, §Concurrency scope).
 
-8. **Single vs multi-instance for a single user** (see §Context bullet on guitar/piano use case). If we support multi-instance:
-   - Each instance needs a distinct MCP server endpoint (or the server needs to address multiple engines). The former is simpler; the latter is more MCP-idiomatic.
-   - The LLM needs to disambiguate targets in each tool call ("set the piano's horizon to 0.5" vs "set the guitar's horizon to 0.5"). Either add an `instance` parameter to every tool, or the LLM connects to N separate MCP servers and picks one per call.
-   - Instance identity: user-supplied labels (`--instance piano`) or auto-assigned (port numbers)? Labels are more legible for the LLM.
-   - State subscription: one state URI per instance, discoverable from a top-level index resource.
+8. ~~Single vs multi-instance~~ — RESOLVED: one LLM controls many instances via a single CLI-managed MCP server; per-instance addressing via labels (see §Multi-instance model).
 
 ## Preconditions (must be true before implementation begins)
 
 - [x] SPEC 004 §I10-I13 invariants confirmed still applicable
 - [x] Tunables reviewed; the "expose vs internal" split is decided (docs/tunables.md — decisions in the Decision column of each table)
 - [x] Macro namespace and resolution semantics defined (see §Macro namespace and semantics)
+- [x] Multi-instance model decided (see §Multi-instance model)
 - [ ] HarmonyGrammar + DynamicsGrammar macro coverage implemented per the macro list (synesthetica-bfb — plumbing to add `setMacros` to those grammars and stabilizer configs)
 - [ ] Cleanup items enacted (see §Cleanup items — plateauFraction dedupe, hue-invariant reconciliation)
+- [ ] Annotation type extensions defined and adopted (see §Annotation types — generalised MacroAnnotation, new SessionControlAnnotation, new SystemConceptAnnotation)
 - [ ] Semantic smoke test (see below) run and passing — annotation model produces coherent LLM behaviour on ~10 test utterances
 - [ ] MCP vs skill decision formalised in a spec
-- [ ] Single vs multi-instance decision formalised in a spec (see §Plan step 5)
 
 ## Plan
 
 Ordered work, with the semantic smoke test as the gate:
 
 1. ~~Re-read context~~ ✓ *(done)*
-2. ~~Tunables review~~ ✓ *(done — see §Macro namespace and semantics for the output)*
-3. **Macro plumbing** (synesthetica-bfb). Add `setMacros` surface to HarmonyGrammar + DynamicsGrammar + relevant stabilizers per the macro list. Also enact §Cleanup items. Enables the smoke test to actually test with the intended macros rather than mocked ones.
-4. **Semantic smoke test** (~2 hrs, expands synesthetica-dib):
-   - Write annotations for a representative slice of the macro list (start with `time:horizon`, `rhythm:difficulty`, `harmony:linger`, `harmony:arpeggio-tolerance`, `system:colour-mapping:reference`)
+2. ~~Tunables review~~ ✓ *(done — see §Macro namespace and semantics)*
+3. ~~Multi-instance decision~~ ✓ *(done — see §Multi-instance model)*
+4. **Annotation type extensions** (new beads issue). Generalise `MacroAnnotation` (add `type` field with continuous / discrete / compound variants), add `SessionControlAnnotation`, add `SystemConceptAnnotation`. Small contract-shape work; blocks step 6 because the smoke test needs the new types to author real annotations.
+5. **Macro plumbing** (synesthetica-bfb). Add `setMacros` surface to HarmonyGrammar + DynamicsGrammar + relevant stabilizers per the macro list. Also enact §Cleanup items. Together with step 4, enables the smoke test to run against real macros with real annotations.
+6. **Semantic smoke test** (~2 hrs, expands synesthetica-dib):
+   - Write annotations for a representative slice of the macro list (start with `time-horizon`, `rhythm:difficulty`, `harmony:linger`, `harmony:arpeggio-tolerance`, `system:colour-mapping:reference`)
+   - Include a few `SystemConceptAnnotation` entries so the LLM has terms to reason from
    - Mock a control-op schema (JSON) — no runtime, just structure
    - Write 8–12 realistic utterances covering the annotated surface
    - Feed utterances + annotation manifest + control-op schema to the LLM in a fresh context, ask it to produce the ops
    - Evaluate: did it pick sensible ops? Where did it guess? What annotations are missing?
    - **Gate: if the LLM can produce coherent responses for ≥80% of utterances, proceed. If not, redesign the annotation model.**
-5. **MCP vs skill decision.** Now with real evidence from the smoke test, formalise the transport choice.
-6. **Single vs multi-instance decision.** Guitar/piano side-by-side use case (see §Context) argues for multi-instance from day one. Decide: are we shipping single-instance and deferring multi (simpler now, refactor later), or building the multi-instance model up front (more work now, no refactor)? The decision affects:
-   - CLI shape (`synesthetica start` vs `synesthetica start --instance piano --port ...`)
-   - MCP server topology (one server per engine, or one server routing to multiple engines)
-   - Tool schemas (need `instance` param, or one MCP endpoint per instance)
-   - Annotation manifest (per-instance or shared)
-   - State resource shape (one state URI or per-instance)
-   Recommend the decision be small-scoped and time-boxed — not a full spec, just a design memo.
-6. **SPEC write-up** covering: MCP surface (tools/resources/prompts), annotation storage format, annotation → resource pipeline, CLI shape, state subscription model, error handling, concurrency stance, instance model (per step 5). Also possibly amend SPEC 004 §What This Spec Does NOT Cover.
-7. **Implementation** — first the CLI + MCP server skeleton, then annotation manifest generator, then the control-op receiver in the engine.
+7. **MCP vs skill decision.** Now with real evidence from the smoke test, formalise the transport choice.
+8. **SPEC write-up** covering: MCP surface (tools/resources/prompts), annotation storage format, annotation → resource pipeline, CLI shape, state subscription model, error handling. Amends SPEC 004 to cover the new annotation types (SessionControlAnnotation, SystemConceptAnnotation, generalised MacroAnnotation).
+9. **Implementation** — first the CLI + MCP server skeleton, then annotation manifest generator, then the control-op receiver in the engine.
 
 ## Next-session pickup
 
