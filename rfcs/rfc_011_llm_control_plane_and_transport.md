@@ -122,6 +122,105 @@ synesthetica start                         # start app + MCP server
 synesthetica start --annotations ./custom  # override annotation set
 ```
 
+## Macro namespace and semantics (from tunables review)
+
+Output of the tunables review (see `docs/tunables.md` and synesthetica-2v7). Fills in what SPEC 004 left abstract — the concrete macros the LLM will actually operate on, plus the resolution rules that make multi-macro-touching-same-param behaviour predictable.
+
+### Naming convention (three-tier + session/input)
+
+- **`system:*`** — global; applies across all instances of the app (colour mapping, audio detection). Never per-instance.
+- **`session:*`** — per-instance musical-frame settings (key, mode, tempo, meter, chord-interpretation, metronome). These aren't aesthetic macros — they set the frame the analyser reads within. Categorical/enum values, not 0-1 dials.
+- **`input:*`** — per-instance input source management (MIDI device / audio).
+- **`<no prefix>`** (bare, e.g. `time:horizon`) — cross-grammar aesthetic macros. Per-instance-tunable.
+- **`<grammar>:*`** (e.g. `rhythm:difficulty`) — grammar-scoped aesthetic macros. Per-instance-tunable.
+
+Delimiter is `:` throughout for uniformity. No `macro:` prefix — the fact that it's a macro is implied by the tool that sets it.
+
+The `session:` and `input:` namespaces likely get **their own MCP tools** (e.g. `override_key(root, mode)`, `override_tempo(bpm)`, `select_input(source)`) rather than being fanned through a generic `set_macro`, because their types are precise (enums, positive numbers) rather than 0-1 dials. The namespace here is for annotations and discoverability. Aesthetic macros go through `set_macro`.
+
+### Macro list (initial set)
+
+**System (global):**
+- `system:colour-mapping:reference` — anchor colour (Vocab.referenceHue + HarmonyGrammar.referenceHue; the two need reconciling — see §Cleanup)
+- `system:colour-mapping:direction` — wheel rotation direction (cw/ccw)
+- `system:audio:note-on-threshold` — Basic Pitch onset confidence gate
+- `system:audio:note-off-threshold` — Basic Pitch frame-presence confidence gate
+- `system:audio:min-note-length` — reject-notes-shorter-than
+- `system:audio:note-off-timeout` — silence gap before emitting note-off
+- `system:audio:note-repeat-stability` — minimum onset gap for re-strike vs continuation
+
+**Cross-grammar (bare):**
+- `time:horizon` — fans to RhythmGrammar.horizon + Harmony.PROGRESSION_FADE_VALUE + Dynamics.FADE_MS
+
+**Rhythm-scoped:**
+- `rhythm:difficulty` — compound; fans to RhythmGrammar.horizon + TIGHT_TOLERANCE_MS
+- `rhythm:quantise-resolution` — subdivisionDepth (quarter/8th/16th)
+- `rhythm:emphasis` — compound; fans to referenceLinger + PULSE_DECAY_MS + PULSE_OPACITY_BOOST + PULSE_VALUE_BOOST
+
+**Harmony-scoped:**
+- `harmony:linger` — Harmony.PROGRESSION_FADE_VALUE
+- `harmony:arpeggio-tolerance` — ChordDetectionStabilizer.pitchDecayMs
+- `harmony:note-threshold` — ChordDetectionStabilizer.minPitchClasses
+- `harmony:detection-stability` — ChordDetectionStabilizer.hysteresisMs
+
+**Dynamics-scoped:**
+- `dynamics:linger` — Dynamics.FADE_MS
+
+**Session (per-instance musical frame — enums/precise types, likely separate MCP tools):**
+- `session:tonic` — pitch class 0–11 (nullable — clearing disables key-aware analysis)
+- `session:mode` — ionian/dorian/phrygian/lydian/mixolydian/aeolian/locrian (paired with `session:tonic`)
+- `session:tempo` — BPM (nullable)
+- `session:beats-per-bar` — 1–16 (paired with `session:beat-unit`)
+- `session:beat-unit` — 1–16, typically 4
+- `session:chord-mode` — "harmonic" | "bass-led"
+- `session:metronome` — boolean
+
+**Input (per-instance input source):**
+- `input:source` — MIDI device name | "audio"
+
+~22 controls total across all namespaces. Three aesthetic parameters (horizon, PROGRESSION_FADE_VALUE, FADE_MS) are touched by more than one macro; see resolution rules below. Session controls don't overlap this way — each maps 1:1 to a `Prescribed*` field.
+
+### Resolution: last-write-wins, macro-set is a one-shot fanout
+
+When multiple macros target the same underlying parameter (or a macro and a direct param-set both do), **whichever operation ran most recently wins**. No accumulation, no multiplicative composition, no priority weights.
+
+**Corollary**: a `set_macro` call is a **one-shot fanout**, not a subscription. After `set_macro("time:horizon", 0.5)`, the params it touched are not "owned" by `time:horizon` — subsequent macro sets or direct param sets overwrite freely. This is what keeps last-write-wins clean. The LLM's system prompt should reflect this so the LLM doesn't reason as if macros hold their values.
+
+**Why not multiplicative or priority-based**: predictability. Every op is invertible (just set the target back). No hidden state accumulates. The LLM can reason "I set X → the effect is what I set" without tracking a history of composing macros.
+
+### Compound-macro dispatch curves — deferred
+
+Two macros are compound (touch multiple params via a single 0–1 dial):
+- `rhythm:difficulty` → 2 params (horizon + TIGHT_TOLERANCE_MS)
+- `rhythm:emphasis` → 4 params (referenceLinger + PULSE_DECAY_MS + PULSE_OPACITY_BOOST + PULSE_VALUE_BOOST)
+
+Each needs a dispatch curve — how a single 0–1 dial maps to each underlying param. Options range from linear to piecewise to non-linear. **Curves deferred to implementation time**, when a concrete grammar and iteration loop are available. Not blocking for design.
+
+### Stabilizer-cap validation rule
+
+Linger-style macros (`harmony:linger`, `dynamics:linger`, `time:horizon`, `rhythm:emphasis`) touch grammar-level fade/window constants that sit under stabilizer-level tracking windows (e.g. NoteTrackingStabilizer.releaseWindowMs = 10000ms). If a macro range asks for a linger longer than its stabilizer window can supply, the visual silently clips.
+
+**Rule**: at annotation-writing time, each linger macro's declared range MUST NOT exceed the underlying stabilizer window. Either clamp with a warning, or the macro's annotation says "max ~8s" so the LLM won't request more. Enforced by validation during MCP resource generation.
+
+### referencePc intentionally internal
+
+Pitch-hue mapping has three legs: `referencePc` (which pitch anchors), `referenceHue` (which colour it anchors on), `direction` (wheel rotation). Two are exposed as macros; `referencePc` is kept internal (fixed at A=9). This isn't a limitation of expressive range — any colour-mapping intent ("make C red") is still achievable by rotating `referenceHue` and `direction` appropriately. The LLM (or a server-side helper tool `set_hue_for_pitch(pc, hue)`) does the math.
+
+Trade-off accepted: keeping only two of the three legs tunable makes the wheel easier to dial in — one less axis to think about. If the LLM-side math proves tedious at implementation time, we can add the helper tool without changing the macro surface.
+
+### Coverage explicitly left internal
+
+The tunables review examined and *deliberately kept internal*:
+- NoteTrackingStabilizer.releaseWindowMs, DynamicsStabilizer.windowMs — structural stabilizer windows; performance parameters, not artistic knobs (they only affect the visual if reduced below the grammar's rendering window, which is a bug not a feature)
+- HarmonyStabilizer theory tables (INTERVAL_DISSONANCE, QUALITY_TENSION, MODAL_INTERCHANGE_MAJOR, SECONDARY_DOMINANT_WEIGHTS, CHAIN_RESOLUTION_WEIGHT) — canon; the theory the system reads by
+- All cosmetic/layout constants (~50 items) — setup-time, not intent-time
+
+### Cleanup items surfaced by the review (tracked as beads)
+
+- `plateauFraction` has two defaults (0.1 in grammar entity, 0.2 in renderer fallback) — reconcile
+- `DEFAULT_HUE_INVARIANT` duplicated between HarmonyGrammar and MusicalVisualVocabulary — HarmonyGrammar should read from vocabulary
+- Hidden-param audit — for any renderer fallback default, either grammar always supplies OR the fallback IS the intentional default. Never diverging values on both sides.
+
 ## Alternative considered: Claude Code skill
 
 A skill would work — annotations get rendered into a `SKILL.md`, control ops become a tool schema, Claude Code handles the loop. Advantages: simpler to bootstrap (skill is basically prose + a schema), no MCP server to run. Disadvantages: Claude-Code-specific, less discoverable, doesn't showcase the standard integration pattern.
@@ -154,9 +253,11 @@ Simplest to build (WebSocket + JSON messages), but reinvents what MCP standardis
 
 ## Preconditions (must be true before implementation begins)
 
-- [ ] SPEC 004 §I10-I13 invariants confirmed still applicable
-- [ ] Tunables reviewed; the "expose vs internal" split is decided (docs/tunables.md as starting point)
-- [ ] HarmonyGrammar + DynamicsGrammar macro coverage decided (either "add macros" refactor scoped, or "start with rhythm only" accepted)
+- [x] SPEC 004 §I10-I13 invariants confirmed still applicable
+- [x] Tunables reviewed; the "expose vs internal" split is decided (docs/tunables.md — decisions in the Decision column of each table)
+- [x] Macro namespace and resolution semantics defined (see §Macro namespace and semantics)
+- [ ] HarmonyGrammar + DynamicsGrammar macro coverage implemented per the macro list (synesthetica-bfb — plumbing to add `setMacros` to those grammars and stabilizer configs)
+- [ ] Cleanup items enacted (see §Cleanup items — plateauFraction dedupe, hue-invariant reconciliation)
 - [ ] Semantic smoke test (see below) run and passing — annotation model produces coherent LLM behaviour on ~10 test utterances
 - [ ] MCP vs skill decision formalised in a spec
 - [ ] Single vs multi-instance decision formalised in a spec (see §Plan step 5)
@@ -165,17 +266,18 @@ Simplest to build (WebSocket + JSON messages), but reinvents what MCP standardis
 
 Ordered work, with the semantic smoke test as the gate:
 
-1. **Re-read context** (docs/tunables.md, this RFC, SPEC 004). Cheap context reload.
-2. **Tunables review** (~1 hr). Walk the tunables doc; for each, decide: expose as macro, expose as advanced/preset-only, keep internal. Output: annotated tunables doc, and a list of "should be a macro but isn't" refactors.
-3. **Semantic smoke test** (~2 hrs, expands synesthetica-dib):
-   - Write annotations for ~4 representative grammars/macros (RhythmGrammar's `horizon` and `subdivisionDepth`, HarmonyGrammar's `PROGRESSION_FADE_VALUE` if promoted, DynamicsGrammar's `FADE_MS` if promoted)
+1. ~~Re-read context~~ ✓ *(done)*
+2. ~~Tunables review~~ ✓ *(done — see §Macro namespace and semantics for the output)*
+3. **Macro plumbing** (synesthetica-bfb). Add `setMacros` surface to HarmonyGrammar + DynamicsGrammar + relevant stabilizers per the macro list. Also enact §Cleanup items. Enables the smoke test to actually test with the intended macros rather than mocked ones.
+4. **Semantic smoke test** (~2 hrs, expands synesthetica-dib):
+   - Write annotations for a representative slice of the macro list (start with `time:horizon`, `rhythm:difficulty`, `harmony:linger`, `harmony:arpeggio-tolerance`, `system:colour-mapping:reference`)
    - Mock a control-op schema (JSON) — no runtime, just structure
    - Write 8–12 realistic utterances covering the annotated surface
    - Feed utterances + annotation manifest + control-op schema to the LLM in a fresh context, ask it to produce the ops
    - Evaluate: did it pick sensible ops? Where did it guess? What annotations are missing?
    - **Gate: if the LLM can produce coherent responses for ≥80% of utterances, proceed. If not, redesign the annotation model.**
-4. **MCP vs skill decision.** Now with real evidence from the smoke test, formalise the transport choice.
-5. **Single vs multi-instance decision.** Guitar/piano side-by-side use case (see §Context) argues for multi-instance from day one. Decide: are we shipping single-instance and deferring multi (simpler now, refactor later), or building the multi-instance model up front (more work now, no refactor)? The decision affects:
+5. **MCP vs skill decision.** Now with real evidence from the smoke test, formalise the transport choice.
+6. **Single vs multi-instance decision.** Guitar/piano side-by-side use case (see §Context) argues for multi-instance from day one. Decide: are we shipping single-instance and deferring multi (simpler now, refactor later), or building the multi-instance model up front (more work now, no refactor)? The decision affects:
    - CLI shape (`synesthetica start` vs `synesthetica start --instance piano --port ...`)
    - MCP server topology (one server per engine, or one server routing to multiple engines)
    - Tool schemas (need `instance` param, or one MCP endpoint per instance)

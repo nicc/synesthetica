@@ -21,9 +21,9 @@ Only RhythmGrammar exposes true macros at the moment. The others are configured 
 
 | Macro | File | Default | Range | Controls | Impact | Pertinence | Class | Decision |
 |---|---|---|---|---|---|---|---|---|
-| `horizon` | RhythmGrammar (state) | 1.0 | 0–1 | Field of vision — how much history/future is visible on the rhythm strip. Lower = tighter, more zoomed-in NOW; higher = more context. | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | macro:time-horizon, macro:rhythm:difficulty |
-| `subdivisionDepth` | RhythmGrammar (state) | "16th" | quarter / 8th / 16th | Grid resolution for drift analysis. Affects reference-line placement and "tight vs drifted" labelling. | ⭐⭐ | 🎵🎵🎵 | interpretive | macro:rhythm:quantise-resolution |
-| `referenceLinger` | RhythmGrammar (state) | 1.3 | multiplier | Reference lines + streaks linger this multiple of the note window. Longer = clearer visual memory of recent timing. | ⭐⭐ | 🎵🎵 | dynamics | macro:rhythm:emphasis |
+| `horizon` | RhythmGrammar (state) | 1.0 | 0–1 | Field of vision — how much history/future is visible on the rhythm strip. Lower = tighter, more zoomed-in NOW; higher = more context. | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | time:horizon, rhythm:difficulty |
+| `subdivisionDepth` | RhythmGrammar (state) | "16th" | quarter / 8th / 16th | Grid resolution for drift analysis. Affects reference-line placement and "tight vs drifted" labelling. | ⭐⭐ | 🎵🎵🎵 | interpretive | rhythm:quantise-resolution |
+| `referenceLinger` | RhythmGrammar (state) | 1.3 | multiplier | Reference lines + streaks linger this multiple of the note window. Longer = clearer visual memory of recent timing. | ⭐⭐ | 🎵🎵 | dynamics | rhythm:emphasis |
 
 ---
 
@@ -36,10 +36,10 @@ Only RhythmGrammar exposes true macros at the moment. The others are configured 
 | `MAX_NOTE_HISTORY_MS` | 8000 | Ceiling on how far back note strips render at max horizon | ⭐⭐ | 🎵🎵 | dynamics | internal |
 | `MIN_NOTE_HISTORY_BEATS` | 1 | Floor on note history at min horizon (in beats — tempo-relative) | ⭐⭐ | 🎵🎵 | dynamics | internal |
 | `DEFAULT_REFERENCE_LINGER_MULTIPLIER` | 1.3 | Default for the `referenceLinger` macro | ⭐⭐ | 🎵🎵 | dynamics | internal |
-| `PULSE_DECAY_MS` | 120 | Exponential decay τ of the NOW-line beat pulse | ⭐⭐ | 🎵🎵 | dynamics | macro:rhythm:emphasis |
-| `PULSE_OPACITY_BOOST` | 0.4 | Peak opacity added to the NOW line on each beat | ⭐⭐ | 🎵🎵 | cosmetic | macro:rhythm:emphasis |
-| `PULSE_VALUE_BOOST` | 0.2 | Peak HSV value added to the NOW line on each beat | ⭐ | 🎵 | cosmetic | macro:rhythm:emphasis |
-| `TIGHT_TOLERANCE_MS` | 30 | Threshold below which a note is "on the grid" (reference line shows) | ⭐⭐ | 🎵🎵🎵 | interpretive | macro:rhythm:difficulty|
+| `PULSE_DECAY_MS` | 120 | Exponential decay τ of the NOW-line beat pulse | ⭐⭐ | 🎵🎵 | dynamics | rhythm:emphasis |
+| `PULSE_OPACITY_BOOST` | 0.4 | Peak opacity added to the NOW line on each beat | ⭐⭐ | 🎵🎵 | cosmetic | rhythm:emphasis |
+| `PULSE_VALUE_BOOST` | 0.2 | Peak HSV value added to the NOW line on each beat | ⭐ | 🎵 | cosmetic | rhythm:emphasis |
+| `TIGHT_TOLERANCE_MS` | 30 | Threshold below which a note is "on the grid" (reference line shows) | ⭐⭐ | 🎵🎵🎵 | interpretive | rhythm:difficulty|
 | `STREAK_COUNT` | 3 | Number of streak lines per note | ⭐ | 🎵 | cosmetic | internal |
 | `MIN_NOTE_STRIP_HEIGHT` | 0.008 | Floor on rendered note height (short notes stay visible) | ⭐ | 🎵 | layout | internal |
 | `GRID_COLORS.beatLine` | `{h:200,s:0.2,v:0.5,a:0.4}` | Beat grid line colour | ⭐ | 🎵 | cosmetic | internal |
@@ -53,7 +53,7 @@ Progression clock:
 
 | Constant | Value | Controls | Impact | Pertinence | Class | Decision |
 |---|---|---|---|---|---|---|
-| `PROGRESSION_FADE_VALUE` | 3 | Fade window (bars if tempo set, seconds otherwise). Governs how long chords linger after release. | ⭐⭐⭐ | 🎵🎵 | dynamics | macro:harmony:linger, macro:time-horizon |
+| `PROGRESSION_FADE_VALUE` | 3 | Fade window (bars if tempo set, seconds otherwise). Governs how long chords linger after release. | ⭐⭐⭐ | 🎵🎵 | dynamics | harmony:linger, time:horizon |
 | `RELEASE_BRIGHTNESS_STEP` | 0.30 | Immediate brightness drop on chord release, before linear fade | ⭐⭐ | 🎵 | cosmetic | internal |
 | `WIDTH_COMPENSATION_EXPONENT` | 1.8 | Non-linear opacity compensation as strokes thicken through the fade | ⭐ | — | cosmetic | internal |
 | `STROKE_WIDTH_FRESH` | 2 | Chord numeral stroke while held or fresh | ⭐ | 🎵 | cosmetic | internal |
@@ -98,7 +98,7 @@ Scrolling chord strip (mini roman numerals on rhythm timeline):
 
 | Constant | Value | Controls | Impact | Pertinence | Class | Decision |
 |---|---|---|---|---|---|---|
-| `FADE_MS` | 2000 | Fade window for velocity indicator dots | ⭐⭐ | 🎵🎵 | dynamics | macro:time-horizon, macro:dynamics:linger |
+| `FADE_MS` | 2000 | Fade window for velocity indicator dots | ⭐⭐ | 🎵🎵 | dynamics | time:horizon, dynamics:linger |
 | `INDICATOR_THICKNESS_MIN` | 0.003 | Thickness at min velocity | ⭐ | 🎵 | cosmetic | internal |
 | `INDICATOR_THICKNESS_MAX` | 0.012 | Thickness at max velocity | ⭐⭐ | 🎵🎵 | cosmetic | internal |
 | `MIN_OPACITY` | 0.25 | Floor opacity so faint hits stay visible | ⭐ | 🎵 | cosmetic | internal |
@@ -171,9 +171,9 @@ Constructor-configurable. Currently no runtime tuning surface but each has a def
 
 | Field | Default | Controls | Impact | Pertinence | Class | Decision |
 |---|---|---|---|---|---|---|
-| `pitchDecayMs` | 400 | How long a released pitch stays "in the pot" for chord inference | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | macro:harmony:arpeggio-tolerance |
-| `minPitchClasses` | 2 | Minimum unique pitches to attempt chord inference | ⭐⭐ | 🎵🎵 | interpretive | macro:harmony:note-threshold |
-| `hysteresisMs` | 50 | Minimum time before switching detected chord (prevents flicker) | ⭐⭐ | 🎵🎵 | interpretive | macro:harmony:detection-stability |
+| `pitchDecayMs` | 400 | How long a released pitch stays "in the pot" for chord inference | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | harmony:arpeggio-tolerance |
+| `minPitchClasses` | 2 | Minimum unique pitches to attempt chord inference | ⭐⭐ | 🎵🎵 | interpretive | harmony:note-threshold |
+| `hysteresisMs` | 50 | Minimum time before switching detected chord (prevents flicker) | ⭐⭐ | 🎵🎵 | interpretive | harmony:detection-stability |
 | `progressionWindowMs` | 60000 | Rolling window of chord progression history | ⭐ | 🎵 | dynamics | internal |
 
 ### DynamicsStabilizer
@@ -213,6 +213,31 @@ Constructor-configurable. Currently no runtime tuning surface but each has a def
 | `DEFAULT_NOTE_OFF_TIMEOUT_MS` | 160 | Silence gap before emitting note-off | ⭐⭐⭐ | 🎵🎵🎵 | detection |system:audio:note-off-timeout |
 | `DEFAULT_FRESH_ONSET_MAX_AGE_MS` | 300 | Max onset age for emitting a fresh note-on (kills retroactive markers) | ⭐⭐⭐ | 🎵🎵 | detection | internal |
 | `DEFAULT_RESTRIKE_GAP_MS` | 120 | Minimum onset gap to classify as re-strike vs continuation | ⭐⭐⭐ | 🎵🎵🎵 | detection | system:audio:note-repeat-stability |
+
+---
+
+## Session / UI controls (added after review — these need LLM control too)
+
+These aren't file-level constants — they're runtime values driven by the app's UI, held in the pipeline as prescribed context. LLM-mediation needs to set these the same way it sets macros. Distinct from aesthetic macros because they set the **musical frame** the analyser reads within (categorical values, not 0-1 dials).
+
+**Proposed namespace: `session:*`** (per-instance, describes the musical situation the app is set up for) and **`input:*`** (input source management).
+
+| Field | Location | Controls | Range | Class | Decision |
+|---|---|---|---|---|---|
+| `prescribedKey.root` | AnnotatedMusicalFrame | Tonic pitch class for functional analysis | 0–11 (or note name), nullable | interpretive | session:tonic |
+| `prescribedKey.mode` | AnnotatedMusicalFrame | Mode for functional analysis | ionian/dorian/phrygian/lydian/mixolydian/aeolian/locrian, nullable | interpretive | session:mode |
+| `prescribedTempo` | AnnotatedMusicalFrame | BPM for grid + bar-based fade windows | positive number, nullable | dynamics | session:tempo |
+| `prescribedMeter.beatsPerBar` | AnnotatedMusicalFrame | Beats per bar | 1–16, nullable | interpretive | session:beats-per-bar |
+| `prescribedMeter.beatUnit` | AnnotatedMusicalFrame | Beat unit (denominator) | 1–16, typically 4, nullable | interpretive | session:beat-unit |
+| `chordInterpretation` | AnnotatedMusicalFrame | How chord names are read | "harmonic" \| "bass-led" | interpretive | session:chord-mode |
+| Metronome enabled | web-app UI | Metronome audio on/off | boolean | — | session:metronome |
+| MIDI input device | web-app UI | Which MIDI input is active | device name string, or "audio" for mic mode | detection | input:source |
+
+Notes:
+- These likely get **their own MCP tools** rather than being fanned through `set_macro` — types are precise (enums, positive numbers) rather than 0-1 dials, so a generic macro tool would have to punt on typing. SPEC 004 already anticipates `override_key`, `override_meter`, `override_tempo` as separate tools; the namespace here is for annotations and discoverability, not necessarily for a single tool endpoint.
+- All are **nullable** (clearable). "Clear the key" is a meaningful op — it toggles the pipeline between key-aware and key-agnostic analysis.
+- `session:tonic` + `session:mode` are paired — set/cleared together (a key is a root+mode). The tool signature probably takes both.
+- Same for `session:beats-per-bar` + `session:beat-unit`.
 
 ---
 
