@@ -11,7 +11,8 @@
     "clean": "npm run clean -ws",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "dev": "npm run build -w @synesthetica/contracts -w @synesthetica/adapters -w @synesthetica/engine && npm run dev:chrome -w @synesthetica/web-app"
+    "dev": "npm run build -w @synesthetica/contracts -w @synesthetica/adapters -w @synesthetica/engine && npm run dev:chrome -w @synesthetica/web-app",
+    "smoke:regen": "node --experimental-strip-types docs/smoke-test/generate-manifest.mjs"
   },
   "devDependencies": {
     "@types/webmidi": "^2.1.0",
