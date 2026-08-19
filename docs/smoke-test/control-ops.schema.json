@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synesthetica/smoke-test/control-ops.schema.json",
+  "title": "Synesthetica Control Ops (smoke-test schema)",
+  "description": "JSON Schema for the MCP tools proposed in RFC 011 §What the MCP server exposes. Represents what the LLM emits during the semantic smoke test — no runtime, just the shape the LLM is asked to produce. Nic will edit this alongside annotations.ts.",
+
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/SetMacro" },
+    { "$ref": "#/$defs/SetKey" },
+    { "$ref": "#/$defs/SetTempo" },
+    { "$ref": "#/$defs/SetMeter" },
+    { "$ref": "#/$defs/SetChordMode" },
+    { "$ref": "#/$defs/SetMetronome" },
+    { "$ref": "#/$defs/SetInput" },
+    { "$ref": "#/$defs/SetHueForPitch" },
+    { "$ref": "#/$defs/SwitchPreset" },
+    { "$ref": "#/$defs/SavePreset" }
+  ],
+
+  "$defs": {
+
+    "InstanceRef": {
+      "type": "string",
+      "description": "Instance label. Optional when only one instance is running (defaults to 'default'). Required when multiple.",
+      "examples": ["default", "piano", "guitar"]
+    },
+
+    "SetMacro": {
+      "type": "object",
+      "description": "Set an aesthetic macro (system:*, cross-cutting, or <scope>:*). Value type varies per macro annotation — number for continuous, string/number enum for discrete, number 0..1 for compound.",
+      "properties": {
+        "tool": { "const": "set_macro" },
+        "name": {
+          "type": "string",
+          "description": "Macro id, drawn from the macro annotations manifest.",
+          "examples": [
+            "harmony:linger",
+            "rhythm:difficulty",
+            "rhythm:quantise-resolution",
+            "time-horizon",
+            "system:colour-mapping:reference"
+          ]
+        },
+        "value": {
+          "description": "Value to set. Shape depends on the macro's type: number for continuous / compound, string or number for discrete. Consult the macro's annotation for expected type and range.",
+          "oneOf": [
+            { "type": "number" },
+            { "type": "string" }
+          ]
+        },
+        "instance": { "$ref": "#/$defs/InstanceRef" }
+      },
+      "required": ["tool", "name", "value"],
+      "additionalProperties": false
+    },
+
+    "SetKey": {
+      "type": "object",
+      "description": "Set the prescribed key (tonic + mode paired). Pass both null to clear (disables key-aware analysis).",
+      "properties": {
+        "tool": { "const": "set_key" },
+        "root": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 11,
+          "description": "Tonic pitch class (0 = C, 1 = C♯/D♭, ..., 11 = B). Null to clear."
+        },
+        "mode": {
+          "type": ["string", "null"],
+          "enum": ["ionian", "dorian", "phrygian", "lydian", "mixolydian", "aeolian", "locrian", null],
+          "description": "Mode. Null to clear."
+        },
+        "instance": { "$ref": "#/$defs/InstanceRef" }
+      },
+      "required": ["tool", "root", "mode"],
+      "additionalProperties": false
+    },
+
+    "SetTempo": {
+      "type": "object",
+      "description": "Set the prescribed tempo. Null clears (falls back to seconds-based windows).",
+      "properties": {
+        "tool": { "const": "set_tempo" },
+        "bpm": {
+          "type": ["number", "null"],
+          "minimum": 30,
+          "maximum": 240
+        },
+        "instance": { "$ref": "#/$defs/InstanceRef" }
+      },
+      "required": ["tool", "bpm"],
+      "additionalProperties": false
+    },
+
+    "SetMeter": {
+      "type": "object",
+      "description": "Set the prescribed meter (paired). Pass both null to clear.",
+      "properties": {
+        "tool": { "const": "set_meter" },
+        "beats_per_bar": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 16
+        },
+        "beat_value": {
+          "type": ["integer", "null"],
+          "enum": [1, 2, 4, 8, 16, null],
+          "description": "Note value that gets one beat (denominator of the time signature)."
+        },
+        "instance": { "$ref": "#/$defs/InstanceRef" }
+      },
+      "required": ["tool", "beats_per_bar", "beat_value"],
+      "additionalProperties": false
+    },
+
+    "SetChordMode": {
+      "type": "object",
+      "description": "Set how chord names are read.",
+      "properties": {
+        "tool": { "const": "set_chord_mode" },
+        "mode": {
+          "type": "string",
+          "enum": ["harmonic", "bass-led"]
+        },
+        "instance": { "$ref": "#/$defs/InstanceRef" }
+      },
+      "required": ["tool", "mode"],
+      "additionalProperties": false
+    },
+
+    "SetMetronome": {
+      "type": "object",
+      "description": "Enable or disable metronome audio.",
+      "properties": {
+        "tool": { "const": "set_metronome" },
+        "enabled": { "type": "boolean" },
+        "instance": { "$ref": "#/$defs/InstanceRef" }
+      },
+      "required": ["tool", "enabled"],
+      "additionalProperties": false
+    },
+
+    "SetInput": {
+      "type": "object",
+      "description": "Choose the input source for this instance.",
+      "properties": {
+        "tool": { "const": "set_input" },
+        "source": {
+          "type": "string",
+          "description": "MIDI device name (as reported by the browser MIDI API) or the literal 'audio' for microphone input."
+        },
+        "instance": { "$ref": "#/$defs/InstanceRef" }
+      },
+      "required": ["tool", "source"],
+      "additionalProperties": false
+    },
+
+    "SetHueForPitch": {
+      "type": "object",
+      "description": "Helper — rotate the colour wheel so a given pitch class maps to a given hue. Server-side math; means the LLM doesn't have to compute the rotation for 'make C red'-type requests. Adjusts system:colour-mapping:reference and system:colour-mapping:direction as needed.",
+      "properties": {
+        "tool": { "const": "set_hue_for_pitch" },
+        "pc": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 11,
+          "description": "Pitch class (0 = C)."
+        },
+        "hue": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 360,
+          "description": "Target hue in degrees."
+        },
+        "instance": { "$ref": "#/$defs/InstanceRef" }
+      },
+      "required": ["tool", "pc", "hue"],
+      "additionalProperties": false
+    },
+
+    "SwitchPreset": {
+      "type": "object",
+      "description": "Load a named preset into the target instance.",
+      "properties": {
+        "tool": { "const": "switch_preset" },
+        "name": { "type": "string" },
+        "instance": { "$ref": "#/$defs/InstanceRef" }
+      },
+      "required": ["tool", "name"],
+      "additionalProperties": false
+    },
+
+    "SavePreset": {
+      "type": "object",
+      "description": "Save the current state of the target instance as a named preset.",
+      "properties": {
+        "tool": { "const": "save_preset" },
+        "name": { "type": "string" },
+        "instance": { "$ref": "#/$defs/InstanceRef" }
+      },
+      "required": ["tool", "name"],
+      "additionalProperties": false
+    }
+
+  }
+}
