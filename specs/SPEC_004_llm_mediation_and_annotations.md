@@ -1,8 +1,8 @@
 # SPEC 004: LLM Mediation and Annotation Strategy
 
 Status: Approved
-Date: 2026-01-16
-Source: RFC 004
+Date: 2026-01-16 (amended 2026-08-19 — see §Amendments below)
+Source: RFC 004; extended by RFC 011 (annotation type generalisation, session controls, concepts)
 
 ## Summary
 
@@ -383,14 +383,37 @@ The LLM may balance competing concerns (I13), but cannot bypass constraints.
 Types defined in `packages/contracts/annotations/annotations.ts`:
 - `GrammarAnnotation`
 - `PresetAnnotation`
-- `MacroAnnotation`
+- `MacroAnnotation` (discriminated union — see §Amendments)
 - `MacroDirectionality`
 - `MusicalConcept`
 - `VisualTrait`
+- `SessionControlAnnotation` (added 2026-08-19)
+- `SystemConceptAnnotation` (added 2026-08-19)
 
 ## What This Spec Does NOT Cover
 
-- LLM prompt design (implementation-specific)
-- Annotation storage format (YAML, JSON, embedded in code)
+- LLM prompt design (implementation-specific — but see SPEC 013 §Prompts for the MCP-hosted quiet/conversational and system-guide prompts)
+- ~~Annotation storage format~~ (decided in SPEC 013 §Annotation Storage — embedded TS objects, single canonical file)
 - User-created preset annotation requirements
 - Explanation generation ("why did it change?")
+- Runtime transport and process boundaries (covered in SPEC 013)
+
+## Amendments
+
+### 2026-08-19 — Annotation type extensions (per RFC 011)
+
+The original `MacroAnnotation` shape assumed a numeric 0–1 dial with directionality. The tunables review and semantic smoke test surfaced cases the original shape didn't cover: discrete macros (enum values), compound macros (one dial fans to N params), session controls (categorically distinct from aesthetic macros), and a terminology dictionary the LLM needs to reason coherently.
+
+**`MacroAnnotation` is now a discriminated union** on a `type` field:
+
+- `type: "continuous"` — the original shape (range + directionality)
+- `type: "discrete"` — `enumValues: {value, label}[]`, no directionality
+- `type: "compound"` — declares underlying `targets: string[]` that a single dial fans to; dispatcher owns the per-target curves
+
+**`SessionControlAnnotation` (new)** — describes per-instance controls that set the musical frame the analyser reads within (session:tonic, session:mode, session:tempo, session:meter, session:chord-mode, session:metronome, input:source). Categorically distinct from macros: enums, pairs, booleans, nullable numbers rather than 0–1 dials. Discriminated on `type: "number" | "enum" | "boolean" | "pair"`. Nullable flag governs clearing semantics.
+
+**`SystemConceptAnnotation` (new)** — terminology dictionary. Kebab-case `term`, short prose `definition`, `related` cross-links, optional `examples`. Rendered as `concepts://<term>` MCP resources per SPEC 013.
+
+**System guide** (documentation artifact, not an annotation type) — a prose narrative of the pipeline flow, grammar semantics, prescribed-context meaning, and confidence handling. Loaded as `guide://system-overview` MCP prompt per SPEC 013. Structured lookup (concepts) and prose narrative (guide) serve different LLM needs.
+
+Refer to SPEC 013 for how these annotation types are delivered to the LLM (resource URIs, generator model, refresh semantics).
