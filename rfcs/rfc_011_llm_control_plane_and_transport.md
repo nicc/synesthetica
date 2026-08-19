@@ -1,8 +1,8 @@
 # RFC 0011: LLM Control Plane and Transport Architecture
 
-Status: Draft (in-progress; pickup planned next session)
+Status: Approved (transport decision landed 2026-08-19; awaiting SPEC write-up)
 Author(s): Synesthetica
-Date: 2026-08-13
+Date: 2026-08-13 (last amended 2026-08-19)
 
 ### Related
 
@@ -17,9 +17,9 @@ Date: 2026-08-13
 
 Defines the architectural shape of the LLM control plane: how a language model produces control ops that the engine executes. SPEC 004 established the *what* (annotation-driven, LLM interprets, engine executes deterministically) but left the *how* — transport, process boundary, discovery — unspecified.
 
-This RFC proposes an **external-process architecture**: the LLM runs outside the app entirely, communicating with a wrapper CLI that exposes the engine's control surface. **MCP (Model Context Protocol) is the leading candidate for the transport**, chosen preliminarily on portability (any MCP client works) and technical fit (tools + resources + subscriptions map cleanly onto control ops + state).
+This RFC establishes an **external-process architecture**: the LLM runs outside the app entirely, communicating with a wrapper CLI that exposes the engine's control surface. **MCP (Model Context Protocol) is the transport** (decided 2026-08-19), chosen on portability (any MCP client works) and technical fit (tools + resources + subscriptions map cleanly onto control ops + state).
 
-The alternative — a Claude-Code-native skill generated from annotations — is a viable fallback but is Claude-Code-specific and offers less structural leverage.
+The alternative — a Claude-Code-native skill generated from annotations — was considered and rejected as the primary path, retained as a fallback if MCP setup proves too heavy in practice. See §Alternative considered: Claude Code skill.
 
 ## Context: what changed since RFC 004
 
@@ -334,9 +334,16 @@ A skill would work — annotations get rendered into a `SKILL.md`, control ops b
 
 Simplest to build (WebSocket + JSON messages), but reinvents what MCP standardises. Rejected on grounds of "why write our own version of a well-designed standard."
 
-## Recommendation
+## Decision
 
-**MCP, provisionally.** Formal decision deferred until after the semantic smoke test (see Plan below) and one more considered pass on complexity budget.
+**MCP.** Confirmed 2026-08-19 after smoke test passed. Reasoning:
+
+- **Portability across LLM clients.** Any MCP-capable client works (Claude Desktop, Claude Code, other MCP clients as they emerge). Skill would tie us to Claude Code.
+- **Multi-instance model relies on resource URIs.** The guitar/piano side-by-side use case (§Multi-instance model) leans naturally on `instances://` + per-instance `state://<label>/*` — MCP-native. Skill would need bespoke labelling.
+- **Annotation → resource pipeline is already close to what SPEC 004 commits to.** Building it as MCP resources vs. a `SKILL.md` is comparable work; MCP output is more reusable.
+- **State subscription** (subscribable `state://<instance>/current`) is idiomatic in MCP, not in a skill.
+
+Trade-off accepted: **more setup work up front** (server, tool registration, resource generator, subscription plumbing) in exchange for the above. Skill remains a documented fallback if MCP setup proves disproportionate to the value.
 
 ## Open questions
 
@@ -360,7 +367,7 @@ Simplest to build (WebSocket + JSON messages), but reinvents what MCP standardis
 - [x] Cleanup items enacted (plateauFraction dedupe: synesthetica-2bn; hue-invariant reconciliation: synesthetica-65y)
 - [x] Annotation type extensions defined and adopted (synesthetica-2ol — generalised MacroAnnotation, new SessionControlAnnotation, new SystemConceptAnnotation)
 - [x] Semantic smoke test run and passing — synesthetica-dib closed 2026-08-19; 11/11 utterances coherent, model works; see §Smoke test findings
-- [ ] MCP vs skill decision formalised in a spec
+- [x] MCP vs skill decision made (2026-08-19 — MCP; see §Decision). SPEC write-up pending as its own step.
 
 ## Plan
 
@@ -372,19 +379,20 @@ Ordered work, with the semantic smoke test as the gate:
 4. **Annotation type extensions** (new beads issue). Generalise `MacroAnnotation` (add `type` field with continuous / discrete / compound variants), add `SessionControlAnnotation`, add `SystemConceptAnnotation`. Small contract-shape work; blocks step 6 because the smoke test needs the new types to author real annotations.
 5. **Macro plumbing** (synesthetica-bfb). Add `setMacros` surface to HarmonyGrammar + DynamicsGrammar + relevant stabilizers per the macro list. Also enact §Cleanup items. Together with step 4, enables the smoke test to run against real macros with real annotations.
 6. ~~Semantic smoke test~~ ✓ *(done 2026-08-19 — gate PASSED; see §Smoke test findings)*
-7. **MCP vs skill decision** (next). With smoke-test evidence that the annotation model works transport-agnostically, formalise the transport choice. Alternatives considered are documented below; RFC 011 preliminarily recommends MCP. This step is where that becomes a formal decision, either confirming MCP or moving to the skill fallback with recorded reasoning.
-8. **SPEC write-up** covering: MCP surface (tools/resources/prompts), annotation storage format, annotation → resource pipeline, CLI shape, state subscription model, error handling. Amends SPEC 004 to cover the new annotation types (SessionControlAnnotation, SystemConceptAnnotation, generalised MacroAnnotation).
-9. **Implementation** — first the CLI + MCP server skeleton, then annotation manifest generator, then the control-op receiver in the engine.
+7. ~~MCP vs skill decision~~ ✓ *(done 2026-08-19 — MCP; see §Decision)*
+8. **SPEC write-up** (next). New SPEC covering: MCP surface (tools/resources/prompts) in full detail, annotation storage format, annotation → resource pipeline (generator, URI structure, refresh model), CLI shape and lifecycle, state subscription protocol, error surfacing, multi-instance routing, concurrency stance. Amends SPEC 004 to cover the extended annotation types (SessionControlAnnotation, SystemConceptAnnotation, generalised MacroAnnotation).
+9. **Implementation** — first the CLI + MCP server skeleton, then annotation manifest generator, then the control-op receiver in the engine, then per-tool wiring against the existing grammar/stabilizer setters (already landed in Tier 1 of synesthetica-bfb).
 
 ## Next-session pickup
 
 **Everything above is a breadcrumb. If we're picking this up cold:**
 
-- Read this RFC first (context)
+- Read this RFC first (context — decision framing)
+- Read SPEC 004 (annotation contract this builds on)
 - Read docs/tunables.md (what we can control)
-- Read SPEC 004 (why we're doing it this way)
-- The smoke test has PASSED. Next work is Plan step 7 (MCP vs skill decision), then the SPEC write-up, then implementation.
-- Nic's lean is toward MCP but was formally undecided when we wrote this. Confirm with him before treating MCP as final.
+- **The design decisions are done.** Transport = MCP. Multi-instance model = decided. Macro namespace + semantics = defined. Smoke test passed.
+- **Next work is the SPEC write-up** (Plan step 8). It should be new (probably SPEC 013 or similar; check the numbering), amending SPEC 004 for the annotation type changes rather than duplicating.
+- After SPEC lands, implementation is a series of concrete pieces (CLI + MCP server skeleton → annotation manifest generator → control-op receiver → per-tool wiring).
 
 ## Non-goals
 
