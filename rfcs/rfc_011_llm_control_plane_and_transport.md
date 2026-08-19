@@ -299,6 +299,31 @@ Presets are shared across instances (one store, per-user). Loading a preset targ
 
 **Not supported: multiple LLM clients concurrently driving the same instance.** The single-user framing rules out this case. If two clients ever both connect, last-write-wins is the trivial behaviour; no coordination or locking is designed for.
 
+## Smoke test findings
+
+Semantic smoke test ran 2026-08-19 (synesthetica-dib closed). 11 realistic utterances covering key/tempo/meter prescription, macro adjustments (relative and absolute), colour-mapping, discrete enums, informational queries, and one intentionally-underserved request.
+
+**Gate outcome: PASSED cleanly.** 11/11 utterances handled coherently (counting "correctly declined with reasoning" as coherent — that's the intended posture, not a miss). Zero hallucinated tools, zero force-fit ops. The LLM correctly identified where the annotation set had gaps and named them rather than papering over.
+
+### What the smoke test validated
+
+- **Annotation model works.** Discriminated MacroAnnotation shape (continuous / discrete / compound) is legible to the LLM without additional prompting.
+- **SystemConceptAnnotation is load-bearing.** Informational queries ("what is the clock thing?") produced good prose without a dedicated explain tool — the LLM assembled from concept entries.
+- **`set_hue_for_pitch` helper was used unprompted on first attempt.** Justifies its inclusion.
+- **Aliases matched natural phrasing** — "chord fade" → `harmony:linger`, "strictness" → `rhythm:difficulty`, "look-back" → `time-horizon`.
+- **`session:beat-value` rename didn't confuse.** LLM emitted `beat_value: 4` correctly for "3/4".
+- **Conversational posture worked.** LLM declined "emphasise rhythm" (utterance 9) with a clean explanation of what was missing, rather than force-fitting an unrelated op.
+
+### Gaps surfaced
+
+1. **No annotated defaults + no readback in the smoke test.** Every relative request ("more slowly", "less history", "stricter") became a guess. Fix tracked as **synesthetica-lmn**: add `default` field to `ContinuousMacroAnnotation`. The state readback path (`state://current`) is already in the RFC surface; adding it to the smoke test manifest was considered and skipped — the signal is banked.
+2. **`rhythm:horizon` only reachable via compound `time-horizon`.** Causes spillover into harmony:linger and dynamics:linger when the user only wanted less rhythm history. Fix tracked as **synesthetica-ec8**: expose `rhythm:horizon` as a first-class macro alongside the compound.
+3. **`emphasis:*` per-grammar salience missing.** SPEC 004 named these as core macros; the current release doesn't have them. Explicitly deferred — accepted omission; annotation set will document this rather than attempt a partial implementation.
+
+### Implication for MCP-vs-skill decision
+
+The smoke test used a static JSON manifest attached to a fresh LLM session — deliberately transport-agnostic. What it proved: the annotation model + tool schema together produce coherent behaviour from any capable LLM. Either MCP or a skill could deliver the same manifest to the same LLM and get the same result. **The transport choice is not gated on model correctness** — it's gated on portability, discoverability, and operational shape.
+
 ## Alternative considered: Claude Code skill
 
 A skill would work — annotations get rendered into a `SKILL.md`, control ops become a tool schema, Claude Code handles the loop. Advantages: simpler to bootstrap (skill is basically prose + a schema), no MCP server to run. Disadvantages: Claude-Code-specific, less discoverable, tied to one client rather than portable across the MCP ecosystem.
@@ -331,10 +356,10 @@ Simplest to build (WebSocket + JSON messages), but reinvents what MCP standardis
 - [x] Tunables reviewed; the "expose vs internal" split is decided (docs/tunables.md — decisions in the Decision column of each table)
 - [x] Macro namespace and resolution semantics defined (see §Macro namespace and semantics)
 - [x] Multi-instance model decided (see §Multi-instance model)
-- [ ] HarmonyGrammar + DynamicsGrammar macro coverage implemented per the macro list (synesthetica-bfb — plumbing to add `setMacros` to those grammars and stabilizer configs)
-- [ ] Cleanup items enacted (see §Cleanup items — plateauFraction dedupe, hue-invariant reconciliation)
-- [ ] Annotation type extensions defined and adopted (see §Annotation types — generalised MacroAnnotation, new SessionControlAnnotation, new SystemConceptAnnotation)
-- [ ] Semantic smoke test (see below) run and passing — annotation model produces coherent LLM behaviour on ~10 test utterances
+- [x] HarmonyGrammar + DynamicsGrammar macro coverage implemented per the macro list (synesthetica-bfb — Tier 1 done; cross-grammar dispatcher deferred until curves are informed by smoke-test findings)
+- [x] Cleanup items enacted (plateauFraction dedupe: synesthetica-2bn; hue-invariant reconciliation: synesthetica-65y)
+- [x] Annotation type extensions defined and adopted (synesthetica-2ol — generalised MacroAnnotation, new SessionControlAnnotation, new SystemConceptAnnotation)
+- [x] Semantic smoke test run and passing — synesthetica-dib closed 2026-08-19; 11/11 utterances coherent, model works; see §Smoke test findings
 - [ ] MCP vs skill decision formalised in a spec
 
 ## Plan
@@ -346,15 +371,8 @@ Ordered work, with the semantic smoke test as the gate:
 3. ~~Multi-instance decision~~ ✓ *(done — see §Multi-instance model)*
 4. **Annotation type extensions** (new beads issue). Generalise `MacroAnnotation` (add `type` field with continuous / discrete / compound variants), add `SessionControlAnnotation`, add `SystemConceptAnnotation`. Small contract-shape work; blocks step 6 because the smoke test needs the new types to author real annotations.
 5. **Macro plumbing** (synesthetica-bfb). Add `setMacros` surface to HarmonyGrammar + DynamicsGrammar + relevant stabilizers per the macro list. Also enact §Cleanup items. Together with step 4, enables the smoke test to run against real macros with real annotations.
-6. **Semantic smoke test** (~2 hrs, expands synesthetica-dib):
-   - Write annotations for a representative slice of the macro list (start with `time-horizon`, `rhythm:difficulty`, `harmony:linger`, `harmony:arpeggio-tolerance`, `system:colour-mapping:reference`)
-   - Include a few `SystemConceptAnnotation` entries so the LLM has terms to reason from
-   - Mock a control-op schema (JSON) — no runtime, just structure
-   - Write 8–12 realistic utterances covering the annotated surface
-   - Feed utterances + annotation manifest + control-op schema to the LLM in a fresh context, ask it to produce the ops
-   - Evaluate: did it pick sensible ops? Where did it guess? What annotations are missing?
-   - **Gate: if the LLM can produce coherent responses for ≥80% of utterances, proceed. If not, redesign the annotation model.**
-7. **MCP vs skill decision.** Now with real evidence from the smoke test, formalise the transport choice.
+6. ~~Semantic smoke test~~ ✓ *(done 2026-08-19 — gate PASSED; see §Smoke test findings)*
+7. **MCP vs skill decision** (next). With smoke-test evidence that the annotation model works transport-agnostically, formalise the transport choice. Alternatives considered are documented below; RFC 011 preliminarily recommends MCP. This step is where that becomes a formal decision, either confirming MCP or moving to the skill fallback with recorded reasoning.
 8. **SPEC write-up** covering: MCP surface (tools/resources/prompts), annotation storage format, annotation → resource pipeline, CLI shape, state subscription model, error handling. Amends SPEC 004 to cover the new annotation types (SessionControlAnnotation, SystemConceptAnnotation, generalised MacroAnnotation).
 9. **Implementation** — first the CLI + MCP server skeleton, then annotation manifest generator, then the control-op receiver in the engine.
 
@@ -363,10 +381,10 @@ Ordered work, with the semantic smoke test as the gate:
 **Everything above is a breadcrumb. If we're picking this up cold:**
 
 - Read this RFC first (context)
-- Read docs/tunables.md next (what we can control)
+- Read docs/tunables.md (what we can control)
 - Read SPEC 004 (why we're doing it this way)
-- The gate is step 3 (semantic smoke test). Don't do design work past the gate until the gate passes.
-- Nic's lean is toward MCP but is formally undecided. Don't skip the alternative comparison.
+- The smoke test has PASSED. Next work is Plan step 7 (MCP vs skill decision), then the SPEC write-up, then implementation.
+- Nic's lean is toward MCP but was formally undecided when we wrote this. Confirm with him before treating MCP as final.
 
 ## Non-goals
 
