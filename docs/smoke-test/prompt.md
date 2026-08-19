@@ -58,13 +58,16 @@ If a request needs **no** ops (e.g., pure clarification or genuinely unfulfillab
 
 ## Utterances
 
-<!-- Nic: paste 8–12 realistic utterances here, one per line, numbered. Examples of the shape:
-1. "Give me more history on the rhythm view."
-2. "This is in A minor."
-3. "Chords should linger longer."
-4. "Make it stricter — I want to see my timing errors."
-5. "Cut the metronome."
-6. "Set C to red."
-7. "Use eighth-note grid."
-8. "Wait, that's too much history. Halve it."
--->
+
+1. I'm practicing in F minor at 85bpm. Time is 3/4.
+2. Give me a metronome.
+3. Can you make the chords fade more slowly?
+4. Make it stricter — I want to see my timing errors.
+5. Can you make C# a teal colour?
+6. I'm playing 16ths but it doesn't seem to be picking that up. Keeps sayign I'm early or late.
+7. Explain to me what I'm seeing here.
+8. Can you make it show less history?
+9. Can you emphasise rhythm?
+10. What does the clock thing in the bottom right represent?
+11. Chord detection is a bit skittish, can you make ti more stable?
+
