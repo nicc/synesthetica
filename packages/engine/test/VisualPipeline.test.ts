@@ -193,21 +193,26 @@ describe("VisualPipeline", () => {
     });
 
     it("handles chord with different velocities", () => {
-      adapter.addNoteOn(60, 127, 1000); // Loud
-      adapter.addNoteOn(64, 64, 1000); // Medium
-      adapter.addNoteOn(67, 32, 1000); // Soft
+      adapter.addNoteOn(60, 127, 1000); // C4, loud
+      adapter.addNoteOn(64, 64, 1000); // E4, medium
+      adapter.addNoteOn(67, 32, 1000); // G4, soft
 
       const frame = pipeline.requestFrame(1000);
 
-      expect(frame.entities.length).toBeGreaterThanOrEqual(3);
+      // The pipeline processes all three notes through the stabilizer
+      // and into distinct note-strip entities. Velocity does not
+      // currently modulate visual output in RhythmGrammar (strips are
+      // uniform-width by design); pitch class differentiates the three
+      // via hue (see Invariant I15 in SPEC 004 for the hue vs
+      // brightness roles).
+      const noteStrips = frame.entities.filter(
+        (e) => e.data?.type === "note-strip",
+      );
+      expect(noteStrips).toHaveLength(3);
 
-      // Different velocities should produce different sizes
-      const sizes = frame.entities
-        .filter((e) => e.data?.type === "note-strip")
-        .map((e) => e.style.size);
-      if (sizes.length > 1) {
-        expect(new Set(sizes).size).toBeGreaterThan(1); // Not all same size
-      }
+      // Each strip carries a distinct pitch class in its data payload.
+      const pitchClasses = noteStrips.map((e) => e.data?.pitchClass);
+      expect(new Set(pitchClasses).size).toBe(3);
     });
   });
 
