@@ -187,6 +187,16 @@ export interface EnumSessionControlAnnotation
   extends SessionControlAnnotationBase {
   type: "enum";
   enumValues: Array<{ value: string | number; label: string }>;
+  /**
+   * When true, the manifest declares the shape but not the values —
+   * the renderer expects runtime hydration (e.g. input:source needs
+   * the actual list of connected MIDI + audio devices, which lives
+   * outside the manifest per SPEC 013 §Audio input selection).
+   *
+   * `enumValues` is ignored on dynamic controls; the renderer should
+   * consult its own device/option source at bind time.
+   */
+  dynamicOptions?: boolean;
 }
 
 export interface BooleanSessionControlAnnotation

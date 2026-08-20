@@ -67,16 +67,12 @@ export function generatePanel(manifest: ManifestForPanel): Panel {
     .map((s) => sessionWidget(s, sessionById));
 
   // ----- Basics (session:*) section -----
+  // Pairs come out of sessionControls directly (their children are
+  // absorbed into them by the absorbed-set above), so a single
+  // filter+map handles standalone and pair widgets in source order.
   const basicsWidgets: WidgetDescriptor[] = manifest.sessionControls
     .filter((s) => s.id.startsWith("session:") && !absorbed.has(s.id))
     .map((s) => sessionWidget(s, sessionById));
-
-  // Insert pairs at their earliest child's original position so key/meter
-  // sit near their tonic/beats-per-bar neighbours in the source order.
-  for (const p of pairs) {
-    if (!p.id.startsWith("session:")) continue;
-    basicsWidgets.push(pairWidget(p, sessionById));
-  }
 
   // ----- Advanced section: all macros, subgrouped by scope prefix -----
   const macroWidgets = manifest.macros.map(macroWidget);
@@ -150,6 +146,7 @@ function discreteSelect(
     options: m.enumValues,
     defaultValue: m.default,
     clearable: false, // macros never take null
+    dynamicOptions: false,
   };
 }
 
@@ -192,15 +189,18 @@ function enumSelect(
   s: EnumSessionControlAnnotation,
   base: WidgetBase,
 ): SelectWidgetDescriptor {
+  const dyn = s.dynamicOptions === true;
   return {
     ...base,
     kind: "select",
     options: s.enumValues,
     // Session enum defaults aren't declared in the annotation; leave
-    // the renderer to pick from state or first-option. Use first as
-    // fallback since the descriptor requires a value.
-    defaultValue: s.enumValues[0]?.value ?? "",
+    // the renderer to pick from state or first-option. Empty string
+    // is the "unset" fallback (used by dynamicOptions widgets until
+    // the renderer hydrates).
+    defaultValue: dyn ? "" : (s.enumValues[0]?.value ?? ""),
     clearable: s.nullable,
+    dynamicOptions: dyn,
   };
 }
 

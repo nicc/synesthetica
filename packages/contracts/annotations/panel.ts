@@ -56,6 +56,13 @@ export interface SelectWidgetDescriptor extends WidgetDescriptorBase {
   defaultValue: string | number;
   /** True when this control accepts null (session enum with nullable=true). */
   clearable: boolean;
+  /**
+   * When true, `options` is a shape declaration only — the renderer
+   * must populate the actual list at bind time (e.g. input:source
+   * device list). If the renderer has no hydration source, the
+   * widget renders empty with a hint.
+   */
+  dynamicOptions: boolean;
 }
 
 /**

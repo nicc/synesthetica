@@ -12,13 +12,49 @@ describe("generatePanel — sections", () => {
     expect(panel.sections.map((s) => s.id)).toEqual(["input", "basics", "advanced"]);
   });
 
-  it("Basics contains session:* controls", () => {
+  it("Basics contains session:* controls (pairs absorb their children)", () => {
     const panel = generatePanel(productionManifest);
     const basics = panel.sections.find((s) => s.id === "basics")!;
     const ids = basics.widgets.map((w) => w.id);
-    expect(ids).toContain("session:tonic");
+    // Pairs render as composite widgets
+    expect(ids).toContain("session:key");
+    expect(ids).toContain("session:meter");
+    // Standalone session controls
     expect(ids).toContain("session:tempo");
-    expect(ids).toContain("session:mode");
+    expect(ids).toContain("session:chord-mode");
+    expect(ids).toContain("session:metronome");
+    // Pair children are NOT rendered standalone — they live inside the pair
+    expect(ids).not.toContain("session:tonic");
+    expect(ids).not.toContain("session:mode");
+    expect(ids).not.toContain("session:beats-per-bar");
+    expect(ids).not.toContain("session:beat-value");
+  });
+
+  it("Input section contains input:source with dynamicOptions", () => {
+    const panel = generatePanel(productionManifest);
+    const input = panel.sections.find((s) => s.id === "input")!;
+    const source = input.widgets.find((w) => w.id === "input:source");
+    expect(source).toBeDefined();
+    expect(source!.kind).toBe("select");
+    if (source && source.kind === "select") {
+      expect(source.dynamicOptions).toBe(true);
+      expect(source.options).toEqual([]);
+    }
+  });
+
+  it("session:tonic is an enum with pitch-class labels (not raw 0–11)", () => {
+    const panel = generatePanel(productionManifest);
+    const key = findWidget(panel, "session:key");
+    expect(key.kind).toBe("pair");
+    if (key.kind !== "pair") return;
+    const tonicChild = key.children.find((c) => c.id === "session:tonic")!;
+    expect(tonicChild.kind).toBe("select");
+    if (tonicChild.kind === "select") {
+      const labels = tonicChild.options.map((o) => o.label);
+      expect(labels).toContain("C");
+      expect(labels).toContain("A");
+      expect(tonicChild.options.map((o) => o.value)).toContain(9); // A = 9
+    }
   });
 
   it("Advanced contains every macro subgrouped by scope prefix", () => {
@@ -210,10 +246,27 @@ function findWidget(
   aliases: string[];
   [k: string]: unknown;
 } {
+  const search = (widgets: readonly { id: string; kind: string; [k: string]: unknown }[]): typeof widgets[number] | null => {
+    for (const w of widgets) {
+      if (w.id === id) return w;
+      if (w.kind === "pair") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const found = search((w as any).children);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
   for (const section of panel.sections) {
-    for (const w of section.widgets) if (w.id === id) return w;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const inTop = search(section.widgets as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (inTop) return inTop as any;
     for (const sg of section.subgroups) {
-      for (const w of sg.widgets) if (w.id === id) return w;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const inSg = search(sg.widgets as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (inSg) return inSg as any;
     }
   }
   throw new Error(`widget not found: ${id}`);

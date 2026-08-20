@@ -281,20 +281,46 @@ const macros: MacroAnnotation[] = [
 // ============================================================================
 
 const sessionControls: SessionControlAnnotation[] = [
+  // ---- Input ----
+  {
+    id: "input:source",
+    name: "Input source",
+    aliases: ["device", "instrument", "mic"],
+    type: "enum",
+    enumValues: [],
+    dynamicOptions: true,
+    nullable: false,
+    notes: [
+      "MIDI device or audio input. Populated at runtime from connected devices; see inputs://available.",
+    ],
+  },
+
+  // ---- Key ----
   {
     id: "session:tonic",
     name: "Tonic",
     aliases: ["key root", "tonal centre"],
-    type: "number",
-    range: [0, 11],
-    unit: "pitch class",
+    type: "enum",
+    enumValues: [
+      { value: 0, label: "C" },
+      { value: 1, label: "C♯ / D♭" },
+      { value: 2, label: "D" },
+      { value: 3, label: "E♭" },
+      { value: 4, label: "E" },
+      { value: 5, label: "F" },
+      { value: 6, label: "F♯ / G♭" },
+      { value: 7, label: "G" },
+      { value: 8, label: "A♭" },
+      { value: 9, label: "A" },
+      { value: 10, label: "B♭" },
+      { value: 11, label: "B" },
+    ],
     nullable: true,
     notes: [
-      "Sets the tonic pitch class for key-aware analysis. Paired with session:mode.",
-      "Clear (set null) to disable functional harmony analysis.",
+      "The tonic pitch class for key-aware analysis. Paired with session:mode.",
+      "Clear to disable functional harmony analysis.",
     ],
   },
-
   {
     id: "session:mode",
     name: "Mode",
@@ -311,7 +337,16 @@ const sessionControls: SessionControlAnnotation[] = [
     nullable: true,
     notes: ["Paired with session:tonic. Set both together via set_key(root, mode)."],
   },
+  {
+    id: "session:key",
+    name: "Key",
+    type: "pair",
+    pair: ["session:tonic", "session:mode"],
+    nullable: true,
+    notes: ["Composite of tonic + mode. Rendered as a single grouped widget."],
+  },
 
+  // ---- Tempo ----
   {
     id: "session:tempo",
     name: "Tempo",
@@ -322,9 +357,69 @@ const sessionControls: SessionControlAnnotation[] = [
     nullable: true,
     notes: [
       "Anchors grid + linger calculations to musical time.",
-      "Clear (set null) to fall back to seconds-based windows.",
+      "Clear to fall back to seconds-based windows.",
       "The system does not infer tempo from onset patterns — it must be set explicitly.",
     ],
+  },
+
+  // ---- Meter ----
+  {
+    id: "session:beats-per-bar",
+    name: "Beats per bar",
+    aliases: ["beats/bar"],
+    type: "number",
+    range: [1, 16],
+    nullable: true,
+    notes: ["The numerator of the time signature. Paired with session:beat-value."],
+  },
+  {
+    id: "session:beat-value",
+    name: "Beat value",
+    aliases: ["beat unit", "note value"],
+    type: "enum",
+    enumValues: [
+      { value: 1, label: "whole (1)" },
+      { value: 2, label: "half (2)" },
+      { value: 4, label: "quarter (4)" },
+      { value: 8, label: "eighth (8)" },
+      { value: 16, label: "sixteenth (16)" },
+    ],
+    nullable: true,
+    notes: ["The denominator of the time signature. Paired with session:beats-per-bar."],
+  },
+  {
+    id: "session:meter",
+    name: "Time signature",
+    aliases: ["meter"],
+    type: "pair",
+    pair: ["session:beats-per-bar", "session:beat-value"],
+    nullable: true,
+    notes: ["Composite of beats-per-bar + beat-value. Rendered as a single grouped widget."],
+  },
+
+  // ---- Chord interpretation ----
+  {
+    id: "session:chord-mode",
+    name: "Chord mode",
+    aliases: ["chord interpretation"],
+    type: "enum",
+    enumValues: [
+      { value: "harmonic", label: "harmonic" },
+      { value: "bass-led", label: "bass-led" },
+    ],
+    nullable: false,
+    notes: [
+      "How chord detection interprets held notes. Harmonic favours full triads/tetrachords; bass-led anchors on the lowest note. See SPEC 010.",
+    ],
+  },
+
+  // ---- Metronome ----
+  {
+    id: "session:metronome",
+    name: "Metronome",
+    type: "boolean",
+    nullable: false,
+    notes: ["Audible click on each beat when a tempo is prescribed."],
   },
 ];
 
