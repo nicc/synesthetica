@@ -10,7 +10,8 @@
   },
   "files": ["dist"],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && npm run copy-assets",
+    "copy-assets": "mkdir -p dist/prompts && cp src/prompts/*.md dist/prompts/",
     "clean": "rm -rf dist",
     "test": "vitest run",
     "test:watch": "vitest",
