@@ -1,17 +1,12 @@
 /**
- * Semantic smoke test — annotation seed (RFC 011 Plan step 6, synesthetica-dib).
+ * Production annotation manifest — the deployed macro / session /
+ * concept / grammar annotations shipped to LLMs (via MCP resources)
+ * and rendered as UI controls (via the panel generator).
  *
- * A representative slice of the macro / session / concept / grammar
- * annotations, drafted as a jumping-off point. TypeScript enforces
- * the shape (see packages/contracts/annotations/annotations.ts).
+ * Single source of truth: MCP tool advertisement, UI widget generation,
+ * and default-value seeding all read this file.
  *
- * How this file is used:
- *   1. Nic edits — refine descriptions, add/remove entries, tune
- *      aliases and directionality to what the LLM should hear.
- *   2. Regenerate manifest.json (npm run smoke:regen).
- *   3. Feed to the LLM as its annotation manifest (JSON serialisable).
- *   4. Run the smoke test / production integration; LLM uses this
- *      manifest to interpret user requests.
+ * TypeScript enforces the shape from ./annotations.ts.
  */
 
 import type {
@@ -19,7 +14,7 @@ import type {
   SessionControlAnnotation,
   SystemConceptAnnotation,
   GrammarAnnotation,
-} from "@synesthetica/contracts";
+} from "./annotations";
 
 // ============================================================================
 // Macros
@@ -584,7 +579,7 @@ const grammars: GrammarAnnotation[] = [
 // Manifest (what the LLM consumes)
 // ============================================================================
 
-export const smokeTestManifest = {
+export const productionManifest = {
   macros,
   sessionControls,
   concepts,

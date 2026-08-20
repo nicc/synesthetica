@@ -21,7 +21,7 @@ import {
   UnsubscribeRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { smokeTestManifest as productionManifest } from "./annotations/manifest.js";
+import { productionManifest } from "@synesthetica/contracts";
 import {
   buildAnnotationResources,
   type ResourceEntry,

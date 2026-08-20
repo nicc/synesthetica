@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { smokeTestManifest as productionManifest } from "../src/annotations/manifest.js";
+import { productionManifest } from "@synesthetica/contracts";
 import { buildAnnotationResources } from "../src/resources/annotationResources.js";
 import { buildPromptResources } from "../src/resources/promptResources.js";
 

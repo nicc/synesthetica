@@ -26,7 +26,7 @@ import type {
   DiscreteMacroAnnotation,
   CompoundMacroAnnotation,
 } from "@synesthetica/contracts";
-import { smokeTestManifest as manifest } from "../annotations/manifest.js";
+import { productionManifest as manifest } from "@synesthetica/contracts";
 import type { ToolSpec } from "./sessionTools.js";
 
 type ToolInput = Record<string, unknown>;

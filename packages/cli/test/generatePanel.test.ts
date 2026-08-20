@@ -1,19 +1,19 @@
 import { describe, it, expect } from "vitest";
 import {
   generatePanel,
+  productionManifest,
   type MacroAnnotation,
   type SessionControlAnnotation,
 } from "@synesthetica/contracts";
-import { smokeTestManifest } from "../src/annotations/manifest.js";
 
 describe("generatePanel — sections", () => {
   it("always produces three sections in fixed order", () => {
-    const panel = generatePanel(smokeTestManifest);
+    const panel = generatePanel(productionManifest);
     expect(panel.sections.map((s) => s.id)).toEqual(["input", "basics", "advanced"]);
   });
 
   it("Basics contains session:* controls", () => {
-    const panel = generatePanel(smokeTestManifest);
+    const panel = generatePanel(productionManifest);
     const basics = panel.sections.find((s) => s.id === "basics")!;
     const ids = basics.widgets.map((w) => w.id);
     expect(ids).toContain("session:tonic");
@@ -22,7 +22,7 @@ describe("generatePanel — sections", () => {
   });
 
   it("Advanced contains every macro subgrouped by scope prefix", () => {
-    const panel = generatePanel(smokeTestManifest);
+    const panel = generatePanel(productionManifest);
     const advanced = panel.sections.find((s) => s.id === "advanced")!;
     // No standalone widgets at Advanced level — everything is subgrouped
     expect(advanced.widgets).toEqual([]);
@@ -34,7 +34,7 @@ describe("generatePanel — sections", () => {
   });
 
   it("Advanced subgroups are ordered harmony → rhythm → dynamics → system → general", () => {
-    const panel = generatePanel(smokeTestManifest);
+    const panel = generatePanel(productionManifest);
     const advanced = panel.sections.find((s) => s.id === "advanced")!;
     const ids = advanced.subgroups.map((g) => g.id);
     const harmonyIdx = ids.indexOf("harmony");
@@ -47,7 +47,7 @@ describe("generatePanel — sections", () => {
   });
 
   it("bare (unscoped) macros land in 'General' subgroup", () => {
-    const panel = generatePanel(smokeTestManifest);
+    const panel = generatePanel(productionManifest);
     const advanced = panel.sections.find((s) => s.id === "advanced")!;
     const general = advanced.subgroups.find((g) => g.id === "general");
     // time-horizon is a compound macro with no scope prefix
@@ -58,7 +58,7 @@ describe("generatePanel — sections", () => {
 
 describe("generatePanel — widget kinds", () => {
   it("continuous macro → slider with range and directionality", () => {
-    const panel = generatePanel(smokeTestManifest);
+    const panel = generatePanel(productionManifest);
     const linger = findWidget(panel, "harmony:linger");
     expect(linger.kind).toBe("slider");
     if (linger.kind === "slider") {
@@ -70,7 +70,7 @@ describe("generatePanel — widget kinds", () => {
   });
 
   it("compound macro → slider (dispatch handled at engine, not renderer)", () => {
-    const panel = generatePanel(smokeTestManifest);
+    const panel = generatePanel(productionManifest);
     const horizon = findWidget(panel, "time-horizon");
     expect(horizon.kind).toBe("slider");
     if (horizon.kind === "slider") {
@@ -80,7 +80,7 @@ describe("generatePanel — widget kinds", () => {
   });
 
   it("discrete macro → select with enum options", () => {
-    const panel = generatePanel(smokeTestManifest);
+    const panel = generatePanel(productionManifest);
     const quantise = findWidget(panel, "rhythm:quantise-resolution");
     expect(quantise.kind).toBe("select");
     if (quantise.kind === "select") {
@@ -92,7 +92,7 @@ describe("generatePanel — widget kinds", () => {
   });
 
   it("nullable number session → number widget with clearable=true", () => {
-    const panel = generatePanel(smokeTestManifest);
+    const panel = generatePanel(productionManifest);
     const tempo = findWidget(panel, "session:tempo");
     expect(tempo.kind).toBe("number");
     if (tempo.kind === "number") {
@@ -103,7 +103,7 @@ describe("generatePanel — widget kinds", () => {
   });
 
   it("enum session with nullable=true → select with clearable=true", () => {
-    const panel = generatePanel(smokeTestManifest);
+    const panel = generatePanel(productionManifest);
     const mode = findWidget(panel, "session:mode");
     expect(mode.kind).toBe("select");
     if (mode.kind === "select") {
@@ -130,7 +130,7 @@ describe("generatePanel — widget kinds", () => {
   });
 
   it("tooltip comes from notes[0]", () => {
-    const panel = generatePanel(smokeTestManifest);
+    const panel = generatePanel(productionManifest);
     const tempo = findWidget(panel, "session:tempo");
     expect(tempo.tooltip).toContain("grid");
   });

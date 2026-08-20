@@ -5,11 +5,11 @@
  * that `state://<label>/current` never lies about defaults.
  */
 
-import { smokeTestManifest } from "../annotations/manifest.js";
+import { productionManifest } from "@synesthetica/contracts";
 
 export const defaultMacroValues: Record<string, number | string> = (() => {
   const out: Record<string, number | string> = {};
-  for (const macro of smokeTestManifest.macros) {
+  for (const macro of productionManifest.macros) {
     if (macro.type === "compound") {
       out[macro.id] = macro.default;
     } else if (macro.type === "continuous") {
