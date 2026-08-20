@@ -44,6 +44,12 @@ export interface RenderPanelOptions {
    * carry one; otherwise the widget renders in its unset state.
    */
   initialValues?: Record<string, PanelDispatchValue>;
+  /**
+   * Hydrator for widgets with `dynamicOptions: true`. Called at bind
+   * time with the widget id; returns the list of options to render.
+   * When absent, dynamic-options widgets render empty (with a hint).
+   */
+  optionsFor?: (widgetId: string) => Array<{ value: string | number; label: string }> | undefined;
 }
 
 /**
@@ -55,18 +61,47 @@ export interface RenderedPanel {
   root: HTMLElement;
   /** Refresh widget values from a new state snapshot (e.g. after MCP tool call). */
   update(values: Record<string, PanelDispatchValue>): void;
+  /**
+   * Replace the option list for a dynamic-options widget. Used when
+   * the underlying source hydrates late (e.g. Web MIDI enumeration
+   * completes after the panel is rendered).
+   */
+  updateOptions(
+    widgetId: string,
+    options: Array<{ value: string | number; label: string }>,
+  ): void;
 }
 
-export function renderPanel(opts: RenderPanelOptions): RenderedPanel {
+/**
+ * Options for renderPanel that additionally scope rendering to a
+ * subset of the manifest's sections. When omitted, all sections
+ * render.
+ */
+export interface RenderPanelSubsetOptions extends RenderPanelOptions {
+  sectionIds?: readonly string[];
+}
+
+export function renderPanel(opts: RenderPanelSubsetOptions): RenderedPanel;
+export function renderPanel(opts: RenderPanelOptions): RenderedPanel;
+export function renderPanel(opts: RenderPanelSubsetOptions): RenderedPanel {
   const root = document.createElement("div");
   root.className = "syn-panel";
 
   // Per-widget updater — records how to refresh the widget's DOM from
   // a new value. Used by update() below.
   const updaters = new Map<string, (v: PanelDispatchValue) => void>();
+  // Per-widget option-list updater for dynamic-options selects.
+  const optionUpdaters = new Map<
+    string,
+    (options: Array<{ value: string | number; label: string }>) => void
+  >();
 
+  const wantedIds = opts.sectionIds
+    ? new Set<string>(opts.sectionIds)
+    : null;
   for (const section of opts.panel.sections) {
-    root.appendChild(renderSection(section, opts, updaters));
+    if (wantedIds && !wantedIds.has(section.id)) continue;
+    root.appendChild(renderSection(section, opts, updaters, optionUpdaters));
   }
 
   return {
@@ -77,6 +112,10 @@ export function renderPanel(opts: RenderPanelOptions): RenderedPanel {
         if (fn) fn(v);
       }
     },
+    updateOptions(widgetId, options) {
+      const fn = optionUpdaters.get(widgetId);
+      if (fn) fn(options);
+    },
   };
 }
 
@@ -84,6 +123,7 @@ function renderSection(
   section: PanelSection,
   opts: RenderPanelOptions,
   updaters: Map<string, (v: PanelDispatchValue) => void>,
+  optionUpdaters: Map<string, (options: Array<{ value: string | number; label: string }>) => void>,
 ): HTMLElement {
   const wrap = document.createElement("section");
   wrap.className = `syn-panel-section syn-panel-section-${section.id}`;
@@ -96,12 +136,12 @@ function renderSection(
 
   // Widgets directly under a section (used for Input / Basics).
   for (const w of section.widgets) {
-    wrap.appendChild(renderWidget(w, opts, updaters));
+    wrap.appendChild(renderWidget(w, opts, updaters, optionUpdaters));
   }
 
   // Subgroups (used for Advanced).
   for (const sg of section.subgroups) {
-    wrap.appendChild(renderSubgroup(sg, opts, updaters));
+    wrap.appendChild(renderSubgroup(sg, opts, updaters, optionUpdaters));
   }
 
   return wrap;
@@ -111,6 +151,7 @@ function renderSubgroup(
   sg: PanelSubgroup,
   opts: RenderPanelOptions,
   updaters: Map<string, (v: PanelDispatchValue) => void>,
+  optionUpdaters: Map<string, (options: Array<{ value: string | number; label: string }>) => void>,
 ): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "syn-panel-subgroup";
@@ -122,7 +163,7 @@ function renderSubgroup(
   wrap.appendChild(header);
 
   for (const w of sg.widgets) {
-    wrap.appendChild(renderWidget(w, opts, updaters));
+    wrap.appendChild(renderWidget(w, opts, updaters, optionUpdaters));
   }
   return wrap;
 }
@@ -131,18 +172,23 @@ function renderWidget(
   w: WidgetDescriptor,
   opts: RenderPanelOptions,
   updaters: Map<string, (v: PanelDispatchValue) => void>,
+  optionUpdaters: Map<string, (options: Array<{ value: string | number; label: string }>) => void>,
 ): HTMLElement {
   switch (w.kind) {
     case "slider":
       return renderSlider(w, opts, updaters);
     case "select":
-      return renderSelect(w, opts, updaters);
+      return renderSelect(w, opts, updaters, optionUpdaters);
     case "toggle":
       return renderToggle(w, opts, updaters);
     case "number":
       return renderNumber(w, opts, updaters);
     case "pair":
-      return renderPair(w, opts, updaters);
+      return renderPair(w, opts, updaters, optionUpdaters);
+    default:
+      throw new Error(
+        `unknown widget kind: ${(w as { kind: string }).kind}`,
+      );
   }
 }
 
@@ -233,23 +279,45 @@ function renderSelect(
   w: SelectWidgetDescriptor,
   opts: RenderPanelOptions,
   updaters: Map<string, (v: PanelDispatchValue) => void>,
+  optionUpdaters: Map<string, (options: Array<{ value: string | number; label: string }>) => void>,
 ): HTMLElement {
   const el = widgetShell(w);
   const select = document.createElement("select");
   select.id = domId(w.id);
 
-  if (w.clearable) {
-    const clear = document.createElement("option");
-    clear.value = "";
-    clear.textContent = "—";
-    select.appendChild(clear);
-  }
-  for (const opt of w.options) {
-    const option = document.createElement("option");
-    option.value = String(opt.value);
-    option.textContent = opt.label;
-    select.appendChild(option);
-  }
+  // Options come from the descriptor by default; dynamicOptions widgets
+  // (e.g. input:source) ask the renderer's optionsFor() hook for
+  // runtime-populated lists at bind time and may be refreshed later
+  // via RenderedPanel.updateOptions().
+  let currentOptions: Array<{ value: string | number; label: string }> =
+    w.dynamicOptions ? (opts.optionsFor?.(w.id) ?? []) : w.options;
+
+  const rebuild = () => {
+    select.innerHTML = "";
+    if (w.clearable) {
+      const clear = document.createElement("option");
+      clear.value = "";
+      clear.textContent = "—";
+      select.appendChild(clear);
+    }
+    if (w.dynamicOptions && currentOptions.length === 0) {
+      const empty = document.createElement("option");
+      empty.value = "";
+      empty.textContent = "(none available)";
+      empty.disabled = true;
+      select.appendChild(empty);
+      select.disabled = true;
+    } else {
+      select.disabled = false;
+    }
+    for (const opt of currentOptions) {
+      const option = document.createElement("option");
+      option.value = String(opt.value);
+      option.textContent = opt.label;
+      select.appendChild(option);
+    }
+  };
+  rebuild();
 
   const initial = initialFor(opts, w.id, w.defaultValue);
   select.value = initial === null ? "" : String(initial);
@@ -258,8 +326,7 @@ function renderSelect(
     if (w.clearable && select.value === "") {
       opts.dispatch(w.id, null);
     } else {
-      // Convert back to number if the descriptor's options were numeric.
-      const opt = w.options.find((o) => String(o.value) === select.value);
+      const opt = currentOptions.find((o) => String(o.value) === select.value);
       opts.dispatch(w.id, opt ? opt.value : select.value);
     }
   });
@@ -269,6 +336,18 @@ function renderSelect(
   updaters.set(w.id, (v) => {
     select.value = v === null || v === undefined ? "" : String(v);
   });
+  if (w.dynamicOptions) {
+    optionUpdaters.set(w.id, (nextOptions) => {
+      const prevValue = select.value;
+      currentOptions = nextOptions;
+      rebuild();
+      // Preserve the current selection if the new option list still
+      // includes it — user shouldn't be silently reset on refresh.
+      if (nextOptions.some((o) => String(o.value) === prevValue)) {
+        select.value = prevValue;
+      }
+    });
+  }
 
   return el;
 }
@@ -354,6 +433,7 @@ function renderPair(
   w: PairWidgetDescriptor,
   opts: RenderPanelOptions,
   updaters: Map<string, (v: PanelDispatchValue) => void>,
+  optionUpdaters: Map<string, (options: Array<{ value: string | number; label: string }>) => void>,
 ): HTMLElement {
   const el = document.createElement("div");
   el.className = "syn-panel-widget syn-panel-widget-pair";
@@ -368,7 +448,7 @@ function renderPair(
   const row = document.createElement("div");
   row.className = "syn-panel-widget-pair-children";
   for (const child of w.children) {
-    row.appendChild(renderWidget(child, opts, updaters));
+    row.appendChild(renderWidget(child, opts, updaters, optionUpdaters));
   }
   el.appendChild(row);
   return el;

@@ -3,194 +3,126 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Synesthetica - Phase 0</title>
+  <title>Synesthetica</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    /* -----------------------------------------------------------------
+     * Reset + surface
+     * ----------------------------------------------------------------- */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: #000;
-      color: #fff;
+      color: #ddd;
       overflow: hidden;
     }
+    #canvas { display: block; width: 100vw; height: 100vh; }
 
-    #controls {
+    /* -----------------------------------------------------------------
+     * Panel toolbar (top-right)
+     * ----------------------------------------------------------------- */
+    .syn-panel-toolbar {
       position: absolute;
-      top: 20px;
-      right: 20px;
-      z-index: 10;
-      background: rgba(0, 0, 0, 0.8);
-      padding: 15px;
-      border-radius: 8px;
-      border: 1px solid #333;
-      transition: opacity 0.2s;
-    }
-
-    #controls.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    #toggle-controls {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      z-index: 11;
-      background: rgba(0, 0, 0, 0.6);
-      color: #888;
-      border: 1px solid #444;
-      border-radius: 4px;
-      padding: 6px 10px;
-      font-size: 12px;
-      cursor: pointer;
-    }
-
-    #toggle-controls:hover {
-      background: rgba(50, 50, 50, 0.8);
-      color: #fff;
-    }
-
-    #controls.hidden + #toggle-controls {
-      background: rgba(0, 0, 0, 0.8);
-    }
-
-    #controls label {
-      display: block;
-      margin-bottom: 8px;
-      font-size: 14px;
-      color: #aaa;
-    }
-
-    #controls select,
-    #controls input[type="number"] {
-      width: 250px;
-      padding: 8px;
-      background: #222;
-      color: #fff;
-      border: 1px solid #444;
-      border-radius: 4px;
-      font-size: 14px;
-    }
-
-    #controls select:disabled,
-    #controls input:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    #controls .control-group {
-      margin-bottom: 15px;
-    }
-
-    #controls .control-group:last-child {
-      margin-bottom: 0;
-    }
-
-    #controls .inline-controls {
+      top: 16px;
+      right: 16px;
+      z-index: 20;
       display: flex;
-      gap: 10px;
+      gap: 6px;
+    }
+    .syn-panel-tab {
+      background: rgba(20, 20, 20, 0.7);
+      color: #aaa;
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 120ms, color 120ms;
+    }
+    .syn-panel-tab:hover { background: rgba(40, 40, 40, 0.85); color: #ddd; }
+    .syn-panel-tab.open {
+      background: rgba(80, 80, 80, 0.9);
+      color: #fff;
+      border-color: #555;
     }
 
-    #controls .inline-controls input[type="number"] {
-      width: 70px;
+    /* -----------------------------------------------------------------
+     * Panel overlay + frame
+     * ----------------------------------------------------------------- */
+    .syn-panel-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 15;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.35);
     }
-
-    #controls .inline-controls label {
-      margin-bottom: 0;
+    .syn-panel-overlay[hidden] { display: none; }
+    .syn-panel-host {
+      max-width: 480px;
+      width: min(480px, 90vw);
+      max-height: 80vh;
+      display: flex;
+    }
+    .syn-panel-frame {
+      background: rgba(15, 15, 15, 0.96);
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      width: 100%;
+      max-height: 80vh;
+      overflow: hidden;
     }
-
-    #controls .inline-controls .input-label {
-      font-size: 11px;
-      color: #666;
+    .syn-panel-frame-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid #222;
+      background: rgba(30, 30, 30, 0.4);
     }
-
-    #controls button {
-      padding: 6px 12px;
-      background: #333;
-      color: #fff;
-      border: 1px solid #444;
-      border-radius: 4px;
+    .syn-panel-frame-title {
       font-size: 12px;
-      cursor: pointer;
-      margin-top: 8px;
-    }
-
-    #controls button:hover {
-      background: #444;
-    }
-
-    #controls button:active {
-      background: #555;
-    }
-
-    #status {
-      margin-top: 10px;
-      font-size: 12px;
-      color: #666;
-    }
-
-    #canvas {
-      display: block;
-      width: 100vw;
-      height: 100vh;
-    }
-
-    .error {
-      color: #ff4444;
-    }
-
-    .success {
-      color: #44ff44;
-    }
-
-    .section-divider {
-      border-top: 1px solid #333;
-      margin: 15px 0;
-      padding-top: 15px;
-    }
-
-    .section-header {
-      font-size: 12px;
-      color: #666;
+      color: #999;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 12px;
+      letter-spacing: 0.6px;
+    }
+    .syn-panel-frame-close {
+      background: transparent;
+      color: #888;
+      border: none;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0 4px;
+    }
+    .syn-panel-frame-close:hover { color: #eee; }
+    .syn-panel-frame-body {
+      padding: 14px;
+      overflow-y: auto;
+    }
+    .syn-panel-placeholder {
+      padding: 20px;
+      color: #666;
+      font-size: 12px;
+      text-align: center;
     }
 
-    /* Manifest-generated panel — separate from #controls so we can
-       evolve them independently while both are visible. */
-    .generated-panel {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      z-index: 10;
-      max-width: 320px;
-      max-height: calc(100vh - 40px);
-      overflow-y: auto;
-      background: rgba(0, 0, 0, 0.8);
-      padding: 14px;
-      border-radius: 8px;
-      border: 1px solid #333;
-      color: #ddd;
-      font-size: 12px;
-    }
-    .generated-panel.hidden { display: none; }
-    .syn-panel-section { margin-bottom: 12px; }
+    /* -----------------------------------------------------------------
+     * Widgets (rendered by renderPanel)
+     * ----------------------------------------------------------------- */
+    .syn-panel-section { margin-bottom: 14px; }
+    .syn-panel-section:last-child { margin-bottom: 0; }
     .syn-panel-section-title {
-      font-size: 11px;
+      font-size: 10px;
       color: #666;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       margin-bottom: 8px;
-      border-bottom: 1px solid #222;
       padding-bottom: 4px;
+      border-bottom: 1px solid #202020;
     }
     .syn-panel-subgroup { margin: 10px 0 10px 6px; }
     .syn-panel-subgroup-title {
@@ -201,159 +133,183 @@
     }
     .syn-panel-widget {
       display: grid;
-      grid-template-columns: 100px 1fr auto;
-      column-gap: 8px;
+      grid-template-columns: 110px 1fr auto;
+      column-gap: 10px;
       align-items: center;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
     .syn-panel-widget-label {
       font-size: 11px;
-      color: #aaa;
+      color: #999;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .syn-panel-widget-value {
-      font-family: monospace;
+      font-family: ui-monospace, SFMono-Regular, monospace;
       font-size: 10px;
-      color: #888;
-      min-width: 40px;
+      color: #777;
+      min-width: 42px;
       text-align: right;
     }
     .syn-panel-widget-hints {
       grid-column: 1 / -1;
       font-size: 9px;
-      color: #555;
-      margin-top: -2px;
-      margin-bottom: 4px;
+      color: #444;
+      margin-top: -4px;
+      margin-bottom: 6px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .syn-panel-widget input[type="range"] { width: 100%; }
+    /* Range sliders — desaturated, ash-toned, to match the surface. */
+    .syn-panel-widget input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      background: #2a2a2a;
+      border-radius: 2px;
+      outline: none;
+    }
+    .syn-panel-widget input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      background: #888;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .syn-panel-widget input[type="range"]::-moz-range-thumb {
+      width: 12px;
+      height: 12px;
+      background: #888;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+    }
     .syn-panel-widget select,
     .syn-panel-widget input[type="number"] {
       width: 100%;
-      background: #222;
-      color: #ddd;
-      border: 1px solid #444;
+      background: #1a1a1a;
+      color: #ccc;
+      border: 1px solid #333;
       border-radius: 3px;
-      padding: 3px 5px;
+      padding: 4px 6px;
       font-size: 11px;
+      font-family: inherit;
     }
-    .syn-panel-widget-clear {
-      background: #333;
-      color: #aaa;
-      border: 1px solid #444;
-      border-radius: 3px;
-      padding: 2px 6px;
-      font-size: 10px;
+    .syn-panel-widget select:disabled { color: #555; }
+    .syn-panel-widget input[type="checkbox"] {
+      accent-color: #888;
+      width: 14px;
+      height: 14px;
       cursor: pointer;
     }
-    .syn-panel-widget-unit {
+    .syn-panel-widget-clear {
+      background: #222;
+      color: #888;
+      border: 1px solid #333;
+      border-radius: 3px;
+      padding: 3px 7px;
       font-size: 10px;
-      color: #666;
+      font-family: inherit;
+      cursor: pointer;
     }
-    .syn-panel-widget-pair {
-      grid-template-columns: 1fr;
-    }
+    .syn-panel-widget-clear:hover { background: #2a2a2a; color: #ccc; }
+    .syn-panel-widget-unit { font-size: 10px; color: #666; }
+    .syn-panel-widget-pair { grid-template-columns: 1fr; }
     .syn-panel-widget-pair-children {
       display: grid;
-      gap: 4px;
+      gap: 6px;
+      padding-left: 8px;
     }
+
+    /* -----------------------------------------------------------------
+     * About panel body (rendered from system-overview.md)
+     * ----------------------------------------------------------------- */
+    .syn-about {
+      font-size: 13px;
+      line-height: 1.55;
+      color: #ccc;
+    }
+    .syn-about h1 { font-size: 15px; color: #fff; margin: 0 0 8px; }
+    .syn-about h2 {
+      font-size: 12px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 14px 0 6px;
+    }
+    .syn-about h3 {
+      font-size: 12px;
+      color: #bbb;
+      margin: 10px 0 4px;
+    }
+    .syn-about p { margin: 0 0 8px; }
+    .syn-about ul { margin: 0 0 8px 20px; }
+    .syn-about li { margin-bottom: 4px; }
+    .syn-about hr {
+      border: none;
+      border-top: 1px solid #222;
+      margin: 12px 0;
+    }
+    .syn-about code {
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 11px;
+      background: #1a1a1a;
+      color: #ddd;
+      padding: 1px 4px;
+      border-radius: 2px;
+    }
+    .syn-about pre {
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 3px;
+      padding: 8px;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 11px;
+      color: #bbb;
+      overflow-x: auto;
+      margin: 0 0 8px;
+    }
+    .syn-about table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 8px;
+      font-size: 12px;
+    }
+    .syn-about th, .syn-about td {
+      border-bottom: 1px solid #222;
+      padding: 4px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .syn-about th { color: #888; font-weight: normal; }
+
+    /* -----------------------------------------------------------------
+     * Session status line (bottom-left)
+     * ----------------------------------------------------------------- */
+    .syn-status {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      z-index: 5;
+      font-size: 10px;
+      color: #555;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 3px 8px;
+      border-radius: 3px;
+    }
+    .syn-status.error { color: #c66; }
+    .syn-status.success { color: #7c7; }
   </style>
 </head>
 <body>
-  <div id="controls">
-    <div class="control-group">
-      <label for="midi-input">MIDI Input Device</label>
-      <select id="midi-input" disabled>
-        <option>Loading MIDI devices...</option>
-      </select>
-    </div>
-
-    <div class="control-group">
-      <label>Audio Input (Microphone)</label>
-      <button id="toggle-audio">Enable microphone</button>
-      <div id="audio-status" style="font-size: 11px; color: #888; margin-top: 4px;"></div>
-    </div>
-
-    <div class="section-divider">
-      <div class="section-header">Tempo & Meter</div>
-      <div class="control-group">
-        <div class="inline-controls">
-          <label>
-            <span class="input-label">BPM</span>
-            <input type="number" id="tempo-input" min="20" max="300" placeholder="--" />
-          </label>
-          <label>
-            <span class="input-label">Beats/Bar</span>
-            <input type="number" id="beats-per-bar" min="1" max="16" placeholder="4" />
-          </label>
-          <label>
-            <span class="input-label">Beat Unit</span>
-            <input type="number" id="beat-unit" min="1" max="16" placeholder="4" />
-          </label>
-        </div>
-        <button id="clear-tempo">Clear Tempo/Meter</button>
-        <button id="toggle-metronome">Metronome: Off</button>
-      </div>
-    </div>
-
-    <div class="section-divider">
-      <div class="section-header">Key</div>
-      <div class="control-group">
-        <div class="inline-controls">
-          <label>
-            <span class="input-label">Root</span>
-            <select id="key-root">
-              <option value="">--</option>
-              <option value="0">C</option>
-              <option value="1">C♯/D♭</option>
-              <option value="2">D</option>
-              <option value="3">E♭</option>
-              <option value="4">E</option>
-              <option value="5">F</option>
-              <option value="6">F♯/G♭</option>
-              <option value="7">G</option>
-              <option value="8">A♭</option>
-              <option value="9">A</option>
-              <option value="10">B♭</option>
-              <option value="11">B</option>
-            </select>
-          </label>
-          <label>
-            <span class="input-label">Mode</span>
-            <select id="key-mode">
-              <option value="ionian">Major</option>
-              <option value="dorian">Dorian</option>
-              <option value="phrygian">Phrygian</option>
-              <option value="lydian">Lydian</option>
-              <option value="mixolydian">Mixolydian</option>
-              <option value="aeolian">Minor</option>
-              <option value="locrian">Locrian</option>
-              <option value="harmonic-minor">Harmonic minor</option>
-              <option value="melodic-minor">Melodic minor</option>
-            </select>
-          </label>
-        </div>
-        <button id="clear-key">Clear Key</button>
-        <button id="toggle-chord-mode">Chord mode: Harmonic</button>
-      </div>
-    </div>
-
-    <div id="status">Initializing...</div>
-  </div>
-
-  <button id="toggle-controls">Hide Controls</button>
-
-  <!-- Manifest-generated panel (SPEC 013 §UI Controls). Rendered from
-       the same annotation manifest that MCP serves — so LLM tools and
-       this panel operate on the same control surface. -->
-  <div id="generated-panel" class="generated-panel"></div>
-
   <canvas id="canvas"></canvas>
-
+  <div id="syn-status" class="syn-status">Initialising…</div>
   <script type="module" src="./src/main.ts"></script>
 </body>
 </html>

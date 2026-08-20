@@ -30,6 +30,12 @@ export interface PanelBindingTargets {
   getMetronome(): Metronome | null;
   /** Called when the metronome toggle changes; owner decides how to construct/enable it. */
   onMetronomeToggle?(enabled: boolean): void;
+  /**
+   * Called when the input source changes. Value is a source id (e.g.
+   * "midi:<deviceId>" or "audio:<label>"). Owner handles the actual
+   * session teardown/start — MIDI and audio have different lifecycles.
+   */
+  onInputSource?(source: string): void;
 }
 
 interface KeyState {
@@ -89,6 +95,12 @@ export function bindPanelToPipeline(
       }
       case "session:metronome": {
         targets.onMetronomeToggle?.(Boolean(value));
+        return;
+      }
+      case "input:source": {
+        if (typeof value === "string" && value.length > 0) {
+          targets.onInputSource?.(value);
+        }
         return;
       }
       // --- Everything else: macros not yet plumbed to pipeline setters. ---

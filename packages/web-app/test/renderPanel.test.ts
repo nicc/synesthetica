@@ -94,6 +94,65 @@ describe("renderPanel — widget interactions", () => {
   });
 });
 
+describe("renderPanel — dynamic options hydration", () => {
+  it("renders empty select with placeholder when no optionsFor is provided", () => {
+    const panel = generatePanel(productionManifest);
+    const rendered = renderPanel({ panel, dispatch: () => {} });
+    const select = rendered.root.querySelector(
+      '[data-widget-id="input:source"] select',
+    ) as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    expect(select.disabled).toBe(true);
+    // Placeholder option present
+    expect(select.querySelector("option")!.textContent).toBe("(none available)");
+  });
+
+  it("populates dynamic-options widget from optionsFor hydrator", () => {
+    const panel = generatePanel(productionManifest);
+    const rendered = renderPanel({
+      panel,
+      dispatch: () => {},
+      optionsFor: (id) => {
+        if (id === "input:source") {
+          return [
+            { value: "midi:0", label: "Yamaha P-125" },
+            { value: "audio:default", label: "Built-in microphone" },
+          ];
+        }
+        return undefined;
+      },
+    });
+    const select = rendered.root.querySelector(
+      '[data-widget-id="input:source"] select',
+    ) as HTMLSelectElement;
+    expect(select.disabled).toBe(false);
+    const optionLabels = Array.from(select.querySelectorAll("option")).map(
+      (o) => o.textContent,
+    );
+    expect(optionLabels).toContain("Yamaha P-125");
+    expect(optionLabels).toContain("Built-in microphone");
+  });
+
+  it("dispatch fires source value when a hydrated option is picked", () => {
+    const dispatch = vi.fn();
+    const panel = generatePanel(productionManifest);
+    const rendered = renderPanel({
+      panel,
+      dispatch,
+      optionsFor: (id) =>
+        id === "input:source"
+          ? [{ value: "midi:0", label: "Piano" }]
+          : undefined,
+    });
+    const select = rendered.root.querySelector(
+      '[data-widget-id="input:source"] select',
+    ) as HTMLSelectElement;
+    select.value = "midi:0";
+    select.dispatchEvent(new Event("change"));
+    expect(dispatch).toHaveBeenCalledWith("input:source", "midi:0");
+  });
+});
+
 describe("renderPanel — initial values + update()", () => {
   it("initial value overrides descriptor default on render", () => {
     const panel = generatePanel(productionManifest);

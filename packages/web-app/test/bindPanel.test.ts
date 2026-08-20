@@ -84,6 +84,28 @@ describe("bindPanelToPipeline — session controls", () => {
     expect(pipeline.setChordInterpretation).toHaveBeenCalledWith("bass-led");
   });
 
+  it("input:source calls onInputSource with the value string", () => {
+    const onInputSource = vi.fn();
+    const dispatch = bindPanelToPipeline({
+      getPipeline: () => null,
+      getMetronome: () => null,
+      onInputSource,
+    });
+    dispatch("input:source", "midi:12345");
+    expect(onInputSource).toHaveBeenCalledWith("midi:12345");
+  });
+
+  it("input:source with empty string does nothing", () => {
+    const onInputSource = vi.fn();
+    const dispatch = bindPanelToPipeline({
+      getPipeline: () => null,
+      getMetronome: () => null,
+      onInputSource,
+    });
+    dispatch("input:source", "");
+    expect(onInputSource).not.toHaveBeenCalled();
+  });
+
   it("metronome toggle calls onMetronomeToggle callback", () => {
     const onToggle = vi.fn();
     const dispatch = bindPanelToPipeline({
