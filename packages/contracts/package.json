@@ -16,7 +16,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/add-js-extensions.mjs",
     "clean": "rm -rf dist"
   },
   "devDependencies": {

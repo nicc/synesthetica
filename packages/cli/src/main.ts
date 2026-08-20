@@ -1,15 +1,19 @@
 /**
  * CLI main — dispatches parsed commands.
  *
- * Chunk A scope: `start` launches the MCP server; other subcommands
- * print not-yet-implemented placeholders. Real command handlers land
- * as subsequent chunks fill in state, engine registry, and preset store.
+ * `start` launches the web-app (Vite subprocess + browser tab), and,
+ * unless `--no-mcp` is passed, the MCP server. Both consumers are
+ * independent — engine + UI work standalone in --no-mcp; MCP layers
+ * LLM-mediated control over the same underlying pipeline (SPEC 013
+ * §UI Controls, §Standalone-launch).
  */
 
 import { parseArgs, helpText, type StartOptions } from "./args.js";
 import { startMcpServer } from "./mcpServer.js";
 import { StubEngineHandle } from "./engine/stubEngineHandle.js";
 import { createPresetStore } from "./presets/presetStore.js";
+import { spawnWebApp, type WebAppHandle } from "./webApp/spawnWebApp.js";
+import { openBrowser } from "./webApp/openBrowser.js";
 
 const SERVER_NAME = "synesthetica";
 const SERVER_VERSION = "0.1.0";
@@ -29,7 +33,7 @@ export async function runCli(argv: readonly string[]): Promise<number> {
     case "status":
     case "reload-annotations":
     case "list-presets":
-      writeErr(`'${cmd.kind}' not yet implemented (Chunk A only covers 'start')`);
+      writeErr(`'${cmd.kind}' not yet implemented`);
       return 1;
   }
 }
@@ -38,19 +42,51 @@ async function runStart(options: StartOptions): Promise<number> {
   const instanceLabel = options.instance ?? "default";
   writeErr(`starting synesthetica (instance=${instanceLabel})`);
 
-  if (!options.mcpEnabled) {
-    writeErr(
-      `--no-mcp: engine standalone mode not yet implemented (Chunk F). ` +
-        `Nothing to start without an engine adapter yet.`,
-    );
+  const shutdownTasks: Array<() => Promise<void>> = [];
+  let shuttingDown = false;
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    writeErr(`\nreceived ${signal}, shutting down...`);
+    for (const task of shutdownTasks) {
+      try {
+        await task();
+      } catch (e) {
+        writeErr(`shutdown task failed: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+    process.exit(0);
+  };
+  process.on("SIGINT", () => void shutdown("SIGINT"));
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
+
+  // ---- Web app (always, per SPEC 013 §Standalone-launch) ----
+  let webApp: WebAppHandle;
+  try {
+    writeErr("launching web app…");
+    webApp = await spawnWebApp({
+      port: options.webAppPort ?? undefined,
+    });
+    shutdownTasks.push(() => webApp.close());
+    writeErr(`web app ready at ${webApp.url}`);
+    if (options.openBrowser) {
+      openBrowser(webApp.url);
+    }
+  } catch (err) {
+    writeErr(`error launching web app: ${err instanceof Error ? err.message : String(err)}`);
     return 1;
   }
 
-  // Chunk C: a StubEngineHandle stands in for the real browser-hosted
-  // engine until Chunk F wires the WebSocket bridge. The stub tracks
-  // state so tool calls are meaningful end-to-end (MCP client → tool
-  // handler → engine → state resource). Ships the real engine wiring
-  // as a swap at Chunk F.
+  // ---- MCP server (unless --no-mcp) ----
+  if (!options.mcpEnabled) {
+    writeErr("--no-mcp: MCP server skipped; web app + engine only.");
+    // Keep the process alive so the child Vite stays up.
+    await new Promise<void>(() => {
+      /* never resolves */
+    });
+    return 0;
+  }
+
   const stubEngine = new StubEngineHandle({ label: instanceLabel });
   const presetStore = createPresetStore();
   writeErr(`preset store: ${presetStore.storePath()}`);
@@ -63,8 +99,6 @@ async function runStart(options: StartOptions): Promise<number> {
         engines: [stubEngine],
         presetStore,
         resolveEngine: (instance) => {
-          // Single-instance for now — Phase 3 replaces this with a
-          // registry lookup.
           if (instance !== undefined && instance !== stubEngine.label) {
             return {
               error: {
@@ -79,18 +113,9 @@ async function runStart(options: StartOptions): Promise<number> {
       options.transport,
       options.port,
     );
-
-    // Graceful shutdown on SIGINT / SIGTERM.
-    const shutdown = async (signal: string) => {
-      writeErr(`\nreceived ${signal}, shutting down...`);
-      await server.close();
-      process.exit(0);
-    };
-    process.on("SIGINT", () => void shutdown("SIGINT"));
-    process.on("SIGTERM", () => void shutdown("SIGTERM"));
+    shutdownTasks.push(() => server.close());
 
     writeErr(`MCP server ready on ${options.transport}`);
-    // Keep the process alive; the transport is what does the real work.
     await new Promise<void>(() => {
       /* never resolves */
     });

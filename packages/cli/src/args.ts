@@ -30,6 +30,8 @@ export interface StartOptions {
   mcpEnabled: boolean;
   recentEventsBufferSize: number;
   logRetentionDays: number;
+  openBrowser: boolean;
+  webAppPort: number | null;
 }
 
 const DEFAULT_START_OPTIONS: StartOptions = {
@@ -39,6 +41,8 @@ const DEFAULT_START_OPTIONS: StartOptions = {
   mcpEnabled: true,
   recentEventsBufferSize: 1000,
   logRetentionDays: 7,
+  openBrowser: true,
+  webAppPort: null,
 };
 
 export function parseArgs(argv: readonly string[]): Command {
@@ -124,6 +128,18 @@ function parseStart(args: string[]): Command {
         options.logRetentionDays = n;
         break;
       }
+      case "--no-open":
+        options.openBrowser = false;
+        break;
+      case "--web-app-port": {
+        const value = args[++i];
+        const n = Number(value);
+        if (!Number.isInteger(n) || n < 1 || n > 65535) {
+          return { kind: "error", message: `--web-app-port requires an integer in [1, 65535]` };
+        }
+        options.webAppPort = n;
+        break;
+      }
       default:
         return { kind: "error", message: `unknown flag: ${flag}` };
     }
@@ -173,6 +189,8 @@ start OPTIONS
                           in-memory event ring size (default 1000)
   --log-retention-days <N>
                           days to retain rotated event logs (default 7)
+  --no-open               do not open the browser automatically
+  --web-app-port <port>   fix the web-app dev server port (default: auto)
 
 See specs/SPEC_013_llm_control_plane_mcp.md for full details.
 `;

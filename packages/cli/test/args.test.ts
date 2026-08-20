@@ -28,6 +28,8 @@ describe("parseArgs — start", () => {
     expect(cmd.options.mcpEnabled).toBe(true);
     expect(cmd.options.recentEventsBufferSize).toBe(1000);
     expect(cmd.options.logRetentionDays).toBe(7);
+    expect(cmd.options.openBrowser).toBe(true);
+    expect(cmd.options.webAppPort).toBeNull();
   });
 
   it("--instance requires a value", () => {
@@ -82,6 +84,20 @@ describe("parseArgs — start", () => {
     const cmd = parseArgs(["start", "--log-retention-days", "0"]);
     expect(cmd.kind).toBe("start");
     if (cmd.kind === "start") expect(cmd.options.logRetentionDays).toBe(0);
+  });
+
+  it("--no-open disables browser autolaunch", () => {
+    const cmd = parseArgs(["start", "--no-open"]);
+    expect(cmd.kind).toBe("start");
+    if (cmd.kind === "start") expect(cmd.options.openBrowser).toBe(false);
+  });
+
+  it("--web-app-port validates integer range", () => {
+    expect(parseArgs(["start", "--web-app-port", "0"]).kind).toBe("error");
+    expect(parseArgs(["start", "--web-app-port", "abc"]).kind).toBe("error");
+    const cmd = parseArgs(["start", "--web-app-port", "5555"]);
+    expect(cmd.kind).toBe("start");
+    if (cmd.kind === "start") expect(cmd.options.webAppPort).toBe(5555);
   });
 
   it("unknown flag → error", () => {
