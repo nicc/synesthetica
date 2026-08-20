@@ -97,6 +97,9 @@ export interface ContinuousMacroAnnotation extends MacroAnnotationBase {
   type: "continuous";
   /** Inclusive range [min, max]. Values outside are clamped. */
   range: [number, number];
+  /** Default value (also the launch-time value). Anchors relative
+   *  requests like "more" or "less" for the LLM. */
+  default: number;
   directionality: MacroDirectionality;
 }
 
@@ -109,6 +112,9 @@ export interface DiscreteMacroAnnotation extends MacroAnnotationBase {
   type: "discrete";
   /** The allowed values, each with a human-readable label. */
   enumValues: Array<{ value: string | number; label: string }>;
+  /** Default value (also the launch-time value). Must be one of
+   *  enumValues[i].value. */
+  default: string | number;
 }
 
 /**
@@ -127,6 +133,8 @@ export interface CompoundMacroAnnotation extends MacroAnnotationBase {
   targets: string[];
   /** Inclusive input range for the top-level dial. Usually [0, 1]. */
   range: [number, number];
+  /** Default value (also the launch-time value). */
+  default: number;
   directionality: MacroDirectionality;
 }
 
