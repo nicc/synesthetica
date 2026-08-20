@@ -5,37 +5,32 @@
  *   posture://conversational    — conversational posture prompt
  *   guide://system-overview     — pipeline narrative for LLM context
  *
- * Bodies are loaded from packages/cli/src/prompts/*.md at build time
- * (bundled as strings). Refinement is a docs edit, not a code edit —
- * matches SPEC 013 §Annotation Storage's spirit.
+ * Bodies live in `@synesthetica/contracts/prompts/*.md`. The CLI and
+ * the web-app both read the same authoritative copy — no duplication.
+ * Resolution uses import.meta.resolve so this works both in the
+ * monorepo (workspace symlink) and after npm install.
  */
 
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 
-const here = dirname(fileURLToPath(import.meta.url));
+// createRequire against this module's URL gives us a resolver that
+// works in native Node ESM AND under vitest (which doesn't implement
+// import.meta.resolve). We resolve contracts' package.json — a
+// stable export — and read the prompts dir relative to it.
+const req = createRequire(import.meta.url);
 
-// Resolve prompt files relative to the module. `here` = dist/resources
-// after build; source promptdir is dist/prompts (tsc copies MD? no,
-// only .ts). We ship the prompts alongside the code via a build step
-// (see package.json + build script). For now, resolve from the
-// source tree if we're running from dist by walking up.
 function loadPrompt(filename: string): string {
-  // Try dist-adjacent first (bundled), then source (dev).
-  const candidates = [
-    resolve(here, "..", "prompts", filename),
-    resolve(here, "..", "..", "src", "prompts", filename),
-    resolve(here, "..", "..", "..", "src", "prompts", filename),
-  ];
-  for (const path of candidates) {
-    try {
-      return readFileSync(path, "utf8");
-    } catch {
-      continue;
-    }
+  const pkgPath = req.resolve("@synesthetica/contracts/package.json");
+  const path = resolve(dirname(pkgPath), "prompts", filename);
+  try {
+    return readFileSync(path, "utf8");
+  } catch (err) {
+    throw new Error(
+      `prompt file not found: ${filename} at ${path} (${err instanceof Error ? err.message : err})`,
+    );
   }
-  throw new Error(`prompt file not found: ${filename} (looked in: ${candidates.join(", ")})`);
 }
 
 export interface PromptEntry {

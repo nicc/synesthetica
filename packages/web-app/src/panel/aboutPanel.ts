@@ -1,28 +1,21 @@
 /**
- * About-panel content: fetches the system-overview markdown from
- * public/ and renders it as a lightly-styled document. Intentionally
- * simple — no full Markdown parser dependency, just the subset the
- * overview uses (headings, paragraphs, tables, lists, hr, code spans).
+ * About-panel content: renders the system-overview markdown as a
+ * lightly-styled document. Intentionally simple — no full Markdown
+ * parser dependency, just the subset the overview uses (headings,
+ * paragraphs, tables, lists, hr, code spans).
+ *
+ * Source-of-truth is @synesthetica/contracts/prompts/system-overview.md.
+ * Vite's ?raw suffix inlines the markdown as a string at build time,
+ * so runtime needs no HTTP fetch and the file lives in exactly one
+ * place across the monorepo.
  */
 
-const OVERVIEW_URL = "/system-overview.md";
+import overviewMd from "@synesthetica/contracts/prompts/system-overview.md?raw";
 
 export async function buildAboutPanel(): Promise<HTMLElement> {
   const wrap = document.createElement("div");
   wrap.className = "syn-about";
-  try {
-    const res = await fetch(OVERVIEW_URL);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const md = await res.text();
-    wrap.appendChild(renderMarkdown(md));
-  } catch (err) {
-    const p = document.createElement("p");
-    p.className = "syn-about-error";
-    p.textContent = `Could not load system overview: ${
-      err instanceof Error ? err.message : String(err)
-    }`;
-    wrap.appendChild(p);
-  }
+  wrap.appendChild(renderMarkdown(overviewMd));
   return wrap;
 }
 

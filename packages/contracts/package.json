@@ -24,10 +24,13 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./package.json": "./package.json",
+    "./prompts/*": "./prompts/*"
   },
   "files": [
     "dist",
+    "prompts",
     "LICENSE",
     "README.md"
   ],
