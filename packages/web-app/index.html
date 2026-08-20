@@ -162,15 +162,27 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    /* Range sliders — desaturated, ash-toned, to match the surface. */
+    /* Range sliders — desaturated, ash-toned, to match the surface.
+     * Explicit selectors for both WebKit and Firefox so neither
+     * browser leaks its default blue accent through. */
     .syn-panel-widget input[type="range"] {
       -webkit-appearance: none;
       appearance: none;
       width: 100%;
       height: 4px;
+      background: transparent;
+      outline: none;
+    }
+    .syn-panel-widget input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
       background: #2a2a2a;
       border-radius: 2px;
-      outline: none;
+    }
+    .syn-panel-widget input[type="range"]::-moz-range-track {
+      height: 4px;
+      background: #2a2a2a;
+      border-radius: 2px;
+      border: none;
     }
     .syn-panel-widget input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
@@ -180,6 +192,7 @@
       background: #888;
       border-radius: 50%;
       cursor: pointer;
+      margin-top: -4px; /* re-centre on the 4px track */
     }
     .syn-panel-widget input[type="range"]::-moz-range-thumb {
       width: 12px;
@@ -188,6 +201,10 @@
       border-radius: 50%;
       border: none;
       cursor: pointer;
+    }
+    .syn-panel-widget input[type="range"]:hover::-webkit-slider-thumb,
+    .syn-panel-widget input[type="range"]:hover::-moz-range-thumb {
+      background: #b0b0b0;
     }
     .syn-panel-widget select,
     .syn-panel-widget input[type="number"] {
