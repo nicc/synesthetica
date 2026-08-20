@@ -8,6 +8,7 @@
     "sourceMap": true,
     "outDir": "dist",
     "rootDir": ".",
+    "tsBuildInfoFile": ".tsbuildinfo",
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,

@@ -107,16 +107,68 @@ High-level principles live in `PRINCIPLES.md` and act as *constraints*, not aspi
 This README acts as the root index. A more detailed `INDEX.md` may be added once the document set grows.
 
 ## Status
-The project is in active development. The core pipeline is implemented with proper frame type separation (RawInputFrame → MusicalFrame → AnnotatedMusicalFrame → SceneFrame).
 
-You can run the pipeline:
+Actively developed. The core pipeline is implemented with proper frame type
+separation (RawInputFrame → MusicalFrame → AnnotatedMusicalFrame → SceneFrame),
+the CLI + MCP server run end-to-end, and the browser engine speaks to the CLI
+over WebSocket.
+
+Not yet publishable to npm — the CLI still spawns Vite as a subprocess to serve
+the web-app; that needs to be swapped for a bundled static server before
+`npx @synesthetica/cli` will work outside the monorepo. Tracked as
+`synesthetica-co4`.
+
+## Quickstart (dev / from-source)
+
 ```bash
-cd packages/web-app
+git clone https://github.com/nicc/synesthetica.git
+cd synesthetica
 npm install
-npm run dev:chrome  # Opens in Chrome (required for Web MIDI)
+npm run build -ws
+
+# Standalone: browser visualiser + manifest-generated controls, no LLM.
+node packages/cli/dist/bin.js start --no-mcp
+
+# With MCP server on stdio (connect any MCP-capable client via stdio).
+node packages/cli/dist/bin.js start
 ```
 
-See [packages/web-app/README.md](packages/web-app/README.md) for details.
+Both paths spawn Vite for the web-app and open a browser tab. Use `--no-open`
+to skip the auto-launch.
+
+## Adding to an LLM client
+
+MCP servers are packaged as CLIs the client spawns as a subprocess.
+`@synesthetica/cli` fits that shape — the client runs `synesthetica start`,
+connects to its stdin/stdout, and the LLM sees Synesthetica's tools and
+resources. See [packages/cli/README.md](packages/cli/README.md) for
+platform-specific config snippets (Claude Desktop, Claude Code).
+
+Once shippable to npm, the client-side config will look like this:
+
+```json
+{
+  "mcpServers": {
+    "synesthetica": {
+      "command": "npx",
+      "args": ["-y", "@synesthetica/cli", "start"]
+    }
+  }
+}
+```
+
+Until then, the same shape works with a path to the built CLI:
+
+```json
+{
+  "mcpServers": {
+    "synesthetica": {
+      "command": "node",
+      "args": ["/path/to/synesthetica/packages/cli/dist/bin.js", "start"]
+    }
+  }
+}
+```
 
 ## Control and Interaction Model
 

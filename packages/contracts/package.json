@@ -1,8 +1,22 @@
 {
   "name": "@synesthetica/contracts",
   "version": "0.1.0",
-  "private": true,
-  "description": "Type and interface contracts for the Synesthetica system",
+  "description": "Type and interface contracts for the Synesthetica system — annotations, panel descriptors, engine-bridge protocol, control ops.",
+  "license": "MIT",
+  "author": "Nic Young",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nicc/synesthetica.git",
+    "directory": "packages/contracts"
+  },
+  "homepage": "https://github.com/nicc/synesthetica#readme",
+  "bugs": "https://github.com/nicc/synesthetica/issues",
+  "keywords": [
+    "synesthetica",
+    "mcp",
+    "music-visualisation",
+    "annotations"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,11 +27,15 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/add-js-extensions.mjs",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist .tsbuildinfo",
+    "prepack": "cp ../../LICENSE ./LICENSE",
+    "prepublishOnly": "npm run clean && npm run build"
   },
   "devDependencies": {
     "typescript": "^5.3.0"

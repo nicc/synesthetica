@@ -74,3 +74,6 @@ __pycache__/
 # Clojure tooling (from Pencil)
 .clj-kondo/
 .lsp/
+
+# LICENSE copies made at publish time by `npm pack` (see per-package prepack).
+packages/*/LICENSE

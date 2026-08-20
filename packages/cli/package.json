@@ -1,27 +1,51 @@
 {
   "name": "@synesthetica/cli",
   "version": "0.1.0",
-  "private": true,
-  "description": "Synesthetica CLI wrapper: launches engine instances and hosts the MCP server (SPEC 013)",
+  "description": "Synesthetica CLI + MCP server — launches the visualiser and exposes it to any MCP-capable LLM client.",
+  "license": "MIT",
+  "author": "Nic Young",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nicc/synesthetica.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/nicc/synesthetica#readme",
+  "bugs": "https://github.com/nicc/synesthetica/issues",
+  "keywords": [
+    "synesthetica",
+    "mcp",
+    "mcp-server",
+    "claude",
+    "music-visualisation",
+    "cli"
+  ],
   "type": "module",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
     "synesthetica": "dist/bin.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json && npm run copy-assets",
     "copy-assets": "mkdir -p dist/prompts && cp src/prompts/*.md dist/prompts/",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev": "tsc -p tsconfig.json --watch"
+    "dev": "tsc -p tsconfig.json --watch",
+    "prepack": "cp ../../LICENSE ./LICENSE",
+    "prepublishOnly": "npm run clean && npm run build && npm test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
-    "@synesthetica/contracts": "*",
+    "@synesthetica/contracts": "^0.1.0",
     "ws": "^8.21.3"
   },
   "devDependencies": {
