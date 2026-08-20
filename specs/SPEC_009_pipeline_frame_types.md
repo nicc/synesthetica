@@ -73,7 +73,6 @@ export interface MusicalFrame {
   part: PartId;
   notes: Note[];
   chords: MusicalChord[];
-  rhythmicAnalysis: RhythmicAnalysis;
   prescribedTempo: number | null;  // User-set BPM (not inferred)
   prescribedMeter: { beatsPerBar: number; beatUnit: number } | null;
   prescribedKey: PrescribedKey | null;  // User-set key+mode (not inferred)
@@ -81,30 +80,11 @@ export interface MusicalFrame {
   harmonicContext?: HarmonicContext;     // Tension + functional analysis
 }
 
-// Currently unpopulated: BeatDetectionStabilizer has been removed
-// and drift is computed directly in RhythmGrammar from the prescribed
-// tempo grid. The type stays on MusicalFrame as a forward-looking
-// slot: a future audio adapter may measure drift from the waveform
-// and populate these fields.
-export interface RhythmicAnalysis {
-  detectedDivision: Ms | null;     // Most prominent IOI (not a tempo)
-  onsetDrifts: OnsetDrift[];       // Per-onset drift data at 4 subdivision levels
-  stability: number;               // [0,1] how consistent the division is
-  confidence: number;              // [0,1] detection confidence
-}
-
-// Per-onset subdivision drift analysis (RFC 008)
-export interface OnsetDrift {
-  t: Ms;                           // Onset timestamp
-  subdivisions: SubdivisionDrift[]; // 4 elements, coarse to fine
-}
-
-export interface SubdivisionDrift {
-  label: string;                   // "quarter"|"8th"|"16th"|"32nd" or "1x"|"2x"|"4x"|"8x"
-  period: Ms;                      // Subdivision period in ms
-  drift: Ms;                       // Signed error (negative = early, positive = late)
-  nearest: boolean;                // True if this is the closest subdivision
-}
+// RhythmicAnalysis / OnsetDrift / SubdivisionDrift removed 2026-08-20
+// along with any BPM inference from the system. RhythmGrammar computes
+// drift inline from the prescribed tempo grid; no shared "rhythmic
+// analysis" type is needed. See SPEC 013 §Non-Goals. RFCs 007 and 008
+// (which designed these types) are superseded.
 
 export interface Note {
   id: NoteId;
@@ -158,8 +138,7 @@ export interface DynamicsState {
 - Notes have phase (attack → sustain → release)
 - Includes derived state (dynamics with contour history, trend, and range)
 - DynamicsState separates constituents (events) from aggregates (level, trend, contour, range)
-- Rhythmic analysis is purely descriptive (not tempo inference)
-- Tempo/meter are user-prescribed, not stabilizer-inferred
+- Tempo/meter are user-prescribed, not stabilizer-inferred (BPM inference removed 2026-08-20)
 
 ### AnnotatedMusicalFrame (RFC 006)
 
@@ -171,18 +150,16 @@ export interface AnnotatedMusicalFrame {
   part: PartId;
   notes: AnnotatedNote[];
   chords: AnnotatedChord[];
-  rhythm: AnnotatedRhythm;
   bars: AnnotatedBar[];
   phrases: AnnotatedPhrase[];
   dynamics: AnnotatedDynamics;
+  // Prescribed context (tempo, meter, key, chord-interpretation) passes
+  // straight through from MusicalFrame — see the actual contract in
+  // packages/contracts/annotated/annotated.ts for the full field list.
 }
 
-export interface AnnotatedRhythm {
-  analysis: RhythmicAnalysis;      // Descriptive analysis from stabilizer
-  visual: VisualAnnotation;        // Visual properties from ruleset
-  prescribedTempo: number | null;  // User-set BPM (from pipeline)
-  prescribedMeter: { beatsPerBar: number; beatUnit: number } | null;
-}
+// AnnotatedRhythm removed 2026-08-20 along with RhythmicAnalysis.
+// Grammars read prescribedTempo/prescribedMeter directly from the frame.
 
 export interface AnnotatedNote {
   note: Note;                    // The underlying musical note
@@ -220,8 +197,8 @@ Adapters              Stabilizers           Rulesets              Grammars
    │                      │                     │                     │
    │  - MidiNoteOn        │  - Note             │  - AnnotatedNote    │
    │  - MidiNoteOff       │  - MusicalChord     │  - AnnotatedChord   │
-   │  - MidiCC            │  - RhythmicAnalysis │  - AnnotatedRhythm  │
-   │  - AudioFeatures     │  - DynamicsState    │  - AnnotatedDynamics│
+   │  - MidiCC            │  - DynamicsState    │  - AnnotatedDynamics│
+   │  - AudioFeatures     │  - HarmonicContext  │  - HarmonicContext  │
 ```
 
 ## Note Lifecycle

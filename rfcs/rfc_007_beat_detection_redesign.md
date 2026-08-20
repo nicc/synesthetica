@@ -2,10 +2,18 @@
 
 ---
 id: RFC.beat.detection-v1
-status: draft
+status: superseded (2026-08-20)
 owner: agent
-last_updated: 2026-01-20
+last_updated: 2026-08-20
+supersededBy: SPEC 013 §Non-Goals (BPM inference removed entirely)
 ---
+
+> **Superseded 2026-08-20.** The BeatDetectionStabilizer this RFC proposed
+> was never implemented; the underlying `RhythmicAnalysis` types were
+> removed from the contract along with any BPM inference from the system.
+> Tempo is user-prescribed only. RhythmGrammar computes drift inline from
+> the prescribed grid; no shared descriptive-analysis type is needed.
+> Historical content preserved below.
 
 ## 1. Purpose
 

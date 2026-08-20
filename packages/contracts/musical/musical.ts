@@ -147,85 +147,18 @@ export interface TimeSignature {
   beatUnit: number;
 }
 
-/**
- * Drift measurement for a single subdivision level.
- * See RFC 008 for design rationale.
- */
-export interface SubdivisionDrift {
-  /**
-   * Human-readable label for this subdivision level.
-   * Tier 2/3 (with tempo): "quarter" | "8th" | "16th" | "32nd"
-   * Tier 1 (without tempo): "1x" | "2x" | "4x" | "8x"
-   */
-  label: string;
+// Tempo/beat/rhythm inference removed 2026-08-20 (Nic decision):
+// the system does not infer tempo, subdivisions, or beat positions
+// from onset patterns under any circumstances. Tempo and meter are
+// user-prescribed only (via set_tempo / set_meter control ops); if
+// not prescribed, the pipeline runs free-time.
+//
+// Historic types RhythmicAnalysis / OnsetDrift / SubdivisionDrift and
+// their EMPTY_RHYTHMIC_ANALYSIS default removed; no consumer remained
+// after RhythmGrammar's tempo inference was removed. RFC 007 (beat
+// detection redesign) and RFC 008 (per-onset drift analysis) are
+// superseded by this decision.
 
-  /** Subdivision period in ms */
-  period: Ms;
-
-  /** Signed timing error: negative = early, positive = late */
-  drift: Ms;
-
-  /** True if this is the closest subdivision to the onset */
-  nearest: boolean;
-}
-
-/**
- * Per-onset drift analysis with measurements at multiple subdivision levels.
- * Replaces raw onset timestamps with structured timing data.
- * See RFC 008 for design rationale.
- */
-export interface OnsetDrift {
-  /** Onset timestamp */
-  t: Ms;
-
-  /** Drift at 4 subdivision levels, coarse to fine */
-  subdivisions: SubdivisionDrift[];
-}
-
-/**
- * Rhythmic analysis produced by BeatDetectionStabilizer.
- *
- * This is purely DESCRIPTIVE - it analyzes historic onset patterns
- * without inferring future intent. See RFC 007 for design rationale,
- * RFC 008 for per-onset drift analysis.
- *
- * Key insight: Tempo inference is a category error. We cannot distinguish
- * subdivisions from tempo changes, drift from rubato, off-beat from syncopation
- * based on historic data alone. Therefore:
- * - Stabilizer outputs descriptive analysis (detectedDivision, stability)
- * - Tempo/meter are set explicitly by user via control ops
- */
-export interface RhythmicAnalysis {
-  /**
-   * Detected time division between recent onsets in ms.
-   * This is the most prominent IOI cluster, NOT a "tempo".
-   * Null if insufficient data or no clear pattern.
-   */
-  detectedDivision: Ms | null;
-
-  /**
-   * Per-onset drift analysis at 4 subdivision levels.
-   * Each onset includes drift measurements from coarse (beat/detected) to fine (32nd/8x).
-   * The `nearest` flag on each subdivision indicates the closest grid position.
-   * Empty if no onsets in the analysis window.
-   */
-  onsetDrifts: OnsetDrift[];
-
-  /**
-   * How stable the detected division is across the window.
-   * High stability = consistent spacing between onsets.
-   * Range: 0.0 to 1.0
-   */
-  stability: number;
-
-  /**
-   * Confidence in the detected division.
-   * Based on cluster strength and sample count.
-   * Low confidence = "not enough data" or "ambiguous pattern".
-   * Range: 0.0 to 1.0
-   */
-  confidence: Confidence;
-}
 
 /**
  * A single velocity observation at a point in time.
@@ -493,7 +426,6 @@ export interface MusicalFrame {
   // Current state (from stabilizers)
   notes: Note[];
   chords: MusicalChord[];
-  rhythmicAnalysis: RhythmicAnalysis;
   dynamics: DynamicsState;
 
   // Prescribed context (from control ops, not stabilizers)
@@ -583,14 +515,6 @@ function pitchClassName(pc: PitchClass): string {
 // Shared Defaults
 // ============================================================================
 
-/** Empty rhythmic analysis — no detected patterns. */
-export const EMPTY_RHYTHMIC_ANALYSIS: Readonly<RhythmicAnalysis> = Object.freeze({
-  detectedDivision: null,
-  onsetDrifts: [],
-  stability: 0,
-  confidence: 0,
-});
-
 /** Empty dynamics state — silence. */
 export const EMPTY_DYNAMICS: Readonly<DynamicsState> = Object.freeze({
   events: [],
@@ -619,7 +543,6 @@ export function createEmptyMusicalFrame(t: Ms, part: PartId): MusicalFrame {
     part,
     notes: [],
     chords: [],
-    rhythmicAnalysis: { ...EMPTY_RHYTHMIC_ANALYSIS },
     dynamics: {
       ...EMPTY_DYNAMICS,
       range: { ...EMPTY_DYNAMICS.range },

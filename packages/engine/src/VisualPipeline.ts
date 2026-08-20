@@ -543,13 +543,6 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       }
     }
 
-    // Take latest non-null values for rhythmicAnalysis and dynamics
-    let rhythmicAnalysis: MusicalFrame["rhythmicAnalysis"] = {
-      detectedDivision: null,
-      onsetDrifts: [],
-      stability: 0,
-      confidence: 0,
-    };
     let dynamics: MusicalFrame["dynamics"] = {
       events: [],
       level: 0,
@@ -561,9 +554,6 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     // Take latest non-null/non-default values for derived signals
     let harmonicContext: MusicalFrame["harmonicContext"];
     for (const frame of frames) {
-      if (frame.rhythmicAnalysis.detectedDivision !== null) {
-        rhythmicAnalysis = frame.rhythmicAnalysis;
-      }
       if (frame.dynamics.events.length > 0) dynamics = frame.dynamics;
       if (frame.harmonicContext) harmonicContext = frame.harmonicContext;
     }
@@ -574,7 +564,6 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       part: partId,
       notes: Array.from(notesMap.values()),
       chords: Array.from(chordsMap.values()),
-      rhythmicAnalysis,
       dynamics,
       prescribedTempo: this.prescribedTempo,
       prescribedMeter: this.prescribedMeter,

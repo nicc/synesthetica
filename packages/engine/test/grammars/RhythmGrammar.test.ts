@@ -84,12 +84,6 @@ function createTestFrame(
 
   return createTestAnnotatedFrame(t, "main", {
     notes,
-    rhythmicAnalysis: {
-      detectedDivision: null,
-      onsetDrifts: [],
-      stability: 0,
-      confidence: 0,
-    },
     prescribedTempo: options.tempo ?? null,
     prescribedMeter: options.meter ?? null,
   });

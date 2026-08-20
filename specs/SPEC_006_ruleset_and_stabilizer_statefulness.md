@@ -102,8 +102,7 @@ Stabilizers produce MusicalFrame containing:
 | `chords: MusicalChord[]` | Detected chords | Note analysis |
 | `progression: ChordId[]` | Recent chord history (references) | Chord tracking over time |
 | `phrases: Phrase[]` | Phrase boundaries | Beat + density analysis |
-| `rhythmicAnalysis: RhythmicAnalysis` | Descriptive analysis of note timing patterns | IOI clustering |
-| `prescribedTempo: number \| null` | User-set tempo in BPM (not inferred) | Control op |
+| `prescribedTempo: number \| null` | User-set tempo in BPM (never inferred) | Control op |
 | `prescribedMeter: { beatsPerBar, beatUnit } \| null` | User-set meter (not inferred) | Control op |
 | `prescribedKey: PrescribedKey \| null` | User-set key and mode (not inferred) | Control op |
 | `dynamics: DynamicsState` | Velocity observations, raw level contour, trend, and dynamic range | DynamicsStabilizer (max intensity per onset, linear regression trend) |

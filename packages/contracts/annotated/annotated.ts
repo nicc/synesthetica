@@ -18,7 +18,6 @@ import type {
   NotePhase,
   MusicalChord,
   ChordId,
-  RhythmicAnalysis,
   TimeSignature,
   DynamicsState,
   HarmonicContext,
@@ -284,21 +283,9 @@ export interface AnnotatedChord {
   shape: ChordShapeGeometry;
 }
 
-/**
- * Rhythmic analysis with visual annotations.
- *
- * Contains purely descriptive analysis of onset patterns.
- * Grammars check prescribedTempo/prescribedMeter for intent-relative visualization.
- *
- * See RFC 007 for design rationale.
- */
-export interface AnnotatedRhythm {
-  /** Rhythmic analysis (detected division, stability, onsets) */
-  analysis: RhythmicAnalysis;
-
-  /** Visual properties for rhythm visualization */
-  visual: VisualAnnotation;
-}
+// AnnotatedRhythm removed 2026-08-20 with the removal of tempo/beat
+// inference. Grammars read prescribed tempo/meter directly from the
+// frame's prescribed* fields for their visualisation logic.
 
 /**
  * Bar boundary information.
@@ -408,9 +395,6 @@ export interface AnnotatedMusicalFrame {
    * See HarmonicContext for tier 1 (key-agnostic) vs tier 2 (key-aware) behavior.
    */
   harmonicContext: HarmonicContext;
-
-  /** Rhythmic analysis with visual annotations */
-  rhythm: AnnotatedRhythm;
 
   /** Bar boundaries with visual annotations */
   bars: AnnotatedBar[];

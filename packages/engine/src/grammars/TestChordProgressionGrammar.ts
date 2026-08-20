@@ -117,7 +117,9 @@ export class TestChordProgressionGrammar implements IVisualGrammar {
       // Notes not in chords are ignored by this grammar
     }
 
-    // Note: We completely ignore input.rhythm and input.bars
+    // Note: We ignore input.bars (bar detection stabilizer never
+    // shipped). input.rhythm was removed 2026-08-20 with the BPM
+    // inference cleanup.
 
     return {
       t,

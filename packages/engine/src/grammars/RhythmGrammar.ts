@@ -264,13 +264,16 @@ export class RhythmGrammar implements IVisualGrammar {
   }
 
   // ============================================================================
-  // Effective Tempo/Meter (prescribed or inferred)
+  // Effective Tempo/Meter (prescribed only — no inference; SPEC 013 §Non-Goals)
   // ============================================================================
 
   /**
-   * Effective tempo in BPM — now purely from prescribed tempo. No more
-   * tempo inference from onset clustering; free-time mode is the
-   * default when the user hasn't prescribed one.
+   * Effective tempo in BPM — purely from prescribed tempo. The system
+   * does not infer tempo from onset patterns under any circumstances;
+   * free-time mode is the default when the user hasn't prescribed a
+   * tempo. Method retained for the two-tier tempo/no-tempo branch and
+   * for future non-prescribed tempo sources (e.g. MIDI clock in) that
+   * are still explicit rather than inferred.
    */
   private getEffectiveTempo(prescribed: PrescribedContext): number | null {
     return prescribed.tempo;

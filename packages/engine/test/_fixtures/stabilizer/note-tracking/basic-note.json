@@ -29,12 +29,6 @@
       }
     ],
     "chords": [],
-    "rhythmicAnalysis": {
-      "detectedDivision": null,
-      "onsetDrifts": [],
-      "stability": 0,
-      "confidence": 0
-    },
     "dynamics": {
       "events": [],
       "level": 0,

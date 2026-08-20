@@ -26,7 +26,7 @@ SPEC 004 established the principle (annotation-driven, LLM interprets, engine ex
 - **Concurrent LLM clients driving the same instance** — see §Concurrency stance. Explicitly not supported.
 - **The LLM prompt design** — system prompts are the LLM client's concern; this SPEC only defines the resources the LLM reads (annotations + concepts + guide).
 - **Explanation UI ("why did it change?")** — the LLM narrates via the tool-call/response loop; no separate explanation channel.
-- **A GUI for control operations** — the web app remains render-only; all control flows through MCP.
+- **BPM / tempo inference** — the system does not infer tempo from onset patterns under any circumstances. Tempo is user-prescribed only (via `set_tempo`, UI, or a future explicit source like MIDI clock). Removed 2026-08-20 (RhythmicAnalysis contract deleted; no stabilizer ever populated it).
 
 ## Principles Honoured
 
@@ -146,7 +146,12 @@ Errors: `CHORD_MODE_UNKNOWN`, `INSTANCE_*`.
 
 #### `set_input(source, instance?)`
 
-`source: string` — a MIDI device name (as reported by the browser MIDI API) or the literal `"audio"`.
+`source: string` — the id of a specific input device. Enumerated inputs are exposed via `inputs://available` (see §Resources). Format:
+
+- `midi:<device-name>` — a specific MIDI device (e.g. `midi:Yamaha P-125`)
+- `audio:<device-id>` — a specific audio input device (e.g. `audio:built-in-mic`, `audio:usb-audio-0`)
+
+Specific audio-device selection matters for setups where the user wants to route speech input (for LLM-mediated control) separately from music input. Falls back to the OS default within each category if an unqualified `"midi"` or `"audio"` is passed.
 
 Errors: `INPUT_SOURCE_UNAVAILABLE`.
 
@@ -184,7 +189,8 @@ Shared across all instances (the annotations describe the system, not an instanc
 #### `state://<instance>/*` — engine state per instance
 
 - `state://<label>/current` — a snapshot of current macro values, active preset, prescribed context (key/tempo/meter/chord-mode/metronome), and input source. **Subscribable** — see §State subscription protocol.
-- `state://<label>/recent-events` — recent musical activity: notes (last N seconds), chords, tempo estimate, active grammar. Also subscribable but at a coarser cadence (see subscription rules).
+- `state://<label>/recent-events?limit=<N>` — recent musical activity (see §Recent events). **Pull-only, not subscribable.** LLM reads when it wants context; `limit` defaults to 100, capped at 1000 for in-memory reads. `?since=<eventId>` returns events after a specific ID (for cursor-style consumption).
+- `state://<label>/recent-events/history?limit=<N>&before=<eventId>` — disk-backed deeper history (see §Recent events — disk log). Same shape as `recent-events` but reads from rotated log files.
 
 Instance labels are per §Multi-instance routing.
 
@@ -194,6 +200,13 @@ Instance labels are per §Multi-instance routing.
 - `instances://<label>` — details for one instance (label, status, current preset, current input, MCP resource URIs it exposes).
 
 Not subscribable; the LLM re-fetches when it needs a fresh view.
+
+#### `inputs://` — available input devices
+
+- `inputs://available` — enumerated MIDI + audio input devices. Refreshed on device connect/disconnect. Same list underpins the UI dropdown (see §UI Controls).
+- Each entry: `{ id: string, label: string, kind: "midi" | "audio", isDefault: boolean }`. `id` is what `set_input` accepts.
+
+**Subscribable** — device connect/disconnect fires an update so the LLM (and UI) can adapt (e.g. "the piano I was using just disconnected — do you want to switch?").
 
 #### `concepts://` — terminology dictionary
 
@@ -230,7 +243,7 @@ Validation errors halt server startup with a clear message identifying the offen
 
 ### Refresh model
 
-- **Development**: file-watch on the annotations source; regenerate on change. MCP resource list is re-published via the standard notification mechanism (`notifications/resources/list_changed`).
+- **Development**: file-watch on the annotations source; regenerate on change. MCP resource list is re-published via the standard notification mechanism (`notifications/resources/list_changed`); UI controls (see §UI Controls) also re-render on the same signal.
 - **Production**: annotations are baked at CLI install time; no live reload. `synesthetica reload-annotations` (a CLI subcommand) forces a regenerate + republish for the running server.
 
 ### Storage format decision (was Open Q #3 in RFC 011)
@@ -244,18 +257,64 @@ Alternatives considered and rejected:
 - YAML — no type checking; comment fidelity worse than TS.
 - Separate `.annotation.ts` per macro — spreads related concepts across many small files; loses cross-reference locality.
 
+## UI Controls (generated from the same manifest)
+
+The web app renders a control panel derived from the same annotation manifest that MCP serves. Same source of truth, two consumers — MCP tools for LLM-mediated control, UI controls for direct-manual control. Either can operate without the other; both can operate simultaneously.
+
+### Sections
+
+Controls are grouped by annotation namespace into three collapsible sections. Each section is collapsed by default to keep the panel small.
+
+- **Input** — controls in the `input:*` namespace. Currently just `input:source`; renders as a dropdown of available MIDI devices + audio devices (see §Audio input selection).
+- **Basics** — controls in the `session:*` namespace: key (paired `session:tonic` + `session:mode`), tempo, meter (paired `session:beats-per-bar` + `session:beat-value`), chord mode, metronome. Compact widgets — pair-typed controls render as a single grouped widget (e.g. key selector combines root + mode).
+- **Advanced** — everything else: all aesthetic macros (`system:*`, bare cross-cutting, and grammar-scoped). Grouped by scope prefix so the LLM's namespace conventions are visible in the UI.
+
+### Widget generation
+
+Each control gets a widget appropriate to its annotation type:
+
+| Annotation type | Widget |
+|---|---|
+| `ContinuousMacroAnnotation` | Slider (range from annotation, current value from state) |
+| `DiscreteMacroAnnotation` | Segmented control or dropdown (enum values) |
+| `CompoundMacroAnnotation` | Slider (dispatches to the underlying targets per the compound's fan-out) |
+| `NumberSessionControlAnnotation` (nullable) | Number input + clear button |
+| `EnumSessionControlAnnotation` | Dropdown |
+| `BooleanSessionControlAnnotation` | Toggle |
+| `PairSessionControlAnnotation` | Composite widget grouping the two referenced controls (e.g. root+mode → key selector) |
+
+Widget labels come from `name` (fallback to `id`), tooltips from `notes[0]` when present. Aliases don't render in the UI but are searchable via a filter input at the top of the panel (implementation-time nice-to-have).
+
+### Coexistence with LLM-mediated control
+
+- The UI dispatches control changes through the **same engine setter path** as MCP tools (via the `EngineHandle` interface, §Engine Channel). No parallel control path.
+- State updates fire on `state://<label>/current` regardless of which side initiated the change. LLM sees UI-driven changes, UI sees LLM-driven changes — both stay in sync through the same subscription.
+- No ownership or locking between UI and LLM. Last-write-wins on races, consistent with §Concurrency Stance.
+
+### Standalone-launch
+
+The CLI can be started without the MCP server if no LLM control is wanted:
+
+```
+synesthetica start --no-mcp
+```
+
+The engine + web app + UI controls all work; only MCP registration is skipped. This is the "I just want to launch and play" path.
+
 ## CLI Shape and Lifecycle
 
 ### Commands
 
 ```
-synesthetica start [--instance <label>] [--port <port>] [--transport stdio|tcp]
+synesthetica start [--instance <label>] [--port <port>] [--transport stdio|tcp] [--no-mcp] [--recent-events-buffer <N>] [--log-retention-days <N>]
 synesthetica stop [--instance <label>]
 synesthetica status
 synesthetica reload-annotations
 synesthetica list-presets
 synesthetica help
 ```
+
+`--no-mcp` skips MCP server registration entirely — engine + web app + UI controls launch and work standalone; no LLM integration. See §UI Controls — standalone-launch.
 
 `start`:
 - First invocation: starts the MCP server, spawns one engine instance labelled `default` (or user-supplied), opens the browser tab.
@@ -325,24 +384,72 @@ The MCP server calls tool handlers → routes to the right `EngineHandle` → se
 
 ## State Subscription Protocol
 
-### What triggers a state update
+Two kinds of state, two access patterns. The distinction matters because subscription implies notification traffic to the LLM client, which for high-frequency data can pump inference in some client configurations.
 
-`state://<label>/current` publishes an update when:
+### `state://<label>/current` — subscribable
+
+Fires an update when:
 - Any `set_*` tool call succeeds (fires immediately, with the new snapshot).
 - A preset load completes.
 - Input source changes (device connected/disconnected).
+- UI controls modify state (same path as MCP tools).
 
-`state://<label>/recent-events` publishes an update on a coalesced timer (default: every 500ms) if the recent-events buffer changed. Never fires on every note — coalescing is mandatory to keep the LLM's context load bounded.
+Cadence: event-driven, no debouncing. Update-per-op is the norm. If the LLM issues five `set_macro` calls in rapid sequence, five updates fire. Rate is bounded by decision events (user + LLM combined), not per-frame musical activity — safe to subscribe.
 
-### Cadence rules
+### `state://<label>/recent-events` — pull-only (not subscribable)
 
-- `current` — event-driven, no debouncing. Update-per-op is the norm. If the LLM issues five `set_macro` calls in rapid sequence, five updates fire.
-- `recent-events` — 500ms coalescing. If nothing changed in the window, no update.
-- Both — publisher may drop updates if the LLM client isn't reading them (backpressure).
+Musical events (notes, chords, dynamics) arrive at 10s of Hz. Subscribing would inject notifications into the LLM client at a cadence that could trigger inference in clients that map notifications to conversation turns. **Pull-only** avoids this — the LLM reads recent-events on demand, when its own reasoning needs the context.
+
+Typical usage: LLM reads `recent-events?limit=20` before making a decision, or when a user says something ambiguous ("did I play what I think I just played?"). If the LLM wants continuous awareness, it polls at its own cadence.
+
+If we later find pull is insufficient (e.g. a genuine "quiet posture where the LLM watches the music" mode), we add subscription then with an explicit rate-contract and coalescing rule. Not designed for v1.
+
+### `inputs://available` — subscribable
+
+Device connect/disconnect fires an update. Very low frequency (physical device events); safe to subscribe.
 
 ### Subscription lifecycle
 
-Standard MCP: LLM client calls `resources/subscribe` with a URI, receives notifications until it calls `resources/unsubscribe` or disconnects. The server tracks per-URI subscriber counts and stops generating updates when no one is listening.
+Standard MCP: LLM client calls `resources/subscribe` with a URI, receives notifications until it calls `resources/unsubscribe` or disconnects. The server tracks per-URI subscriber counts and stops generating updates when no one is listening. Attempts to subscribe to non-subscribable resources (e.g. `state://<label>/recent-events`) return an error.
+
+## Recent Events
+
+### In-memory buffer (ring)
+
+A per-instance ring buffer holds the most recent N events (default: 1000; configurable via `--recent-events-buffer <N>` at CLI start). Events are pushed as they're produced by the pipeline; oldest evicted when the ring fills.
+
+### Event content
+
+Each event has: `id` (monotonic), `t` (ms since instance start), `kind`, and kind-specific payload.
+
+Kinds emitted (reflects the actual pipeline as of 2026-08-19; add as new stabilizers ship):
+
+- `note-on` — `{ pitch, velocity, noteId, source: "midi" | "audio", confidence? }`
+- `note-off` — `{ noteId, t, source }`
+- `chord-detected` — `{ root, quality, name, roman?, borrowed?, degree?, noteIds }` — from ChordDetectionStabilizer; `roman`/`borrowed`/`degree` populated when a key is prescribed
+- `chord-released` — `{ chordId, t }`
+- `functional-edge` — `{ sourceChordId, targetDegree, targetPc, targetDiatonic, weight, type }` — from HarmonyStabilizer, when a borrowed chord implies resolution to a diatonic destination
+- `dynamics-event` — `{ intensity }` — from DynamicsStabilizer, per note onset
+
+Notably NOT included (called out because earlier drafts / RFCs referenced them, wrongly):
+- ~~Active grammar~~ — no grammar-switching concept exists; all three grammars always run
+- ~~Tempo estimate~~ — the system does not infer tempo from onset patterns under any circumstances (SPEC 013 §Non-Goals; RhythmGrammar's `getEffectiveTempo` returns prescribed tempo only). Prescribed tempo is available in `state://<label>/current` via the `prescribedTempo` field.
+
+### Disk log (rotating)
+
+The in-memory ring is bounded (default 1000 events, ~seconds to minutes of history). For deeper lookback, events are also appended to a rotating disk log.
+
+- **Location**: `$XDG_STATE_HOME/synesthetica/logs/<instance-label>/events-YYYY-MM-DD.jsonl` (one file per day per instance).
+- **Format**: JSONL, one event per line, same shape as in-memory events.
+- **Rotation**: new file at midnight local time.
+- **Retention**: keep the last N days (default 7; `--log-retention-days <N>`). Older files deleted on daily rotation.
+- **Read access**: via `state://<label>/recent-events/history?limit=<N>&before=<eventId>` — reads from the current day's file first, then earlier days as needed to fill `limit`. Bounded lookback (won't scan indefinitely).
+
+Kept simple deliberately — no compression, no indexing, no querying by content. If we outgrow that, revisit.
+
+### Coalescing on pull
+
+Reads of `recent-events` return raw events (no coalescing) up to `limit`. The LLM decides what to make of density. If the LLM wants aggregated summaries ("what happened in the last 10 seconds?"), it aggregates on its side or we add a `?summary=true` param later.
 
 ## Error Surfacing
 
@@ -409,6 +516,8 @@ Each instance has its own `state://<label>/*` resource. The `instances://` resou
 - **I26**: Annotations are validated at server startup and on reload. Invalid annotations halt startup or reload with a clear diagnostic; the server never runs with partially-valid annotations.
 - **I27**: Instance labels are unique per running CLI process. Label collisions on `synesthetica start` are rejected.
 - **I28**: `state://<label>/current` updates are event-driven (no polling); the resource never returns stale data on read.
+- **I29**: UI controls and MCP tools dispatch through the same engine setter path. There is one control surface, two consumers; both stay in sync via the shared subscription.
+- **I30**: `state://<label>/recent-events` is pull-only. Subscribing to it returns an error. Musical activity is not pushed to LLM clients at pipeline cadence.
 
 ## Out of Scope
 

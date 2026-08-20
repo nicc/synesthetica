@@ -59,7 +59,7 @@ npm run preview
 ### What You Should See
 
 - Notes trigger visual markers and particles with colors based on pitch class
-- Beat pulses appear on downbeats (when beat detection is active)
+- Beat pulses appear on downbeats when a tempo is prescribed
 - Chords produce expanding glows with history trails
 - Different pitches = different hues (deterministic mapping per SPEC 002)
 
@@ -106,7 +106,7 @@ WebMidiSource → RawMidiAdapter → VisualPipeline
 
 - No audio input (MIDI only)
 - Single part (no multi-instrument support)
-- No beat detection stabilizer yet (beat annotation always null)
+- No tempo/BPM inference (decision 2026-08-20 — prescribed only)
 - No LLM integration
 - No presets or macro controls
 - Minimal visual polish
@@ -135,7 +135,6 @@ WebMidiSource → RawMidiAdapter → VisualPipeline
 
 ## Next Steps
 
-- Beat detection stabilizer
 - Better rulesets (harmonic tension, phrase awareness, richer palette system)
 - More expressive grammars (trails, fields, glyphs)
 - Enhanced stabilizers (phrase detection, progression tracking)

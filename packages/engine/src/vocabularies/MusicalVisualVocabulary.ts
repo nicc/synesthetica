@@ -27,7 +27,6 @@ import type {
   AnnotatedMusicalFrame,
   AnnotatedNote,
   AnnotatedChord,
-  AnnotatedRhythm,
   AnnotatedDynamics,
   PaletteRef,
   TextureRef,
@@ -38,7 +37,6 @@ import type {
   Note,
   MusicalChord,
   ChordInterpretationMode,
-  RhythmicAnalysis,
   DynamicsState,
   Ms,
 } from "@synesthetica/contracts";
@@ -119,7 +117,6 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
         direction: this.config.hueDirection,
       },
       harmonicContext: frame.harmonicContext ?? defaultHarmonicContext,
-      rhythm: this.annotateRhythm(frame.rhythmicAnalysis),
       bars: [], // No bar detection yet
       phrases: [], // No phrase detection yet
       dynamics: this.annotateDynamics(frame.dynamics),
@@ -249,46 +246,11 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     };
   }
 
-  // ===========================================================================
-  // Rhythm Annotation
-  // ===========================================================================
-
-  private annotateRhythm(
-    analysis: RhythmicAnalysis,
-  ): AnnotatedRhythm {
-    // Rhythm visualization uses neutral gray palette
-    // Brightness based on stability (more stable = brighter)
-    const brightness = 0.5 + analysis.stability * 0.4;
-
-    const palette: PaletteRef = {
-      id: "rhythm",
-      primary: { h: 0, s: 0, v: brightness, a: 1 },
-    };
-
-    const texture: TextureRef = {
-      id: "rhythm",
-      grain: 0.1 + (1 - analysis.stability) * 0.2, // More grain when unstable
-      smoothness: 0.5 + analysis.stability * 0.4, // Smoother when stable
-      density: 0.5,
-    };
-
-    // Motion based on analysis - pulse follows detected division
-    const motion: MotionAnnotation = {
-      jitter: (1 - analysis.stability) * 0.1, // More jitter when unstable
-      pulse: analysis.confidence * 0.6, // Pulse based on confidence
-      flow: 0,
-    };
-
-    return {
-      analysis,
-      visual: {
-        palette,
-        texture,
-        motion,
-        uncertainty: 1 - analysis.confidence,
-      },
-    };
-  }
+  // Rhythm annotation removed 2026-08-20 with the removal of BPM
+  // inference — RhythmicAnalysis was populated only by inference paths
+  // that never had a stabilizer. RhythmGrammar computes its own
+  // drift analysis inline from prescribed tempo, not from an
+  // AnnotatedRhythm.
 
   // ===========================================================================
   // Dynamics Annotation

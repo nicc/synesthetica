@@ -12,7 +12,6 @@ import type {
   AnnotatedNote,
   AnnotatedChord,
   DynamicsState,
-  RhythmicAnalysis,
   HarmonicContext,
   PrescribedKey,
   TimeSignature,
@@ -25,7 +24,6 @@ import type {
 import {
   createEmptyMusicalFrame,
   EMPTY_DYNAMICS,
-  EMPTY_RHYTHMIC_ANALYSIS,
   EMPTY_HARMONIC_CONTEXT,
 } from "@synesthetica/contracts";
 
@@ -52,7 +50,6 @@ export function createTestRawFrame(
 export interface MusicalFrameOverrides {
   notes?: Note[];
   chords?: MusicalChord[];
-  rhythmicAnalysis?: RhythmicAnalysis;
   dynamics?: DynamicsState;
   prescribedTempo?: number | null;
   prescribedMeter?: TimeSignature | null;
@@ -89,11 +86,9 @@ export interface AnnotatedFrameOverrides {
   progression?: ChordId[];
   harmonicContext?: HarmonicContext;
   dynamics?: DynamicsState;
-  rhythmicAnalysis?: RhythmicAnalysis;
   prescribedTempo?: number | null;
   prescribedMeter?: TimeSignature | null;
   prescribedKey?: PrescribedKey | null;
-  rhythmVisual?: VisualAnnotation;
   dynamicsVisual?: VisualAnnotation;
 }
 
@@ -118,10 +113,6 @@ export function createTestAnnotatedFrame(
       direction: "cw",
     },
     harmonicContext: overrides.harmonicContext ?? { ...EMPTY_HARMONIC_CONTEXT },
-    rhythm: {
-      analysis: overrides.rhythmicAnalysis ?? { ...EMPTY_RHYTHMIC_ANALYSIS },
-      visual: overrides.rhythmVisual ?? { ...NEUTRAL_VISUAL },
-    },
     bars: [],
     phrases: [],
     dynamics: {
@@ -132,4 +123,4 @@ export function createTestAnnotatedFrame(
 }
 
 // Re-export constants for convenience
-export { EMPTY_DYNAMICS, EMPTY_RHYTHMIC_ANALYSIS, EMPTY_HARMONIC_CONTEXT };
+export { EMPTY_DYNAMICS, EMPTY_HARMONIC_CONTEXT };

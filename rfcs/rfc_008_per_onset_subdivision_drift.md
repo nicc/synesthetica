@@ -1,8 +1,15 @@
 # RFC 008: Per-Onset Subdivision Drift Analysis
 
-Status: Draft
-Date: 2026-01-21
+Status: superseded (2026-08-20)
+Date: 2026-01-21 (superseded 2026-08-20)
 Issue: synesthetica-4f0
+supersededBy: SPEC 013 §Non-Goals (BPM inference removed); RhythmGrammar's inline drift computation
+
+> **Superseded 2026-08-20.** The `OnsetDrift`/`SubdivisionDrift` types
+> this RFC proposed were removed from the contract along with any BPM
+> inference from the system. RhythmGrammar computes per-onset drift
+> inline from the prescribed tempo grid — no shared cross-stabilizer
+> type is needed. Historical content preserved below.
 
 ## Problem
 
