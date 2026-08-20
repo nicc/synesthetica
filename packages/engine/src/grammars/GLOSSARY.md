@@ -93,7 +93,7 @@ Set of short, gestural lines fanning from a note toward where the beat was. Comi
 **Horizon** (0-1)
 Controls field of vision. At 0, minimal history shown (tight focus on present). At 1, full history visible.
 
-**Subdivision depth** (quarter | 8th | 16th)
+**Subdivision depth** (quarter | 8th | 16th | 32nd)
 Which subdivision to use for drift calculation. Finer subdivisions catch smaller timing deviations.
 
 **Reference linger** (default 1.3)

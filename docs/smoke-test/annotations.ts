@@ -87,7 +87,8 @@ const macros: MacroAnnotation[] = [
     enumValues: [
       { value: "quarter", label: "quarter notes (loose)" },
       { value: "8th", label: "eighth notes" },
-      { value: "16th", label: "sixteenth notes (tight)" },
+      { value: "16th", label: "sixteenth notes (default)" },
+      { value: "32nd", label: "thirty-second notes (finest)" },
     ],
     affects: ["rhythm"],
     notes: [

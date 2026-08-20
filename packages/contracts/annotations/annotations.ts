@@ -102,7 +102,7 @@ export interface ContinuousMacroAnnotation extends MacroAnnotationBase {
 
 /**
  * A macro exposed as a discrete enum — e.g. rhythm:quantise-resolution
- * (quarter | 8th | 16th). No directionality; each value is its own
+ * (quarter | 8th | 16th | 32nd). No directionality; each value is its own
  * meaning.
  */
 export interface DiscreteMacroAnnotation extends MacroAnnotationBase {

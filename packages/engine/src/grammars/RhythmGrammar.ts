@@ -14,7 +14,7 @@
  *
  * Macro controls:
  * - Horizon: Controls field of vision (0 = minimal, 1 = full view)
- * - Subdivision depth: Which subdivision to reference for drift (quarter/8th/16th)
+ * - Subdivision depth: Which subdivision to reference for drift (quarter/8th/16th/32nd)
  *
  * See synesthetica-o1v for design rationale.
  */
@@ -115,7 +115,7 @@ interface PrescribedContext {
 }
 
 /** Subdivision depth options (notched macro) */
-type SubdivisionDepth = "quarter" | "8th" | "16th";
+type SubdivisionDepth = "quarter" | "8th" | "16th" | "32nd";
 
 /** Macro parameters for the grammar */
 interface RhythmGrammarMacros {
@@ -808,6 +808,8 @@ export class RhythmGrammar implements IVisualGrammar {
         return beatMs / 2;
       case "16th":
         return beatMs / 4;
+      case "32nd":
+        return beatMs / 8;
     }
   }
 

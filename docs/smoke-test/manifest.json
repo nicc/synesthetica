@@ -94,7 +94,11 @@
         },
         {
           "value": "16th",
-          "label": "sixteenth notes (tight)"
+          "label": "sixteenth notes (default)"
+        },
+        {
+          "value": "32nd",
+          "label": "thirty-second notes (finest)"
         }
       ],
       "affects": [

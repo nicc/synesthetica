@@ -22,7 +22,7 @@ Only RhythmGrammar exposes true macros at the moment. The others are configured 
 | Macro | File | Default | Range | Controls | Impact | Pertinence | Class | Decision |
 |---|---|---|---|---|---|---|---|---|
 | `horizon` | RhythmGrammar (state) | 1.0 | 0–1 | Field of vision — how much history/future is visible on the rhythm strip. Lower = tighter, more zoomed-in NOW; higher = more context. | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | time:horizon, rhythm:difficulty |
-| `subdivisionDepth` | RhythmGrammar (state) | "16th" | quarter / 8th / 16th | Grid resolution for drift analysis. Affects reference-line placement and "tight vs drifted" labelling. | ⭐⭐ | 🎵🎵🎵 | interpretive | rhythm:quantise-resolution |
+| `subdivisionDepth` | RhythmGrammar (state) | "16th" | quarter / 8th / 16th / 32nd | Grid resolution for drift analysis. Affects reference-line placement and "tight vs drifted" labelling. | ⭐⭐ | 🎵🎵🎵 | interpretive | rhythm:quantise-resolution |
 | `referenceLinger` | RhythmGrammar (state) | 1.3 | multiplier | Reference lines + streaks linger this multiple of the note window. Longer = clearer visual memory of recent timing. | ⭐⭐ | 🎵🎵 | dynamics | rhythm:emphasis |
 
 ---
