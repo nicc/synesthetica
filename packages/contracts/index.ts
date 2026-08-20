@@ -27,6 +27,8 @@ export * from "./control/control_ops";
 export * from "./control/queries";
 
 export * from "./annotations/annotations";
+export * from "./annotations/panel";
+export * from "./annotations/generatePanel";
 
 export * from "./routing/router";
 
