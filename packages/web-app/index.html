@@ -163,6 +163,104 @@
       letter-spacing: 0.5px;
       margin-bottom: 12px;
     }
+
+    /* Manifest-generated panel — separate from #controls so we can
+       evolve them independently while both are visible. */
+    .generated-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      max-width: 320px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid #333;
+      color: #ddd;
+      font-size: 12px;
+    }
+    .generated-panel.hidden { display: none; }
+    .syn-panel-section { margin-bottom: 12px; }
+    .syn-panel-section-title {
+      font-size: 11px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid #222;
+      padding-bottom: 4px;
+    }
+    .syn-panel-subgroup { margin: 10px 0 10px 6px; }
+    .syn-panel-subgroup-title {
+      font-size: 10px;
+      color: #555;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .syn-panel-widget {
+      display: grid;
+      grid-template-columns: 100px 1fr auto;
+      column-gap: 8px;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .syn-panel-widget-label {
+      font-size: 11px;
+      color: #aaa;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .syn-panel-widget-value {
+      font-family: monospace;
+      font-size: 10px;
+      color: #888;
+      min-width: 40px;
+      text-align: right;
+    }
+    .syn-panel-widget-hints {
+      grid-column: 1 / -1;
+      font-size: 9px;
+      color: #555;
+      margin-top: -2px;
+      margin-bottom: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .syn-panel-widget input[type="range"] { width: 100%; }
+    .syn-panel-widget select,
+    .syn-panel-widget input[type="number"] {
+      width: 100%;
+      background: #222;
+      color: #ddd;
+      border: 1px solid #444;
+      border-radius: 3px;
+      padding: 3px 5px;
+      font-size: 11px;
+    }
+    .syn-panel-widget-clear {
+      background: #333;
+      color: #aaa;
+      border: 1px solid #444;
+      border-radius: 3px;
+      padding: 2px 6px;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .syn-panel-widget-unit {
+      font-size: 10px;
+      color: #666;
+    }
+    .syn-panel-widget-pair {
+      grid-template-columns: 1fr;
+    }
+    .syn-panel-widget-pair-children {
+      display: grid;
+      gap: 4px;
+    }
   </style>
 </head>
 <body>
@@ -248,6 +346,11 @@
   </div>
 
   <button id="toggle-controls">Hide Controls</button>
+
+  <!-- Manifest-generated panel (SPEC 013 §UI Controls). Rendered from
+       the same annotation manifest that MCP serves — so LLM tools and
+       this panel operate on the same control surface. -->
+  <div id="generated-panel" class="generated-panel"></div>
 
   <canvas id="canvas"></canvas>
 

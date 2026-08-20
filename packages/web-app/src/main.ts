@@ -6,6 +6,10 @@ import type {
   ChordInterpretationMode,
 } from "@synesthetica/contracts";
 import {
+  generatePanel,
+  productionManifest,
+} from "@synesthetica/contracts";
+import {
   RawMidiAdapter,
   WebMidiSource,
   AudioInputAdapter,
@@ -24,6 +28,8 @@ import {
   IdentityCompositor,
   Metronome,
 } from "@synesthetica/engine";
+import { renderPanel } from "./panel/renderPanel.js";
+import { bindPanelToPipeline } from "./panel/bindPanel.js";
 
 /**
  * InferenceWorker URL — vite's `?worker&url` bundles the entry file
@@ -590,3 +596,28 @@ toggleAudioBtn.addEventListener("click", toggleAudio);
 
 // Initialize on load
 initMidi();
+mountGeneratedPanel();
+
+/**
+ * Mount the manifest-generated control panel. Renders once at startup;
+ * dispatches user changes through the same pipeline setters MCP tools
+ * will use once wired (SPEC 013 §UI Controls, §Engine Channel).
+ */
+function mountGeneratedPanel(): void {
+  const host = document.getElementById("generated-panel");
+  if (!host) return;
+  const panel = generatePanel(productionManifest);
+  const dispatch = bindPanelToPipeline({
+    getPipeline: () => pipeline,
+    getMetronome: () => metronome,
+    onMetronomeToggle: (enabled) => {
+      // Reuse the existing toggle path so metronome AudioContext
+      // setup (which requires a user gesture) stays in one place.
+      if (enabled !== (metronome?.isRunning() ?? false)) {
+        toggleMetronome();
+      }
+    },
+  });
+  const rendered = renderPanel({ panel, dispatch });
+  host.appendChild(rendered.root);
+}
