@@ -27,6 +27,9 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
-    sourcemap: true,
+    // Source maps ship at ~17MB per bundle and blow up the CLI
+    // package we bundle into. Off for production; developers pull
+    // maps locally via `vite dev`.
+    sourcemap: false,
   },
 });

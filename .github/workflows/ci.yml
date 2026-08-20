@@ -16,12 +16,9 @@ jobs:
           cache: 'npm'
       - name: Install
         run: npm ci
-      # Contracts is a topological root; build it first so downstream
-      # packages have its dist available before their own tsc runs.
-      - name: Build contracts
-        run: npm run build -w @synesthetica/contracts
-      - name: Build remaining workspaces
-        run: npm run build -ws --if-present
+      # Build in topological order (root's `build` script).
+      - name: Build
+        run: npm run build
       - name: Lint
         run: npm run lint
       - name: Test all workspaces

@@ -103,9 +103,9 @@ start OPTIONS
 
 ## Status
 
-**Not publishable to npm yet.** The current build spawns Vite as a subprocess and locates the web-app via the monorepo workspace layout; an npm-installed copy won't find it. Tracked as [synesthetica-co4](https://github.com/nicc/synesthetica/issues) — replace the Vite subprocess with a bundled static server.
+Shippable in shape — publish gated only on account permissions. `npm publish --dry-run` builds the CLI with the web-app bundled in and produces a ~1.6 MB tarball that includes the visualiser dist, the static HTTP server, the MCP server, and every prompt/annotation resource. Running `synesthetica start` from an installed copy hosts the visualiser via the built-in static server (no Vite required); running from a monorepo checkout uses Vite for HMR.
 
-Everything else works today when run from the monorepo checkout: MCP tools, resources, prompts, presets, state subscription, the WebSocket bridge to the browser, the manifest-generated control panel.
+Full pipeline verified end-to-end: MCP tool call → CLI handler → WebSocket bridge → browser engine → state return.
 
 See [../../specs/SPEC_013_llm_control_plane_mcp.md](../../specs/SPEC_013_llm_control_plane_mcp.md) for the full architecture.
 

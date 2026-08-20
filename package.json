@@ -7,8 +7,8 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -ws",
-    "clean": "npm run clean -ws",
+    "build": "npm run build -w @synesthetica/contracts -w @synesthetica/adapters -w @synesthetica/engine -w @synesthetica/web-app -w @synesthetica/cli",
+    "clean": "npm run clean --if-present -ws",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "dev": "npm run build -w @synesthetica/contracts -w @synesthetica/adapters -w @synesthetica/engine && npm run dev:chrome -w @synesthetica/web-app",

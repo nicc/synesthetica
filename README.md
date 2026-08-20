@@ -113,10 +113,10 @@ separation (RawInputFrame → MusicalFrame → AnnotatedMusicalFrame → SceneFr
 the CLI + MCP server run end-to-end, and the browser engine speaks to the CLI
 over WebSocket.
 
-Not yet publishable to npm — the CLI still spawns Vite as a subprocess to serve
-the web-app; that needs to be swapped for a bundled static server before
-`npx @synesthetica/cli` will work outside the monorepo. Tracked as
-`synesthetica-co4`.
+**Shippable in shape** — `npm publish --dry-run` produces a self-contained
+tarball (~1.6 MB compressed) with the web-app bundled in and a built-in static
+server. Publishing gated on account permissions; the client-side install flow
+below already works with the monorepo checkout.
 
 ## Quickstart (dev / from-source)
 
