@@ -6,9 +6,10 @@
  * as subsequent chunks fill in state, engine registry, and preset store.
  */
 
-import { parseArgs, helpText, type Command, type StartOptions } from "./args.js";
+import { parseArgs, helpText, type StartOptions } from "./args.js";
 import { startMcpServer } from "./mcpServer.js";
 import { StubEngineHandle } from "./engine/stubEngineHandle.js";
+import { createPresetStore } from "./presets/presetStore.js";
 
 const SERVER_NAME = "synesthetica";
 const SERVER_VERSION = "0.1.0";
@@ -51,12 +52,16 @@ async function runStart(options: StartOptions): Promise<number> {
   // handler → engine → state resource). Ships the real engine wiring
   // as a swap at Chunk F.
   const stubEngine = new StubEngineHandle({ label: instanceLabel });
+  const presetStore = createPresetStore();
+  writeErr(`preset store: ${presetStore.storePath()}`);
 
   try {
     const server = await startMcpServer(
       {
         serverName: SERVER_NAME,
         serverVersion: SERVER_VERSION,
+        engines: [stubEngine],
+        presetStore,
         resolveEngine: (instance) => {
           // Single-instance for now — Phase 3 replaces this with a
           // registry lookup.

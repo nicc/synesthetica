@@ -17,6 +17,8 @@ import {
   ListPromptsRequestSchema,
   ReadResourceRequestSchema,
   GetPromptRequestSchema,
+  SubscribeRequestSchema,
+  UnsubscribeRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { smokeTestManifest as productionManifest } from "./annotations/manifest.js";
@@ -30,6 +32,11 @@ import {
 } from "./resources/promptResources.js";
 import { buildToolRegistry, type ToolSpec } from "./tools/registry.js";
 import type { EngineHandle } from "./engine/engineHandle.js";
+import {
+  buildStateResources,
+  type AsyncResourceEntry,
+} from "./state/stateResources.js";
+import type { PresetStore } from "./presets/presetStore.js";
 
 export interface McpServerConfig {
   serverName: string;
@@ -41,6 +48,10 @@ export interface McpServerConfig {
    * routing lands in Phase 3.
    */
   resolveEngine: (instance?: string) => EngineHandle | { error: { code: string; message: string; details?: unknown } };
+  /** Every running engine at server-start, for state resource seeding. */
+  engines: EngineHandle[];
+  /** Filesystem preset store. */
+  presetStore: PresetStore;
 }
 
 export async function startMcpServer(
@@ -63,19 +74,41 @@ export async function startMcpServer(
   );
 
   // -----------------------------------------------------------------
-  // Resources (Chunk B)
+  // Resources — annotations (Chunk B) + state (Chunk E)
   // -----------------------------------------------------------------
-  const resourceEntries: ResourceEntry[] = buildAnnotationResources(productionManifest);
-  const resourceIndex = new Map<string, ResourceEntry>();
-  for (const entry of resourceEntries) resourceIndex.set(entry.uri, entry);
+  const annotationEntries: ResourceEntry[] = buildAnnotationResources(productionManifest);
+  const stateEntries: AsyncResourceEntry[] = config.engines.flatMap((e) =>
+    buildStateResources(e),
+  );
+
+  // Two indices — annotations are sync, state is async. ReadResource
+  // dispatches based on which map the URI hits.
+  const syncIndex = new Map<string, ResourceEntry>();
+  for (const e of annotationEntries) syncIndex.set(e.uri, e);
+  const asyncIndex = new Map<string, AsyncResourceEntry>();
+  // For state URIs, register the exact URI without query params;
+  // the query is parsed in read().
+  for (const e of stateEntries) asyncIndex.set(e.uri, e);
+
+  // Track state-changed subscriptions per URI so we know who to notify.
+  const stateSubscribers = new Map<string, number>(); // uri → count
+  const engineUnsubs = new Map<string, () => void>(); // uri → unsub fn
 
   server.setRequestHandler(ListResourcesRequestSchema, async () => ({
-    resources: resourceEntries.map((e) => ({
-      uri: e.uri,
-      name: e.name,
-      description: e.description,
-      mimeType: e.mimeType,
-    })),
+    resources: [
+      ...annotationEntries.map((e) => ({
+        uri: e.uri,
+        name: e.name,
+        description: e.description,
+        mimeType: e.mimeType,
+      })),
+      ...stateEntries.map((e) => ({
+        uri: e.uri,
+        name: e.name,
+        description: e.description,
+        mimeType: e.mimeType,
+      })),
+    ],
   }));
 
   server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
@@ -119,19 +152,79 @@ export async function startMcpServer(
 
   server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const uri = request.params.uri;
-    const entry = resourceIndex.get(uri);
-    if (!entry) {
-      throw new Error(`resource not found: ${uri}`);
+
+    // Try sync (annotation) index first.
+    const sync = syncIndex.get(uri);
+    if (sync) {
+      return {
+        contents: [
+          { uri: sync.uri, mimeType: sync.mimeType, text: sync.read() },
+        ],
+      };
     }
-    return {
-      contents: [
-        {
-          uri: entry.uri,
-          mimeType: entry.mimeType,
-          text: entry.read(),
-        },
-      ],
-    };
+
+    // Try async (state) index. Strip query string for lookup; pass
+    // the full URI through so the resource can parse ?limit=, ?since=.
+    const bareUri = uri.split("?")[0];
+    const async = asyncIndex.get(bareUri);
+    if (async) {
+      const text = await async.read(uri);
+      return {
+        contents: [
+          { uri, mimeType: async.mimeType, text },
+        ],
+      };
+    }
+
+    throw new Error(`resource not found: ${uri}`);
+  });
+
+  // Subscribe / unsubscribe for state://<label>/current only.
+  // recent-events is pull-only per SPEC 013 §I30 — reject subscriptions.
+  server.setRequestHandler(SubscribeRequestSchema, async (request) => {
+    const uri = request.params.uri;
+    const entry = asyncIndex.get(uri);
+    if (!entry) {
+      throw new Error(`no such resource to subscribe to: ${uri}`);
+    }
+    if (!entry.subscribable) {
+      throw new Error(
+        `${uri} is pull-only (SPEC 013 §I30). Read the resource on demand instead of subscribing.`,
+      );
+    }
+    // Increment sub count; on first subscriber, attach engine listener.
+    const prev = stateSubscribers.get(uri) ?? 0;
+    stateSubscribers.set(uri, prev + 1);
+    if (prev === 0) {
+      // Find the engine that owns this URI (state://<label>/current).
+      const label = uri.replace(/^state:\/\//, "").split("/")[0];
+      const engine = config.engines.find((e) => e.label === label);
+      if (engine) {
+        const unsub = engine.subscribe("state-changed", () => {
+          void server.notification({
+            method: "notifications/resources/updated",
+            params: { uri },
+          });
+        });
+        engineUnsubs.set(uri, unsub);
+      }
+    }
+    return {};
+  });
+
+  server.setRequestHandler(UnsubscribeRequestSchema, async (request) => {
+    const uri = request.params.uri;
+    const prev = stateSubscribers.get(uri) ?? 0;
+    const next = Math.max(0, prev - 1);
+    stateSubscribers.set(uri, next);
+    if (next === 0) {
+      const unsub = engineUnsubs.get(uri);
+      if (unsub) {
+        unsub();
+        engineUnsubs.delete(uri);
+      }
+    }
+    return {};
   });
 
   // -----------------------------------------------------------------
@@ -169,7 +262,7 @@ export async function startMcpServer(
   // -----------------------------------------------------------------
   // Tools (Chunk C: session + input; Chunk D adds macros)
   // -----------------------------------------------------------------
-  const toolRegistry: Map<string, ToolSpec> = buildToolRegistry();
+  const toolRegistry: Map<string, ToolSpec> = buildToolRegistry(config.presetStore);
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: Array.from(toolRegistry.values()).map((t) => ({

@@ -89,18 +89,15 @@ async function dispatchCompound(
 ): Promise<StateSnapshot> {
   // Fan out to each target with a linear map. Last write wins per
   // SPEC 013 §Resolution — no accumulation, no priority.
-  let last: StateSnapshot | null = null;
   for (const targetId of compound.targets) {
     const targetValue = linearMapTo(value, compound.range, targetId);
-    last = await engine.setMacro(targetId, targetValue);
+    await engine.setMacro(targetId, targetValue);
   }
-  // Also record the compound's own value so state://current reflects
+  // Record the compound's own value last so state://current reflects
   // "the user set time-horizon to 0.5" even though the underlying
-  // params were what actually got written.
+  // params were what actually got written. This trailing write is the
+  // state-of-record for what the LLM most-recently asked for.
   return engine.setMacro(compound.id, value);
-  // NB: the trailing setMacro of the compound itself is the state-of-
-  // record for what the LLM most-recently asked for. `last` is
-  // discarded; the compound-id write publishes the final snapshot.
 }
 
 // ============================================================================
