@@ -1,0 +1,164 @@
+/**
+ * StubEngineHandle — in-memory implementation used for unit tests
+ * and for the CLI's `--no-mcp` standalone smoke path (Chunk F).
+ * Records every op it receives; exposes state to assertions.
+ *
+ * NOT a real engine — no rendering, no adapter, no stabilizers.
+ * It just tracks state so tool handlers can be exercised without
+ * a browser.
+ */
+
+import type {
+  EngineHandle,
+  StateSnapshot,
+  RecentEvent,
+  Unsubscribe,
+} from "./engineHandle.js";
+import { defaultMacroValues } from "./defaultMacroValues.js";
+
+export interface StubOptions {
+  label?: string;
+  initialMacros?: Record<string, number | string>;
+}
+
+export class StubEngineHandle implements EngineHandle {
+  readonly label: string;
+  status: "starting" | "running" | "stopping" | "error" = "running";
+
+  private state: StateSnapshot;
+  private events: RecentEvent[] = [];
+  private nextEventId = 0;
+  private stateSubscribers: Array<(s: StateSnapshot) => void> = [];
+
+  /** Public log of every method call, for test assertions. */
+  readonly opLog: Array<{ method: string; args: unknown[] }> = [];
+
+  constructor(opts: StubOptions = {}) {
+    this.label = opts.label ?? "default";
+    this.state = {
+      instance: this.label,
+      macros: { ...defaultMacroValues, ...(opts.initialMacros ?? {}) },
+      session: {
+        tonic: null,
+        mode: null,
+        tempo: null,
+        beatsPerBar: null,
+        beatValue: null,
+        chordMode: "harmonic",
+        metronome: false,
+      },
+      input: null,
+      activePreset: null,
+    };
+  }
+
+  // ---- macros ----
+  async setMacro(name: string, value: number | string): Promise<StateSnapshot> {
+    this.opLog.push({ method: "setMacro", args: [name, value] });
+    this.state.macros = { ...this.state.macros, [name]: value };
+    return this.publishState();
+  }
+
+  // ---- session ----
+  async setKey(root: number | null, mode: string | null): Promise<StateSnapshot> {
+    this.opLog.push({ method: "setKey", args: [root, mode] });
+    this.state.session.tonic = root;
+    this.state.session.mode = mode;
+    return this.publishState();
+  }
+  async setTempo(bpm: number | null): Promise<StateSnapshot> {
+    this.opLog.push({ method: "setTempo", args: [bpm] });
+    this.state.session.tempo = bpm;
+    return this.publishState();
+  }
+  async setMeter(beatsPerBar: number | null, beatValue: number | null): Promise<StateSnapshot> {
+    this.opLog.push({ method: "setMeter", args: [beatsPerBar, beatValue] });
+    this.state.session.beatsPerBar = beatsPerBar;
+    this.state.session.beatValue = beatValue;
+    return this.publishState();
+  }
+  async setChordMode(mode: "harmonic" | "bass-led"): Promise<StateSnapshot> {
+    this.opLog.push({ method: "setChordMode", args: [mode] });
+    this.state.session.chordMode = mode;
+    return this.publishState();
+  }
+  async setMetronome(enabled: boolean): Promise<StateSnapshot> {
+    this.opLog.push({ method: "setMetronome", args: [enabled] });
+    this.state.session.metronome = enabled;
+    return this.publishState();
+  }
+
+  // ---- input ----
+  async setInput(source: string): Promise<StateSnapshot> {
+    this.opLog.push({ method: "setInput", args: [source] });
+    this.state.input = source;
+    return this.publishState();
+  }
+
+  // ---- helper ----
+  async setHueForPitch(pc: number, hue: number): Promise<StateSnapshot> {
+    this.opLog.push({ method: "setHueForPitch", args: [pc, hue] });
+    // Stub math: just record the intent; real impl adjusts
+    // system:colour-mapping:reference (and direction) so the given
+    // pc maps to the given hue. Chunk D wires the real math.
+    this.state.macros["system:colour-mapping:reference"] = hue;
+    return this.publishState();
+  }
+
+  // ---- presets ----
+  async switchPreset(name: string): Promise<StateSnapshot> {
+    this.opLog.push({ method: "switchPreset", args: [name] });
+    this.state.activePreset = name;
+    return this.publishState();
+  }
+  async savePreset(name: string): Promise<StateSnapshot> {
+    this.opLog.push({ method: "savePreset", args: [name] });
+    return this.state;
+  }
+
+  // ---- state ----
+  async getStateSnapshot(): Promise<StateSnapshot> {
+    return this.state;
+  }
+  async getRecentEvents(limit = 100, since?: number): Promise<RecentEvent[]> {
+    let events = this.events;
+    if (since !== undefined) events = events.filter((e) => e.id > since);
+    return events.slice(-limit);
+  }
+
+  /** Test-only: inject a synthetic event into the recent-events buffer. */
+  injectEvent(kind: string, payload: Record<string, unknown> = {}): void {
+    this.events.push({
+      id: this.nextEventId++,
+      t: Date.now(),
+      kind,
+      ...payload,
+    });
+  }
+
+  // ---- subscriptions ----
+  subscribe(
+    _event: "state-changed",
+    callback: (s: StateSnapshot) => void,
+  ): Unsubscribe {
+    this.stateSubscribers.push(callback);
+    return () => {
+      this.stateSubscribers = this.stateSubscribers.filter((c) => c !== callback);
+    };
+  }
+
+  // ---- lifecycle ----
+  async close(): Promise<void> {
+    this.status = "stopping";
+    this.stateSubscribers = [];
+  }
+
+  // ---- internal ----
+  private publishState(): StateSnapshot {
+    // Return a defensive copy; real engines shouldn't leak mutable state
+    // to callers.
+    const snapshot: StateSnapshot = JSON.parse(JSON.stringify(this.state));
+    for (const cb of this.stateSubscribers) cb(snapshot);
+    return snapshot;
+  }
+}

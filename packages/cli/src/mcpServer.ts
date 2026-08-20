@@ -11,6 +11,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   ListToolsRequestSchema,
+  CallToolRequestSchema,
   ListResourcesRequestSchema,
   ListResourceTemplatesRequestSchema,
   ListPromptsRequestSchema,
@@ -27,10 +28,19 @@ import {
   buildPromptResources,
   type PromptEntry,
 } from "./resources/promptResources.js";
+import { buildToolRegistry, type ToolSpec } from "./tools/registry.js";
+import type { EngineHandle } from "./engine/engineHandle.js";
 
 export interface McpServerConfig {
   serverName: string;
   serverVersion: string;
+  /**
+   * Engine lookup for tool dispatch. Given an optional `instance`
+   * arg from the tool call, return the corresponding EngineHandle
+   * (or an error). Chunk C accepts a single engine; multi-instance
+   * routing lands in Phase 3.
+   */
+  resolveEngine: (instance?: string) => EngineHandle | { error: { code: string; message: string; details?: unknown } };
 }
 
 export async function startMcpServer(
@@ -157,9 +167,60 @@ export async function startMcpServer(
   });
 
   // -----------------------------------------------------------------
-  // Tools (empty for now — Chunks C/D)
+  // Tools (Chunk C: session + input; Chunk D adds macros)
   // -----------------------------------------------------------------
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [] }));
+  const toolRegistry: Map<string, ToolSpec> = buildToolRegistry();
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: Array.from(toolRegistry.values()).map((t) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema as { type: "object" } & Record<string, unknown>,
+    })),
+  }));
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const tool = toolRegistry.get(request.params.name);
+    if (!tool) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(
+              { ok: false, error: { code: "TOOL_UNKNOWN", message: `no such tool: ${request.params.name}` } },
+              null,
+              2,
+            ),
+          },
+        ],
+        isError: true,
+      };
+    }
+    const args = (request.params.arguments ?? {}) as Record<string, unknown>;
+    const instance = typeof args.instance === "string" ? args.instance : undefined;
+    const engineOrErr = config.resolveEngine(instance);
+    if ("error" in engineOrErr) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ ok: false, error: engineOrErr.error }, null, 2),
+          },
+        ],
+        isError: true,
+      };
+    }
+    const result = await tool.handle(args, engineOrErr);
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+      isError: !result.ok,
+    };
+  });
 
   // -----------------------------------------------------------------
   // Transport

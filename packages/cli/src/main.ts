@@ -8,6 +8,7 @@
 
 import { parseArgs, helpText, type Command, type StartOptions } from "./args.js";
 import { startMcpServer } from "./mcpServer.js";
+import { StubEngineHandle } from "./engine/stubEngineHandle.js";
 
 const SERVER_NAME = "synesthetica";
 const SERVER_VERSION = "0.1.0";
@@ -44,9 +45,32 @@ async function runStart(options: StartOptions): Promise<number> {
     return 1;
   }
 
+  // Chunk C: a StubEngineHandle stands in for the real browser-hosted
+  // engine until Chunk F wires the WebSocket bridge. The stub tracks
+  // state so tool calls are meaningful end-to-end (MCP client → tool
+  // handler → engine → state resource). Ships the real engine wiring
+  // as a swap at Chunk F.
+  const stubEngine = new StubEngineHandle({ label: instanceLabel });
+
   try {
     const server = await startMcpServer(
-      { serverName: SERVER_NAME, serverVersion: SERVER_VERSION },
+      {
+        serverName: SERVER_NAME,
+        serverVersion: SERVER_VERSION,
+        resolveEngine: (instance) => {
+          // Single-instance for now — Phase 3 replaces this with a
+          // registry lookup.
+          if (instance !== undefined && instance !== stubEngine.label) {
+            return {
+              error: {
+                code: "INSTANCE_NOT_FOUND",
+                message: `no instance labelled '${instance}' (only '${stubEngine.label}' is running)`,
+              },
+            };
+          }
+          return stubEngine;
+        },
+      },
       options.transport,
       options.port,
     );
