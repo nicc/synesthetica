@@ -1,138 +1,91 @@
 /**
- * Wires renderPanel dispatch events to the local pipeline + metronome.
+ * Panel-to-engine adapter.
  *
- * Only the widgets whose backing engine setters exist are wired to real
- * effects. Macros (harmony:linger, time-horizon, etc.) will be plumbed
- * through as their pipeline setters land; for now they log to the
- * console so a user sees the intent flowed through the panel correctly
- * without pretending state changed.
+ * Translates renderPanel dispatch events (widget id + value) into
+ * engine method calls (method + args), enforcing SPEC 013 §Engine
+ * Channel — user-driven and LLM-driven changes go through the same
+ * EngineHandle-shaped surface, ensuring both stay in sync.
  *
- * The point in Phase 1 is to prove the SPEC 013 control surface —
- * "user + LLM operate through the same setters" — end-to-end for the
- * session controls. Macro plumbing catches up in a later phase.
+ * Pair widgets are the reason we can't dispatch straight — tonic
+ * and mode are two panel widgets but one engine call (setKey).
+ * Same for beats-per-bar + beat-value → setMeter. This adapter
+ * caches the pair members between dispatches and issues the composite
+ * call when both are set (or clears when either goes null).
  */
 
-import type {
-  VisualPipeline,
-  Metronome,
-} from "@synesthetica/engine";
-import type {
-  PitchClass,
-  ModeId,
-  ChordInterpretationMode,
-} from "@synesthetica/contracts";
+import type { EngineMethod } from "@synesthetica/contracts";
 import type { PanelDispatch, PanelDispatchValue } from "./renderPanel.js";
 
-export interface PanelBindingTargets {
-  /** Called with the pipeline that owns session state — may be null before a session starts. */
-  getPipeline(): VisualPipeline | null;
-  /** Metronome may or may not be initialised (needs a user gesture). */
-  getMetronome(): Metronome | null;
-  /** Called when the metronome toggle changes; owner decides how to construct/enable it. */
-  onMetronomeToggle?(enabled: boolean): void;
-  /**
-   * Called when the input source changes. Value is a source id (e.g.
-   * "midi:<deviceId>" or "audio:<label>"). Owner handles the actual
-   * session teardown/start — MIDI and audio have different lifecycles.
-   */
-  onInputSource?(source: string): void;
-}
+export type PanelEngineDispatch = (
+  method: EngineMethod,
+  args: readonly unknown[],
+) => void | Promise<unknown>;
 
-interface KeyState {
-  tonic: PitchClass | null;
-  mode: ModeId | null;
+export interface BindPanelOptions {
+  onEngineOp: PanelEngineDispatch;
 }
 
 /**
- * Build the dispatch callback for renderPanel. Owns a small tonic/mode
- * cache because setKey requires both together — the panel dispatches
- * them separately (they're two child widgets of the pair) but the
- * pipeline API is atomic.
+ * Build the PanelDispatch callback for renderPanel. Every widget
+ * change is normalised to an EngineHandle-shaped op.
+ *
+ * Widgets that don't map to a known op fall through with a console
+ * warning — indicates a manifest addition that hasn't been plumbed
+ * through this translator.
  */
-export function bindPanelToPipeline(
-  targets: PanelBindingTargets,
-): PanelDispatch {
-  const key: KeyState = { tonic: null, mode: null };
-  const meter: { bpb: number | null; unit: number } = { bpb: null, unit: 4 };
+export function bindPanelToEngine(opts: BindPanelOptions): PanelDispatch {
+  const key: { tonic: number | null; mode: string | null } = {
+    tonic: null,
+    mode: null,
+  };
+  const meter: { bpb: number | null; unit: number | null } = {
+    bpb: null,
+    unit: null,
+  };
 
   return function dispatch(id: string, value: PanelDispatchValue): void {
-    const pipeline = targets.getPipeline();
     switch (id) {
-      // --- Session controls ---
-      case "session:tonic": {
-        key.tonic = value === null ? null : (Number(value) as PitchClass);
-        applyKey(pipeline, key);
+      case "session:tonic":
+        key.tonic = value === null ? null : Number(value);
+        void opts.onEngineOp("setKey", [key.tonic, key.mode]);
         return;
-      }
-      case "session:mode": {
-        key.mode = value === null ? null : (value as ModeId);
-        applyKey(pipeline, key);
+      case "session:mode":
+        key.mode = value === null ? null : String(value);
+        void opts.onEngineOp("setKey", [key.tonic, key.mode]);
         return;
-      }
-      case "session:tempo": {
-        if (pipeline) {
-          pipeline.setTempo(value === null ? null : Number(value));
-        }
-        const met = targets.getMetronome();
-        met?.setTempo(value === null ? null : Number(value));
+      case "session:tempo":
+        void opts.onEngineOp("setTempo", [value === null ? null : Number(value)]);
         return;
-      }
-      case "session:beats-per-bar": {
+      case "session:beats-per-bar":
         meter.bpb = value === null ? null : Number(value);
-        applyMeter(pipeline, meter, targets);
+        void opts.onEngineOp("setMeter", [meter.bpb, meter.unit]);
         return;
-      }
-      case "session:beat-value": {
-        meter.unit = value === null ? 4 : Number(value);
-        applyMeter(pipeline, meter, targets);
+      case "session:beat-value":
+        meter.unit = value === null ? null : Number(value);
+        void opts.onEngineOp("setMeter", [meter.bpb, meter.unit]);
         return;
-      }
-      case "session:chord-mode": {
-        if (pipeline && (value === "harmonic" || value === "bass-led")) {
-          pipeline.setChordInterpretation(value as ChordInterpretationMode);
+      case "session:chord-mode":
+        if (value === "harmonic" || value === "bass-led") {
+          void opts.onEngineOp("setChordMode", [value]);
         }
         return;
-      }
-      case "session:metronome": {
-        targets.onMetronomeToggle?.(Boolean(value));
+      case "session:metronome":
+        void opts.onEngineOp("setMetronome", [Boolean(value)]);
         return;
-      }
-      case "input:source": {
+      case "input:source":
         if (typeof value === "string" && value.length > 0) {
-          targets.onInputSource?.(value);
+          void opts.onEngineOp("setInput", [value]);
         }
         return;
-      }
-      // --- Everything else: macros not yet plumbed to pipeline setters. ---
-      default: {
-        // eslint-disable-next-line no-console
-        console.info(
-          `[panel] dispatch '${id}' = ${JSON.stringify(value)} (macro plumbing pending)`,
-        );
+      default:
+        // Assume anything else is a macro id.
+        if (id.includes(":") || !id.startsWith("session:")) {
+          void opts.onEngineOp("setMacro", [id, value ?? 0]);
+        } else {
+          // eslint-disable-next-line no-console
+          console.warn(`[panel] unknown widget id '${id}' = ${JSON.stringify(value)}`);
+        }
         return;
-      }
     }
   };
-}
-
-function applyKey(
-  pipeline: VisualPipeline | null,
-  key: KeyState,
-): void {
-  if (!pipeline) return;
-  if (key.tonic === null || key.mode === null) {
-    pipeline.setKey(null);
-  } else {
-    pipeline.setKey({ root: key.tonic, mode: key.mode });
-  }
-}
-
-function applyMeter(
-  pipeline: VisualPipeline | null,
-  meter: { bpb: number | null; unit: number },
-  targets: PanelBindingTargets,
-): void {
-  if (!pipeline) return;
-  pipeline.setMeter(meter.bpb, meter.unit);
-  if (meter.bpb !== null) targets.getMetronome()?.setMeter(meter.bpb);
 }

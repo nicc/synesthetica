@@ -32,6 +32,7 @@ export interface StartOptions {
   logRetentionDays: number;
   openBrowser: boolean;
   webAppPort: number | null;
+  wsPort: number;
 }
 
 const DEFAULT_START_OPTIONS: StartOptions = {
@@ -43,6 +44,7 @@ const DEFAULT_START_OPTIONS: StartOptions = {
   logRetentionDays: 7,
   openBrowser: true,
   webAppPort: null,
+  wsPort: 0, // 0 = OS-assigned free port; browser reads via ?ws-port=
 };
 
 export function parseArgs(argv: readonly string[]): Command {
@@ -140,6 +142,15 @@ function parseStart(args: string[]): Command {
         options.webAppPort = n;
         break;
       }
+      case "--ws-port": {
+        const value = args[++i];
+        const n = Number(value);
+        if (!Number.isInteger(n) || n < 0 || n > 65535) {
+          return { kind: "error", message: `--ws-port requires an integer in [0, 65535] (0 = auto)` };
+        }
+        options.wsPort = n;
+        break;
+      }
       default:
         return { kind: "error", message: `unknown flag: ${flag}` };
     }
@@ -191,6 +202,7 @@ start OPTIONS
                           days to retain rotated event logs (default 7)
   --no-open               do not open the browser automatically
   --web-app-port <port>   fix the web-app dev server port (default: auto)
+  --ws-port <port>        engine bridge WebSocket port (default: auto)
 
 See specs/SPEC_013_llm_control_plane_mcp.md for full details.
 `;

@@ -25,6 +25,7 @@ export * from "./config/preset";
 
 export * from "./control/control_ops";
 export * from "./control/queries";
+export * from "./control/engineBridge";
 
 export * from "./annotations/annotations";
 export * from "./annotations/panel";

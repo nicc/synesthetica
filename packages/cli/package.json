@@ -8,7 +8,9 @@
   "bin": {
     "synesthetica": "dist/bin.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json && npm run copy-assets",
     "copy-assets": "mkdir -p dist/prompts && cp src/prompts/*.md dist/prompts/",
@@ -19,9 +21,11 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
-    "@synesthetica/contracts": "*"
+    "@synesthetica/contracts": "*",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
+    "@types/ws": "^8.18.1",
     "typescript": "^5.3.0",
     "vitest": "^2.0.0"
   }

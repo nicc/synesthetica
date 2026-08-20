@@ -38,9 +38,14 @@ import {
   Metronome,
 } from "@synesthetica/engine";
 import { renderPanel, type RenderedPanel } from "./panel/renderPanel.js";
-import { bindPanelToPipeline } from "./panel/bindPanel.js";
+import { bindPanelToEngine } from "./panel/bindPanel.js";
 import { mountPanelShell } from "./panel/panelShell.js";
 import { buildAboutPanel } from "./panel/aboutPanel.js";
+import { startWsReceiver, type WsReceiverHandle } from "./engine/wsReceiver.js";
+import type {
+  EngineMethod,
+  EngineStateSnapshot,
+} from "@synesthetica/contracts";
 
 /* -----------------------------------------------------------------
  * Worker + model URLs (Vite handles these at build time)
@@ -68,6 +73,163 @@ let animationFrameId: number | null = null;
 let lastSceneFrame: SceneFrame | null = null;
 let basicsPanel: RenderedPanel | null = null;
 let advancedPanel: RenderedPanel | null = null;
+let wsReceiver: WsReceiverHandle | null = null;
+
+// State snapshot we publish back to the CLI over WS. Kept in sync
+// with pipeline mutations; every setter update also mirrors here so
+// the CLI's WSBackedEngineHandle can return it to MCP callers.
+const engineState: EngineStateSnapshot = {
+  instance: "default",
+  macros: {},
+  session: {
+    tonic: null,
+    mode: null,
+    tempo: null,
+    beatsPerBar: null,
+    beatValue: null,
+    chordMode: "harmonic",
+    metronome: false,
+  },
+  input: null,
+  activePreset: null,
+};
+
+/** Publish the current engineState snapshot to the CLI. */
+function publishState(): void {
+  wsReceiver?.publishStateChanged({
+    ...engineState,
+    session: { ...engineState.session },
+    macros: { ...engineState.macros },
+  });
+}
+
+/**
+ * Single dispatch path — both the local panel and the CLI-over-WS
+ * end up here. Updates local pipeline state, mirrors to engineState,
+ * publishes to the CLI, and refreshes the panel widget.
+ */
+async function applyEngineOp(
+  method: EngineMethod,
+  args: readonly unknown[],
+): Promise<EngineStateSnapshot> {
+  switch (method) {
+    case "setKey": {
+      const [tonic, mode] = args as [number | null, string | null];
+      engineState.session.tonic = tonic;
+      engineState.session.mode = mode;
+      if (pipeline) {
+        if (tonic === null || mode === null) pipeline.setKey(null);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        else pipeline.setKey({ root: tonic as any, mode: mode as any });
+      }
+      break;
+    }
+    case "setTempo": {
+      const [bpm] = args as [number | null];
+      engineState.session.tempo = bpm;
+      pipeline?.setTempo(bpm);
+      metronome?.setTempo(bpm);
+      break;
+    }
+    case "setMeter": {
+      const [bpb, unit] = args as [number | null, number | null];
+      engineState.session.beatsPerBar = bpb;
+      engineState.session.beatValue = unit;
+      pipeline?.setMeter(bpb, unit ?? 4);
+      if (bpb !== null) metronome?.setMeter(bpb);
+      break;
+    }
+    case "setChordMode": {
+      const [mode] = args as ["harmonic" | "bass-led"];
+      engineState.session.chordMode = mode;
+      pipeline?.setChordInterpretation(mode);
+      break;
+    }
+    case "setMetronome": {
+      const [enabled] = args as [boolean];
+      engineState.session.metronome = enabled;
+      toggleMetronome(enabled);
+      break;
+    }
+    case "setMacro": {
+      const [name, value] = args as [string, number | string];
+      engineState.macros[name] = value;
+      // Macro plumbing to pipeline setters lands with the tier-1 work
+      // (synesthetica-1wq). For now the state mirror is truthful even
+      // if the pipeline hasn't wired the parameter yet.
+      break;
+    }
+    case "setInput": {
+      const [source] = args as [string];
+      engineState.input = source;
+      handleInputSource(source);
+      break;
+    }
+    case "setHueForPitch": {
+      // Placeholder — engine plumbing lands with the hue-anchor macro.
+      break;
+    }
+    case "switchPreset": {
+      const [name] = args as [string];
+      engineState.activePreset = name;
+      break;
+    }
+    case "savePreset": {
+      // No pipeline side effect; the CLI's preset store owns the file.
+      break;
+    }
+    case "getStateSnapshot":
+    case "getRecentEvents":
+      // Read-only ops handled below.
+      break;
+  }
+  // Refresh the panel widget for this id so LLM-driven changes appear
+  // in the UI. For pair-typed ids we push both children.
+  refreshPanelForMethod(method, args);
+  publishState();
+  return snapshotCopy();
+}
+
+function refreshPanelForMethod(method: EngineMethod, args: readonly unknown[]): void {
+  const values: Record<string, number | string | boolean | null> = {};
+  switch (method) {
+    case "setKey":
+      values["session:tonic"] = (args[0] as number | null) ?? null;
+      values["session:mode"] = (args[1] as string | null) ?? null;
+      break;
+    case "setTempo":
+      values["session:tempo"] = (args[0] as number | null) ?? null;
+      break;
+    case "setMeter":
+      values["session:beats-per-bar"] = (args[0] as number | null) ?? null;
+      values["session:beat-value"] = (args[1] as number | null) ?? null;
+      break;
+    case "setChordMode":
+      values["session:chord-mode"] = args[0] as string;
+      break;
+    case "setMetronome":
+      values["session:metronome"] = args[0] as boolean;
+      break;
+    case "setMacro":
+      values[args[0] as string] = args[1] as number | string;
+      break;
+    case "setInput":
+      values["input:source"] = args[0] as string;
+      break;
+    default:
+      return;
+  }
+  basicsPanel?.update(values);
+  advancedPanel?.update(values);
+}
+
+function snapshotCopy(): EngineStateSnapshot {
+  return {
+    ...engineState,
+    session: { ...engineState.session },
+    macros: { ...engineState.macros },
+  };
+}
 
 /* -----------------------------------------------------------------
  * Canvas resize
@@ -229,11 +391,11 @@ function currentInputOptions(): Array<{ value: string; label: string }> {
 
 function mountPanels(): void {
   const panel = generatePanel(productionManifest);
-  const dispatch = bindPanelToPipeline({
-    getPipeline: () => pipeline,
-    getMetronome: () => metronome,
-    onMetronomeToggle: toggleMetronome,
-    onInputSource: handleInputSource,
+  // Single dispatch path: panel → applyEngineOp → (pipeline, state
+  // mirror, WS publish). LLM-driven calls end up in the same path via
+  // wsReceiver.onCall, keeping user + LLM control surfaces coherent.
+  const dispatch = bindPanelToEngine({
+    onEngineOp: (method, args) => applyEngineOp(method, args),
   });
   const optionsFor = (id: string) => (id === "input:source" ? currentInputOptions() : undefined);
 
@@ -332,3 +494,31 @@ function captureFrame(): void {
 // Bootstrap
 mountPanels();
 void initMidi();
+mountWsReceiver();
+
+function mountWsReceiver(): void {
+  const params = new URLSearchParams(window.location.search);
+  const wsPort = params.get("ws-port");
+  const label = params.get("instance") ?? "default";
+  if (!wsPort) {
+    // Standalone browser use — no CLI to connect to. Panel still
+    // works locally; LLM control is unavailable.
+    return;
+  }
+  engineState.instance = label;
+  wsReceiver = startWsReceiver({
+    url: `ws://${window.location.hostname}:${wsPort}`,
+    label,
+    onCall: async (method, args) => {
+      if (method === "getStateSnapshot") return snapshotCopy();
+      if (method === "getRecentEvents") {
+        // Recent events aren't buffered here yet; return an empty
+        // window rather than failing. Full buffer lands as engine
+        // wiring extends.
+        return [] as unknown[];
+      }
+      return applyEngineOp(method, args);
+    },
+    log: (line) => console.info(line),
+  });
+}

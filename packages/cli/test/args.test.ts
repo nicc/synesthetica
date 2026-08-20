@@ -100,6 +100,17 @@ describe("parseArgs — start", () => {
     if (cmd.kind === "start") expect(cmd.options.webAppPort).toBe(5555);
   });
 
+  it("--ws-port accepts 0 (auto) through 65535", () => {
+    const cmd0 = parseArgs(["start", "--ws-port", "0"]);
+    expect(cmd0.kind).toBe("start");
+    if (cmd0.kind === "start") expect(cmd0.options.wsPort).toBe(0);
+    const cmd = parseArgs(["start", "--ws-port", "8765"]);
+    expect(cmd.kind).toBe("start");
+    if (cmd.kind === "start") expect(cmd.options.wsPort).toBe(8765);
+    expect(parseArgs(["start", "--ws-port", "-1"]).kind).toBe("error");
+    expect(parseArgs(["start", "--ws-port", "abc"]).kind).toBe("error");
+  });
+
   it("unknown flag → error", () => {
     expect(parseArgs(["start", "--frobnicate"]).kind).toBe("error");
   });

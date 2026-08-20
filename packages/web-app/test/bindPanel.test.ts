@@ -1,140 +1,92 @@
 import { describe, it, expect, vi } from "vitest";
-import { bindPanelToPipeline } from "../src/panel/bindPanel.js";
+import { bindPanelToEngine } from "../src/panel/bindPanel.js";
 
-// Minimal VisualPipeline shape: we test dispatch → method-call
-// forwarding, not any pipeline internals.
-function fakePipeline() {
-  return {
-    setKey: vi.fn(),
-    setTempo: vi.fn(),
-    setMeter: vi.fn(),
-    setChordInterpretation: vi.fn(),
-  };
-}
-
-function fakeMetronome() {
-  return {
-    setTempo: vi.fn(),
-    setMeter: vi.fn(),
-    isRunning: () => false,
-  };
-}
-
-describe("bindPanelToPipeline — session controls", () => {
-  it("session:tempo → pipeline.setTempo + metronome.setTempo", () => {
-    const pipeline = fakePipeline();
-    const met = fakeMetronome();
-    const dispatch = bindPanelToPipeline({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      getPipeline: () => pipeline as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      getMetronome: () => met as any,
-    });
+describe("bindPanelToEngine — session control translation", () => {
+  it("session:tempo → setTempo(bpm)", () => {
+    const onEngineOp = vi.fn();
+    const dispatch = bindPanelToEngine({ onEngineOp });
     dispatch("session:tempo", 120);
-    expect(pipeline.setTempo).toHaveBeenCalledWith(120);
-    expect(met.setTempo).toHaveBeenCalledWith(120);
+    expect(onEngineOp).toHaveBeenCalledWith("setTempo", [120]);
   });
 
-  it("session:tempo null clears tempo", () => {
-    const pipeline = fakePipeline();
-    const met = fakeMetronome();
-    const dispatch = bindPanelToPipeline({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      getPipeline: () => pipeline as any,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      getMetronome: () => met as any,
-    });
+  it("session:tempo null → setTempo(null)", () => {
+    const onEngineOp = vi.fn();
+    const dispatch = bindPanelToEngine({ onEngineOp });
     dispatch("session:tempo", null);
-    expect(pipeline.setTempo).toHaveBeenCalledWith(null);
-    expect(met.setTempo).toHaveBeenCalledWith(null);
+    expect(onEngineOp).toHaveBeenCalledWith("setTempo", [null]);
   });
 
-  it("tonic + mode set together → pipeline.setKey({root, mode})", () => {
-    const pipeline = fakePipeline();
-    const dispatch = bindPanelToPipeline({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      getPipeline: () => pipeline as any,
-      getMetronome: () => null,
-    });
+  it("tonic + mode set together → setKey([root, mode])", () => {
+    const onEngineOp = vi.fn();
+    const dispatch = bindPanelToEngine({ onEngineOp });
     dispatch("session:tonic", 2);
     dispatch("session:mode", "dorian");
-    // Both dispatches call setKey; the second is the useful one.
-    expect(pipeline.setKey).toHaveBeenLastCalledWith({ root: 2, mode: "dorian" });
+    expect(onEngineOp).toHaveBeenLastCalledWith("setKey", [2, "dorian"]);
   });
 
-  it("tonic without mode → setKey(null) (key incomplete)", () => {
-    const pipeline = fakePipeline();
-    const dispatch = bindPanelToPipeline({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      getPipeline: () => pipeline as any,
-      getMetronome: () => null,
-    });
+  it("tonic without mode → setKey([root, null])", () => {
+    const onEngineOp = vi.fn();
+    const dispatch = bindPanelToEngine({ onEngineOp });
     dispatch("session:tonic", 5);
-    expect(pipeline.setKey).toHaveBeenCalledWith(null);
+    expect(onEngineOp).toHaveBeenCalledWith("setKey", [5, null]);
   });
 
-  it("chord-mode toggles interpretation", () => {
-    const pipeline = fakePipeline();
-    const dispatch = bindPanelToPipeline({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      getPipeline: () => pipeline as any,
-      getMetronome: () => null,
-    });
+  it("bpb + beat-value set together → setMeter", () => {
+    const onEngineOp = vi.fn();
+    const dispatch = bindPanelToEngine({ onEngineOp });
+    dispatch("session:beats-per-bar", 6);
+    dispatch("session:beat-value", 8);
+    expect(onEngineOp).toHaveBeenLastCalledWith("setMeter", [6, 8]);
+  });
+
+  it("chord-mode → setChordMode(harmonic|bass-led)", () => {
+    const onEngineOp = vi.fn();
+    const dispatch = bindPanelToEngine({ onEngineOp });
     dispatch("session:chord-mode", "bass-led");
-    expect(pipeline.setChordInterpretation).toHaveBeenCalledWith("bass-led");
+    expect(onEngineOp).toHaveBeenCalledWith("setChordMode", ["bass-led"]);
   });
 
-  it("input:source calls onInputSource with the value string", () => {
-    const onInputSource = vi.fn();
-    const dispatch = bindPanelToPipeline({
-      getPipeline: () => null,
-      getMetronome: () => null,
-      onInputSource,
-    });
-    dispatch("input:source", "midi:12345");
-    expect(onInputSource).toHaveBeenCalledWith("midi:12345");
+  it("chord-mode ignores unknown values", () => {
+    const onEngineOp = vi.fn();
+    const dispatch = bindPanelToEngine({ onEngineOp });
+    dispatch("session:chord-mode", "unknown-mode");
+    expect(onEngineOp).not.toHaveBeenCalled();
   });
 
-  it("input:source with empty string does nothing", () => {
-    const onInputSource = vi.fn();
-    const dispatch = bindPanelToPipeline({
-      getPipeline: () => null,
-      getMetronome: () => null,
-      onInputSource,
-    });
-    dispatch("input:source", "");
-    expect(onInputSource).not.toHaveBeenCalled();
-  });
-
-  it("metronome toggle calls onMetronomeToggle callback", () => {
-    const onToggle = vi.fn();
-    const dispatch = bindPanelToPipeline({
-      getPipeline: () => null,
-      getMetronome: () => null,
-      onMetronomeToggle: onToggle,
-    });
+  it("metronome → setMetronome(boolean)", () => {
+    const onEngineOp = vi.fn();
+    const dispatch = bindPanelToEngine({ onEngineOp });
     dispatch("session:metronome", true);
-    expect(onToggle).toHaveBeenCalledWith(true);
+    expect(onEngineOp).toHaveBeenCalledWith("setMetronome", [true]);
   });
 
-  it("dispatch is safe when pipeline is null (pre-session)", () => {
-    const dispatch = bindPanelToPipeline({
-      getPipeline: () => null,
-      getMetronome: () => null,
-    });
-    expect(() => dispatch("session:tempo", 100)).not.toThrow();
-    expect(() => dispatch("session:tonic", 0)).not.toThrow();
+  it("input:source with non-empty string → setInput", () => {
+    const onEngineOp = vi.fn();
+    const dispatch = bindPanelToEngine({ onEngineOp });
+    dispatch("input:source", "midi:12345");
+    expect(onEngineOp).toHaveBeenCalledWith("setInput", ["midi:12345"]);
   });
 
-  it("unknown ids are logged, not thrown", () => {
-    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
-    const dispatch = bindPanelToPipeline({
-      getPipeline: () => null,
-      getMetronome: () => null,
-    });
+  it("input:source with empty string is a no-op", () => {
+    const onEngineOp = vi.fn();
+    const dispatch = bindPanelToEngine({ onEngineOp });
+    dispatch("input:source", "");
+    expect(onEngineOp).not.toHaveBeenCalled();
+  });
+});
+
+describe("bindPanelToEngine — macros", () => {
+  it("unknown scoped id → setMacro(name, value)", () => {
+    const onEngineOp = vi.fn();
+    const dispatch = bindPanelToEngine({ onEngineOp });
     dispatch("harmony:linger", 5);
-    expect(infoSpy).toHaveBeenCalled();
-    expect(infoSpy.mock.calls[0][0]).toContain("harmony:linger");
-    infoSpy.mockRestore();
+    expect(onEngineOp).toHaveBeenCalledWith("setMacro", ["harmony:linger", 5]);
+  });
+
+  it("bare compound macro id → setMacro (contains no colon but not session:*)", () => {
+    const onEngineOp = vi.fn();
+    const dispatch = bindPanelToEngine({ onEngineOp });
+    dispatch("time-horizon", 0.7);
+    expect(onEngineOp).toHaveBeenCalledWith("setMacro", ["time-horizon", 0.7]);
   });
 });
