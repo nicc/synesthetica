@@ -133,7 +133,7 @@
     }
     .syn-panel-widget {
       display: grid;
-      grid-template-columns: 140px 1fr auto;
+      grid-template-columns: 160px 1fr auto;
       column-gap: 10px;
       align-items: center;
       /* Uniform row height across all widget kinds — sliders would
@@ -334,12 +334,19 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      padding-left: 8px;
+      /* No padding-left here — that would shift the controls out of
+       * alignment with the sibling controls above (Tempo, Chord
+       * mode, etc.). Instead we indent only the child LABELS below,
+       * so the visual hierarchy reads without breaking the control
+       * column. */
     }
     /* Children inside a pair use the same 3-column grid so their
      * controls line up under one another. */
     .syn-panel-widget-pair-children .syn-panel-widget {
       margin-bottom: 0;
+    }
+    .syn-panel-widget-pair-children .syn-panel-widget-label-wrap {
+      padding-left: 10px;
     }
 
     /* -----------------------------------------------------------------
