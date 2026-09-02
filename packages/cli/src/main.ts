@@ -89,7 +89,7 @@ async function runStart(options: StartOptions): Promise<number> {
       `?ws-port=${bridge.port}&instance=${encodeURIComponent(instanceLabel)}`;
     writeErr(`web app ready at ${openUrl}`);
     if (options.openBrowser) {
-      openBrowser(openUrl);
+      openBrowser(openUrl, options.browser);
     }
   } catch (err) {
     writeErr(`error launching web app: ${err instanceof Error ? err.message : String(err)}`);

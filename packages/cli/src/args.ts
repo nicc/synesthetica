@@ -31,6 +31,7 @@ export interface StartOptions {
   recentEventsBufferSize: number;
   logRetentionDays: number;
   openBrowser: boolean;
+  browser: "default" | "chrome";
   webAppPort: number | null;
   wsPort: number;
 }
@@ -43,6 +44,7 @@ const DEFAULT_START_OPTIONS: StartOptions = {
   recentEventsBufferSize: 1000,
   logRetentionDays: 7,
   openBrowser: true,
+  browser: "default",
   webAppPort: null,
   wsPort: 0, // 0 = OS-assigned free port; browser reads via ?ws-port=
 };
@@ -133,6 +135,20 @@ function parseStart(args: string[]): Command {
       case "--no-open":
         options.openBrowser = false;
         break;
+      case "--browser": {
+        const value = args[++i];
+        if (value !== "default" && value !== "chrome") {
+          return {
+            kind: "error",
+            message: `--browser requires 'default' or 'chrome' (got: ${value})`,
+          };
+        }
+        options.browser = value;
+        break;
+      }
+      case "--chrome":
+        options.browser = "chrome";
+        break;
       case "--web-app-port": {
         const value = args[++i];
         const n = Number(value);
@@ -201,6 +217,8 @@ start OPTIONS
   --log-retention-days <N>
                           days to retain rotated event logs (default 7)
   --no-open               do not open the browser automatically
+  --browser <target>      'default' (default) or 'chrome'
+  --chrome                shorthand for --browser chrome
   --web-app-port <port>   fix the web-app dev server port (default: auto)
   --ws-port <port>        engine bridge WebSocket port (default: auto)
 

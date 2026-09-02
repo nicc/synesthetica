@@ -334,8 +334,12 @@ const sessionControls: SessionControlAnnotation[] = [
       { value: "aeolian", label: "minor (Aeolian)" },
       { value: "locrian", label: "Locrian" },
     ],
+    default: "ionian",
     nullable: true,
-    notes: ["Paired with session:tonic. Set both together via set_key(root, mode)."],
+    notes: [
+      "Paired with session:tonic. Set both together via set_key(root, mode).",
+      "Defaults to major (Ionian) when a tonic is set without an explicit mode.",
+    ],
   },
   {
     id: "session:key",

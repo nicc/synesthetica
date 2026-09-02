@@ -190,15 +190,23 @@ function enumSelect(
   base: WidgetBase,
 ): SelectWidgetDescriptor {
   const dyn = s.dynamicOptions === true;
+  // Resolution order:
+  //   dynamic  → ""  (renderer hydrates at bind time)
+  //   declared default → use it (e.g. mode: "ionian")
+  //   nullable → ""  (widget shows "—" until user picks)
+  //   else     → first enumValue (safe fallback for non-nullable)
+  const defaultValue = dyn
+    ? ""
+    : s.default !== undefined
+      ? s.default
+      : s.nullable
+        ? ""
+        : (s.enumValues[0]?.value ?? "");
   return {
     ...base,
     kind: "select",
     options: s.enumValues,
-    // Session enum defaults aren't declared in the annotation; leave
-    // the renderer to pick from state or first-option. Empty string
-    // is the "unset" fallback (used by dynamicOptions widgets until
-    // the renderer hydrates).
-    defaultValue: dyn ? "" : (s.enumValues[0]?.value ?? ""),
+    defaultValue,
     clearable: s.nullable,
     dynamicOptions: dyn,
   };

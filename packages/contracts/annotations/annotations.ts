@@ -197,6 +197,14 @@ export interface EnumSessionControlAnnotation
    * consult its own device/option source at bind time.
    */
   dynamicOptions?: boolean;
+  /**
+   * Preferred value when nothing has been prescribed. Used by the UI
+   * to seed the widget, and by the engine to fill implicit paired
+   * values (e.g. session:mode fills to 'ionian' when a tonic is set
+   * with no mode). Optional — when absent, a nullable enum shows
+   * "—" and a non-nullable enum shows the first enumValue.
+   */
+  default?: string | number;
 }
 
 export interface BooleanSessionControlAnnotation

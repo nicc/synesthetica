@@ -114,7 +114,15 @@ async function applyEngineOp(
 ): Promise<EngineStateSnapshot> {
   switch (method) {
     case "setKey": {
-      const [tonic, mode] = args as [number | null, string | null];
+      const [tonic] = args as [number | null, string | null];
+      let mode = (args as [number | null, string | null])[1];
+      // When a tonic is set without an explicit mode, fill from the
+      // annotated default (session:mode declares "ionian"). Preserves
+      // any mode the user already picked. Keeps mode + tonic in
+      // lockstep so key detection can enable on tonic-only picks.
+      if (tonic !== null && mode === null) {
+        mode = engineState.session.mode ?? readModeDefault();
+      }
       engineState.session.tonic = tonic;
       engineState.session.mode = mode;
       if (pipeline) {
@@ -194,8 +202,11 @@ function refreshPanelForMethod(method: EngineMethod, args: readonly unknown[]): 
   const values: Record<string, number | string | boolean | null> = {};
   switch (method) {
     case "setKey":
-      values["session:tonic"] = (args[0] as number | null) ?? null;
-      values["session:mode"] = (args[1] as string | null) ?? null;
+      // Read from engineState (already mutated by applyEngineOp),
+      // not raw args — that way mode auto-fill on tonic-only picks
+      // is reflected in the widget.
+      values["session:tonic"] = engineState.session.tonic;
+      values["session:mode"] = engineState.session.mode;
       break;
     case "setTempo":
       values["session:tempo"] = (args[0] as number | null) ?? null;
@@ -221,6 +232,21 @@ function refreshPanelForMethod(method: EngineMethod, args: readonly unknown[]): 
   }
   basicsPanel?.update(values);
   advancedPanel?.update(values);
+}
+
+/**
+ * Read the annotated default for session:mode from the manifest —
+ * the manifest is the single source of truth for defaults, so this
+ * stays in sync if the value ever changes there.
+ */
+function readModeDefault(): string {
+  const modeAnn = productionManifest.sessionControls.find(
+    (s) => s.id === "session:mode",
+  );
+  if (modeAnn && modeAnn.type === "enum" && typeof modeAnn.default === "string") {
+    return modeAnn.default;
+  }
+  return "ionian";
 }
 
 function snapshotCopy(): EngineStateSnapshot {

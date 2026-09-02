@@ -12,8 +12,8 @@
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "dev": "npm run build -w @synesthetica/contracts -w @synesthetica/adapters -w @synesthetica/engine && npm run dev:chrome -w @synesthetica/web-app",
-    "start": "node packages/cli/dist/bin.js start",
-    "start:standalone": "node packages/cli/dist/bin.js start --no-mcp",
+    "start": "node packages/cli/dist/bin.js start --chrome",
+    "start:standalone": "node packages/cli/dist/bin.js start --no-mcp --chrome",
     "smoke:regen": "node --experimental-strip-types docs/smoke-test/generate-manifest.mjs"
   },
   "devDependencies": {
