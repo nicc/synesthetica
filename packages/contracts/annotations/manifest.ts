@@ -343,7 +343,7 @@ const sessionControls: SessionControlAnnotation[] = [
     type: "pair",
     pair: ["session:tonic", "session:mode"],
     nullable: true,
-    notes: ["Composite of tonic + mode. Rendered as a single grouped widget."],
+    notes: ["Composite of tonic + mode."],
   },
 
   // ---- Tempo ----
@@ -394,7 +394,7 @@ const sessionControls: SessionControlAnnotation[] = [
     type: "pair",
     pair: ["session:beats-per-bar", "session:beat-value"],
     nullable: true,
-    notes: ["Composite of beats-per-bar + beat-value. Rendered as a single grouped widget."],
+    notes: ["Composite of beats-per-bar + beat-value."],
   },
 
   // ---- Chord interpretation ----
