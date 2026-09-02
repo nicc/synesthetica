@@ -94,6 +94,52 @@ describe("renderPanel — widget interactions", () => {
   });
 });
 
+describe("renderPanel — hover-help", () => {
+  it("adds a '?' hover-help element for sliders with directionality", () => {
+    const panel = generatePanel(productionManifest);
+    const rendered = renderPanel({ panel, dispatch: () => {} });
+    // harmony:linger is a continuous macro with directionality
+    const w = rendered.root.querySelector(
+      '[data-widget-id="harmony:linger"]',
+    ) as HTMLElement;
+    const help = w.querySelector(".syn-panel-widget-help") as HTMLElement;
+    expect(help).toBeTruthy();
+    expect(help.textContent?.startsWith("?")).toBe(true);
+    // Hover panel present with both low + high endpoints.
+    const panelEl = help.querySelector(".syn-panel-widget-help-panel") as HTMLElement;
+    expect(panelEl).toBeTruthy();
+    const endpoints = panelEl.querySelectorAll("dt");
+    const labels = Array.from(endpoints).map((n) => n.textContent);
+    expect(labels).toContain("Low");
+    expect(labels).toContain("High");
+  });
+
+  it("does not render inline hints line under the widget row", () => {
+    const panel = generatePanel(productionManifest);
+    const rendered = renderPanel({ panel, dispatch: () => {} });
+    expect(rendered.root.querySelector(".syn-panel-widget-hints")).toBeNull();
+  });
+
+  it("skips the '?' when a widget has no tooltip and no endpoints", () => {
+    const panel = generatePanel({
+      macros: [],
+      sessionControls: [
+        {
+          id: "session:metronome",
+          name: "Metronome",
+          type: "boolean",
+          nullable: false,
+        },
+      ],
+    });
+    const rendered = renderPanel({ panel, dispatch: () => {} });
+    const w = rendered.root.querySelector(
+      '[data-widget-id="session:metronome"]',
+    ) as HTMLElement;
+    expect(w.querySelector(".syn-panel-widget-help")).toBeNull();
+  });
+});
+
 describe("renderPanel — dynamic options hydration", () => {
   it("renders empty select with placeholder when no optionsFor is provided", () => {
     const panel = generatePanel(productionManifest);

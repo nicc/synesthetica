@@ -196,14 +196,81 @@ function widgetShell(w: WidgetDescriptor): HTMLElement {
   const el = document.createElement("div");
   el.className = `syn-panel-widget syn-panel-widget-${w.kind}`;
   el.dataset.widgetId = w.id;
-  if (w.tooltip) el.title = w.tooltip;
+
+  const labelWrap = document.createElement("div");
+  labelWrap.className = "syn-panel-widget-label-wrap";
 
   const label = document.createElement("label");
   label.className = "syn-panel-widget-label";
   label.textContent = w.label;
   label.htmlFor = domId(w.id);
-  el.appendChild(label);
+  labelWrap.appendChild(label);
+
+  // Descriptor prose (tooltip + directionality endpoints for sliders)
+  // lives in a hover-only panel behind a `?` icon rather than crowding
+  // the widget row inline. Same font weight / colour as the rest of
+  // the panel body — this is real content, not a browser tooltip.
+  const helpBody = buildHelpBody(w);
+  if (helpBody) {
+    const help = document.createElement("span");
+    help.className = "syn-panel-widget-help";
+    help.textContent = "?";
+    help.setAttribute("aria-label", "Show description");
+    const panel = document.createElement("div");
+    panel.className = "syn-panel-widget-help-panel";
+    panel.appendChild(helpBody);
+    help.appendChild(panel);
+    labelWrap.appendChild(help);
+  }
+
+  el.appendChild(labelWrap);
   return el;
+}
+
+/**
+ * Build the DOM body for the hover-help panel. Combines the widget's
+ * primary tooltip (from annotation `notes[0]`) with slider endpoint
+ * hints (from directionality). Returns null when the widget has
+ * nothing to say — the `?` icon is omitted in that case.
+ */
+function buildHelpBody(w: WidgetDescriptor): HTMLElement | null {
+  const hasTooltip = Boolean(w.tooltip);
+  const hasEndpoints =
+    w.kind === "slider" && Boolean((w as SliderWidgetDescriptor).low || (w as SliderWidgetDescriptor).high);
+  if (!hasTooltip && !hasEndpoints) return null;
+
+  const body = document.createElement("div");
+  body.className = "syn-panel-widget-help-body";
+
+  if (hasTooltip) {
+    const p = document.createElement("p");
+    p.className = "syn-panel-widget-help-tooltip";
+    p.textContent = w.tooltip!;
+    body.appendChild(p);
+  }
+  if (hasEndpoints) {
+    const s = w as SliderWidgetDescriptor;
+    const list = document.createElement("dl");
+    list.className = "syn-panel-widget-help-endpoints";
+    if (s.low) {
+      const dt = document.createElement("dt");
+      dt.textContent = "Low";
+      const dd = document.createElement("dd");
+      dd.textContent = s.low;
+      list.appendChild(dt);
+      list.appendChild(dd);
+    }
+    if (s.high) {
+      const dt = document.createElement("dt");
+      dt.textContent = "High";
+      const dd = document.createElement("dd");
+      dd.textContent = s.high;
+      list.appendChild(dt);
+      list.appendChild(dd);
+    }
+    body.appendChild(list);
+  }
+  return body;
 }
 
 function domId(widgetId: string): string {
@@ -248,14 +315,9 @@ function renderSlider(
 
   el.appendChild(input);
   el.appendChild(valueLabel);
-
-  // Endpoint hints from directionality prose.
-  if (w.low || w.high) {
-    const hints = document.createElement("div");
-    hints.className = "syn-panel-widget-hints";
-    hints.textContent = `${w.low} · ${w.high}`;
-    el.appendChild(hints);
-  }
+  // Endpoint hints live in the hover-help panel (widgetShell) rather
+  // than as an inline line — kept off the primary widget row to keep
+  // the panel legible.
 
   updaters.set(w.id, (v) => {
     if (typeof v !== "number") return;

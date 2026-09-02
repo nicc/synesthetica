@@ -138,6 +138,12 @@
       align-items: center;
       margin-bottom: 8px;
     }
+    .syn-panel-widget-label-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      overflow: hidden;
+    }
     .syn-panel-widget-label {
       font-size: 11px;
       color: #999;
@@ -152,15 +158,81 @@
       min-width: 42px;
       text-align: right;
     }
-    .syn-panel-widget-hints {
-      grid-column: 1 / -1;
+    /* Hover-help '?' — small pill next to the label. Behind it,
+     * a floating panel opens on hover / focus with the widget's
+     * descriptor prose (annotation notes + directionality endpoints).
+     * Same font weight / colour as the panel body — not a browser
+     * tooltip. */
+    .syn-panel-widget-help {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 12px;
+      height: 12px;
+      border: 1px solid #333;
+      border-radius: 50%;
       font-size: 9px;
-      color: #444;
-      margin-top: -4px;
-      margin-bottom: 6px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      line-height: 1;
+      color: #666;
+      background: #1a1a1a;
+      cursor: help;
+      flex-shrink: 0;
+    }
+    .syn-panel-widget-help:hover,
+    .syn-panel-widget-help:focus {
+      color: #ddd;
+      border-color: #555;
+      background: #222;
+      outline: none;
+    }
+    .syn-panel-widget-help-panel {
+      position: absolute;
+      left: 16px;
+      top: -6px;
+      width: 260px;
+      max-width: 60vw;
+      z-index: 40;
+      background: rgba(20, 20, 20, 0.98);
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 10px 12px;
+      color: #ccc;
+      font-size: 11px;
+      line-height: 1.55;
+      /* Hidden by default; hover / focus on the '?' reveals it. */
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 100ms;
+      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.6);
+    }
+    .syn-panel-widget-help:hover .syn-panel-widget-help-panel,
+    .syn-panel-widget-help:focus .syn-panel-widget-help-panel {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .syn-panel-widget-help-tooltip {
+      margin: 0 0 6px;
+    }
+    .syn-panel-widget-help-tooltip:last-child { margin-bottom: 0; }
+    .syn-panel-widget-help-endpoints {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      column-gap: 8px;
+      row-gap: 3px;
+      margin: 0;
+    }
+    .syn-panel-widget-help-endpoints dt {
+      color: #888;
+      text-transform: uppercase;
+      font-size: 9px;
+      letter-spacing: 0.5px;
+      align-self: baseline;
+      padding-top: 2px;
+    }
+    .syn-panel-widget-help-endpoints dd {
+      margin: 0;
+      color: #ccc;
     }
     /* Range sliders — desaturated, ash-toned, to match the surface.
      * Explicit selectors for both WebKit and Firefox so neither
