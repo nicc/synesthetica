@@ -216,10 +216,25 @@ function widgetShell(w: WidgetDescriptor): HTMLElement {
     help.className = "syn-panel-widget-help";
     help.textContent = "?";
     help.setAttribute("aria-label", "Show description");
+    help.tabIndex = 0;
     const panel = document.createElement("div");
     panel.className = "syn-panel-widget-help-panel";
     panel.appendChild(helpBody);
-    help.appendChild(panel);
+    // The panel is fixed-position so it escapes ancestor overflow
+    // (frame body scrolls; label-wrap ellipsises). Placement is
+    // computed on hover / focus relative to the '?' icon.
+    document.body.appendChild(panel);
+    const place = () => {
+      const r = help.getBoundingClientRect();
+      panel.style.left = `${Math.round(r.right + 6)}px`;
+      panel.style.top = `${Math.round(r.top - 4)}px`;
+      panel.classList.add("open");
+    };
+    const hide = () => panel.classList.remove("open");
+    help.addEventListener("mouseenter", place);
+    help.addEventListener("focus", place);
+    help.addEventListener("mouseleave", hide);
+    help.addEventListener("blur", hide);
     labelWrap.appendChild(help);
   }
 
@@ -394,6 +409,23 @@ function renderSelect(
   });
 
   el.appendChild(select);
+  // Clearable selects also get an explicit Clear button so pair widgets
+  // (key, meter) can wire both children's clears to one shared handler.
+  // The inline "—" option stays as a convenience affordance.
+  if (w.clearable) {
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.className = "syn-panel-widget-clear";
+    clearBtn.textContent = "Clear";
+    clearBtn.addEventListener("click", () => {
+      select.value = "";
+      opts.dispatch(w.id, null);
+    });
+    const trail = document.createElement("div");
+    trail.className = "syn-panel-widget-trail";
+    trail.appendChild(clearBtn);
+    el.appendChild(trail);
+  }
 
   updaters.set(w.id, (v) => {
     select.value = v === null || v === undefined ? "" : String(v);
@@ -465,23 +497,30 @@ function renderNumber(
   });
 
   el.appendChild(input);
-  if (w.unit) {
-    const unit = document.createElement("span");
-    unit.className = "syn-panel-widget-unit";
-    unit.textContent = w.unit;
-    el.appendChild(unit);
-  }
-
-  if (w.clearable) {
-    const clearBtn = document.createElement("button");
-    clearBtn.type = "button";
-    clearBtn.className = "syn-panel-widget-clear";
-    clearBtn.textContent = "Clear";
-    clearBtn.addEventListener("click", () => {
-      input.value = "";
-      opts.dispatch(w.id, null);
-    });
-    el.appendChild(clearBtn);
+  // unit + clear share one grid cell so 'BPM' and 'Clear' sit on the
+  // same row as the input — the earlier layout put them in separate
+  // columns and Clear wrapped to a new line.
+  if (w.unit || w.clearable) {
+    const trail = document.createElement("div");
+    trail.className = "syn-panel-widget-trail";
+    if (w.unit) {
+      const unit = document.createElement("span");
+      unit.className = "syn-panel-widget-unit";
+      unit.textContent = w.unit;
+      trail.appendChild(unit);
+    }
+    if (w.clearable) {
+      const clearBtn = document.createElement("button");
+      clearBtn.type = "button";
+      clearBtn.className = "syn-panel-widget-clear";
+      clearBtn.textContent = "Clear";
+      clearBtn.addEventListener("click", () => {
+        input.value = "";
+        opts.dispatch(w.id, null);
+      });
+      trail.appendChild(clearBtn);
+    }
+    el.appendChild(trail);
   }
 
   updaters.set(w.id, (v) => {
@@ -497,21 +536,47 @@ function renderPair(
   updaters: Map<string, (v: PanelDispatchValue) => void>,
   optionUpdaters: Map<string, (options: Array<{ value: string | number; label: string }>) => void>,
 ): HTMLElement {
-  const el = document.createElement("div");
-  el.className = "syn-panel-widget syn-panel-widget-pair";
-  el.dataset.widgetId = w.id;
-  if (w.tooltip) el.title = w.tooltip;
-
-  const label = document.createElement("div");
-  label.className = "syn-panel-widget-label";
-  label.textContent = w.label;
-  el.appendChild(label);
-
+  // Use widgetShell so the pair gets its own '?' hover-help driven by
+  // its tooltip / notes. Then override the grid to stack the children
+  // below the group label rather than sitting in one grid row.
+  const el = widgetShell(w);
   const row = document.createElement("div");
   row.className = "syn-panel-widget-pair-children";
   for (const child of w.children) {
     row.appendChild(renderWidget(child, opts, updaters, optionUpdaters));
   }
   el.appendChild(row);
+
+  // For a nullable pair (session:key, session:meter), each child's
+  // Clear button should clear BOTH children — the pair is meaningful
+  // only as a set. Rebind after render.
+  if (w.nullable) {
+    const clearAll = () => {
+      for (const child of w.children) {
+        const scope = row.querySelector(
+          `[data-widget-id="${cssEscape(child.id)}"]`,
+        );
+        const inputEl = scope?.querySelector("select, input") as
+          | HTMLSelectElement
+          | HTMLInputElement
+          | null;
+        if (inputEl) inputEl.value = "";
+        opts.dispatch(child.id, null);
+      }
+    };
+    for (const btn of row.querySelectorAll<HTMLButtonElement>(
+      ".syn-panel-widget-clear",
+    )) {
+      const fresh = btn.cloneNode(true) as HTMLButtonElement;
+      fresh.addEventListener("click", clearAll);
+      btn.replaceWith(fresh);
+    }
+  }
   return el;
+}
+
+function cssEscape(s: string): string {
+  return typeof CSS !== "undefined" && typeof CSS.escape === "function"
+    ? CSS.escape(s)
+    : s.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
 }

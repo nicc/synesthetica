@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { generatePanel, productionManifest } from "@synesthetica/contracts";
 import { renderPanel } from "../src/panel/renderPanel.js";
+
+// Popups are appended to document.body (fixed-positioned so ancestor
+// overflow doesn't clip them). Clear between tests so accumulation
+// doesn't confuse assertions that query the body.
+beforeEach(() => {
+  document.body.innerHTML = "";
+});
 
 describe("renderPanel — structure", () => {
   it("renders three sections in order", () => {
@@ -94,6 +101,69 @@ describe("renderPanel — widget interactions", () => {
   });
 });
 
+describe("renderPanel — nullable pair Clear buttons null both children", () => {
+  it("clicking Clear on beats-per-bar also nulls beat-value", () => {
+    const dispatched: Array<[string, unknown]> = [];
+    const panel = generatePanel(productionManifest);
+    const rendered = renderPanel({
+      panel,
+      dispatch: (id, v) => dispatched.push([id, v]),
+    });
+    // Both children live inside the meter pair.
+    const meter = rendered.root.querySelector(
+      '[data-widget-id="session:meter"]',
+    ) as HTMLElement;
+    const bpbClear = meter.querySelector(
+      '[data-widget-id="session:beats-per-bar"] .syn-panel-widget-clear',
+    ) as HTMLButtonElement;
+    expect(bpbClear).toBeTruthy();
+    bpbClear.click();
+    // Both children nulled by one click on either child's Clear.
+    const nulls = dispatched.filter(([, v]) => v === null).map(([id]) => id);
+    expect(nulls).toContain("session:beats-per-bar");
+    expect(nulls).toContain("session:beat-value");
+  });
+
+  it("clicking Clear on beat-value also nulls beats-per-bar", () => {
+    const dispatched: Array<[string, unknown]> = [];
+    const panel = generatePanel(productionManifest);
+    const rendered = renderPanel({
+      panel,
+      dispatch: (id, v) => dispatched.push([id, v]),
+    });
+    const meter = rendered.root.querySelector(
+      '[data-widget-id="session:meter"]',
+    ) as HTMLElement;
+    const bvClear = meter.querySelector(
+      '[data-widget-id="session:beat-value"] .syn-panel-widget-clear',
+    ) as HTMLButtonElement;
+    expect(bvClear).toBeTruthy();
+    bvClear.click();
+    const nulls = dispatched.filter(([, v]) => v === null).map(([id]) => id);
+    expect(nulls).toContain("session:beats-per-bar");
+    expect(nulls).toContain("session:beat-value");
+  });
+
+  it("clickable Clear appears on each nullable pair child (key + meter)", () => {
+    const panel = generatePanel(productionManifest);
+    const rendered = renderPanel({ panel, dispatch: () => {} });
+    // Key pair — tonic + mode, both clearable selects.
+    const key = rendered.root.querySelector(
+      '[data-widget-id="session:key"]',
+    ) as HTMLElement;
+    expect(
+      key.querySelectorAll(".syn-panel-widget-clear").length,
+    ).toBeGreaterThanOrEqual(2);
+    // Meter pair — bpb + beat-value.
+    const meter = rendered.root.querySelector(
+      '[data-widget-id="session:meter"]',
+    ) as HTMLElement;
+    expect(
+      meter.querySelectorAll(".syn-panel-widget-clear").length,
+    ).toBeGreaterThanOrEqual(2);
+  });
+});
+
 describe("renderPanel — hover-help", () => {
   it("adds a '?' hover-help element for sliders with directionality", () => {
     const panel = generatePanel(productionManifest);
@@ -105,13 +175,17 @@ describe("renderPanel — hover-help", () => {
     const help = w.querySelector(".syn-panel-widget-help") as HTMLElement;
     expect(help).toBeTruthy();
     expect(help.textContent?.startsWith("?")).toBe(true);
-    // Hover panel present with both low + high endpoints.
-    const panelEl = help.querySelector(".syn-panel-widget-help-panel") as HTMLElement;
-    expect(panelEl).toBeTruthy();
-    const endpoints = panelEl.querySelectorAll("dt");
-    const labels = Array.from(endpoints).map((n) => n.textContent);
-    expect(labels).toContain("Low");
-    expect(labels).toContain("High");
+    // Popup lives on document.body (fixed-positioned, escapes clip
+    // ancestors). Grab the last help panel — one per '?' created.
+    const panels = document.body.querySelectorAll(
+      ".syn-panel-widget-help-panel",
+    );
+    expect(panels.length).toBeGreaterThan(0);
+    const bodies = Array.from(panels).map((p) =>
+      Array.from(p.querySelectorAll("dt")).map((dt) => dt.textContent),
+    );
+    // At least one panel carries the low/high endpoints.
+    expect(bodies.some((b) => b.includes("Low") && b.includes("High"))).toBe(true);
   });
 
   it("does not render inline hints line under the widget row", () => {

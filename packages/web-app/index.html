@@ -133,16 +133,27 @@
     }
     .syn-panel-widget {
       display: grid;
-      grid-template-columns: 110px 1fr auto;
+      grid-template-columns: 140px 1fr auto;
       column-gap: 10px;
       align-items: center;
+      /* Uniform row height across all widget kinds — sliders would
+       * otherwise render shorter than selects/inputs and Advanced
+       * would look tighter than Basics. */
+      min-height: 30px;
       margin-bottom: 8px;
     }
     .syn-panel-widget-label-wrap {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      overflow: hidden;
+      /* No overflow clipping here — the label itself ellipsises,
+       * and the '?' hover panel uses fixed positioning so ancestor
+       * overflow doesn't clip it. */
+    }
+    .syn-panel-widget-trail {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
     .syn-panel-widget-label {
       font-size: 11px;
@@ -186,13 +197,16 @@
       background: #222;
       outline: none;
     }
+    /* Popup is fixed-positioned + appended to <body> at render time
+     * so it escapes every ancestor overflow (frame body scrolls,
+     * frame clips, label-wrap doesn't clip but might in future).
+     * Placement is set from JS on hover; visibility toggles via the
+     * .open class. */
     .syn-panel-widget-help-panel {
-      position: absolute;
-      left: 16px;
-      top: -6px;
+      position: fixed;
       width: 260px;
       max-width: 60vw;
-      z-index: 40;
+      z-index: 100;
       background: rgba(20, 20, 20, 0.98);
       border: 1px solid #333;
       border-radius: 4px;
@@ -200,16 +214,15 @@
       color: #ccc;
       font-size: 11px;
       line-height: 1.55;
-      /* Hidden by default; hover / focus on the '?' reveals it. */
       opacity: 0;
+      visibility: hidden;
       pointer-events: none;
       transition: opacity 100ms;
       box-shadow: 0 3px 12px rgba(0, 0, 0, 0.6);
     }
-    .syn-panel-widget-help:hover .syn-panel-widget-help-panel,
-    .syn-panel-widget-help:focus .syn-panel-widget-help-panel {
+    .syn-panel-widget-help-panel.open {
       opacity: 1;
-      pointer-events: auto;
+      visibility: visible;
     }
     .syn-panel-widget-help-tooltip {
       margin: 0 0 6px;
@@ -308,11 +321,25 @@
     }
     .syn-panel-widget-clear:hover { background: #2a2a2a; color: #ccc; }
     .syn-panel-widget-unit { font-size: 10px; color: #666; }
-    .syn-panel-widget-pair { grid-template-columns: 1fr; }
+    /* Pair widgets stack: group label on its own row, children below. */
+    .syn-panel-widget-pair {
+      grid-template-columns: 1fr;
+      align-items: start;
+      min-height: 0;
+    }
+    .syn-panel-widget-pair > .syn-panel-widget-label-wrap {
+      margin-bottom: 4px;
+    }
     .syn-panel-widget-pair-children {
-      display: grid;
+      display: flex;
+      flex-direction: column;
       gap: 6px;
       padding-left: 8px;
+    }
+    /* Children inside a pair use the same 3-column grid so their
+     * controls line up under one another. */
+    .syn-panel-widget-pair-children .syn-panel-widget {
+      margin-bottom: 0;
     }
 
     /* -----------------------------------------------------------------

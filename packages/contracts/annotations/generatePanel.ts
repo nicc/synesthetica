@@ -237,6 +237,7 @@ function pairWidget(
     aliases: s.aliases ?? [],
     kind: "pair",
     children: [sessionWidget(a, index), sessionWidget(b, index)],
+    nullable: s.nullable,
   };
 }
 

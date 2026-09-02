@@ -94,6 +94,12 @@ export interface NumberWidgetDescriptor extends WidgetDescriptorBase {
 export interface PairWidgetDescriptor extends WidgetDescriptorBase {
   kind: "pair";
   children: [WidgetDescriptor, WidgetDescriptor];
+  /**
+   * True when the pair accepts null (both children can be cleared as
+   * a unit). Renderers wire any child's Clear button to null both,
+   * since the pair is meaningful only as a set.
+   */
+  nullable: boolean;
 }
 
 export type WidgetDescriptor =
