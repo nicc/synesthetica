@@ -40,6 +40,22 @@ describe("spawnWebApp", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("detects the URL when Vite wraps the port in ANSI escapes", async () => {
+    // Reproduce the exact byte pattern Vite 5.x emits when colouring
+    // the port digits — regression guard for the stripAnsi bug that
+    // left \x1b between the colon and the digits.
+    const dir = makeFakeWebApp(
+      `process.stdout.write('  \\x1b[32m\\x1b[1mVITE\\x1b[22m v5.4.21\\x1b[39m\\n' +
+        '  \\x1b[36m➜\\x1b[39m  \\x1b[1mLocal\\x1b[22m:   \\x1b[36mhttp://localhost:\\x1b[1m5178\\x1b[22m/\\x1b[39m\\n');
+       setInterval(()=>{}, 1000);`,
+    );
+    const log = new PassThrough();
+    const handle = await spawnWebApp({ webAppDir: dir, log });
+    expect(handle.url).toBe("http://localhost:5178/");
+    await handle.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("rejects when the subprocess exits before ready", async () => {
     const dir = makeFakeWebApp(`process.exit(3);`);
     const log = new PassThrough();

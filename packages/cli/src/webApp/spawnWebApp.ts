@@ -221,8 +221,11 @@ function waitForVite(
   });
 }
 
+// Strips CSI (Control Sequence Introducer) sequences: ESC [ ... final-byte.
+// Includes the ESC prefix — the earlier version omitted it and left \x1b
+// bytes wedged between the colon and the port digits, breaking URL parsing.
 // eslint-disable-next-line no-control-regex
-const ANSI_RE = /\[[0-?]*[ -/]*[@-~]/g;
+const ANSI_RE = /\x1b\[[0-9;?]*[@-~]/g;
 function stripAnsi(s: string): string {
   return s.replace(ANSI_RE, "");
 }
