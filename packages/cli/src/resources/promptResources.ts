@@ -136,14 +136,23 @@ function renderMacro(m: MacroAnnotation): string {
         `Values: ${m.enumValues.map((v) => `${JSON.stringify(v.value)} (${v.label})`).join(", ")}`,
       );
       break;
-    case "compound":
+    case "compound": {
       lines.push(
         `Type: compound, range [${m.range[0]}, ${m.range[1]}], default ${m.default}`,
       );
-      lines.push(`Fans out to: ${m.targets.join(", ")}`);
+      const targetLabels = m.targets.map((t) => {
+        if (typeof t === "string") return t;
+        return t.invert ? `${t.id} (inverted)` : t.id;
+      });
+      lines.push(
+        targetLabels.length > 0
+          ? `Fans out to: ${targetLabels.join(", ")}`
+          : `Fans out to: (none wired yet — no-op until targets are exposed as macros)`,
+      );
       lines.push(`Low: ${m.directionality.low.description}`);
       lines.push(`High: ${m.directionality.high.description}`);
       break;
+    }
   }
 
   if (m.notes?.length) {

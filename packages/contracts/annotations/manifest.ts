@@ -34,11 +34,11 @@ const macros: MacroAnnotation[] = [
     affects: ["harmony", "phrasing"],
     directionality: {
       low: {
-        description: "chords release quickly; fewer overlapping numerals on the clock",
+        description: "chord symbols fade quickly; fewer overlapping numerals on the clock",
         tendsTo: ["emphasise the current chord", "reduce visual accumulation"],
       },
       high: {
-        description: "chords linger; harmonic pattern accumulates visibly",
+        description: "chord symbols linger; harmonic pattern accumulates visibly",
         tendsTo: ["emphasise progression memory", "reveal recurring cadences"],
       },
     },
@@ -66,6 +66,9 @@ const macros: MacroAnnotation[] = [
         tendsTo: ["catch broken chords", "risk false positives on melody"],
       },
     },
+    notes: [
+      "Unit is chord detection window in ms.",
+    ],
   },
 
   {
@@ -78,7 +81,7 @@ const macros: MacroAnnotation[] = [
     affects: ["harmony"],
     directionality: {
       low: {
-        description: "even two-note intervals register as chords (dyads count)",
+        description: "two-note intervals register as chords",
         tendsTo: ["catch sparse harmony", "increase chord flicker"],
       },
       high: {
@@ -86,6 +89,9 @@ const macros: MacroAnnotation[] = [
         tendsTo: ["reject dyads", "stabilise chord surface"],
       },
     },
+    notes: [
+      "Denotes the number of notes required to constitute a chord.",
+    ],
   },
 
   {
@@ -106,6 +112,10 @@ const macros: MacroAnnotation[] = [
         tendsTo: ["stabilise the chord surface", "delay reaction to genuine changes"],
       },
     },
+    notes: [
+      "Hysteresis or lag on chord detection.",
+      "Unit is ms.",
+    ],
   },
 
   {
@@ -126,6 +136,10 @@ const macros: MacroAnnotation[] = [
         tendsTo: ["emphasise dynamic contour", "increase visual density"],
       },
     },
+    notes: [
+      "Determines how long each note's velocty indicator lingers on the dynamics grammar.",
+      "Unit is ms.",
+    ],
   },
 
   {
@@ -147,7 +161,81 @@ const macros: MacroAnnotation[] = [
       },
     },
     notes: [
+      "Determines how much note history is shown on the vertically-scrolling rhythm grammar.",
       "Independent from the compound time-horizon macro. Use rhythm:horizon to isolate rhythm's history without touching harmony:linger or dynamics:linger.",
+      "Unit is decimal fraction of available space.",
+    ],
+  },
+
+  {
+    id: "rhythm:tight-tolerance",
+    name: "Tight-tolerance drift threshold",
+    aliases: ["strictness threshold", "grading tolerance", "drift window"],
+    type: "continuous",
+    range: [10, 100],
+    default: 30, // matches RhythmGrammar TIGHT_TOLERANCE_DEFAULT_MS
+    affects: ["rhythm", "articulation"],
+    directionality: {
+      low: {
+        description: "strict — only near-perfect timing suppresses drift streaks",
+        tendsTo: ["expose timing imprecision", "grade harshly"],
+      },
+      high: {
+        description: "forgiving — a wider window counts as 'tight' and hides drift cues",
+        tendsTo: ["reward looseness", "quiet timing feedback"],
+      },
+    },
+    notes: [
+      "Drift threshold in milliseconds. Notes whose onset falls within this window of the nearest beat subdivision render as 'tight' and suppress the streak-line motion cue.",
+      "Unit is ms.",
+    ],
+  },
+
+  {
+    id: "rhythm:reference-linger",
+    name: "Reference-marker linger",
+    aliases: ["drift-marker trail", "reference trail"],
+    type: "continuous",
+    range: [1.0, 3.0],
+    default: 1.3, // matches RhythmGrammar DEFAULT_REFERENCE_LINGER_MULTIPLIER
+    affects: ["rhythm"],
+    directionality: {
+      low: {
+        description: "reference lines and streaks fade with the note",
+        tendsTo: ["cleaner timeline", "reduce trailing marks"],
+      },
+      high: {
+        description: "timing markers linger past the note's fade, leaving a trail",
+        tendsTo: ["persistent timing feedback", "increase visual density"],
+      },
+    },
+    notes: [
+      "Multiplier applied to the note-history window for reference lines and streak markers.",
+      "Unit is dimensionless multiplier (1.0 = fades with the note; 2.0 = twice as long).",
+    ],
+  },
+
+  {
+    id: "rhythm:pulse-intensity",
+    name: "Beat-pulse intensity",
+    aliases: ["pulse strength", "beat prominence", "now-line pulse"],
+    type: "continuous",
+    range: [0, 1],
+    default: 0.5, // 0.5 preserves the historic pulse baseline exactly
+    affects: ["rhythm"],
+    directionality: {
+      low: {
+        description: "subdued beat pulse on the NOW line — quick decay, faint peak",
+        tendsTo: ["reduce metronomic feel", "let notes carry rhythm"],
+      },
+      high: {
+        description: "prominent beat pulse — longer decay, brighter peak",
+        tendsTo: ["emphasise pulse", "reinforce beat feel"],
+      },
+    },
+    notes: [
+      "Single dial that scales the beat-pulse decay, opacity boost, and value boost together. At 0.5 the pulse matches the historic baseline.",
+      "Skipped in free-time mode (requires a prescribed tempo to have a beat to pulse on).",
     ],
   },
 
@@ -170,6 +258,7 @@ const macros: MacroAnnotation[] = [
     notes: [
       "Anchors the pitch A to this hue. Every other pitch class is derived by wheel rotation.",
       "To set 'C is red', use set_hue_for_pitch(0, 0) — server handles the math.",
+      "Unit is degree on the colour wheel with red at 0.",
     ],
   },
 
@@ -230,8 +319,12 @@ const macros: MacroAnnotation[] = [
     range: [0, 1],
     default: 0.5,
     targets: [
-      "rhythm:horizon", // tighter view at higher difficulty
-      "rhythm:tight-tolerance", // stricter drift grading at higher difficulty
+      // Both targets invert: higher difficulty ↔ narrower view ↔
+      // stricter drift grading. Without inversion, higher difficulty
+      // would give MORE tolerance (backwards) and a WIDER view (also
+      // arguably backwards for a "harder" mode).
+      { id: "rhythm:horizon", invert: true },
+      { id: "rhythm:tight-tolerance", invert: true },
     ],
     affects: ["rhythm", "articulation"],
     directionality: {
@@ -257,10 +350,8 @@ const macros: MacroAnnotation[] = [
     range: [0, 1],
     default: 0.5,
     targets: [
-      "rhythm:reference-linger", // longer drift-marker persistence
-      "rhythm:pulse-decay", // slower NOW-line beat pulse decay
-      "rhythm:pulse-opacity-boost", // brighter pulse peak
-      "rhythm:pulse-value-boost", // stronger HSV value boost on pulse
+      "rhythm:pulse-intensity", // brighter, longer beat pulse on the NOW line
+      "rhythm:reference-linger", // reference lines / streaks trail past the note fade
     ],
     affects: ["rhythm"],
     directionality: {

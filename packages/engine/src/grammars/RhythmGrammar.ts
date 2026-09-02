@@ -57,15 +57,20 @@ const MIN_NOTE_HISTORY_BEATS = 1;
 /** Reference window (streaks + reference lines) lingers longer than notes (multiplier) */
 const DEFAULT_REFERENCE_LINGER_MULTIPLIER = 1.3;
 
-/** NOW-line beat pulse: exponential decay time constant (ms) */
-const PULSE_DECAY_MS = 120;
-/** Peak opacity boost added on the beat (decays to zero) */
-const PULSE_OPACITY_BOOST = 0.4;
-/** Peak HSV value boost added on the beat (decays to zero) */
-const PULSE_VALUE_BOOST = 0.2;
+/** Baseline NOW-line beat pulse constants, scaled at runtime by the
+ *  rhythm:pulse-intensity macro (default 0.5 keeps historic feel). */
+const PULSE_DECAY_MS_BASE = 120;
+const PULSE_OPACITY_BOOST_BASE = 0.4;
+const PULSE_VALUE_BOOST_BASE = 0.2;
+/** Default value for the rhythm:pulse-intensity macro (0..1). At 0.5
+ *  the derived pulse constants equal the historic baseline exactly.
+ *  See derivePulseParams() for the mapping. */
+const PULSE_INTENSITY_DEFAULT = 0.5;
 
-/** Drift tolerance in ms - within this, note is considered "tight" and shows reference line */
-const TIGHT_TOLERANCE_MS = 30;
+/** Default tight-tolerance in ms for the rhythm:tight-tolerance macro.
+ *  Below this drift threshold a note is graded "tight" and the streak
+ *  lines are suppressed. */
+const TIGHT_TOLERANCE_DEFAULT_MS = 30;
 
 /** Number of streak lines per note */
 const STREAK_COUNT = 3;
@@ -123,8 +128,41 @@ interface RhythmGrammarMacros {
   horizon: number;
   /** Which subdivision to use for drift calculation */
   subdivisionDepth: SubdivisionDepth;
-  /** How long reference window lingers beyond note window (multiplier) */
+  /** How long reference window lingers beyond note window (multiplier).
+   *  Range roughly [1.0, 3.0]; default 1.3. Higher values leave drift
+   *  markers on-screen longer after the source note fades. */
   referenceLinger: number;
+  /** Drift tolerance in ms (rhythm:tight-tolerance). Notes with
+   *  |drift| below this threshold render as "tight" and suppress the
+   *  streak-line motion cue. Tighter = higher difficulty. */
+  tightTolerance: number;
+  /** Beat-pulse intensity (rhythm:pulse-intensity), 0..1. Scales
+   *  duration + amplitude of the pulse on the NOW line; 0.5 preserves
+   *  the historic baseline exactly. */
+  pulseIntensity: number;
+}
+
+/**
+ * Derive the three pulse constants from a single 0..1 intensity value.
+ * Constraint: intensity = 0.5 reproduces the historic baseline (128 ms
+ * decay, 0.4 opacity boost, 0.2 value boost). Below 0.5 the pulse is
+ * quicker and quieter; above, longer and brighter.
+ *
+ * All three components scale on the same linear axis for simplicity —
+ * users choose "how much beat pulse" as one dial, not three.
+ */
+function derivePulseParams(intensity: number): {
+  decayMs: number;
+  opacityBoost: number;
+  valueBoost: number;
+} {
+  // 0 → 0.5x baseline; 0.5 → 1.0x; 1 → 1.5x
+  const scale = 0.5 + intensity;
+  return {
+    decayMs: PULSE_DECAY_MS_BASE * scale,
+    opacityBoost: Math.min(1, PULSE_OPACITY_BOOST_BASE * scale),
+    valueBoost: Math.min(1, PULSE_VALUE_BOOST_BASE * scale),
+  };
 }
 
 // ============================================================================
@@ -142,6 +180,8 @@ export class RhythmGrammar implements IVisualGrammar {
     horizon: 1.0, // Default to full view
     subdivisionDepth: "16th", // Default to finest subdivision
     referenceLinger: DEFAULT_REFERENCE_LINGER_MULTIPLIER,
+    tightTolerance: TIGHT_TOLERANCE_DEFAULT_MS,
+    pulseIntensity: PULSE_INTENSITY_DEFAULT,
   };
 
   /** Drift frozen at first computation per note. Ensures referential transparency:
@@ -322,22 +362,23 @@ export class RhythmGrammar implements IVisualGrammar {
     prescribed: PrescribedContext,
   ): Entity {
     // Beat pulse: when a beat passes through the NOW line (every beatMs),
-    // briefly brighten and increase opacity. Decays exponentially over
-    // PULSE_DECAY_MS so it reads as a "light pulsing inside the line"
-    // — present but never distracting. Skipped when no tempo is known
-    // (free-time mode), since there's nothing to sync to.
+    // briefly brighten and increase opacity. Decay + amplitude scale
+    // with rhythm:pulse-intensity so users can dial the beat feel from
+    // subdued to prominent. Skipped when no tempo is known (free-time
+    // mode), since there's nothing to sync to.
     const tempo = this.getEffectiveTempo(prescribed);
+    const pulseParams = derivePulseParams(this.macros.pulseIntensity);
     let pulse = 0;
     if (tempo !== null) {
       const beatMs = 60000 / tempo;
       const phase = ((t % beatMs) + beatMs) % beatMs;
-      pulse = Math.exp(-phase / PULSE_DECAY_MS);
+      pulse = Math.exp(-phase / pulseParams.decayMs);
     }
 
     const baseOpacity = GRID_COLORS.nowLine.a ?? 0.6;
     const baseV = GRID_COLORS.nowLine.v;
-    const opacity = Math.min(1, baseOpacity + pulse * PULSE_OPACITY_BOOST);
-    const v = Math.min(1, baseV + pulse * PULSE_VALUE_BOOST);
+    const opacity = Math.min(1, baseOpacity + pulse * pulseParams.opacityBoost);
+    const v = Math.min(1, baseV + pulse * pulseParams.valueBoost);
 
     return {
       id: this.entityId("now-line"),
@@ -568,7 +609,7 @@ export class RhythmGrammar implements IVisualGrammar {
       }
 
       // Add streak lines if there's drift beyond tight tolerance
-      if (Math.abs(driftInfo.driftMs) > TIGHT_TOLERANCE_MS) {
+      if (Math.abs(driftInfo.driftMs) > this.macros.tightTolerance) {
         const streaks = this.createStreakLines(
           note.id,
           x,

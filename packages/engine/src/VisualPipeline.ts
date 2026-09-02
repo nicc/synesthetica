@@ -138,6 +138,46 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     this.compositor = compositor;
   }
 
+  /**
+   * Route a manifest macro (id + value) to whichever grammar owns it.
+   *
+   * Names are scope-prefixed: `<grammarId>:<param>`. The grammar id
+   * matches the prefix of the grammar constant that consumes the
+   * param — `rhythm:*` routes to RhythmGrammar, `harmony:*` to
+   * HarmonyGrammar, `dynamics:*` to DynamicsGrammar.
+   *
+   * The param name is converted from kebab-case to camelCase (e.g.
+   * `rhythm:pulse-intensity` → `{ pulseIntensity: value }`) and passed
+   * to `grammar.setMacros(...)`. Grammars ignore keys they don't own.
+   *
+   * Bare (unscoped) and `system:*` macros aren't grammar-owned; they
+   * flow to the vocabulary or land elsewhere in the pipeline. The
+   * router silently drops names it can't map — caller is responsible
+   * for schema-side validation.
+   */
+  setMacro(name: string, value: number | string): void {
+    const colon = name.indexOf(":");
+    if (colon < 0) return;
+    const scope = name.slice(0, colon);
+    const paramKebab = name.slice(colon + 1);
+    // If the param itself contains further colons (e.g.
+    // "system:colour-mapping:reference"), the tail becomes the param
+    // to camelCase — but system-scope isn't grammar-owned, so it exits
+    // via the grammar loop as a no-op. Vocabulary routing lands in a
+    // later chunk.
+    const paramCamel = paramKebab.replace(/-([a-z])/g, (_, c: string) =>
+      c.toUpperCase(),
+    );
+    for (const grammar of this.grammars) {
+      if (grammar.id === `${scope}-grammar` || grammar.id === scope) {
+        const g = grammar as unknown as {
+          setMacros?: (m: Record<string, number | string>) => void;
+        };
+        g.setMacros?.({ [paramCamel]: value });
+      }
+    }
+  }
+
   // === Tempo/Meter Control (RFC 007) ===
 
   /**

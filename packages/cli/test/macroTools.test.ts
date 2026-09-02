@@ -90,6 +90,46 @@ describe("set_macro — compound (linear fan-out)", () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe("MACRO_VALUE_OUT_OF_RANGE");
   });
+
+  it("rhythm:difficulty inverts targets — HIGH difficulty → LOW leaf values", async () => {
+    const engine = new StubEngineHandle();
+    // Max difficulty = 1.0 (strict). Both targets are marked invert:true,
+    // so each leaf gets its RANGE MINIMUM (tight view, tight tolerance).
+    const r = await setMacroTool.handle(
+      { name: "rhythm:difficulty", value: 1.0 },
+      engine,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.macros["rhythm:horizon"]).toBe(0); // [0, 1] inverted → 0
+    expect(r.state.macros["rhythm:tight-tolerance"]).toBe(10); // [10, 100] inverted → 10
+    expect(r.state.macros["rhythm:difficulty"]).toBe(1);
+  });
+
+  it("rhythm:difficulty at 0 gives leaves their max (loose/wide)", async () => {
+    const engine = new StubEngineHandle();
+    const r = await setMacroTool.handle(
+      { name: "rhythm:difficulty", value: 0 },
+      engine,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.macros["rhythm:horizon"]).toBe(1);
+    expect(r.state.macros["rhythm:tight-tolerance"]).toBe(100);
+  });
+
+  it("rhythm:emphasis fans forward to pulse-intensity + reference-linger", async () => {
+    const engine = new StubEngineHandle();
+    const r = await setMacroTool.handle(
+      { name: "rhythm:emphasis", value: 1.0 },
+      engine,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // Non-inverted targets: max compound → max leaf.
+    expect(r.state.macros["rhythm:pulse-intensity"]).toBe(1); // [0, 1] max
+    expect(r.state.macros["rhythm:reference-linger"]).toBe(3); // [1.0, 3.0] max
+  });
 });
 
 describe("set_macro — errors", () => {

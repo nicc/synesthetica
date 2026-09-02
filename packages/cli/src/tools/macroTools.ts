@@ -88,10 +88,20 @@ async function dispatchCompound(
   engine: EngineHandle,
 ): Promise<StateSnapshot> {
   // Fan out to each target with a linear map. Last write wins per
-  // SPEC 013 §Resolution — no accumulation, no priority.
-  for (const targetId of compound.targets) {
-    const targetValue = linearMapTo(value, compound.range, targetId);
-    await engine.setMacro(targetId, targetValue);
+  // SPEC 013 §Resolution — no accumulation, no priority. Per-target
+  // `invert` flips the compound axis so the target's range runs in the
+  // opposite direction (used when a compound's semantics are the
+  // reverse of a leaf's natural range — e.g. rhythm:difficulty HIGH
+  // → rhythm:tight-tolerance LOW).
+  for (const rawTarget of compound.targets) {
+    const target = typeof rawTarget === "string"
+      ? { id: rawTarget, invert: false }
+      : { id: rawTarget.id, invert: rawTarget.invert === true };
+    const compoundValue = target.invert
+      ? compound.range[1] + compound.range[0] - value
+      : value;
+    const targetValue = linearMapTo(compoundValue, compound.range, target.id);
+    await engine.setMacro(target.id, targetValue);
   }
   // Record the compound's own value last so state://current reflects
   // "the user set time-horizon to 0.5" even though the underlying

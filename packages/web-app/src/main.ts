@@ -162,9 +162,11 @@ async function applyEngineOp(
     case "setMacro": {
       const [name, value] = args as [string, number | string];
       engineState.macros[name] = value;
-      // Macro plumbing to pipeline setters lands with the tier-1 work
-      // (synesthetica-1wq). For now the state mirror is truthful even
-      // if the pipeline hasn't wired the parameter yet.
+      // Route to the running pipeline's grammar (or vocabulary in a
+      // later chunk). Scope prefix picks the target; grammars ignore
+      // unknown keys, so bare / system macros without a downstream
+      // owner are safely no-ops until wired.
+      pipeline?.setMacro(name, value);
       break;
     }
     case "setInput": {

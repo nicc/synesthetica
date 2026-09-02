@@ -292,4 +292,43 @@ describe("VisualPipeline", () => {
       expect(frame.t).toBe(1000);
     });
   });
+
+  describe("setMacro routing", () => {
+    it("routes rhythm:* macros to the RhythmGrammar via setMacros", () => {
+      const rhythm = new RhythmGrammar();
+      pipeline.addGrammar(rhythm);
+      pipeline.setMacro("rhythm:horizon", 0.4);
+      expect(rhythm.getMacros().horizon).toBe(0.4);
+    });
+
+    it("kebab-case → camelCase param mapping", () => {
+      const rhythm = new RhythmGrammar();
+      pipeline.addGrammar(rhythm);
+      pipeline.setMacro("rhythm:pulse-intensity", 0.8);
+      expect(rhythm.getMacros().pulseIntensity).toBe(0.8);
+      pipeline.setMacro("rhythm:reference-linger", 2.1);
+      expect(rhythm.getMacros().referenceLinger).toBe(2.1);
+      pipeline.setMacro("rhythm:tight-tolerance", 50);
+      expect(rhythm.getMacros().tightTolerance).toBe(50);
+    });
+
+    it("silently drops unscoped names — no crash", () => {
+      pipeline.addGrammar(new RhythmGrammar());
+      expect(() => pipeline.setMacro("time-horizon", 0.5)).not.toThrow();
+    });
+
+    it("silently drops names whose scope matches no grammar", () => {
+      pipeline.addGrammar(new RhythmGrammar());
+      expect(() => pipeline.setMacro("system:colour-mapping:reference", 90)).not.toThrow();
+    });
+
+    it("does not deliver a rhythm:* name to a non-rhythm grammar", () => {
+      const rhythm = new RhythmGrammar();
+      pipeline.addGrammar(rhythm);
+      // Confirms only the scope-matching grammar receives the write.
+      const before = { ...rhythm.getMacros() };
+      pipeline.setMacro("harmony:linger", 4);
+      expect(rhythm.getMacros()).toEqual(before);
+    });
+  });
 });

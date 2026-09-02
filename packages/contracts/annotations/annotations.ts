@@ -118,6 +118,18 @@ export interface DiscreteMacroAnnotation extends MacroAnnotationBase {
 }
 
 /**
+ * A single target of a compound macro. `id` is the leaf macro this
+ * compound routes to. `invert: true` flips the direction so the
+ * compound's high end corresponds to the leaf's low end (used when a
+ * compound's semantics run counter to a leaf's natural range — e.g.
+ * "difficulty" HIGH should give tolerance LOW).
+ */
+export interface CompoundTarget {
+  id: string;
+  invert?: boolean;
+}
+
+/**
  * A macro exposed as a compound — a single 0..1 dial that fans out to
  * multiple underlying params via a dispatch curve. The dispatcher is
  * responsible for the curve; this annotation declares what the macro
@@ -126,11 +138,11 @@ export interface DiscreteMacroAnnotation extends MacroAnnotationBase {
 export interface CompoundMacroAnnotation extends MacroAnnotationBase {
   type: "compound";
   /**
-   * Underlying targets fanned by this macro. Each target is either
-   * another macro id (recursive) or an internal param reference used
-   * for documentation only — the dispatcher owns the mapping.
+   * Underlying targets fanned by this macro. Each entry is either a
+   * leaf macro id (default direction) or a `{id, invert}` object for
+   * per-target direction control.
    */
-  targets: string[];
+  targets: Array<string | CompoundTarget>;
   /** Inclusive input range for the top-level dial. Usually [0, 1]. */
   range: [number, number];
   /** Default value (also the launch-time value). */
