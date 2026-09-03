@@ -75,7 +75,7 @@ export interface MusicalVisualVocabularyConfig {
 }
 
 const DEFAULT_CONFIG: Required<MusicalVisualVocabularyConfig> = {
-  referencePc: 9, // A
+  referencePc: 0, // C — matches session:tonic's PC=0 convention
   referenceHue: 0, // Red
   hueDirection: "cw",
 };

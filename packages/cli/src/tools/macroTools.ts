@@ -225,7 +225,7 @@ export const setMacroTool: ToolSpec = {
 // set_hue_for_pitch
 // ============================================================================
 
-const HUE_ANCHOR_PC = 9; // A, per SPEC 004 pitch-hue-mapping
+const HUE_ANCHOR_PC = 0; // C — matches vocab default + session:tonic PC convention
 
 export const setHueForPitchTool: ToolSpec = {
   name: "set_hue_for_pitch",
@@ -263,8 +263,8 @@ export const setHueForPitchTool: ToolSpec = {
     // Compute the anchor hue such that pc maps to the requested hue.
     // The anchor is A (pc 9); the direction defaults to "cw" so
     // each semitone rotates hue by +30° from A.
-    // hue(pc) = referenceHue + (pc - 9) * 30 (mod 360) in cw direction.
-    // Solve: referenceHue = hue - (pc - 9) * 30 (mod 360)
+    // hue(pc) = referenceHue + (pc - HUE_ANCHOR_PC) * 30 (mod 360) in cw direction.
+    // Solve: referenceHue = hue - (pc - HUE_ANCHOR_PC) * 30 (mod 360)
     const rawAnchor = (hue as number) - ((pc as number) - HUE_ANCHOR_PC) * 30;
     const anchor = ((rawAnchor % 360) + 360) % 360;
     return safeCall(() =>

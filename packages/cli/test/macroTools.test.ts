@@ -147,14 +147,21 @@ describe("set_macro — errors", () => {
 });
 
 describe("set_hue_for_pitch", () => {
-  it("computes the anchor hue so C maps to the requested hue", async () => {
+  it("computes the anchor hue so the requested pc maps to the requested hue", async () => {
     const engine = new StubEngineHandle();
-    // C is pc 0. Anchor is A (pc 9). Cw direction, 30°/semitone.
-    // hue(C) = hue(A) + (0 - 9) * 30 = hue(A) - 270
-    // To get hue(C) = 0 (red), need hue(A) = 270 (mod 360)
-    const r = await setHueForPitchTool.handle({ pc: 0, hue: 0 }, engine);
-    expect(r.ok).toBe(true);
-    if (r.ok) expect(r.state.macros["system:colour-mapping:reference"]).toBe(270);
+    // Anchor is C (pc 0). Cw direction, 30°/semitone.
+    // hue(pc) = referenceHue + (pc - 0) * 30
+    // Asking set_hue_for_pitch(0, 0) → referenceHue = 0 (C stays red, unchanged).
+    const rCRed = await setHueForPitchTool.handle({ pc: 0, hue: 0 }, engine);
+    expect(rCRed.ok).toBe(true);
+    if (rCRed.ok) expect(rCRed.state.macros["system:colour-mapping:reference"]).toBe(0);
+
+    // Asking set_hue_for_pitch(7, 0) → G red. G is 7 semitones above C.
+    // Need referenceHue such that referenceHue + 7*30 ≡ 0 (mod 360).
+    // referenceHue = -210 ≡ 150 (mod 360).
+    const rGRed = await setHueForPitchTool.handle({ pc: 7, hue: 0 }, engine);
+    expect(rGRed.ok).toBe(true);
+    if (rGRed.ok) expect(rGRed.state.macros["system:colour-mapping:reference"]).toBe(150);
   });
 
   it("rejects out-of-range pc", async () => {

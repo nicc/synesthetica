@@ -73,8 +73,8 @@ describe("Invariant: Pitch class → hue mapping", () => {
     ruleset = new MusicalVisualVocabulary();
   });
 
-  it("A (reference pitch) maps to hue 0 (red)", () => {
-    const frame = makeFrame(0, [makeNote("n1", makePitch(9, 4), 100, "sustain")]);
+  it("C (reference pitch) maps to hue 0 (red)", () => {
+    const frame = makeFrame(0, [makeNote("n1", makePitch(0, 4), 100, "sustain")]);
     const annotated = getAnnotatedNote(ruleset, frame);
 
     expect(annotated).toBeDefined();
@@ -103,7 +103,7 @@ describe("Invariant: Pitch class → hue mapping", () => {
       ]);
       const annotated = getAnnotatedNote(ruleset, frame);
       const expectedHue = pcToHue(pc as PitchClass, {
-        referencePc: 9,
+        referencePc: 0,
         referenceHue: 0,
         direction: "cw",
       });
@@ -115,15 +115,15 @@ describe("Invariant: Pitch class → hue mapping", () => {
   it("counterclockwise direction inverts hue progression", () => {
     ruleset = new MusicalVisualVocabulary({ hueDirection: "ccw" });
 
-    // B (pc=11) is 2 semitones above A
-    // CW: 0 + 2*30 = 60°
-    // CCW: 0 - 2*30 = -60 → 300°
+    // C♯ (pc=1) is 1 semitone above C (reference).
+    // CW: 0 + 1*30 = 30°
+    // CCW: 0 - 1*30 = -30 → 330°
     const frame = makeFrame(0, [
-      makeNote("n1", makePitch(11, 4), 100, "sustain"),
+      makeNote("n1", makePitch(1, 4), 100, "sustain"),
     ]);
     const annotated = getAnnotatedNote(ruleset, frame);
 
-    expect(annotated!.visual.palette.primary.h).toBe(300);
+    expect(annotated!.visual.palette.primary.h).toBe(330);
   });
 
   it("custom reference point shifts all hues equally", () => {

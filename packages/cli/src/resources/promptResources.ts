@@ -104,8 +104,51 @@ function composeSystemOverview(): string {
     "",
     productionManifest.grammars.map(renderGrammar).join("\n\n"),
     "",
+    "## Presets",
+    "",
+    renderPresets(productionManifest.presets ?? []),
+    "",
   ];
   return sections.join("\n");
+}
+
+/**
+ * Preset section: explains the workflow + enumerates any shipped
+ * default presets. Presets themselves are user-managed at runtime;
+ * this section documents the discovery pattern so the LLM knows the
+ * tools exist and what a preset represents.
+ */
+function renderPresets(presets: readonly { id: string; name?: string; notes?: string[] }[]): string {
+  const lines: string[] = [];
+  lines.push(
+    "Presets are named snapshots of the full control surface — macro values, prescribed context (key / tempo / meter / chord mode / metronome), and input source. They're user-managed at runtime:",
+  );
+  lines.push("");
+  lines.push("- `switch_preset(name)` — load a preset; every control snaps to its stored value.");
+  lines.push("- `save_preset(name)` — capture the current state under this name (overwrites if the name exists).");
+  lines.push("");
+  lines.push(
+    "Presets persist on disk (~/Library/Application Support/synesthetica/presets on macOS; XDG_DATA_HOME/synesthetica/presets on Linux). They're per-user, not per-instance.",
+  );
+  lines.push(
+    "Enumeration of existing preset names via MCP is not yet exposed (planned). Ask the user for the name they want if unclear; on switch_preset failure the PRESET_NOT_FOUND error returns the current preset list in `details.available` for reference.",
+  );
+  if (presets.length === 0) {
+    lines.push("");
+    lines.push(
+      "No default presets ship with this build. Any preset the user sees is one they (or a previous session) saved.",
+    );
+    return lines.join("\n");
+  }
+  lines.push("");
+  lines.push("Shipped default presets:");
+  lines.push("");
+  for (const p of presets) {
+    lines.push(`### \`${p.id}\` — ${p.name ?? p.id}`);
+    if (p.notes?.length) for (const n of p.notes) lines.push(`- ${n}`);
+    lines.push("");
+  }
+  return lines.join("\n");
 }
 
 function renderMacro(m: MacroAnnotation): string {

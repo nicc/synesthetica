@@ -14,6 +14,7 @@ import type {
   SessionControlAnnotation,
   SystemConceptAnnotation,
   GrammarAnnotation,
+  PresetAnnotation,
 } from "./annotations";
 
 // ============================================================================
@@ -245,7 +246,7 @@ const macros: MacroAnnotation[] = [
     aliases: ["reference hue", "palette anchor", "colour reference"],
     type: "continuous",
     range: [0, 360],
-    default: 0, // red — matches MusicalVisualVocabulary.DEFAULT_CONFIG.referenceHue
+    default: 0, // red at pitch class 0 (C) — matches MusicalVisualVocabulary.DEFAULT_CONFIG
     affects: ["harmony", "melody"],
     directionality: {
       low: {
@@ -256,8 +257,8 @@ const macros: MacroAnnotation[] = [
       },
     },
     notes: [
-      "Anchors the pitch A to this hue. Every other pitch class is derived by wheel rotation.",
-      "To set 'C is red', use set_hue_for_pitch(0, 0) — server handles the math.",
+      "Anchors the pitch C (pitch class 0) to this hue. Every other pitch class is derived by wheel rotation (+30° per semitone, clockwise).",
+      "To anchor a different pitch class instead — e.g. 'make G red' — use set_hue_for_pitch(7, 0); the server computes the equivalent reference value.",
       "Unit is degree on the colour wheel with red at 0.",
     ],
   },
@@ -410,7 +411,7 @@ const sessionControls: SessionControlAnnotation[] = [
     notes: [
       "The tonic pitch class for key-aware analysis. Paired with session:mode; use set_key(root, mode) to set both together.",
       "Clear to disable functional harmony analysis.",
-      "Note that the same pitch-class mappings (e.g. 0=C) are used for colour mapping controls.",
+      "The same pitch-class encoding (0=C, 1=C♯/D♭, …, 11=B) is used by set_hue_for_pitch's pc argument.",
     ],
   },
   {
@@ -510,7 +511,7 @@ const sessionControls: SessionControlAnnotation[] = [
     ],
     nullable: false,
     notes: [
-      "How chord detection interprets the root note. Harmonic mode considers inversions; bass-led anchors on the lowest note.",
+      "How chord detection identifies the root. Harmonic mode identifies chords by pitch-class content, ignoring voicing/inversion. Bass-led mode uses the lowest sounding note as the chord root.",
     ],
   },
 
@@ -627,6 +628,32 @@ const concepts: SystemConceptAnnotation[] = [
     related: ["connector-arc", "modal-interchange"],
   },
 
+  {
+    term: "chord-quality-glyph",
+    definition:
+      "The radial visual language rendered in the upper section of the harmony grammar, illustrating the QUALITY (nature) of the currently-detected chord — major, minor, sus, dominant seventh, etc. Composed of a central hub and outward spokes: the hub encodes the overall chord quality; each spoke represents one note of the chord (by its degree relative to the root, not its absolute pitch), oriented at a fixed angle around the hub with the root at 0°. Independent of the functional-harmony clock below it — the glyph describes what the chord IS; the clock describes what the chord DOES in the key.",
+    related: ["glyph-spoke", "glyph-hub", "harmony-clock"],
+    examples: [
+      "A C major triad shows a hub coded 'major' and three long spokes at the root, third, and fifth positions.",
+      "A Cmaj7 shows the same triad shape plus one medium-length spoke at the seventh.",
+      "A Csus2 replaces the third spoke with a short spoke at the ninth (second).",
+    ],
+  },
+
+  {
+    term: "glyph-spoke",
+    definition:
+      "One outward line from the chord-quality-glyph hub, representing a single note in the chord relative to the root. Length encodes the note's structural role: triadic notes (root, third, fifth) are longest; seventh is mid-length; other diatonic extensions are shortest; non-diatonic / chromatic tones render as thin lines that don't participate in the overall shape.",
+    related: ["chord-quality-glyph", "glyph-hub"],
+  },
+
+  {
+    term: "glyph-hub",
+    definition:
+      "The centre of the chord-quality-glyph, indicating the overall chord quality (major, minor, diminished, augmented, sus2/sus4, dominant, etc.). The hub's shape and colour summarise the chord's character in a single mark; the spokes around it enumerate its notes.",
+    related: ["chord-quality-glyph", "glyph-spoke"],
+  },
+
   // ------- Dynamics grammar concepts -------
   {
     term: "dynamics-indicator",
@@ -639,14 +666,14 @@ const concepts: SystemConceptAnnotation[] = [
   {
     term: "pitch-hue-mapping",
     definition:
-      "The scheme by which each of the twelve pitch classes maps to a hue on the colour wheel. Anchored on pitch A (pitch class 9); the anchor hue defaults to red. Other pitches are derived by rotating around the wheel — either clockwise or counter-clockwise depending on direction. Consistent across all grammars.",
+      "The scheme by which each of the twelve pitch classes maps to a hue on the colour wheel. Anchored on pitch C (pitch class 0); the anchor hue defaults to red. Other pitches are derived by rotating around the wheel (+30° per semitone, clockwise by default). Consistent across all grammars.",
     related: ["colour-anchor"],
   },
 
   {
     term: "colour-anchor",
     definition:
-      "The colour assigned to the anchor pitch (A by default). All other pitch-class colours are derived by wheel rotation from this anchor. Changing the anchor rotates the whole palette.",
+      "The colour assigned to the anchor pitch (C by default). All other pitch-class colours are derived by wheel rotation from this anchor. Changing the anchor rotates the whole palette; use set_hue_for_pitch(pc, hue) to move the anchor onto a different pitch.",
     related: ["pitch-hue-mapping"],
   },
 
@@ -691,23 +718,35 @@ const grammars: GrammarAnnotation[] = [
     macroResponses: {
       "time-horizon": {
         responsiveness: "strong",
-        notes: "governs how much scrolling history and lookahead is visible",
+        notes: "compound; fans to rhythm:horizon (among others)",
       },
       "rhythm:horizon": {
         responsiveness: "strong",
-        notes: "same effect as time-horizon but isolated to rhythm",
-      },
-      "rhythm:difficulty": {
-        responsiveness: "strong",
-        notes: "compound: tightens both view and grading",
+        notes: "the scrolling window's history + lookahead extent",
       },
       "rhythm:quantise-resolution": {
         responsiveness: "strong",
-        notes: "changes drift reference and grid density",
+        notes: "reference subdivision used for drift calculation + grid density",
+      },
+      "rhythm:tightness-tolerance": {
+        responsiveness: "strong",
+        notes: "drift threshold below which streak-line motion cues are suppressed",
+      },
+      "rhythm:reference-linger": {
+        responsiveness: "strong",
+        notes: "how long reference lines + drift streaks trail past the source note",
+      },
+      "rhythm:pulse-intensity": {
+        responsiveness: "strong",
+        notes: "brightness + duration of the NOW-line beat pulse",
+      },
+      "rhythm:difficulty": {
+        responsiveness: "strong",
+        notes: "compound; fans to rhythm:horizon + rhythm:tightness-tolerance (both inverted)",
       },
       "rhythm:emphasis": {
         responsiveness: "strong",
-        notes: "beat pulse prominence + drift-marker linger",
+        notes: "compound; fans to rhythm:pulse-intensity + rhythm:reference-linger",
       },
     },
   },
@@ -738,11 +777,15 @@ const grammars: GrammarAnnotation[] = [
       },
       "harmony:detection-stability": {
         responsiveness: "moderate",
-        notes: "anti-flicker on the chord surface",
+        notes: "anti-flicker on the chord surface (hysteresis on chord switching)",
       },
       "system:colour-mapping:reference": {
         responsiveness: "strong",
-        notes: "shifts the palette of all chord numerals and connectors",
+        notes: "shifts the palette of all chord numerals, connector strips, and glyph shapes",
+      },
+      "time-horizon": {
+        responsiveness: "strong",
+        notes: "compound; fans to harmony:linger (among others)",
       },
     },
   },
@@ -762,9 +805,27 @@ const grammars: GrammarAnnotation[] = [
         responsiveness: "strong",
         notes: "fade window for velocity indicators",
       },
+      "time-horizon": {
+        responsiveness: "strong",
+        notes: "compound; fans to dynamics:linger (among others)",
+      },
     },
   },
 ];
+
+// ============================================================================
+// Presets
+// ============================================================================
+//
+// Presets are USER-MANAGED at runtime — saved via save_preset(name),
+// switched via switch_preset(name), enumerated via list_presets, and
+// stored on disk at $XDG_DATA_HOME/synesthetica/presets/*.json.
+//
+// This array is for SHIPPED default presets — a curated set the app
+// bundles for first-run users to try. Empty for now; populate when we
+// author defaults. Each entry follows PresetAnnotation shape (name,
+// emphasises, deEmphasises, traits, notes).
+const presets: PresetAnnotation[] = [];
 
 // ============================================================================
 // Manifest (what the LLM consumes)
@@ -775,4 +836,5 @@ export const productionManifest = {
   sessionControls,
   concepts,
   grammars,
+  presets,
 };
