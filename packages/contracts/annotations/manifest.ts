@@ -15,6 +15,7 @@ import type {
   SystemConceptAnnotation,
   GrammarAnnotation,
   PresetAnnotation,
+  ToolAnnotation,
 } from "./annotations";
 
 // ============================================================================
@@ -814,6 +815,151 @@ const grammars: GrammarAnnotation[] = [
 ];
 
 // ============================================================================
+// Tools (MCP verbs)
+// ============================================================================
+//
+// Editorial voice for each MCP tool: description shipped in
+// tools/list, aliases the LLM can recognise from user speech, notes,
+// and examples. The tool's actual schema + handler live in
+// packages/cli/src/tools/*.ts; the CLI reads description from here
+// at registration so this file is the single edit point for the
+// LLM-facing wording.
+//
+// UI panel does NOT render tools — tools are verbs, not adjustable
+// controls. The panel generator reads macros + sessionControls only.
+
+const tools: ToolAnnotation[] = [
+  // ---- Session controls ----
+  {
+    id: "set_key",
+    description:
+      "Set the prescribed key (tonic + mode) so the harmony grammar can perform functional analysis (I, ii, ♭VI degrees; borrowed-chord classification; modal-interchange arcs). Both null to clear.",
+    aliases: ["set key", "in the key of", "we're in", "change key"],
+    notes: [
+      "root: pitch class 0..11 (0=C, 1=C♯/D♭, …, 11=B). mode: 'ionian' | 'dorian' | 'phrygian' | 'lydian' | 'mixolydian' | 'aeolian' | 'locrian'. Set both together as a pair.",
+      "Clearing (both null) disables numerals and borrowed classification — the harmony grammar shows chord names only.",
+    ],
+    examples: [
+      "set_key(root: 5, mode: 'aeolian') — F minor.",
+      "set_key(root: null, mode: null) — clear the key.",
+    ],
+  },
+
+  {
+    id: "set_tempo",
+    description:
+      "Set the prescribed tempo in BPM. Enables the rhythm grammar's beat grid, drift analysis, and beat pulse. Null clears (rhythm falls back to free-time; grid features disable).",
+    aliases: ["set bpm", "set tempo", "change tempo", "we're at"],
+    notes: [
+      "Range 30–240 BPM. The system never infers tempo from onset patterns — it must be set explicitly.",
+      "Also drives the metronome click when session:metronome is enabled.",
+    ],
+    examples: [
+      "set_tempo(bpm: 120) — standard mid-tempo.",
+      "set_tempo(bpm: null) — clear; rhythm grammar goes free-time.",
+    ],
+  },
+
+  {
+    id: "set_meter",
+    description:
+      "Set the prescribed time signature as (beats_per_bar, beat_value). Enables bar-relative visualisation. Both null to clear.",
+    aliases: ["set time signature", "in", "meter"],
+    notes: [
+      "beat_value must be one of {1, 2, 4, 8, 16}. Both args must be both null (clear) or both set.",
+      "Defaults to 4/4 when a tempo is set without an explicit meter.",
+    ],
+    examples: [
+      "set_meter(beats_per_bar: 6, beat_value: 8) — 6/8.",
+      "set_meter(beats_per_bar: 3, beat_value: 4) — waltz.",
+    ],
+  },
+
+  {
+    id: "set_chord_mode",
+    description:
+      "Choose how chord detection identifies the root: 'harmonic' (by pitch-class content, ignoring voicing/inversion) or 'bass-led' (lowest sounding note is the root).",
+    aliases: ["chord interpretation", "chord reading", "how to read chords"],
+    notes: [
+      "Harmonic is the default and suits most contexts. Bass-led is useful for jazz voicings where the bass note carries functional meaning.",
+    ],
+  },
+
+  {
+    id: "set_metronome",
+    description:
+      "Enable or disable the audible metronome click. Requires a prescribed tempo to click against; a no-op otherwise.",
+    aliases: ["click on", "click off", "metronome on", "metronome off"],
+  },
+
+  {
+    id: "set_input",
+    description:
+      "Select the input source (MIDI device or audio input). Format: 'midi:<device-name>' or 'audio:<device-id>'. Enumerated live inputs available at inputs://available.",
+    aliases: ["use", "listen to", "switch to", "input"],
+    examples: [
+      "set_input(source: 'midi:Yamaha P-125') — listen to that MIDI keyboard.",
+      "set_input(source: 'audio:default') — listen to the default microphone.",
+    ],
+  },
+
+  // ---- Macros ----
+  {
+    id: "set_macro",
+    description:
+      "Set any aesthetic macro (system:*, cross-cutting, or <scope>:*). Value shape depends on the macro's type: number for continuous / compound, string or number for discrete. See annotations://macros/{id} for each macro's range, default, and directionality.",
+    aliases: ["adjust", "tune", "set macro", "change how"],
+    notes: [
+      "Compound macros fan out to leaf targets via a linear default curve; per-target inversion is applied when the compound's semantic runs opposite the leaf's natural range. See the compound's targets field in the manifest.",
+      "The state resource state://<label>/current reflects the value the LLM most recently set — including compound values, even when the underlying leaves also change.",
+    ],
+    examples: [
+      "set_macro(name: 'harmony:linger', value: 6) — chord symbols linger visibly on the clock.",
+      "set_macro(name: 'rhythm:emphasis', value: 0.9) — pronounced beat pulse + drift-marker trails.",
+      "set_macro(name: 'rhythm:quantise-resolution', value: '8th') — grade drift against eighth-note subdivisions.",
+    ],
+  },
+
+  {
+    id: "set_hue_for_pitch",
+    description:
+      "Rotate the colour wheel so a specific pitch class maps to a specific hue. Adjusts system:colour-mapping:reference server-side so the LLM doesn't compute wheel-rotation math for anchor requests.",
+    aliases: ["set colour", "make X red", "colour anchor", "map pitch to colour"],
+    notes: [
+      "pc: 0..11 (0=C, …, 11=B). hue: 0..360 degrees (0=red).",
+      "Default anchor is C=red. Every other pitch class is derived by wheel rotation (+30° per semitone, clockwise).",
+    ],
+    examples: [
+      "set_hue_for_pitch(pc: 7, hue: 0) — make G red instead of C.",
+      "set_hue_for_pitch(pc: 4, hue: 120) — anchor E to green.",
+    ],
+  },
+
+  // ---- Presets ----
+  {
+    id: "switch_preset",
+    description:
+      "Load a named preset. Every control (macros, prescribed context, input source) snaps to the preset's stored value. Preset names are enumerable at presets://.",
+    aliases: ["load preset", "switch to", "recall"],
+    notes: [
+      "On failure the error's details.available field lists all preset names known to the store.",
+      "Preset loads reset the active-preset marker on state://current so the LLM can see which preset is current.",
+    ],
+  },
+
+  {
+    id: "save_preset",
+    description:
+      "Save the current control-surface state as a named preset. Overwrites if the name already exists.",
+    aliases: ["save as", "remember this", "save preset"],
+    notes: [
+      "Name must be [a-zA-Z0-9_-]{1,64}. Stored on disk at $XDG_DATA_HOME/synesthetica/presets/<name>.json.",
+      "Captures: macro values, session state (key, tempo, meter, chord mode, metronome), input source.",
+    ],
+  },
+];
+
+// ============================================================================
 // Presets
 // ============================================================================
 //
@@ -837,4 +983,5 @@ export const productionManifest = {
   concepts,
   grammars,
   presets,
+  tools,
 };

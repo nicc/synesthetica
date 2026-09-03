@@ -31,6 +31,7 @@ import {
   type SessionControlAnnotation,
   type SystemConceptAnnotation,
   type GrammarAnnotation,
+  type ToolAnnotation,
 } from "@synesthetica/contracts";
 
 const req = createRequire(import.meta.url);
@@ -104,12 +105,34 @@ function composeSystemOverview(): string {
     "",
     productionManifest.grammars.map(renderGrammar).join("\n\n"),
     "",
+    "## Tools",
+    "",
+    "MCP tools you can call. The description below matches what tools/list serves — this section adds aliases + notes + examples the LLM can lean on when interpreting user speech.",
+    "",
+    (productionManifest.tools ?? []).map(renderTool).join("\n\n"),
+    "",
     "## Presets",
     "",
     renderPresets(productionManifest.presets ?? []),
     "",
   ];
   return sections.join("\n");
+}
+
+function renderTool(t: ToolAnnotation): string {
+  const lines: string[] = [];
+  lines.push(`### \`${t.id}\``);
+  lines.push(t.description);
+  if (t.aliases?.length) lines.push(`Aliases: ${t.aliases.join(", ")}`);
+  if (t.notes?.length) {
+    lines.push("Notes:");
+    for (const n of t.notes) lines.push(`- ${n}`);
+  }
+  if (t.examples?.length) {
+    lines.push("Examples:");
+    for (const e of t.examples) lines.push(`- ${e}`);
+  }
+  return lines.join("\n");
 }
 
 /**
@@ -124,14 +147,13 @@ function renderPresets(presets: readonly { id: string; name?: string; notes?: st
     "Presets are named snapshots of the full control surface — macro values, prescribed context (key / tempo / meter / chord mode / metronome), and input source. They're user-managed at runtime:",
   );
   lines.push("");
+  lines.push("- Read `presets://` for the list of preset summaries (name, savedAt, session, input).");
+  lines.push("- Read `presets://<name>` for one preset's full stored content.");
   lines.push("- `switch_preset(name)` — load a preset; every control snaps to its stored value.");
   lines.push("- `save_preset(name)` — capture the current state under this name (overwrites if the name exists).");
   lines.push("");
   lines.push(
     "Presets persist on disk (~/Library/Application Support/synesthetica/presets on macOS; XDG_DATA_HOME/synesthetica/presets on Linux). They're per-user, not per-instance.",
-  );
-  lines.push(
-    "Enumeration of existing preset names via MCP is not yet exposed (planned). Ask the user for the name they want if unclear; on switch_preset failure the PRESET_NOT_FOUND error returns the current preset list in `details.available` for reference.",
   );
   if (presets.length === 0) {
     lines.push("");

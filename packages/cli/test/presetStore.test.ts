@@ -81,4 +81,23 @@ describe("preset store", () => {
     expect(loaded!.macros["harmony:linger"]).toBe(7);
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it("listWithMeta returns name + savedAt + session + input per preset", () => {
+    const store = createPresetStore(dir);
+    store.save("a", fakeSnapshot());
+    store.save("b", fakeSnapshot());
+    const meta = store.listWithMeta();
+    expect(meta).toHaveLength(2);
+    expect(meta.map((m) => m.name).sort()).toEqual(["a", "b"]);
+    expect(meta[0].savedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(meta[0].session.tempo).toBe(120);
+    expect(meta[0].input).toBe("midi:test-device");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("listWithMeta returns [] when no presets", () => {
+    const store = createPresetStore(dir);
+    expect(store.listWithMeta()).toEqual([]);
+    rmSync(dir, { recursive: true, force: true });
+  });
 });

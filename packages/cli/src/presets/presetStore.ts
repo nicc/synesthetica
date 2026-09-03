@@ -36,10 +36,21 @@ export interface PresetContent {
   savedAt: string; // ISO
 }
 
+/** Preset summary — what presets:// resource returns for each entry. */
+export interface PresetSummary {
+  name: string;
+  savedAt: string; // ISO
+  /** Prescribed context at save time, for LLM to eyeball. */
+  session: PresetContent["session"];
+  input: PresetContent["input"];
+}
+
 export interface PresetStore {
   save(name: string, snapshot: StateSnapshot): void;
   load(name: string): PresetContent | null;
   list(): string[];
+  /** Same as list() but with saved metadata — used by the presets:// MCP resource. */
+  listWithMeta(): PresetSummary[];
   storePath(): string;
 }
 
@@ -85,6 +96,28 @@ export function createPresetStore(overrideDir?: string): PresetStore {
         .map((f) => f.slice(0, -".json".length))
         .filter((n) => NAME_RE.test(n))
         .sort();
+    },
+
+    listWithMeta() {
+      if (!existsSync(dir)) return [];
+      const summaries: PresetSummary[] = [];
+      for (const name of this.list()) {
+        try {
+          const raw = readFileSync(join(dir, `${name}.json`), "utf8");
+          const parsed = JSON.parse(raw) as PresetContent;
+          if (parsed.version !== 1) continue;
+          summaries.push({
+            name,
+            savedAt: parsed.savedAt,
+            session: parsed.session,
+            input: parsed.input,
+          });
+        } catch {
+          // Skip unreadable / malformed entries silently — the LLM
+          // sees only what the store can produce cleanly.
+        }
+      }
+      return summaries;
     },
   };
 }

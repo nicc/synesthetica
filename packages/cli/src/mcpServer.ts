@@ -37,6 +37,7 @@ import {
   type AsyncResourceEntry,
 } from "./state/stateResources.js";
 import type { PresetStore } from "./presets/presetStore.js";
+import { buildPresetResources } from "./presets/presetResources.js";
 
 export interface McpServerConfig {
   serverName: string;
@@ -80,15 +81,20 @@ export async function startMcpServer(
   const stateEntries: AsyncResourceEntry[] = config.engines.flatMap((e) =>
     buildStateResources(e),
   );
+  // Preset resources: fixed presets:// index + template-routed
+  // presets://<name>. Item routing lives in a matcher so we can
+  // dispatch template URIs without maintaining an entry per name.
+  const presetResources = buildPresetResources(config.presetStore);
 
-  // Two indices — annotations are sync, state is async. ReadResource
-  // dispatches based on which map the URI hits.
+  // Two indices — annotations are sync, state + presets index are
+  // async. ReadResource dispatches based on which map the URI hits.
   const syncIndex = new Map<string, ResourceEntry>();
   for (const e of annotationEntries) syncIndex.set(e.uri, e);
   const asyncIndex = new Map<string, AsyncResourceEntry>();
   // For state URIs, register the exact URI without query params;
   // the query is parsed in read().
   for (const e of stateEntries) asyncIndex.set(e.uri, e);
+  for (const e of presetResources.entries) asyncIndex.set(e.uri, e);
 
   // Track state-changed subscriptions per URI so we know who to notify.
   const stateSubscribers = new Map<string, number>(); // uri → count
@@ -103,6 +109,12 @@ export async function startMcpServer(
         mimeType: e.mimeType,
       })),
       ...stateEntries.map((e) => ({
+        uri: e.uri,
+        name: e.name,
+        description: e.description,
+        mimeType: e.mimeType,
+      })),
+      ...presetResources.entries.map((e) => ({
         uri: e.uri,
         name: e.name,
         description: e.description,
@@ -147,6 +159,13 @@ export async function startMcpServer(
         description: "One grammar annotation",
         mimeType: "application/json",
       },
+      {
+        uriTemplate: "presets://{name}",
+        name: "Preset — one entry",
+        description:
+          "Full stored content of one preset (macros, session, input). Enumerate names at presets://.",
+        mimeType: "application/json",
+      },
     ],
   }));
 
@@ -163,8 +182,9 @@ export async function startMcpServer(
       };
     }
 
-    // Try async (state) index. Strip query string for lookup; pass
-    // the full URI through so the resource can parse ?limit=, ?since=.
+    // Try async (state / presets index) map. Strip query string for
+    // lookup; pass the full URI through so the resource can parse
+    // ?limit=, ?since=.
     const bareUri = uri.split("?")[0];
     const async = asyncIndex.get(bareUri);
     if (async) {
@@ -172,6 +192,16 @@ export async function startMcpServer(
       return {
         contents: [
           { uri, mimeType: async.mimeType, text },
+        ],
+      };
+    }
+
+    // Template-routed preset items — presets://<name>.
+    if (presetResources.matchesItemUri(bareUri)) {
+      const { mimeType, text } = await presetResources.readItemUri(bareUri);
+      return {
+        contents: [
+          { uri, mimeType, text },
         ],
       };
     }

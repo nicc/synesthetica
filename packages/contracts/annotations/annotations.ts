@@ -49,6 +49,33 @@ export interface GrammarAnnotation {
 }
 
 // ============================================================================
+// ToolAnnotation
+// ============================================================================
+
+/**
+ * Describes an MCP tool — the LLM-facing description, aliases, notes
+ * examples. The tool's actual schema and handler live in the CLI's
+ * tool code; the annotation supplies the editorial voice.
+ *
+ * Tools are VERBS (set_key, set_macro, switch_preset). This is the
+ * annotation surface for that verb — never rendered as a UI control.
+ * The UI panel reads macros + session controls; tools flow to the
+ * LLM via MCP tools/list only.
+ */
+export interface ToolAnnotation {
+  /** Tool id — must match the name registered with the MCP server. */
+  id: string;
+  /** Short LLM-facing description that appears in tools/list. */
+  description: string;
+  /** Optional natural-language synonyms the LLM can recognise from the user. */
+  aliases?: string[];
+  /** Longer prose — usage guidance, examples, caveats. */
+  notes?: string[];
+  /** Concrete example calls, formatted as free text. */
+  examples?: string[];
+}
+
+// ============================================================================
 // PresetAnnotation
 // ============================================================================
 
