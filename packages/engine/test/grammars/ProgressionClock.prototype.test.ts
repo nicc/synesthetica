@@ -211,7 +211,7 @@ function hsvToCSS(h: number, s: number, v: number, a: number): string {
 }
 
 /**
- * Build a tangent-oriented connection strip polygon and the radial
+ * Build a tangent-oriented connector strip polygon and the radial
  * gradient endpoint coordinates for it. The strip spans from `midR`
  * (guide-ring side, midpoint colour) to `chordR` (numeral side, chord
  * hue with fade) along the radial direction at `angleRad`, with a
@@ -269,7 +269,7 @@ function renderProgressionClock(
 ): string {
   let svg = `<svg width="${SVG_SIZE}" height="${SVG_SIZE}" viewBox="0 0 ${SVG_SIZE} ${SVG_SIZE}" xmlns="http://www.w3.org/2000/svg">\n`;
 
-  // Build connection strip geometry and gradient defs.
+  // Build connector strip geometry and gradient defs.
   // Each strip is a thin polygon tangent to the ring (matching numeral
   // width along the arc) with a radial gradient: chord hue near the
   // numeral fading to midpoint hue at the guide ring boundary.
@@ -381,7 +381,7 @@ function renderProgressionClock(
     svg += `  <line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#222" stroke-width="1"/>\n`;
   }
 
-  // Render connection strips (behind chord numerals)
+  // Render connector strips (behind chord numerals)
   for (const fragment of connSvgFragments) {
     svg += fragment;
   }

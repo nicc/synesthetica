@@ -251,7 +251,7 @@ export type SessionControlAnnotation =
  * A term in the system's musical/visual vocabulary that the LLM should
  * be able to look up to reason coherently about user requests.
  * Examples: "borrowed-chord", "modal-interchange", "now-line",
- * "note-strip", "guide-ring", "connection-strip".
+ * "note-strip", "guide-ring", "connector-strip".
  *
  * Rendered as MCP resources under concepts://<term>. Structured for
  * lookup; prose narrative about how the pipeline flows lives

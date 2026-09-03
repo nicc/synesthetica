@@ -540,7 +540,7 @@ export class ThreeJSRenderer implements IRenderer {
       this.config.worldWidth;
     const outerR = ((entity.data?.outerRadius as number | undefined) ?? 0.1) *
       this.config.worldWidth;
-    // Same angle convention as connection strips: 0° at top, clockwise,
+    // Same angle convention as connector strips: 0° at top, clockwise,
     // y-flipped sin to match Three.js y-up.
     const angleRad = ((angleDeg - 90) * Math.PI) / 180;
     const rx = Math.cos(angleRad);
@@ -582,14 +582,14 @@ export class ThreeJSRenderer implements IRenderer {
   }
 
   /**
-   * Render a functional connection strip pair (SPEC 011). The entity
+   * Render a functional connector strip pair (SPEC 011). The entity
    * carries source + target strip geometries; each strip is a thin
    * tangent-oriented rectangle with a radial gradient — chord hue at
    * the numeral side, fading through the midpoint hue at the guide
    * ring side, and fading to transparent over the last 10% of the
    * radial axis where the strip approaches the numeral.
    */
-  private updateConnectionStrip(entity: Entity): void {
+  private updateConnectorStrip(entity: Entity): void {
     if (!this.scene) return;
 
     let group = this.entityObjects.get(entity.id) as THREE.Group | undefined;
@@ -615,17 +615,17 @@ export class ThreeJSRenderer implements IRenderer {
     // at the guide-ring side (where opacity is highest), so the
     // strip prominently gestures toward the chord that originated
     // the relationship.
-    // plateauFraction is required on connection-strip entity data —
+    // plateauFraction is required on connector-strip entity data —
     // no fallback. The entity contract requires the grammar to supply
     // it; treating missing as an error surfaces contract drift
     // immediately rather than silently rendering with a stale default.
     const plateau = data.plateauFraction as number | undefined;
     if (plateau === undefined) {
       throw new Error(
-        `connection-strip entity ${entity.id} missing required plateauFraction`,
+        `connector-strip entity ${entity.id} missing required plateauFraction`,
       );
     }
-    this.upsertConnectionStripChild(
+    this.upsertConnectorStripChild(
       group,
       0,
       data.targetAngleDeg as number,
@@ -644,10 +644,10 @@ export class ThreeJSRenderer implements IRenderer {
    * Line2 stroke that grows from `startAngleDeg` by `sweepDeg` along a
    * ring at `radius` (normalized clockRadius fraction of worldWidth).
    * `sweepDeg` is signed: positive = clockwise, negative = counter-
-   * clockwise. Same angle convention as connection strips and slot
+   * clockwise. Same angle convention as connector strips and slot
    * ticks — 0° at 12 o'clock, clockwise positive.
    */
-  private updateConnectionArc(entity: Entity): void {
+  private updateConnectorArc(entity: Entity): void {
     if (!this.scene) return;
 
     const data = entity.data ?? {};
@@ -689,7 +689,7 @@ export class ThreeJSRenderer implements IRenderer {
 
     // Rebuild geometry when the shape changes (sweep grows during the
     // animation, or startAngle changes on reuse). Keyed on the same
-    // fields as connection-strip's geomKey for consistency.
+    // fields as connector-strip's geomKey for consistency.
     const geomKey = `${innerR.toFixed(3)}|${outerR.toFixed(3)}|${thetaStart.toFixed(4)}|${thetaLength.toFixed(4)}|${thetaSegments}`;
 
     let mesh = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
@@ -712,7 +712,7 @@ export class ThreeJSRenderer implements IRenderer {
       mesh = new THREE.Mesh(geom, material);
       mesh.position.set(cx, cy, 0);
       mesh.frustumCulled = false;
-      // Render on top of the connection strip so the arc's stroke stays
+      // Render on top of the connector strip so the arc's stroke stays
       // visible where the two overlap (arc now extends through the strip
       // to its far edge).
       mesh.renderOrder = 1;
@@ -746,7 +746,7 @@ export class ThreeJSRenderer implements IRenderer {
    * side) so the triangle reads as a natural continuation of the arc
    * stroke pointing at the chord that emitted the edge.
    */
-  private updateConnectionArrow(entity: Entity): void {
+  private updateConnectorArrow(entity: Entity): void {
     if (!this.scene) return;
 
     const data = entity.data ?? {};
@@ -849,7 +849,7 @@ export class ThreeJSRenderer implements IRenderer {
    * Three.js's RingGeometry assigns UVs based on bounding-box position
    * ((vertex.x / radius + 1) / 2 etc.), which doesn't map to radial
    * distance for our gradient. Replace UV.x with the actual radial
-   * fraction (0 at innerR → 1 at outerR) so the connection-strip
+   * fraction (0 at innerR → 1 at outerR) so the connector-strip
    * shader can read radial position from vUv.x.
    */
   private remapRingGeometryUVsToRadial(
@@ -869,8 +869,8 @@ export class ThreeJSRenderer implements IRenderer {
     uvs.needsUpdate = true;
   }
 
-  /** Build the ShaderMaterial used by both connection-strip arcs. */
-  private makeConnectionStripMaterial(): THREE.ShaderMaterial {
+  /** Build the ShaderMaterial used by both connector-strip arcs. */
+  private makeConnectorStripMaterial(): THREE.ShaderMaterial {
     return new THREE.ShaderMaterial({
       uniforms: {
         midColor: { value: new THREE.Color(1, 1, 1) },
@@ -921,14 +921,14 @@ export class ThreeJSRenderer implements IRenderer {
   }
 
   /**
-   * Insert or update one connection-strip child mesh as a curved arc
+   * Insert or update one connector-strip child mesh as a curved arc
    * (THREE.RingGeometry). The arc is a sector of an annulus from
    * innerR=min(midR,chordR) to outerR=max(midR,chordR), centred on
    * angleDeg with angular extent derived from arcWidth at the mean
    * radius. Geometry is rebuilt whenever the strip's angular/radial
    * inputs change.
    */
-  private upsertConnectionStripChild(
+  private upsertConnectorStripChild(
     group: THREE.Group,
     childIndex: number,
     angleDeg: number,
@@ -967,7 +967,7 @@ export class ThreeJSRenderer implements IRenderer {
         innerR, outerR, 32, 1, thetaStart, thetaLength,
       );
       this.remapRingGeometryUVsToRadial(geom, innerR, outerR);
-      mesh = new THREE.Mesh(geom, this.makeConnectionStripMaterial());
+      mesh = new THREE.Mesh(geom, this.makeConnectorStripMaterial());
       mesh.frustumCulled = false;
       mesh.userData.geomKey = geomKey;
       group.add(mesh);
@@ -1102,12 +1102,12 @@ export class ThreeJSRenderer implements IRenderer {
       this.updateProgressionGuideRing(entity);
     } else if (glyphType === "progression-slot-tick") {
       this.updateProgressionSlotTick(entity);
-    } else if (glyphType === "connection-strip") {
-      this.updateConnectionStrip(entity);
-    } else if (glyphType === "connection-arc") {
-      this.updateConnectionArc(entity);
-    } else if (glyphType === "connection-arrow") {
-      this.updateConnectionArrow(entity);
+    } else if (glyphType === "connector-strip") {
+      this.updateConnectorStrip(entity);
+    } else if (glyphType === "connector-arc") {
+      this.updateConnectorArc(entity);
+    } else if (glyphType === "connector-arrow") {
+      this.updateConnectorArrow(entity);
     } else {
       // Default glyph: circle
       this.updateParticle(entity);

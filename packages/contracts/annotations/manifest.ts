@@ -51,7 +51,7 @@ const macros: MacroAnnotation[] = [
   {
     id: "harmony:arpeggio-tolerance",
     name: "Arpeggio tolerance",
-    aliases: ["chord tolerance", "arpeggio patience", "note decay"],
+    aliases: ["chord tolerance", "arpeggio patience", "harmonic window"],
     type: "continuous",
     range: [100, 2000],
     default: 400, // matches ChordDetectionStabilizer.pitchDecayMs
@@ -59,11 +59,11 @@ const macros: MacroAnnotation[] = [
     directionality: {
       low: {
         description: "notes must be simultaneous to count as a chord",
-        tendsTo: ["reject arpeggios", "favour block chords"],
+        tendsTo: ["reject arpeggios and rolled chords", "favour block chords"],
       },
       high: {
         description: "arpeggios and rolled chords register as chord voicings",
-        tendsTo: ["catch broken chords", "risk false positives on melody"],
+        tendsTo: ["catch arpeggios and broken/rolled chords", "risk false positives on melody"],
       },
     },
     notes: [
@@ -85,8 +85,8 @@ const macros: MacroAnnotation[] = [
         tendsTo: ["catch sparse harmony", "increase chord flicker"],
       },
       high: {
-        description: "chord detection waits for fuller voicings",
-        tendsTo: ["reject dyads", "stabilise chord surface"],
+        description: "only fuller chord voicings register as chords",
+        tendsTo: ["reject sparse voicings", "stabilise chord surface"],
       },
     },
     notes: [
@@ -104,11 +104,11 @@ const macros: MacroAnnotation[] = [
     affects: ["harmony"],
     directionality: {
       low: {
-        description: "detection switches chords immediately as voicing changes",
+        description: "chord detection switches immediately as voicing changes",
         tendsTo: ["react quickly", "risk visible flicker between ambiguous voicings"],
       },
       high: {
-        description: "detection waits before switching, favouring the current reading",
+        description: "chord detection waits before switching, holding the historic reading in the interest of stability",
         tendsTo: ["stabilise the chord surface", "delay reaction to genuine changes"],
       },
     },
@@ -137,7 +137,7 @@ const macros: MacroAnnotation[] = [
       },
     },
     notes: [
-      "Determines how long each note's velocty indicator lingers on the dynamics grammar.",
+      "Determines how long each note's velocity indicator lingers on the dynamics grammar.",
       "Unit is ms.",
     ],
   },
@@ -153,11 +153,11 @@ const macros: MacroAnnotation[] = [
     directionality: {
       low: {
         description: "tight NOW; little history, no lookahead on the rhythm timeline",
-        tendsTo: ["emphasise the current moment", "reduce visual load"],
+        tendsTo: ["emphasise the current moment", "reduce visual load", "make rhythm practice more difficult"],
       },
       high: {
         description: "generous history and future context on the rhythm timeline",
-        tendsTo: ["emphasise pattern over moment", "reveal recurring gestures"],
+        tendsTo: ["emphasise pattern over moment", "reveal recurring gestures", "assist rhythm practice by visually anticipating beats"],
       },
     },
     notes: [
@@ -168,9 +168,9 @@ const macros: MacroAnnotation[] = [
   },
 
   {
-    id: "rhythm:tight-tolerance",
-    name: "Tight-tolerance drift threshold",
-    aliases: ["strictness threshold", "grading tolerance", "drift window"],
+    id: "rhythm:tightness-tolerance",
+    name: "Tightness tolerance",
+    aliases: ["strictness threshold", "grading tolerance", "drift threshold"],
     type: "continuous",
     range: [10, 100],
     default: 30, // matches RhythmGrammar TIGHT_TOLERANCE_DEFAULT_MS
@@ -181,8 +181,8 @@ const macros: MacroAnnotation[] = [
         tendsTo: ["expose timing imprecision", "grade harshly"],
       },
       high: {
-        description: "forgiving — a wider window counts as 'tight' and hides drift cues",
-        tendsTo: ["reward looseness", "quiet timing feedback"],
+        description: "forgiving — a wider window still counts as on time and hides drift cues",
+        tendsTo: ["accommodate looseness", "suppress timing feedback"],
       },
     },
     notes: [
@@ -202,11 +202,11 @@ const macros: MacroAnnotation[] = [
     directionality: {
       low: {
         description: "reference lines and streaks fade with the note",
-        tendsTo: ["cleaner timeline", "reduce trailing marks"],
+        tendsTo: ["cleaner timeline", "not accentuate timing inaccuracy"],
       },
       high: {
         description: "timing markers linger past the note's fade, leaving a trail",
-        tendsTo: ["persistent timing feedback", "increase visual density"],
+        tendsTo: ["persistent timing feedback", "increase visual density", "accentuate timing inaccuracy"],
       },
     },
     notes: [
@@ -226,11 +226,11 @@ const macros: MacroAnnotation[] = [
     directionality: {
       low: {
         description: "subdued beat pulse on the NOW line — quick decay, faint peak",
-        tendsTo: ["reduce metronomic feel", "let notes carry rhythm"],
+        tendsTo: ["reduce metronomic feel", "visually let notes carry rhythm"],
       },
       high: {
         description: "prominent beat pulse — longer decay, brighter peak",
-        tendsTo: ["emphasise pulse", "reinforce beat feel"],
+        tendsTo: ["emphasise pulse", "visually reinforce beat feel"],
       },
     },
     notes: [
@@ -279,8 +279,8 @@ const macros: MacroAnnotation[] = [
     default: "16th", // matches RhythmGrammar.macros.subdivisionDepth
     affects: ["rhythm"],
     notes: [
-      "Determines the reference subdivision for drift analysis.",
-      "Coarser resolutions forgive more; finer resolutions grade more strictly.",
+      "Determines the reference subdivision for timing drift analysis.",
+      "Coarser resolutions are more likely to show inaccurate timing due to fewer matching grid divisions, which counter-intuitively feels stricter but is actually an easier timing intent; finer resolutions will look more forgiving by matching to more grid divisions but is actually grading to a more difficult intent.",
     ],
   },
 
@@ -324,7 +324,7 @@ const macros: MacroAnnotation[] = [
       // would give MORE tolerance (backwards) and a WIDER view (also
       // arguably backwards for a "harder" mode).
       { id: "rhythm:horizon", invert: true },
-      { id: "rhythm:tight-tolerance", invert: true },
+      { id: "rhythm:tightness-tolerance", invert: true },
     ],
     affects: ["rhythm", "articulation"],
     directionality: {
@@ -408,8 +408,9 @@ const sessionControls: SessionControlAnnotation[] = [
     ],
     nullable: true,
     notes: [
-      "The tonic pitch class for key-aware analysis. Paired with session:mode.",
+      "The tonic pitch class for key-aware analysis. Paired with session:mode; use set_key(root, mode) to set both together.",
       "Clear to disable functional harmony analysis.",
+      "Note that the same pitch-class mappings (e.g. 0=C) are used for colour mapping controls.",
     ],
   },
   {
@@ -454,6 +455,7 @@ const sessionControls: SessionControlAnnotation[] = [
       "Anchors grid + linger calculations to musical time.",
       "Clear to fall back to seconds-based windows.",
       "The system does not infer tempo from onset patterns — it must be set explicitly.",
+      "Drives metronome.",
     ],
   },
 
@@ -465,7 +467,9 @@ const sessionControls: SessionControlAnnotation[] = [
     type: "number",
     range: [1, 16],
     nullable: true,
-    notes: ["The numerator of the time signature. Paired with session:beat-value."],
+    notes: [
+      "The numerator of the time signature. Paired with session:beat-value; use set_meter(beats_per_bar, beat_value) to set both together.",
+    ],
   },
   {
     id: "session:beat-value",
@@ -480,7 +484,9 @@ const sessionControls: SessionControlAnnotation[] = [
       { value: 16, label: "sixteenth (16)" },
     ],
     nullable: true,
-    notes: ["The denominator of the time signature. Paired with session:beats-per-bar."],
+    notes: [
+      "The denominator of the time signature. Paired with session:beats-per-bar; use set_meter(beats_per_bar, beat_value) to set both together.",
+    ],
   },
   {
     id: "session:meter",
@@ -504,7 +510,7 @@ const sessionControls: SessionControlAnnotation[] = [
     ],
     nullable: false,
     notes: [
-      "How chord detection interprets held notes. Harmonic favours full triads/tetrachords; bass-led anchors on the lowest note. See SPEC 010.",
+      "How chord detection interprets the root note. Harmonic mode considers inversions; bass-led anchors on the lowest note.",
     ],
   },
 
@@ -527,14 +533,14 @@ const concepts: SystemConceptAnnotation[] = [
   {
     term: "note-strip",
     definition:
-      "The vertical coloured bar rendered per played note in the rhythm grammar. Horizontal position encodes pitch (chromatic left-to-right); vertical position encodes time (top = past, bottom = present); colour encodes pitch class (via the pitch-hue mapping).",
+      "The vertical coloured bar rendered per played note in the rhythm grammar. Horizontal position encodes pitch (chromatic left-to-right, octave agnostic); vertical position encodes time (top = onset, bottom = release); colour encodes pitch class (via the pitch-hue mapping).",
     related: ["now-line", "reference-line", "drift", "pitch-hue-mapping"],
   },
 
   {
     term: "now-line",
     definition:
-      "The horizontal line near the bottom of the rhythm view that marks the present moment. Notes cross it as they're played. History scrolls above; upcoming subdivisions (when a tempo is prescribed) render below.",
+      "The horizontal line near the bottom of the rhythm view that marks the present moment. Notes arise from it as they're played. History scrolls above; upcoming beats render below (when a tempo is prescribed).",
     related: ["note-strip", "rhythm-horizon"],
   },
 
@@ -548,10 +554,10 @@ const concepts: SystemConceptAnnotation[] = [
   {
     term: "drift",
     definition:
-      "The timing offset between a played note's onset and the nearest beat subdivision, given the prescribed tempo. Notes within roughly 30 ms are considered on-the-grid and show no drift marks. Notes further out show streak lines whose direction (up/down) and length encode how early or late the note landed.",
+      "The timing offset between a played note's onset and the nearest beat subdivision, given the prescribed tempo and quantise resolution. Notes within roughly 30 ms (by default; depends on tightness tolerance) are considered on-the-grid and show no drift marks. Notes further out show streak lines whose direction (up/down) and length encode how early or late the note landed. Direction of the streak can be interpreted as a nudge on the vertical orientation of the timeline - pointing up / trailing down shows that the nearest quantised subdivision was earlier than the note, pointing down / trailing up shows that it was later.",
     related: ["reference-line", "quantise-resolution", "rhythm-difficulty"],
     examples: [
-      "A note played 60 ms after the beat shows a downward-trailing streak.",
+      "A note played 60 ms after the beat shows an upward-pointing (downward-trailing) streak.",
       "A note played on-the-grid shows a reference line through it with no streaks.",
     ],
   },
@@ -574,8 +580,8 @@ const concepts: SystemConceptAnnotation[] = [
   {
     term: "harmony-clock",
     definition:
-      "The circular chord layout in the harmony grammar. Chord numerals sit around a clock face by pitch-class angle. When a key is prescribed, an inner ring shows diatonic degrees (I–vii) and an outer ring shows borrowed chords; connector arcs indicate modal-interchange relationships between them.",
-    related: ["guide-ring", "connection-strip", "borrowed-chord", "modal-interchange"],
+      "The circular chord progression layout in the harmony grammar. Chord numerals sit around a clock face by pitch-class angle (I at 0). When a key is prescribed, an inner ring shows diatonic degrees (I–vii) and an outer ring shows borrowed chords; connector arcs indicate modal-interchange relationships between them.",
+    related: ["guide-ring", "connector-strip", "borrowed-chord", "modal-interchange"],
   },
 
   {
@@ -600,7 +606,7 @@ const concepts: SystemConceptAnnotation[] = [
     term: "modal-interchange",
     definition:
       "A functional-harmony relationship where a borrowed chord implies resolution toward one or more diatonic chords. Rendered as a directional connector arc + terminating strip on the harmony clock, arcing from the borrowed chord's position toward the target degree's position.",
-    related: ["borrowed-chord", "connection-strip", "connector-arc", "harmony-clock"],
+    related: ["borrowed-chord", "connector-strip", "connector-arc", "harmony-clock"],
     examples: [
       "♭VI often pulls toward ii or IV (subdominant borrowing).",
       "♭VII typically pulls toward IV.",
@@ -610,12 +616,12 @@ const concepts: SystemConceptAnnotation[] = [
   {
     term: "connector-arc",
     definition:
-      "The animated arc that draws from a borrowed chord's position on the harmony clock toward its implied resolution target. Coloured by the source chord's hue. Terminates in a connection-strip at the target.",
-    related: ["modal-interchange", "connection-strip"],
+      "The animated arc that draws from a borrowed chord's position on the harmony clock toward its implied resolution target. Coloured by the source chord's hue. Terminates in a connector-strip at the target. Only borrowed chords with a modal interchange relationship to a diatonic chord spawn connector arcs and connector strips.",
+    related: ["modal-interchange", "connector-strip"],
   },
 
   {
-    term: "connection-strip",
+    term: "connector-strip",
     definition:
       "A short, wider terminating mark at the target end of a connector arc. Gradient-coloured from source hue (arc side) to target hue (chord side). Marks where the borrowed chord's implied resolution lands on the clock.",
     related: ["connector-arc", "modal-interchange"],
@@ -663,14 +669,7 @@ const concepts: SystemConceptAnnotation[] = [
     definition:
       "The rhythm grammar's mode when no tempo is prescribed. Notes scroll through the now-line with no beat grid, no reference lines, no drift analysis. Grid + drift features re-enable when the user prescribes a tempo.",
     related: ["prescribed-context", "now-line", "drift"],
-  },
-
-  {
-    term: "confidence",
-    definition:
-      "How certain the pipeline is about a detected event. MIDI events arrive at confidence 1.0 (deterministic). Audio events arrive with model-reported confidence < 1.0. Currently informational only — no grammar modulates its output based on confidence, though the design supports it.",
-    related: [],
-  },
+  }
 ];
 
 // ============================================================================
@@ -687,6 +686,7 @@ const grammars: GrammarAnnotation[] = [
     notes: [
       "Central column. Note strips scroll upward through the NOW line.",
       "Reference lines and streaks visualise drift against the current subdivision (when a tempo is prescribed).",
+      "Shows how individual notes appear in time, with visual feedback on timing accuracy and pitch.",
     ],
     macroResponses: {
       "time-horizon": {
@@ -719,8 +719,9 @@ const grammars: GrammarAnnotation[] = [
     illustrates: ["harmony", "phrasing"],
     traits: ["layered", "persistent", "stable"],
     notes: [
-      "Right column. Chord numerals arranged on a clock face by pitch-class angle.",
-      "Modal-interchange relationships shown as directional connector arcs to target strips.",
+      "Right column. Vertically divided in two. Upper section shows chord quality. Lower section shows functional harmony.",
+      "Functional harmony shows chord numerals arranged on a clock face by pitch-class angle, divided into diatonic and non-diatonic rings, with the chord name in the middle. Modal-interchange relationships shown as directional connector arcs to target strips. Only chord name appears when no key is prescribed.",
+      "Chord quality shows the nature of the chord using a bespoke visual language oriented around a radial shape with spokes representing each note degree (1st, 3rd, 7th etc) and a hub representing the overall chord quality (minor, suspended 2nd etc). Root note is at 0 degrees. Triadic notes are the longest. 7ths are mid length. All other diatonic notes are shortest. Non-diatonic / chromatic notes indicated as lines that do not constitute the overall shape.",
     ],
     macroResponses: {
       "harmony:linger": {

@@ -390,7 +390,7 @@ const concepts: SystemConceptAnnotation[] = [
     term: "harmony-clock",
     definition:
       "The circular chord layout in the harmony grammar. Chord numerals sit around a clock face by pitch-class angle. When a key is prescribed, an inner ring shows diatonic degrees (I–vii) and an outer ring shows borrowed chords; connector arcs indicate modal-interchange relationships between them.",
-    related: ["guide-ring", "connection-strip", "borrowed-chord", "modal-interchange"],
+    related: ["guide-ring", "connector-strip", "borrowed-chord", "modal-interchange"],
   },
 
   {
@@ -415,7 +415,7 @@ const concepts: SystemConceptAnnotation[] = [
     term: "modal-interchange",
     definition:
       "A functional-harmony relationship where a borrowed chord implies resolution toward one or more diatonic chords. Rendered as a directional connector arc + terminating strip on the harmony clock, arcing from the borrowed chord's position toward the target degree's position.",
-    related: ["borrowed-chord", "connection-strip", "connector-arc", "harmony-clock"],
+    related: ["borrowed-chord", "connector-strip", "connector-arc", "harmony-clock"],
     examples: [
       "♭VI often pulls toward ii or IV (subdominant borrowing).",
       "♭VII typically pulls toward IV.",
@@ -425,12 +425,12 @@ const concepts: SystemConceptAnnotation[] = [
   {
     term: "connector-arc",
     definition:
-      "The animated arc that draws from a borrowed chord's position on the harmony clock toward its implied resolution target. Coloured by the source chord's hue. Terminates in a connection-strip at the target.",
-    related: ["modal-interchange", "connection-strip"],
+      "The animated arc that draws from a borrowed chord's position on the harmony clock toward its implied resolution target. Coloured by the source chord's hue. Terminates in a connector-strip at the target.",
+    related: ["modal-interchange", "connector-strip"],
   },
 
   {
-    term: "connection-strip",
+    term: "connector-strip",
     definition:
       "A short, wider terminating mark at the target end of a connector arc. Gradient-coloured from source hue (arc side) to target hue (chord side). Marks where the borrowed chord's implied resolution lands on the clock.",
     related: ["connector-arc", "modal-interchange"],

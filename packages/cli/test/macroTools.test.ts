@@ -102,7 +102,7 @@ describe("set_macro — compound (linear fan-out)", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.state.macros["rhythm:horizon"]).toBe(0); // [0, 1] inverted → 0
-    expect(r.state.macros["rhythm:tight-tolerance"]).toBe(10); // [10, 100] inverted → 10
+    expect(r.state.macros["rhythm:tightness-tolerance"]).toBe(10); // [10, 100] inverted → 10
     expect(r.state.macros["rhythm:difficulty"]).toBe(1);
   });
 
@@ -115,7 +115,7 @@ describe("set_macro — compound (linear fan-out)", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.state.macros["rhythm:horizon"]).toBe(1);
-    expect(r.state.macros["rhythm:tight-tolerance"]).toBe(100);
+    expect(r.state.macros["rhythm:tightness-tolerance"]).toBe(100);
   });
 
   it("rhythm:emphasis fans forward to pulse-intensity + reference-linger", async () => {

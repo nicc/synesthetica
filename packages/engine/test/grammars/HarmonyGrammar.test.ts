@@ -274,7 +274,7 @@ describe("HarmonyGrammar", () => {
       expect(newerOpacity).toBeGreaterThan(olderOpacity);
     });
 
-    it("produces connection-strip entity per functional edge", () => {
+    it("produces connector-strip entity per functional edge", () => {
       // ♭VII in C major emits a single edge to IV (subdominant borrowing)
       const frame = createTestAnnotatedFrame(1000, "main", {
         prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
@@ -299,7 +299,7 @@ describe("HarmonyGrammar", () => {
       });
       const scene = grammar.update(frame, null);
       const stripEntities = scene.entities.filter(
-        (e) => e.data?.type === "connection-strip",
+        (e) => e.data?.type === "connector-strip",
       );
 
       expect(stripEntities).toHaveLength(1);
@@ -335,7 +335,7 @@ describe("HarmonyGrammar", () => {
       });
       const scene = grammar.update(frame, null);
       const stripEntities = scene.entities.filter(
-        (e) => e.data?.type === "connection-strip",
+        (e) => e.data?.type === "connector-strip",
       );
       expect(stripEntities).toHaveLength(0);
     });
@@ -368,10 +368,10 @@ describe("HarmonyGrammar", () => {
       });
       const scene = grammar.update(frame, null);
       const arcs = scene.entities.filter(
-        (e) => e.data?.type === "connection-arc",
+        (e) => e.data?.type === "connector-arc",
       );
       const strips = scene.entities.filter(
-        (e) => e.data?.type === "connection-strip",
+        (e) => e.data?.type === "connector-strip",
       );
 
       expect(arcs).toHaveLength(1);
@@ -416,7 +416,7 @@ describe("HarmonyGrammar", () => {
       });
       const scene = grammar.update(frame, null);
       const arc = scene.entities.find(
-        (e) => e.data?.type === "connection-arc",
+        (e) => e.data?.type === "connector-arc",
       )!;
       const emittedSweep = arc.data?.sweepDeg as number;
 
@@ -455,8 +455,8 @@ describe("HarmonyGrammar", () => {
         },
       });
       const scene = grammar.update(frame, null);
-      expect(scene.entities.filter((e) => e.data?.type === "connection-arc")).toHaveLength(1);
-      expect(scene.entities.filter((e) => e.data?.type === "connection-strip")).toHaveLength(1);
+      expect(scene.entities.filter((e) => e.data?.type === "connector-arc")).toHaveLength(1);
+      expect(scene.entities.filter((e) => e.data?.type === "connector-strip")).toHaveLength(1);
     });
 
     it("released chord snaps connector progress to 1 (strip visible during fade)", () => {
@@ -487,7 +487,7 @@ describe("HarmonyGrammar", () => {
         },
       });
       const scene = grammar.update(frame, null);
-      expect(scene.entities.filter((e) => e.data?.type === "connection-strip")).toHaveLength(1);
+      expect(scene.entities.filter((e) => e.data?.type === "connector-strip")).toHaveLength(1);
     });
 
     it("preserves natural direction when two edges on the same ring don't collide", () => {
@@ -529,7 +529,7 @@ describe("HarmonyGrammar", () => {
       });
       const scene = grammar.update(frame, null);
       const arcs = scene.entities.filter(
-        (e) => e.data?.type === "connection-arc",
+        (e) => e.data?.type === "connector-arc",
       );
       expect(arcs).toHaveLength(2);
       const sweeps = arcs.map((a) => a.data?.sweepDeg as number);
@@ -583,7 +583,7 @@ describe("HarmonyGrammar", () => {
       });
       const scene = grammar.update(frame, null);
       const arcs = scene.entities.filter(
-        (e) => e.data?.type === "connection-arc",
+        (e) => e.data?.type === "connector-arc",
       );
       expect(arcs).toHaveLength(2);
 
@@ -638,7 +638,7 @@ describe("HarmonyGrammar", () => {
       });
       const scene = grammar.update(frame, null);
       const arrows = scene.entities.filter(
-        (e) => e.data?.type === "connection-arrow",
+        (e) => e.data?.type === "connector-arrow",
       );
       expect(arrows).toHaveLength(2);
 
@@ -686,12 +686,12 @@ describe("HarmonyGrammar", () => {
       });
       const scene = grammar.update(frame, null);
       const arrows = scene.entities.filter(
-        (e) => e.data?.type === "connection-arrow",
+        (e) => e.data?.type === "connector-arrow",
       );
       // Fan-out to same ring → one arrow (dedup); two arcs still.
       expect(arrows).toHaveLength(1);
       expect(
-        scene.entities.filter((e) => e.data?.type === "connection-arc"),
+        scene.entities.filter((e) => e.data?.type === "connector-arc"),
       ).toHaveLength(2);
     });
 
@@ -731,12 +731,12 @@ describe("HarmonyGrammar", () => {
       });
       const scene = grammar.update(frame, null);
       const arcIds = scene.entities
-        .filter((e) => e.data?.type === "connection-arc")
+        .filter((e) => e.data?.type === "connector-arc")
         .map((e) => e.id);
       expect(arcIds).toHaveLength(2);
       expect(new Set(arcIds).size).toBe(2); // distinct
       const stripIds = scene.entities
-        .filter((e) => e.data?.type === "connection-strip")
+        .filter((e) => e.data?.type === "connector-strip")
         .map((e) => e.id);
       expect(stripIds).toHaveLength(2);
       expect(new Set(stripIds).size).toBe(2); // distinct

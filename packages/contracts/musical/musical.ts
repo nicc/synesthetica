@@ -327,7 +327,7 @@ export type FunctionalRelationType =
 /**
  * A weighted directed edge from a source chord to a target slot on
  * the harmony clock (SPEC 011). The grammar renders this as a single
- * connection strip at the target slot, carrying the full source ↔
+ * connector strip at the target slot, carrying the full source ↔
  * target hue gradient. The target chord may or may not have been
  * played — resolution is perceptual, not tracked as state.
  */

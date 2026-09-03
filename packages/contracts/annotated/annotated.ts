@@ -383,7 +383,7 @@ export interface AnnotatedMusicalFrame {
    * pipeline's colour mapping (which pitch class → which hue,
    * which direction the wheel rotates). Any grammar that derives
    * colours from pitch classes (HarmonyGrammar for numerals +
-   * connection strips + scrolling roman-numeral strip) MUST read
+   * connector strips + scrolling roman-numeral strip) MUST read
    * this from the frame rather than holding its own copy — one
    * source of truth per session prevents colour drift between
    * grammars when the mapping is retuned.

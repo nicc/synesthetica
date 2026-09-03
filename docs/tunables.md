@@ -267,10 +267,10 @@ These are the ones NOT expressed as top-level constants — they live inside ent
 | `note-strip` | `bottomOpacity` | falls back to `style.opacity` | ThreeJSRenderer line 372 | Per-note bottom-edge fade. |
 | `chord-duration-bar` (in HarmonyGrammar's scrolling strip) | `topOpacity` | inline calc | HarmonyGrammar line 1077 | Same gradient pattern as note strips. |
 | `chord-duration-bar` | `bottomOpacity` | inline calc | HarmonyGrammar line 1078 | Same. |
-| `connection-strip` | `plateauFraction` | 0.1 (grammar), 0.2 (renderer fallback) | HarmonyGrammar line 944 → renderer 628 → uniform 877 | The one Nic flagged. Strip's opacity plateau before the smoothstep fade. |
-| `connection-arc` | `halfThickness` | 0.002 (renderer fallback), passed by grammar as `CONNECTOR_HALF_THICKNESS_NORMALIZED` | Renderer 648 | Arc stroke thickness. |
-| `connection-arrow` | `arcHalfThicknessNormalized` | 0.001 (renderer fallback) | Renderer 747 | Arrow's reference to arc thickness for overlap calc. |
-| `connection-arrow` | `heightNormalized` | 0.004 (renderer fallback) | Renderer | Arrow height. |
+| `connector-strip` | `plateauFraction` | 0.1 (grammar), 0.2 (renderer fallback) | HarmonyGrammar line 944 → renderer 628 → uniform 877 | The one Nic flagged. Strip's opacity plateau before the smoothstep fade. |
+| `connector-arc` | `halfThickness` | 0.002 (renderer fallback), passed by grammar as `CONNECTOR_HALF_THICKNESS_NORMALIZED` | Renderer 648 | Arc stroke thickness. |
+| `connector-arrow` | `arcHalfThicknessNormalized` | 0.001 (renderer fallback) | Renderer 747 | Arrow's reference to arc thickness for overlap calc. |
+| `connector-arrow` | `heightNormalized` | 0.004 (renderer fallback) | Renderer | Arrow height. |
 | Adapter config `dedupWindowMs` | (removed) | — | — | Was a plumbed-but-unused knob; pruned recently. Noted here to close the loop. |
 
 ---

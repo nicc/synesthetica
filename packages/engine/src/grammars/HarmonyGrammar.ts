@@ -139,7 +139,7 @@ const BORROWED_SCALE = 1 / 1.618033988749895;
  * harmony clock — the renderer scales entity position.x by worldWidth
  * (100) and position.y by worldHeight (75), so a circular position in
  * normalized coords would render as an ellipse without this fix.
- * Rings and connection strips are immune because the renderer draws
+ * Rings and connector strips are immune because the renderer draws
  * them in world units using worldWidth for both axes.
  */
 const VIEWPORT_ASPECT = 100 / 75;
@@ -736,7 +736,7 @@ export class HarmonyGrammar implements IVisualGrammar {
    *      angular position along the target's guide ring toward the
    *      target strip, over CONNECTOR_ANIMATION_MS from the source
    *      chord's onset. Snaps to complete on release.
-   *   2. A connection strip at the target slot (SPEC 011), emitted
+   *   2. A connector strip at the target slot (SPEC 011), emitted
    *      only once the connector arc has reached the target.
    *
    * Both fade with the source chord's lifecycle — same model as the
@@ -886,7 +886,7 @@ export class HarmonyGrammar implements IVisualGrammar {
             opacity: arcOpacity,
           },
           data: {
-            type: "connection-arc",
+            type: "connector-arc",
             radius: arcRingR,
             startAngleDeg: arcStartAngleDeg,
             sweepDeg: arcExtendedSweep * progress,
@@ -921,7 +921,7 @@ export class HarmonyGrammar implements IVisualGrammar {
               opacity: arcOpacity,
             },
             data: {
-              type: "connection-arrow",
+              type: "connector-arrow",
               radius: arcRingR,
               angleDeg: sourceAngleDeg,
               pointRadial,
@@ -957,7 +957,7 @@ export class HarmonyGrammar implements IVisualGrammar {
           opacity: stripOpacity,
         },
         data: {
-          type: "connection-strip",
+          type: "connector-strip",
           targetAngleDeg,
           targetMidR,
           targetChordR,

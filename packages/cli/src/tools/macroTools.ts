@@ -92,7 +92,7 @@ async function dispatchCompound(
   // `invert` flips the compound axis so the target's range runs in the
   // opposite direction (used when a compound's semantics are the
   // reverse of a leaf's natural range — e.g. rhythm:difficulty HIGH
-  // → rhythm:tight-tolerance LOW).
+  // → rhythm:tightness-tolerance LOW).
   for (const rawTarget of compound.targets) {
     const target = typeof rawTarget === "string"
       ? { id: rawTarget, invert: false }

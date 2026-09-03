@@ -308,8 +308,8 @@ describe("VisualPipeline", () => {
       expect(rhythm.getMacros().pulseIntensity).toBe(0.8);
       pipeline.setMacro("rhythm:reference-linger", 2.1);
       expect(rhythm.getMacros().referenceLinger).toBe(2.1);
-      pipeline.setMacro("rhythm:tight-tolerance", 50);
-      expect(rhythm.getMacros().tightTolerance).toBe(50);
+      pipeline.setMacro("rhythm:tightness-tolerance", 50);
+      expect(rhythm.getMacros().tightnessTolerance).toBe(50);
     });
 
     it("silently drops unscoped names — no crash", () => {

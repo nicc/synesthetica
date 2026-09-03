@@ -67,7 +67,7 @@ const PULSE_VALUE_BOOST_BASE = 0.2;
  *  See derivePulseParams() for the mapping. */
 const PULSE_INTENSITY_DEFAULT = 0.5;
 
-/** Default tight-tolerance in ms for the rhythm:tight-tolerance macro.
+/** Default tightness-tolerance in ms for the rhythm:tightness-tolerance macro.
  *  Below this drift threshold a note is graded "tight" and the streak
  *  lines are suppressed. */
 const TIGHT_TOLERANCE_DEFAULT_MS = 30;
@@ -132,10 +132,10 @@ interface RhythmGrammarMacros {
    *  Range roughly [1.0, 3.0]; default 1.3. Higher values leave drift
    *  markers on-screen longer after the source note fades. */
   referenceLinger: number;
-  /** Drift tolerance in ms (rhythm:tight-tolerance). Notes with
+  /** Drift tolerance in ms (rhythm:tightness-tolerance). Notes with
    *  |drift| below this threshold render as "tight" and suppress the
    *  streak-line motion cue. Tighter = higher difficulty. */
-  tightTolerance: number;
+  tightnessTolerance: number;
   /** Beat-pulse intensity (rhythm:pulse-intensity), 0..1. Scales
    *  duration + amplitude of the pulse on the NOW line; 0.5 preserves
    *  the historic baseline exactly. */
@@ -180,7 +180,7 @@ export class RhythmGrammar implements IVisualGrammar {
     horizon: 1.0, // Default to full view
     subdivisionDepth: "16th", // Default to finest subdivision
     referenceLinger: DEFAULT_REFERENCE_LINGER_MULTIPLIER,
-    tightTolerance: TIGHT_TOLERANCE_DEFAULT_MS,
+    tightnessTolerance: TIGHT_TOLERANCE_DEFAULT_MS,
     pulseIntensity: PULSE_INTENSITY_DEFAULT,
   };
 
@@ -609,7 +609,7 @@ export class RhythmGrammar implements IVisualGrammar {
       }
 
       // Add streak lines if there's drift beyond tight tolerance
-      if (Math.abs(driftInfo.driftMs) > this.macros.tightTolerance) {
+      if (Math.abs(driftInfo.driftMs) > this.macros.tightnessTolerance) {
         const streaks = this.createStreakLines(
           note.id,
           x,
