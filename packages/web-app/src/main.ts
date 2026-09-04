@@ -42,6 +42,10 @@ import { bindPanelToEngine } from "./panel/bindPanel.js";
 import { mountPanelShell } from "./panel/panelShell.js";
 import { buildAboutPanel } from "./panel/aboutPanel.js";
 import { startWsReceiver, type WsReceiverHandle } from "./engine/wsReceiver.js";
+import {
+  attachRecentEventsBuffer,
+  type RecentEventsBuffer,
+} from "./engine/recentEvents.js";
 import type {
   EngineMethod,
   EngineStateSnapshot,
@@ -68,12 +72,26 @@ let pipeline: VisualPipeline | null = null;
 let renderer: ThreeJSRenderer | null = null;
 let metronome: Metronome | null = null;
 let audioAdapter: AudioInputAdapter | null = null;
-let sessionStartTime = 0;
+let sessionStartTime = 0; // performance.now() reference for session-ms math
+let sessionStartedAtIso: string | null = null; // wall-clock ISO at session start
 let animationFrameId: number | null = null;
 let lastSceneFrame: SceneFrame | null = null;
 let basicsPanel: RenderedPanel | null = null;
 let advancedPanel: RenderedPanel | null = null;
 let wsReceiver: WsReceiverHandle | null = null;
+let recentEvents: RecentEventsBuffer | null = null;
+
+/**
+ * Clear the recent-events buffer on session teardown. Called from
+ * stopSession(); the buffer's dispose() cuts the subscription so no
+ * stale frame captures leak across sessions.
+ */
+function clearRecentEvents(): void {
+  if (recentEvents) {
+    recentEvents.dispose();
+    recentEvents = null;
+  }
+}
 
 // State snapshot we publish back to the CLI over WS. Kept in sync
 // with pipeline mutations; every setter update also mirrors here so
@@ -92,10 +110,19 @@ const engineState: EngineStateSnapshot = {
   },
   input: null,
   activePreset: null,
+  startedAt: null,
+  now: null,
 };
+
+/** Current session-time (ms) at call. null when no session is active. */
+function sessionNow(): number | null {
+  if (sessionStartedAtIso === null) return null;
+  return performance.now() - sessionStartTime;
+}
 
 /** Publish the current engineState snapshot to the CLI. */
 function publishState(): void {
+  engineState.now = sessionNow();
   wsReceiver?.publishStateChanged({
     ...engineState,
     session: { ...engineState.session },
@@ -256,6 +283,7 @@ function snapshotCopy(): EngineStateSnapshot {
     ...engineState,
     session: { ...engineState.session },
     macros: { ...engineState.macros },
+    now: sessionNow(),
   };
 }
 
@@ -292,6 +320,12 @@ function buildAndStartPipeline(
   renderer = new ThreeJSRenderer({ backgroundColor: 0x000000 });
   renderer.attach(canvas);
 
+  // Recent-events buffer: subscribes to the pipeline's musical-frame
+  // stream and diffs consecutive frames to derive note-on/off and
+  // chord-detected/changed events. Sized generously — ~1000 events
+  // covers 30-60 seconds of active playing.
+  recentEvents = attachRecentEventsBuffer(pipeline, { capacity: 1000 });
+
   pipeline.reset();
   startRenderLoop();
 }
@@ -327,6 +361,22 @@ function stopSession(): void {
     });
     audioAdapter = null;
   }
+  sessionStartedAtIso = null;
+  engineState.startedAt = null;
+  engineState.now = null;
+  clearRecentEvents();
+}
+
+/**
+ * Mark a session as freshly started — capture both the monotonic
+ * reference (for internal `t` math) AND the wall-clock ISO (for the
+ * LLM's absolute anchor). Called from every session-start path.
+ */
+function markSessionStarted(): void {
+  sessionStartTime = performance.now();
+  sessionStartedAtIso = new Date().toISOString();
+  engineState.startedAt = sessionStartedAtIso;
+  engineState.now = 0;
 }
 
 async function startMidiSession(deviceId: string): Promise<void> {
@@ -334,7 +384,7 @@ async function startMidiSession(deviceId: string): Promise<void> {
   if (!midiSource) throw new Error("MIDI source not initialised");
   const info = midiSource.getInputs().find((i) => i.id === deviceId);
   if (!info) throw new Error(`no MIDI device with id ${deviceId}`);
-  sessionStartTime = performance.now();
+  markSessionStarted();
   const adapter = new RawMidiAdapter(midiSource, { sessionStart: sessionStartTime });
   adapter.start();
   buildAndStartPipeline(adapter);
@@ -344,9 +394,10 @@ async function startMidiSession(deviceId: string): Promise<void> {
 async function startAudioSession(): Promise<void> {
   stopSession();
   setStatus("Loading audio model + requesting mic…");
-  sessionStartTime = performance.now();
+  markSessionStarted();
   const audioDebug =
     new URLSearchParams(window.location.search).get("audio-debug") === "1";
+  // markSessionStarted() has already set sessionStartTime.
   audioAdapter = new AudioInputAdapter({
     sessionStart: sessionStartTime,
     modelUrl: BASIC_PITCH_MODEL_URL,
@@ -540,10 +591,19 @@ function mountWsReceiver(): void {
     onCall: async (method, args) => {
       if (method === "getStateSnapshot") return snapshotCopy();
       if (method === "getRecentEvents") {
-        // Recent events aren't buffered here yet; return an empty
-        // window rather than failing. Full buffer lands as engine
-        // wiring extends.
-        return [] as unknown[];
+        // Wrap the buffered slice in a temporal envelope: startedAt
+        // (wall-clock ISO anchor) + now (session-ms at read time)
+        // give the LLM a self-contained frame of reference. See
+        // synesthetica-lnc's temporal-data addition.
+        const [limit, since] = args as [number | undefined, number | undefined];
+        const events = recentEvents
+          ? recentEvents.get(limit ?? 100, since)
+          : [];
+        return {
+          startedAt: sessionStartedAtIso,
+          now: sessionNow(),
+          events,
+        };
       }
       return applyEngineOp(method, args);
     },

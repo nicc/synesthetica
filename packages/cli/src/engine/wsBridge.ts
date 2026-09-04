@@ -27,7 +27,7 @@ import {
 import type {
   EngineHandle,
   StateSnapshot,
-  RecentEvent,
+  RecentEventsEnvelope,
   Unsubscribe,
 } from "./engineHandle.js";
 
@@ -272,8 +272,8 @@ class WSBackedEngineHandle implements EngineHandle {
     if (conn) return conn.state as StateSnapshot;
     return this.call("getStateSnapshot", []) as Promise<StateSnapshot>;
   }
-  async getRecentEvents(limit = 100, since?: number): Promise<RecentEvent[]> {
-    return this.call("getRecentEvents", [limit, since]) as Promise<RecentEvent[]>;
+  async getRecentEvents(limit = 100, since?: number): Promise<RecentEventsEnvelope> {
+    return this.call("getRecentEvents", [limit, since]) as Promise<RecentEventsEnvelope>;
   }
 
   subscribe(
@@ -326,6 +326,8 @@ function emptyState(label: string): EngineStateSnapshot {
     },
     input: null,
     activePreset: null,
+    startedAt: null,
+    now: null,
   };
 }
 

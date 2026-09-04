@@ -12,6 +12,7 @@ import type {
   EngineHandle,
   StateSnapshot,
   RecentEvent,
+  RecentEventsEnvelope,
   Unsubscribe,
 } from "./engineHandle.js";
 import { defaultMacroValues } from "./defaultMacroValues.js";
@@ -33,6 +34,9 @@ export class StubEngineHandle implements EngineHandle {
   /** Public log of every method call, for test assertions. */
   readonly opLog: Array<{ method: string; args: unknown[] }> = [];
 
+  private startedAtIso: string | null = null;
+  private startedAtMs: number | null = null;
+
   constructor(opts: StubOptions = {}) {
     this.label = opts.label ?? "default";
     this.state = {
@@ -49,7 +53,20 @@ export class StubEngineHandle implements EngineHandle {
       },
       input: null,
       activePreset: null,
+      startedAt: null,
+      now: null,
     };
+  }
+
+  /**
+   * Test-only: mark a session as started at wall-clock `startedAtMs`.
+   * Real engines capture this when the input session begins; stubs
+   * let tests supply it so the temporal envelope can be exercised.
+   */
+  startSession(startedAtMs: number = Date.now()): void {
+    this.startedAtMs = startedAtMs;
+    this.startedAtIso = new Date(startedAtMs).toISOString();
+    this.state.startedAt = this.startedAtIso;
   }
 
   // ---- macros ----
@@ -120,10 +137,14 @@ export class StubEngineHandle implements EngineHandle {
   async getStateSnapshot(): Promise<StateSnapshot> {
     return this.state;
   }
-  async getRecentEvents(limit = 100, since?: number): Promise<RecentEvent[]> {
+  async getRecentEvents(limit = 100, since?: number): Promise<RecentEventsEnvelope> {
     let events = this.events;
     if (since !== undefined) events = events.filter((e) => e.id > since);
-    return events.slice(-limit);
+    return {
+      startedAt: this.startedAtIso,
+      now: this.startedAtMs !== null ? Date.now() - this.startedAtMs : null,
+      events: events.slice(-limit),
+    };
   }
 
   /** Test-only: inject a synthetic event into the recent-events buffer. */
@@ -156,7 +177,10 @@ export class StubEngineHandle implements EngineHandle {
   // ---- internal ----
   private publishState(): StateSnapshot {
     // Return a defensive copy; real engines shouldn't leak mutable state
-    // to callers.
+    // to callers. Refresh `now` at snapshot time so subscribers see a
+    // fresh session-ms reading.
+    this.state.now =
+      this.startedAtMs !== null ? Date.now() - this.startedAtMs : null;
     const snapshot: StateSnapshot = JSON.parse(JSON.stringify(this.state));
     for (const cb of this.stateSubscribers) cb(snapshot);
     return snapshot;

@@ -43,13 +43,43 @@ export interface EngineStateSnapshot {
   };
   input: string | null;
   activePreset: string | null;
+  /** Wall-clock time (ISO 8601) at session start; null when no
+   *  session is active. Stable for the lifetime of the session —
+   *  every recent-event's `t` is milliseconds since this instant. */
+  startedAt: string | null;
+  /** Session-time (ms since startedAt) at snapshot construction.
+   *  Roughly-current when read from a cached snapshot; recent-events
+   *  reads carry a fresher value via the envelope's `now` field. */
+  now: number | null;
 }
 
+/**
+ * One captured musical event. Event stream is intentionally at the
+ * musical layer, not the scene layer (see synesthetica-lnc). Payload
+ * shape depends on `kind`.
+ */
 export interface EngineRecentEvent {
   id: number;
   t: number;
-  kind: string;
+  kind: "note-on" | "note-off" | "chord-detected" | "chord-changed" | string;
   [key: string]: unknown;
+}
+
+/**
+ * Envelope for state://<label>/recent-events reads. Wraps the event
+ * slice in a temporal frame of reference: `startedAt` (wall-clock
+ * ISO at session start) lets the LLM reconstruct absolute wall-clock
+ * times; `now` (session-ms at read time) lets the LLM answer "N
+ * seconds ago" with plain subtraction.
+ *
+ * All three of `startedAt`, `now`, and per-event `t` may be null
+ * when no session is active (in which case events will also be
+ * empty).
+ */
+export interface EngineRecentEventsEnvelope {
+  startedAt: string | null;
+  now: number | null;
+  events: EngineRecentEvent[];
 }
 
 /* ------------------------------------------------------------------

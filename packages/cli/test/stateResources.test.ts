@@ -32,39 +32,52 @@ describe("state://<label>/current — reads live state", () => {
   });
 });
 
-describe("state://<label>/recent-events — pull-only with query", () => {
-  it("returns events up to limit (default 100)", async () => {
+describe("state://<label>/recent-events — envelope + pull-only query", () => {
+  it("returns events up to limit (default 100) wrapped in temporal envelope", async () => {
     const engine = new StubEngineHandle();
     for (let i = 0; i < 5; i++) engine.injectEvent("note-on", { pitch: 60 + i });
     const recent = buildStateResources(engine)[1];
-    const events = JSON.parse(await recent.read());
-    expect(events).toHaveLength(5);
-    expect(events[0].kind).toBe("note-on");
+    const envelope = JSON.parse(await recent.read());
+    expect(envelope.events).toHaveLength(5);
+    expect(envelope.events[0].kind).toBe("note-on");
+    // Temporal frame present (null when no session marked started).
+    expect(envelope).toHaveProperty("startedAt");
+    expect(envelope).toHaveProperty("now");
   });
 
   it("honours ?limit=<N>", async () => {
     const engine = new StubEngineHandle();
     for (let i = 0; i < 20; i++) engine.injectEvent("note-on");
     const recent = buildStateResources(engine)[1];
-    const events = JSON.parse(await recent.read("state://default/recent-events?limit=3"));
-    expect(events).toHaveLength(3);
+    const envelope = JSON.parse(await recent.read("state://default/recent-events?limit=3"));
+    expect(envelope.events).toHaveLength(3);
   });
 
   it("honours ?since=<id>", async () => {
     const engine = new StubEngineHandle();
     for (let i = 0; i < 10; i++) engine.injectEvent("note-on");
     const recent = buildStateResources(engine)[1];
-    const events = JSON.parse(await recent.read("state://default/recent-events?since=5"));
+    const envelope = JSON.parse(await recent.read("state://default/recent-events?since=5"));
     // events with id > 5 → ids 6, 7, 8, 9
-    expect(events.every((e: { id: number }) => e.id > 5)).toBe(true);
-    expect(events).toHaveLength(4);
+    expect(envelope.events.every((e: { id: number }) => e.id > 5)).toBe(true);
+    expect(envelope.events).toHaveLength(4);
   });
 
   it("caps limit at 1000 even if larger is requested", async () => {
     const engine = new StubEngineHandle();
     for (let i = 0; i < 1500; i++) engine.injectEvent("note-on");
     const recent = buildStateResources(engine)[1];
-    const events = JSON.parse(await recent.read("state://default/recent-events?limit=9999"));
-    expect(events).toHaveLength(1000);
+    const envelope = JSON.parse(await recent.read("state://default/recent-events?limit=9999"));
+    expect(envelope.events).toHaveLength(1000);
+  });
+
+  it("envelope populates startedAt + now once a session is marked started", async () => {
+    const engine = new StubEngineHandle();
+    engine.startSession(1_700_000_000_000);
+    engine.injectEvent("note-on", { pitch: 60 });
+    const recent = buildStateResources(engine)[1];
+    const envelope = JSON.parse(await recent.read());
+    expect(envelope.startedAt).toBe(new Date(1_700_000_000_000).toISOString());
+    expect(envelope.now).toBeGreaterThanOrEqual(0);
   });
 });

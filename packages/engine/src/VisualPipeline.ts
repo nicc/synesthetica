@@ -93,6 +93,12 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
   private prescribedKey: PrescribedKey | null = null;
   private chordInterpretation: ChordInterpretationMode = "harmonic";
 
+  /** Callbacks fired once per requestFrame with the freshly-computed
+   *  MusicalFrame (before annotation). Used by the recent-events
+   *  buffer to derive musical events (note-on, chord-detected) by
+   *  diffing consecutive frames. */
+  private musicalFrameListeners: Array<(frame: MusicalFrame) => void> = [];
+
   constructor(config: VisualPipelineConfig) {
     this.config = config;
   }
@@ -176,6 +182,24 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
         g.setMacros?.({ [paramCamel]: value });
       }
     }
+  }
+
+  /**
+   * Subscribe to the musical-frame stream — one callback per
+   * requestFrame, fired with the freshly-computed MusicalFrame
+   * BEFORE annotation. Used by the recent-events buffer (main.ts)
+   * to derive musical events (note-on, chord-detected) by diffing
+   * consecutive frames.
+   *
+   * Returns an unsubscribe function.
+   */
+  onMusicalFrame(callback: (frame: MusicalFrame) => void): () => void {
+    this.musicalFrameListeners.push(callback);
+    return () => {
+      this.musicalFrameListeners = this.musicalFrameListeners.filter(
+        (c) => c !== callback,
+      );
+    };
   }
 
   // === Tempo/Meter Control (RFC 007) ===
@@ -269,6 +293,12 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       // No stabilizers - create empty musical frame
       musicalFrame = this.createEmptyMusicalFrameWithPrescribed(targetTime, partId);
     }
+
+    // Fan the musical frame out to listeners before annotation — this
+    // is the domain-truth layer, before any visual decoration. The
+    // recent-events buffer subscribes here to derive musical events
+    // (note-on, chord-detected) from frame-to-frame diffs.
+    for (const cb of this.musicalFrameListeners) cb(musicalFrame);
 
     // Record activity based on note count
     if (musicalFrame.notes.length > 0) {

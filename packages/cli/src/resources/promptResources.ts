@@ -111,12 +111,42 @@ function composeSystemOverview(): string {
     "",
     (productionManifest.tools ?? []).map(renderTool).join("\n\n"),
     "",
+    "## Session time",
+    "",
+    renderSessionTimeGuidance(),
+    "",
     "## Presets",
     "",
     renderPresets(productionManifest.presets ?? []),
     "",
   ];
   return sections.join("\n");
+}
+
+/**
+ * Session-time explainer. Timestamps across state://current and
+ * state://recent-events are session-relative milliseconds; wall-clock
+ * anchoring lives on the state snapshot's `startedAt`. LLMs need
+ * this frame explicitly — otherwise "3 seconds ago" is unanchorable
+ * given response-latency variance.
+ */
+function renderSessionTimeGuidance(): string {
+  return [
+    "All timestamps in state resources are **milliseconds since session start** (a floating-point number). Absolute wall-clock time is available as `startedAt` (ISO 8601 string).",
+    "",
+    "Where these fields appear:",
+    "- `state://<label>/current` — carries `startedAt` (ISO, stable) and `now` (session-ms, roughly current — freshest as of the last state-changed event).",
+    "- `state://<label>/recent-events` — envelope is `{ startedAt, now, events }`. `now` here is FRESH (computed at read time). Each event's `t` is session-ms.",
+    "",
+    "How to answer temporal questions:",
+    "- **\"N seconds ago\"** — read state://recent-events; `now - event.t` is the age of that event in ms. If the user just spoke, use the recent-events `now` as your zero; it's the freshest reading.",
+    "- **\"What time did I play that?\"** — reconstruct wall-clock as `new Date(startedAt) + event.t` (ms).",
+    "- **\"How long has the session been going?\"** — `now` on the current-state or recent-events envelope.",
+    "",
+    "When no session is active, `startedAt` and `now` are null and events is `[]`. Check for null before doing math.",
+    "",
+    "Response latency doesn't complicate this: you always have `now` at the moment of read, so relative comparisons stay anchored regardless of how long you take to think.",
+  ].join("\n");
 }
 
 function renderTool(t: ToolAnnotation): string {

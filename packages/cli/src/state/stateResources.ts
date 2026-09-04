@@ -54,13 +54,13 @@ export function buildStateResources(engine: EngineHandle): AsyncResourceEntry[] 
       uri: `state://${label}/recent-events`,
       name: `${label} — recent events`,
       description:
-        "Recent musical activity (notes, chords, dynamics events). Pull-only — read on demand. Supports ?limit=N and ?since=<id> query params.",
+        "Recent musical events (note-on/off, chord-detected/changed) wrapped in a temporal envelope: {startedAt: ISO wall-clock at session start, now: session-ms at read time, events: [...]}. Each event's `t` is milliseconds since startedAt. Pull-only per SPEC 013 §I30. Supports ?limit=N and ?since=<id> query params.",
       mimeType: "application/json",
       subscribable: false,
       async read(uri?: string) {
         const { limit, since } = parseRecentEventsQuery(uri);
-        const events = await engine.getRecentEvents(limit, since);
-        return JSON.stringify(events, null, 2);
+        const envelope = await engine.getRecentEvents(limit, since);
+        return JSON.stringify(envelope, null, 2);
       },
     },
   ];
