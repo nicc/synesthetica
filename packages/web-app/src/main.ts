@@ -427,6 +427,20 @@ function setStatus(text: string, kind: "" | "success" | "error" | "warning" = ""
   statusEl.className = kind ? `syn-status ${kind}` : "syn-status";
 }
 
+/**
+ * setStatus variant that renders a small subset of markup: `<a href>`.
+ * Used only for capability hints that need a clickable link (e.g.
+ * the Firefox WebMIDI add-on page). Callers construct HTML strings
+ * literally — no untrusted content flows through here.
+ */
+function setStatusWithLink(
+  htmlText: string,
+  kind: "" | "success" | "error" | "warning" = "",
+): void {
+  statusEl.innerHTML = htmlText;
+  statusEl.className = kind ? `syn-status ${kind}` : "syn-status";
+}
+
 /* -----------------------------------------------------------------
  * Metronome toggle — needs a user gesture (AudioContext)
  * ----------------------------------------------------------------- */
@@ -546,10 +560,23 @@ async function initMidi(): Promise<void> {
       basicsPanel?.updateOptions("input:source", currentInputOptions());
     });
   } catch (err) {
-    setStatus(
-      `MIDI unavailable: ${err instanceof Error ? err.message : String(err)}`,
-      "error",
-    );
+    const msg = err instanceof Error ? err.message : String(err);
+    // Firefox exposes navigator.requestMIDIAccess but refuses to grant
+    // access without the "WebMIDI site permission" add-on installed
+    // per-origin. This isn't a permission dialog we can trigger — the
+    // user must install the Mozilla add-on themselves. Detect the
+    // specific error string and give a clickable install link.
+    const isFirefoxAddOnError =
+      detectBrowser() === "firefox" &&
+      /site permission add-on|permission add-on|WebMIDI/i.test(msg);
+    if (isFirefoxAddOnError) {
+      setStatusWithLink(
+        `MIDI needs a Firefox add-on: <a href="https://addons.mozilla.org/en-US/firefox/addon/webmidi-permission/" target="_blank" rel="noopener">install WebMIDI permission</a>, then reload. Microphone input works without it.`,
+        "warning",
+      );
+    } else {
+      setStatus(`MIDI unavailable: ${msg}`, "error");
+    }
   }
 }
 
