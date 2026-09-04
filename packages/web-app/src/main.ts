@@ -46,6 +46,7 @@ import {
   attachRecentEventsBuffer,
   type RecentEventsBuffer,
 } from "./engine/recentEvents.js";
+import { enumerateInputs, inputsToPanelOptions } from "./engine/enumerateInputs.js";
 import type {
   EngineMethod,
   EngineStateSnapshot,
@@ -458,14 +459,8 @@ function handleInputSource(source: string): void {
  * Panel wiring
  * ----------------------------------------------------------------- */
 function currentInputOptions(): Array<{ value: string; label: string }> {
-  const options: Array<{ value: string; label: string }> = [];
-  if (midiSource) {
-    for (const input of midiSource.getInputs()) {
-      options.push({ value: `midi:${input.id}`, label: `MIDI: ${input.name}` });
-    }
-  }
-  options.push({ value: "audio", label: "Audio: microphone (Basic Pitch)" });
-  return options;
+  // Single source of truth — same list the LLM sees via inputs://.
+  return inputsToPanelOptions(enumerateInputs(midiSource));
 }
 
 function mountPanels(): void {
@@ -590,6 +585,9 @@ function mountWsReceiver(): void {
     label,
     onCall: async (method, args) => {
       if (method === "getStateSnapshot") return snapshotCopy();
+      if (method === "getAvailableInputs") {
+        return enumerateInputs(midiSource);
+      }
       if (method === "getRecentEvents") {
         // Wrap the buffered slice in a temporal envelope: startedAt
         // (wall-clock ISO anchor) + now (session-ms at read time)

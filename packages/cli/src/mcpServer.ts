@@ -38,6 +38,7 @@ import {
 } from "./state/stateResources.js";
 import type { PresetStore } from "./presets/presetStore.js";
 import { buildPresetResources } from "./presets/presetResources.js";
+import { buildInputResources } from "./inputs/inputResources.js";
 
 export interface McpServerConfig {
   serverName: string;
@@ -86,6 +87,13 @@ export async function startMcpServer(
   // dispatch template URIs without maintaining an entry per name.
   const presetResources = buildPresetResources(config.presetStore);
 
+  // Input resources: fixed inputs:// entry per engine. The engine's
+  // getAvailableInputs() call bridges to the browser's live MIDI +
+  // audio enumeration via the WS bridge.
+  const inputEntries: AsyncResourceEntry[] = config.engines.flatMap((e) =>
+    buildInputResources(e),
+  );
+
   // Two indices — annotations are sync, state + presets index are
   // async. ReadResource dispatches based on which map the URI hits.
   const syncIndex = new Map<string, ResourceEntry>();
@@ -95,6 +103,7 @@ export async function startMcpServer(
   // the query is parsed in read().
   for (const e of stateEntries) asyncIndex.set(e.uri, e);
   for (const e of presetResources.entries) asyncIndex.set(e.uri, e);
+  for (const e of inputEntries) asyncIndex.set(e.uri, e);
 
   // Track state-changed subscriptions per URI so we know who to notify.
   const stateSubscribers = new Map<string, number>(); // uri → count
@@ -115,6 +124,12 @@ export async function startMcpServer(
         mimeType: e.mimeType,
       })),
       ...presetResources.entries.map((e) => ({
+        uri: e.uri,
+        name: e.name,
+        description: e.description,
+        mimeType: e.mimeType,
+      })),
+      ...inputEntries.map((e) => ({
         uri: e.uri,
         name: e.name,
         description: e.description,

@@ -26,7 +26,27 @@ export type EngineMethod =
   | "switchPreset"
   | "savePreset"
   | "getStateSnapshot"
-  | "getRecentEvents";
+  | "getRecentEvents"
+  | "getAvailableInputs";
+
+/**
+ * One available input device — MIDI or audio. Returned as an array
+ * by getAvailableInputs / served under inputs://.
+ *
+ * `sourceString` is the exact value to pass to set_input(source): the
+ * scheme lives in this field so the LLM doesn't have to reconstruct
+ * "midi:<id>" from the id + kind separately.
+ */
+export interface AvailableInput {
+  /** Kind — determines the sourceString scheme. */
+  kind: "midi" | "audio";
+  /** Human-readable name (e.g. "Yamaha P-125", "Built-in Microphone"). */
+  name: string;
+  /** Underlying device id (MIDI port id, audio deviceId, etc.). Not stable across sessions on some browsers. */
+  id: string;
+  /** The exact value to pass to set_input(source: ...) to select this device. */
+  sourceString: string;
+}
 
 /** State snapshot shape (mirror of engine/engineHandle.ts). */
 export interface EngineStateSnapshot {

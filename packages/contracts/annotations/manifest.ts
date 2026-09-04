@@ -385,7 +385,7 @@ const sessionControls: SessionControlAnnotation[] = [
     dynamicOptions: true,
     nullable: false,
     notes: [
-      "MIDI device or audio input. The web-app populates the widget's option list at runtime from connected devices (Web MIDI enumeration + audio); the LLM sees the currently-selected source in state://<label>/current.input.",
+      "MIDI device or audio input. The web-app populates the widget's option list at runtime from connected devices; the LLM enumerates the same list via inputs://, and sees the currently-selected source in state://<label>/current.input.",
     ],
   },
 
@@ -896,7 +896,7 @@ const tools: ToolAnnotation[] = [
   {
     id: "set_input",
     description:
-      "Select the input source (MIDI device or audio input). Format: 'midi:<device-name>' or 'audio:<device-id>'. The device list isn't yet enumerable via MCP; ask the user for the source name when unclear, and read state://<label>/current.input to see what's currently selected.",
+      "Select the input source (MIDI device or audio input). Read inputs:// for the enumerated list of available devices — each entry carries a `sourceString` ready to pass here. Format: 'midi:<device-id>' or 'audio'. Current selection is available at state://<label>/current.input.",
     aliases: ["use", "listen to", "switch to", "input"],
     examples: [
       "set_input(source: 'midi:Yamaha P-125') — listen to that MIDI keyboard.",
@@ -976,6 +976,24 @@ const tools: ToolAnnotation[] = [
 // resources/list.
 
 const resources: ResourceAnnotation[] = [
+  {
+    uri: "inputs://",
+    name: "Available inputs",
+    description:
+      "Currently-connected MIDI devices + audio inputs, as an array of { kind, name, id, sourceString }. `sourceString` is exactly what to pass to set_input(source) — no reconstruction needed. Pull-only for now (hot-plug notifications not wired yet).",
+    aliases: ["available devices", "connected devices", "MIDI + audio list"],
+    notes: [
+      "Read this before calling set_input if you don't already know the device name — otherwise you're guessing.",
+      "The audio entry represents the default microphone routed through Basic Pitch; per-device audio enumeration isn't yet exposed.",
+      "MIDI device availability depends on the browser hosting the engine — Chrome is the most reliable; some Firefox versions may miss devices (synesthetica-qko).",
+    ],
+    examples: [
+      "Empty MIDI: [{ kind: 'audio', name: 'Default microphone (Basic Pitch)', id: 'default', sourceString: 'audio' }]",
+      "With a keyboard: [{ kind: 'midi', name: 'Yamaha P-125', id: '…', sourceString: 'midi:…' }, { kind: 'audio', … }]",
+    ],
+    subscribable: false,
+  },
+
   {
     uri: "state://<label>/current",
     name: "Current state snapshot",

@@ -53,6 +53,14 @@ export interface RecentEvent {
   [key: string]: unknown;
 }
 
+/** One available input device (mirror of contracts/AvailableInput). */
+export interface AvailableInput {
+  kind: "midi" | "audio";
+  name: string;
+  id: string;
+  sourceString: string;
+}
+
 /**
  * Envelope returned from getRecentEvents / state://<label>/recent-events.
  * Wraps events with the temporal frame of reference the LLM needs to
@@ -102,6 +110,10 @@ export interface EngineHandle {
   // -- State --
   getStateSnapshot(): Promise<StateSnapshot>;
   getRecentEvents(limit?: number, since?: number): Promise<RecentEventsEnvelope>;
+
+  // -- Discovery --
+  /** Enumerate connected MIDI + audio inputs. Powers inputs://. */
+  getAvailableInputs(): Promise<AvailableInput[]>;
 
   // -- Subscriptions (Chunk E wires these up) --
   subscribe(

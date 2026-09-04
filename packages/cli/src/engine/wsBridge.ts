@@ -28,6 +28,7 @@ import type {
   EngineHandle,
   StateSnapshot,
   RecentEventsEnvelope,
+  AvailableInput,
   Unsubscribe,
 } from "./engineHandle.js";
 
@@ -274,6 +275,9 @@ class WSBackedEngineHandle implements EngineHandle {
   }
   async getRecentEvents(limit = 100, since?: number): Promise<RecentEventsEnvelope> {
     return this.call("getRecentEvents", [limit, since]) as Promise<RecentEventsEnvelope>;
+  }
+  async getAvailableInputs(): Promise<AvailableInput[]> {
+    return this.call("getAvailableInputs", []) as Promise<AvailableInput[]>;
   }
 
   subscribe(

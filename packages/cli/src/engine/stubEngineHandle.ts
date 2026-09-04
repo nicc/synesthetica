@@ -13,6 +13,7 @@ import type {
   StateSnapshot,
   RecentEvent,
   RecentEventsEnvelope,
+  AvailableInput,
   Unsubscribe,
 } from "./engineHandle.js";
 import { defaultMacroValues } from "./defaultMacroValues.js";
@@ -137,6 +138,15 @@ export class StubEngineHandle implements EngineHandle {
   async getStateSnapshot(): Promise<StateSnapshot> {
     return this.state;
   }
+  /** Test-only: seed the available-inputs list for getAvailableInputs. */
+  private availableInputs: AvailableInput[] = [];
+  setAvailableInputs(inputs: AvailableInput[]): void {
+    this.availableInputs = inputs;
+  }
+  async getAvailableInputs(): Promise<AvailableInput[]> {
+    return [...this.availableInputs];
+  }
+
   async getRecentEvents(limit = 100, since?: number): Promise<RecentEventsEnvelope> {
     let events = this.events;
     if (since !== undefined) events = events.filter((e) => e.id > since);
