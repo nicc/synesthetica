@@ -16,10 +16,17 @@ const crossOriginIsolationHeaders = {
   "Cross-Origin-Embedder-Policy": "require-corp",
 };
 
+// When the CLI spawns us (spawnWebApp.ts), it sets SYN_NO_AUTO_OPEN
+// so we DON'T open a tab — the CLI does that itself, with the WS
+// query params. Without this guard the user gets two tabs: one from
+// Vite (bare URL), one from the CLI (with ws-port + instance).
+// Direct `npm run dev` from packages/web-app still auto-opens.
+const shouldAutoOpen = !process.env.SYN_NO_AUTO_OPEN;
+
 export default defineConfig({
   server: {
     port: 3000,
-    open: "/", // Opens in default browser unless BROWSER env var is set
+    open: shouldAutoOpen ? "/" : false,
     headers: crossOriginIsolationHeaders,
   },
   preview: {

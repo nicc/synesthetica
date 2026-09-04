@@ -88,7 +88,10 @@ async function startDev(opts: SpawnWebAppOptions): Promise<WebAppHandle> {
   const child = spawn(nodeExecPath, args, {
     cwd: dir,
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, FORCE_COLOR: "0" },
+    // SYN_NO_AUTO_OPEN suppresses Vite's built-in browser auto-open;
+    // the CLI opens the tab itself with ws-port + instance query
+    // params so the browser connects to the right engine bridge.
+    env: { ...process.env, FORCE_COLOR: "0", SYN_NO_AUTO_OPEN: "1" },
   });
   const url = await waitForVite(child, log);
   return {

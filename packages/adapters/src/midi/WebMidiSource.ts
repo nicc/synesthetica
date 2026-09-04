@@ -34,10 +34,19 @@ export class WebMidiSource implements MidiSource {
     try {
       this.access = await navigator.requestMIDIAccess({ sysex: true });
       this.sysexGranted = true;
-    } catch {
-      // SysEx denied or unsupported — retry without. Non-SysEx access
-      // is sufficient for the notes / velocity / channel data the
-      // visualiser actually reads; SysEx just improves device
+    } catch (err) {
+      // Firefox rejects when the WebMIDI site-permission add-on isn't
+      // installed — that's not a SysEx-specific denial, and the
+      // {sysex:false} retry will fail with the same message. Detect
+      // and re-throw so the caller shows the add-on hint immediately
+      // instead of waiting for a second reject.
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/site permission add-on|permission add-on/i.test(msg)) {
+        throw err;
+      }
+      // Otherwise treat as SysEx denial and retry without. Non-SysEx
+      // access is sufficient for the notes / velocity / channel data
+      // the visualiser actually reads; SysEx just improves device
       // coverage on some browsers.
       this.access = await navigator.requestMIDIAccess({ sysex: false });
       this.sysexGranted = false;

@@ -74,4 +74,21 @@ describe("WebMidiSource.init — SysEx opportunistic access", () => {
     // First call = sysex:true (thrown), second = sysex:false (thrown). No third.
     expect(calls).toBe(2);
   });
+
+  it("skips the sysex:false retry when Firefox reports the add-on isn't installed", async () => {
+    // Firefox's actual error message when the WebMIDI site-permission
+    // add-on isn't installed. The retry would fail with the same
+    // message — pointless second network round-trip that delays the
+    // add-on hint reaching the user.
+    let calls = 0;
+    stubNavigator(vi.fn(async () => {
+      calls++;
+      throw new Error("WebMIDI requires a site permission add-on to activate");
+    }));
+
+    const src = new WebMidiSource();
+    await expect(src.init()).rejects.toThrow(/site permission add-on/);
+    // Only ONE call — no retry.
+    expect(calls).toBe(1);
+  });
 });
