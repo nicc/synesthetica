@@ -32,6 +32,7 @@ import {
   type SystemConceptAnnotation,
   type GrammarAnnotation,
   type ToolAnnotation,
+  type ResourceAnnotation,
 } from "@synesthetica/contracts";
 
 const req = createRequire(import.meta.url);
@@ -111,6 +112,12 @@ function composeSystemOverview(): string {
     "",
     (productionManifest.tools ?? []).map(renderTool).join("\n\n"),
     "",
+    "## Resources",
+    "",
+    "MCP resources you can read for data. Per-item annotation resources (annotations://macros/{id}, annotations://concepts/{term}, etc.) aren't repeated here — this section covers the state + preset-index + bundled-annotations surfaces. Each macro / session control / concept / grammar / preset also has its own annotations://* resource.",
+    "",
+    (productionManifest.resources ?? []).map(renderResource).join("\n\n"),
+    "",
     "## Session time",
     "",
     renderSessionTimeGuidance(),
@@ -147,6 +154,23 @@ function renderSessionTimeGuidance(): string {
     "",
     "Response latency doesn't complicate this: you always have `now` at the moment of read, so relative comparisons stay anchored regardless of how long you take to think.",
   ].join("\n");
+}
+
+function renderResource(r: ResourceAnnotation): string {
+  const lines: string[] = [];
+  lines.push(`### \`${r.uri}\` — ${r.name}`);
+  lines.push(r.description);
+  lines.push(`Subscribable: ${r.subscribable}`);
+  if (r.aliases?.length) lines.push(`Aliases: ${r.aliases.join(", ")}`);
+  if (r.notes?.length) {
+    lines.push("Notes:");
+    for (const n of r.notes) lines.push(`- ${n}`);
+  }
+  if (r.examples?.length) {
+    lines.push("Examples:");
+    for (const e of r.examples) lines.push(`- ${e}`);
+  }
+  return lines.join("\n");
 }
 
 function renderTool(t: ToolAnnotation): string {

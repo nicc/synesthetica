@@ -62,7 +62,7 @@ Three different kinds of thing you can adjust:
 
 - **Aesthetic macros** (`system:*`, bare cross-cutting, `<scope>:*`) — modulate how the grammars *look*. Set via `set_macro(name, value)`. Continuous or discrete or compound. Examples: `harmony:linger`, `rhythm:quantise-resolution`, `time-horizon`.
 - **Session controls** (`session:*`) — set the *musical frame* the analyser reads within. Categorical values, distinct MCP tools. Examples: `set_key`, `set_tempo`, `set_metronome`.
-- **Input controls** (`input:*`) — which device the pipeline is listening to. `set_input`, read `inputs://available` for a device list.
+- **Input controls** (`input:*`) — which device the pipeline is listening to. `set_input(source)`; the device list isn't yet enumerable via MCP (planned), so read `state://<label>/current.input` for the current selection or ask the user for the source name.
 
 When the user says something ambiguous, look at what surface they're asking about:
 

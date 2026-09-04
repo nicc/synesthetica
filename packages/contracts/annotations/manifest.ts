@@ -16,6 +16,7 @@ import type {
   GrammarAnnotation,
   PresetAnnotation,
   ToolAnnotation,
+  ResourceAnnotation,
 } from "./annotations";
 
 // ============================================================================
@@ -384,7 +385,7 @@ const sessionControls: SessionControlAnnotation[] = [
     dynamicOptions: true,
     nullable: false,
     notes: [
-      "MIDI device or audio input. Populated at runtime from connected devices; see inputs://available.",
+      "MIDI device or audio input. The web-app populates the widget's option list at runtime from connected devices (Web MIDI enumeration + audio); the LLM sees the currently-selected source in state://<label>/current.input.",
     ],
   },
 
@@ -895,7 +896,7 @@ const tools: ToolAnnotation[] = [
   {
     id: "set_input",
     description:
-      "Select the input source (MIDI device or audio input). Format: 'midi:<device-name>' or 'audio:<device-id>'. Enumerated live inputs available at inputs://available.",
+      "Select the input source (MIDI device or audio input). Format: 'midi:<device-name>' or 'audio:<device-id>'. The device list isn't yet enumerable via MCP; ask the user for the source name when unclear, and read state://<label>/current.input to see what's currently selected.",
     aliases: ["use", "listen to", "switch to", "input"],
     examples: [
       "set_input(source: 'midi:Yamaha P-125') — listen to that MIDI keyboard.",
@@ -960,6 +961,93 @@ const tools: ToolAnnotation[] = [
 ];
 
 // ============================================================================
+// Resources (MCP nouns — data surfaces the LLM can read)
+// ============================================================================
+//
+// Editorial voice for MCP resources whose content isn't already
+// covered by a per-item annotation. Each macro / session control /
+// concept / grammar / preset already carries its OWN annotation and
+// becomes an annotations://* resource — those don't need entries
+// here. This section is for the state + preset-index + annotations-
+// bundle URIs.
+//
+// The composed system-overview prompt renders these as `## Resources`
+// so the LLM knows what it can read without having to browse
+// resources/list.
+
+const resources: ResourceAnnotation[] = [
+  {
+    uri: "state://<label>/current",
+    name: "Current state snapshot",
+    description:
+      "Snapshot of the current control surface for one instance: macro values, prescribed context (key/tempo/meter/chord-mode/metronome), active preset, input source, and temporal frame (startedAt + now). Subscribable — the CLI pushes an update whenever any control changes.",
+    aliases: ["current state", "state snapshot", "engine state"],
+    notes: [
+      "Read after any control change to see the resolved state (compound macros write to their leaves + the compound itself).",
+      "startedAt is ISO wall-clock at session start; now is session-ms at the time the snapshot was constructed (roughly current — recent-events reads carry a fresher now).",
+      "When no session is active, startedAt and now are null.",
+    ],
+    examples: [
+      "state://default/current — the primary instance's state.",
+      "state://piano/current — when the user has labelled an instance 'piano'.",
+    ],
+    subscribable: true,
+  },
+
+  {
+    uri: "state://<label>/recent-events",
+    name: "Recent musical events",
+    description:
+      "Musical event stream from the pipeline's MusicalFrame — note-on, note-off, chord-detected, chord-changed. Wrapped in a temporal envelope { startedAt, now, events }. Pull-only per SPEC 013 §I30 (subscribing would pump inference in some MCP clients).",
+    aliases: ["recent events", "history", "recent playing", "musical history"],
+    notes: [
+      "Musical-layer event stream — semantic facts (pitch classes, chord root/quality), not visual entities.",
+      "Supports ?limit=N (default 100, max 1000) and ?since=<id> query params.",
+      "Each event's `t` is session-ms; combine with envelope.startedAt for wall-clock, or with envelope.now for 'age' math.",
+      "Read on demand — e.g. before answering 'what did I just play?' or 'summarise the last few chords'.",
+    ],
+    examples: [
+      "state://default/recent-events?limit=20 — most recent 20 events.",
+      "state://default/recent-events?since=42 — everything after event id 42 (useful for incremental polling).",
+    ],
+    subscribable: false,
+  },
+
+  {
+    uri: "presets://",
+    name: "Presets — index",
+    description:
+      "List of saved preset summaries { name, savedAt, session, input } — the LLM's discovery surface for what presets exist before calling switch_preset.",
+    aliases: ["preset list", "available presets"],
+    notes: [
+      "Presets are user-managed; the manifest doesn't ship defaults.",
+      "For one preset's full stored content, read presets://<name>.",
+    ],
+    subscribable: false,
+  },
+
+  {
+    uri: "presets://<name>",
+    name: "Preset — one entry",
+    description:
+      "Full stored content of one preset: macros, session (key/tempo/meter/…), input, savedAt. Read this if you need to know what a preset does before switching to it.",
+    subscribable: false,
+  },
+
+  {
+    uri: "annotations://manifest",
+    name: "Annotation manifest (bundled)",
+    description:
+      "The full annotation manifest as one JSON document — macros, session controls, concepts, grammars, presets, tools, resources. Convenience for clients that prefer one fetch over per-URI browsing.",
+    notes: [
+      "Every individual macro / session control / concept / grammar / preset also has its own annotations://<category>/<id> resource for finer-grained reads.",
+      "The system-overview prompt already embeds this content — reading the bundle is only necessary when you need a specific field the prompt truncates.",
+    ],
+    subscribable: false,
+  },
+];
+
+// ============================================================================
 // Presets
 // ============================================================================
 //
@@ -984,4 +1072,5 @@ export const productionManifest = {
   grammars,
   presets,
   tools,
+  resources,
 };

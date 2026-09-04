@@ -49,6 +49,42 @@ export interface GrammarAnnotation {
 }
 
 // ============================================================================
+// ResourceAnnotation
+// ============================================================================
+
+/**
+ * Describes an MCP resource — the LLM-facing description, aliases,
+ * notes, and shape guidance. Covers the state + preset-index +
+ * annotations-bundle URIs that don't have their own per-item
+ * annotation (unlike macros, session controls, concepts, grammars,
+ * presets which each carry their own annotation).
+ *
+ * Resources are NOUNS (state://<label>/current, presets://). This is
+ * the annotation surface for those nouns — the composed
+ * system-overview prompt lists them so the LLM knows what data it
+ * can read without having to browse resources/list.
+ *
+ * The `uri` may contain a `{label}` or `{name}` placeholder for
+ * template routing.
+ */
+export interface ResourceAnnotation {
+  /** URI or URI template (with {label}, {name}, etc.). */
+  uri: string;
+  /** Short human-oriented name. */
+  name: string;
+  /** LLM-facing description — what the resource returns + when to read it. */
+  description: string;
+  /** Optional natural-language synonyms. */
+  aliases?: string[];
+  /** Longer prose — usage guidance, shape details, caveats. */
+  notes?: string[];
+  /** Concrete example URIs / payloads. */
+  examples?: string[];
+  /** True if the resource fires update notifications; false = pull-only. */
+  subscribable: boolean;
+}
+
+// ============================================================================
 // ToolAnnotation
 // ============================================================================
 

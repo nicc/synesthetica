@@ -224,7 +224,7 @@ export const sessionTools: ToolSpec[] = [
   {
     name: "set_input",
     description:
-      "Select the input source. Format: 'midi:<device-name>' for a specific MIDI device, or 'audio:<device-id>' for a specific audio input. Enumerated inputs available at inputs://available.",
+      "Select the input source. Format: 'midi:<device-name>' for a specific MIDI device, or 'audio:<device-id>' for a specific audio input. The device list isn't enumerable via MCP; read state://<label>/current.input for the current selection.",
     inputSchema: {
       type: "object",
       properties: {
