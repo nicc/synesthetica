@@ -570,17 +570,28 @@ async function initMidi(): Promise<void> {
       detectBrowser() === "firefox" &&
       /site permission add-on|permission add-on|WebMIDI/i.test(msg);
     if (isFirefoxAddOnError) {
-      // Firefox's WebMIDI is gated behind an auto-generated, per-site
-      // permission add-on. Firefox only offers to install it when
-      // requestMIDIAccess() is called with a MIDI device connected AT
-      // THAT MOMENT — otherwise it rejects with this error and no
-      // install prompt. So the fix is: plug in a device, reload, and
-      // accept the add-on prompt Firefox shows.
-      // No stable install URL exists (the add-on is generated per
-      // origin); we link Mozilla's site-permission-add-ons help page
-      // instead, which explains the mechanism.
+      // Firefox's WebMIDI has two hard requirements the user must meet
+      // BEFORE the page loads — not just reload, RESTART Firefox:
+      //
+      //   1. At least one MIDI device physically connected
+      //   2. Firefox launched WITH that device connected — Firefox
+      //      has no MIDI hot-plug support, so devices plugged in
+      //      after launch are invisible until Firefox is restarted
+      //
+      // If both hold, requestMIDIAccess triggers Firefox's inline
+      // prompt to install an auto-generated per-origin site
+      // permission add-on. Accept → API works.
+      //
+      // If either condition fails, requestMIDIAccess rejects with
+      // 'WebMIDI requires a site permission add-on to activate' —
+      // the same error whether no device is connected, Firefox was
+      // launched before connecting one, or the user declined the
+      // prompt. Nothing in the error distinguishes these cases.
+      //
+      // Chrome is the reliable path for casual users. Firefox works
+      // if the user is willing to sequence the launch correctly.
       setStatusWithLink(
-        `MIDI on Firefox: connect a MIDI device and reload — Firefox will offer to install a site permission add-on (<a href="https://support.mozilla.org/en-US/kb/site-permission-add-ons" target="_blank" rel="noopener">learn more</a>). Microphone input works without it.`,
+        `MIDI on Firefox needs: (1) a MIDI device connected BEFORE Firefox launches (Firefox doesn't hot-plug), then (2) accept the site-permission add-on prompt it shows. Chrome doesn't need any of this. <a href="https://support.mozilla.org/en-US/kb/site-permission-add-ons" target="_blank" rel="noopener">Learn more</a>. Microphone input works without any of this.`,
         "warning",
       );
     } else {
