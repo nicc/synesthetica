@@ -570,8 +570,17 @@ async function initMidi(): Promise<void> {
       detectBrowser() === "firefox" &&
       /site permission add-on|permission add-on|WebMIDI/i.test(msg);
     if (isFirefoxAddOnError) {
+      // Firefox's WebMIDI is gated behind an auto-generated, per-site
+      // permission add-on. Firefox only offers to install it when
+      // requestMIDIAccess() is called with a MIDI device connected AT
+      // THAT MOMENT — otherwise it rejects with this error and no
+      // install prompt. So the fix is: plug in a device, reload, and
+      // accept the add-on prompt Firefox shows.
+      // No stable install URL exists (the add-on is generated per
+      // origin); we link Mozilla's site-permission-add-ons help page
+      // instead, which explains the mechanism.
       setStatusWithLink(
-        `MIDI needs a Firefox add-on: <a href="https://addons.mozilla.org/en-US/firefox/addon/webmidi-permission/" target="_blank" rel="noopener">install WebMIDI permission</a>, then reload. Microphone input works without it.`,
+        `MIDI on Firefox: connect a MIDI device and reload — Firefox will offer to install a site permission add-on (<a href="https://support.mozilla.org/en-US/kb/site-permission-add-ons" target="_blank" rel="noopener">learn more</a>). Microphone input works without it.`,
         "warning",
       );
     } else {
