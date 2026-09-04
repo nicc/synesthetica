@@ -9,10 +9,21 @@ export class WebMidiSource implements MidiSource {
   private messageListeners: Array<(msg: MidiMessage) => void> = [];
   private stateListeners: Array<(input: MidiInputInfo, state: "connected" | "disconnected") => void> = [];
   private inputHandlers: Map<string, (event: MIDIMessageEvent) => void> = new Map();
+  /** Whether SysEx access was granted at init. Chrome tends to allow;
+   *  Firefox often prompts and users may deny. Some devices (MPE
+   *  controllers, MIDI-clock sources, patch-dump-heavy hardware) don't
+   *  fully enumerate without SysEx on Firefox specifically. */
+  private sysexGranted = false;
 
   /**
    * Initialize the Web MIDI source.
    * Must be called before using other methods.
+   *
+   * Requests SysEx access opportunistically — a subset of devices
+   * (notably on Firefox) don't fully enumerate without it. Falls
+   * back to non-SysEx access if the user denies or the browser
+   * rejects. Both paths are functional for note-on/note-off traffic.
+   *
    * @returns Promise that resolves when MIDI access is granted.
    */
   async init(): Promise<void> {
@@ -20,7 +31,17 @@ export class WebMidiSource implements MidiSource {
       throw new Error("Web MIDI API not supported in this browser");
     }
 
-    this.access = await navigator.requestMIDIAccess({ sysex: false });
+    try {
+      this.access = await navigator.requestMIDIAccess({ sysex: true });
+      this.sysexGranted = true;
+    } catch {
+      // SysEx denied or unsupported — retry without. Non-SysEx access
+      // is sufficient for the notes / velocity / channel data the
+      // visualiser actually reads; SysEx just improves device
+      // coverage on some browsers.
+      this.access = await navigator.requestMIDIAccess({ sysex: false });
+      this.sysexGranted = false;
+    }
 
     // Set up listeners on all current inputs
     for (const input of this.access.inputs.values()) {
@@ -43,6 +64,12 @@ export class WebMidiSource implements MidiSource {
         }
       }
     };
+  }
+
+  /** True when the browser granted SysEx access at init. Diagnostic
+   *  only — not needed for note-level MIDI. */
+  hasSysExAccess(): boolean {
+    return this.sysexGranted;
   }
 
   getInputs(): MidiInputInfo[] {

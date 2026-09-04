@@ -457,6 +457,13 @@
     }
     .syn-status.error { color: #c66; }
     .syn-status.success { color: #7c7; }
+    .syn-status.warning {
+      color: #cb8;
+      /* Warnings are less transient than plain status — bump the
+       * background so they read as advisory even when the visualiser
+       * behind is busy. */
+      background: rgba(0, 0, 0, 0.6);
+    }
   </style>
 </head>
 <body>

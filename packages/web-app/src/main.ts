@@ -422,7 +422,7 @@ async function startAudioSession(): Promise<void> {
   }
 }
 
-function setStatus(text: string, kind: "" | "success" | "error" = ""): void {
+function setStatus(text: string, kind: "" | "success" | "error" | "warning" = ""): void {
   statusEl.textContent = text;
   statusEl.className = kind ? `syn-status ${kind}` : "syn-status";
 }
@@ -504,10 +504,41 @@ function mountPanels(): void {
  * MIDI enumeration (populates the input:source dropdown)
  * ----------------------------------------------------------------- */
 async function initMidi(): Promise<void> {
+  // Safari + a few edge cases don't expose Web MIDI at all — surface
+  // that clearly instead of hitting the requestMIDIAccess throw path.
+  if (typeof navigator.requestMIDIAccess !== "function") {
+    const browser = detectBrowser();
+    setStatus(
+      browser === "safari"
+        ? "Safari doesn't support Web MIDI. Use Chrome or Firefox for MIDI input; microphone input still works."
+        : "This browser doesn't support Web MIDI. Try Chrome or Firefox for MIDI input; microphone input still works.",
+      "warning",
+    );
+    return;
+  }
+
   try {
     midiSource = new WebMidiSource();
     await midiSource.init();
-    setStatus(`MIDI: ${midiSource.getInputs().length} device(s) available`);
+    const count = midiSource.getInputs().length;
+    const sysexNote = midiSource.hasSysExAccess() ? "" : " (SysEx denied — some devices may not appear)";
+    setStatus(`MIDI: ${count} device(s) available${sysexNote}`);
+
+    // Firefox sometimes under-enumerates MIDI devices vs Chrome. If
+    // we see zero after init and this is Firefox, wait a moment then
+    // soften: some hardware just doesn't show up, and Chrome is the
+    // reliable fallback for users who need it.
+    if (count === 0 && detectBrowser() === "firefox") {
+      setTimeout(() => {
+        if (midiSource && midiSource.getInputs().length === 0) {
+          setStatus(
+            "MIDI: no devices detected. Firefox occasionally misses devices Chrome sees — worth checking a Chromium browser if you have hardware connected. Microphone input still works.",
+            "warning",
+          );
+        }
+      }, 5000);
+    }
+
     // Hydrate the input:source select in case the Basics panel is open.
     basicsPanel?.updateOptions("input:source", currentInputOptions());
     // Watch for device connects/disconnects.
@@ -520,6 +551,20 @@ async function initMidi(): Promise<void> {
       "error",
     );
   }
+}
+
+/**
+ * Coarse browser detection for capability messaging. Not used for
+ * feature switching — always feature-detect first — but for tuning
+ * the user-facing hint text.
+ */
+function detectBrowser(): "chrome" | "firefox" | "safari" | "other" {
+  const ua = navigator.userAgent;
+  if (/Firefox\//.test(ua)) return "firefox";
+  // Chromium-family (Chrome, Edge, Brave, Opera) all report Chrome/…
+  if (/Chrome\/|Chromium\/|Edg\//.test(ua)) return "chrome";
+  if (/Safari\//.test(ua)) return "safari";
+  return "other";
 }
 
 /* -----------------------------------------------------------------
