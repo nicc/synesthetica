@@ -99,12 +99,15 @@ function clearRecentEvents(): void {
   }
 }
 
-// State snapshot we publish back to the CLI over WS. Kept in sync
-// with pipeline mutations; every setter update also mirrors here so
-// the CLI's WSBackedEngineHandle can return it to MCP callers.
+// State snapshot we publish back to the CLI over WS.
+//
+// `macros.intents` is the last user-set value (updated in
+// applyEngineOp). `macros.effective` is sourced from consumer
+// runtime on every publishState — see SPEC 014 §1.9. Everything
+// else is mirrored on the way through applyEngineOp.
 const engineState: EngineStateSnapshot = {
   instance: "default",
-  macros: {},
+  macros: { intents: {}, effective: {} },
   session: {
     tonic: null,
     mode: null,
@@ -126,14 +129,27 @@ function sessionNow(): number | null {
   return performance.now() - sessionStartTime;
 }
 
-/** Publish the current engineState snapshot to the CLI. */
+/** Publish the current engineState snapshot to the CLI. Rebuilds
+ *  `macros.effective` from the live pipeline on every call so
+ *  drift between intent and consumer state stays visible. */
 function publishState(): void {
   engineState.now = sessionNow();
+  refreshEffectiveMacros();
   wsReceiver?.publishStateChanged({
     ...engineState,
     session: { ...engineState.session },
-    macros: { ...engineState.macros },
+    macros: {
+      intents: { ...engineState.macros.intents },
+      effective: { ...engineState.macros.effective },
+    },
   });
+}
+
+function refreshEffectiveMacros(): void {
+  if (!pipeline) return;
+  engineState.macros.effective = pipeline.readEffectiveMacros(
+    productionManifest.macros,
+  );
 }
 
 /**
@@ -194,11 +210,7 @@ async function applyEngineOp(
     }
     case "setMacro": {
       const [name, value] = args as [string, number | string];
-      engineState.macros[name] = value;
-      // Route to the running pipeline's grammar (or vocabulary in a
-      // later chunk). Scope prefix picks the target; grammars ignore
-      // unknown keys, so bare / system macros without a downstream
-      // owner are safely no-ops until wired.
+      engineState.macros.intents[name] = value;
       pipeline?.setMacro(name, value);
       break;
     }
@@ -211,11 +223,13 @@ async function applyEngineOp(
     case "setHueForPitch": {
       const [pc, hue] = args as [number, number];
       vocabulary?.setHueForPitch(pc, hue);
-      // Mirror into engineState.macros so state:// reports the
-      // equivalent reference value the LLM would have used with set_macro.
+      // Record the equivalent reference-hue as the user's intent, so
+      // state://.macros.intents reads back the same value set_macro
+      // would have used. `effective` is picked up automatically from
+      // the vocab by publishState.
       const derived = vocabulary?.readMacros()["system:colour-mapping:reference"];
       if (typeof derived === "number") {
-        engineState.macros["system:colour-mapping:reference"] = derived;
+        engineState.macros.intents["system:colour-mapping:reference"] = derived;
       }
       break;
     }
@@ -292,10 +306,16 @@ function readModeDefault(): string {
 }
 
 function snapshotCopy(): EngineStateSnapshot {
+  // Refresh effective from live pipeline; intents are already
+  // authoritative on engineState.
+  refreshEffectiveMacros();
   return {
     ...engineState,
     session: { ...engineState.session },
-    macros: { ...engineState.macros },
+    macros: {
+      intents: { ...engineState.macros.intents },
+      effective: { ...engineState.macros.effective },
+    },
     now: sessionNow(),
   };
 }

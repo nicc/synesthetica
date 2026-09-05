@@ -28,7 +28,8 @@ describe("state://<label>/current — reads live state", () => {
     const [current] = buildStateResources(engine);
     const json = JSON.parse(await current.read());
     expect(json.session.tempo).toBe(85);
-    expect(json.macros["harmony:linger"]).toBe(4);
+    expect(json.macros.intents["harmony:linger"]).toBe(4);
+    expect(json.macros.effective["harmony:linger"]).toBe(4);
   });
 });
 

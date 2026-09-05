@@ -66,7 +66,7 @@ describe("switch_preset", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.state.session.tempo).toBe(85);
-      expect(result.state.macros["harmony:linger"]).toBe(4);
+      expect(result.state.macros.intents["harmony:linger"]).toBe(4);
       expect(result.state.activePreset).toBe("chill");
     }
     cleanup();
@@ -124,7 +124,7 @@ describe("switch_preset", () => {
         chordMode: "bass-led",
         metronome: true,
       });
-      expect(result.state.macros["harmony:linger"]).toBe(8);
+      expect(result.state.macros.intents["harmony:linger"]).toBe(8);
     }
     cleanup();
   });

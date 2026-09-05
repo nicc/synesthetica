@@ -40,9 +40,13 @@ export class StubEngineHandle implements EngineHandle {
 
   constructor(opts: StubOptions = {}) {
     this.label = opts.label ?? "default";
+    const initial = { ...defaultMacroValues, ...(opts.initialMacros ?? {}) };
     this.state = {
       instance: this.label,
-      macros: { ...defaultMacroValues, ...(opts.initialMacros ?? {}) },
+      // Stubs treat intents = effective — no consumer runtime to
+      // diverge from. Real handles rebuild effective from live
+      // consumers on every publish.
+      macros: { intents: { ...initial }, effective: { ...initial } },
       session: {
         tonic: null,
         mode: null,
@@ -73,7 +77,10 @@ export class StubEngineHandle implements EngineHandle {
   // ---- macros ----
   async setMacro(name: string, value: number | string): Promise<StateSnapshot> {
     this.opLog.push({ method: "setMacro", args: [name, value] });
-    this.state.macros = { ...this.state.macros, [name]: value };
+    this.state.macros = {
+      intents: { ...this.state.macros.intents, [name]: value },
+      effective: { ...this.state.macros.effective, [name]: value },
+    };
     return this.publishState();
   }
 
@@ -118,8 +125,11 @@ export class StubEngineHandle implements EngineHandle {
     this.opLog.push({ method: "setHueForPitch", args: [pc, hue] });
     // Stub math: just record the intent; real impl adjusts
     // system:colour-mapping:reference (and direction) so the given
-    // pc maps to the given hue. Chunk D wires the real math.
-    this.state.macros["system:colour-mapping:reference"] = hue;
+    // pc maps to the given hue.
+    this.state.macros = {
+      intents: { ...this.state.macros.intents, "system:colour-mapping:reference": hue },
+      effective: { ...this.state.macros.effective, "system:colour-mapping:reference": hue },
+    };
     return this.publishState();
   }
 

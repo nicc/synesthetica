@@ -6,9 +6,10 @@ import { createPresetStore } from "../src/presets/presetStore.js";
 import type { StateSnapshot } from "../src/engine/engineHandle.js";
 
 function fakeSnapshot(): StateSnapshot {
+  const macroValues = { "harmony:linger": 5, "rhythm:quantise-resolution": "16th" };
   return {
     instance: "default",
-    macros: { "harmony:linger": 5, "rhythm:quantise-resolution": "16th" },
+    macros: { intents: { ...macroValues }, effective: { ...macroValues } },
     session: {
       tonic: 0,
       mode: "ionian",
@@ -75,7 +76,7 @@ describe("preset store", () => {
     const store = createPresetStore(dir);
     store.save("x", fakeSnapshot());
     const modified = fakeSnapshot();
-    modified.macros["harmony:linger"] = 7;
+    modified.macros.intents["harmony:linger"] = 7;
     store.save("x", modified);
     const loaded = store.load("x");
     expect(loaded!.macros["harmony:linger"]).toBe(7);

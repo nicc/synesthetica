@@ -69,7 +69,10 @@ export function createPresetStore(overrideDir?: string): PresetStore {
       }
       const content: PresetContent = {
         version: 1,
-        macros: snapshot.macros,
+        // Save the user-facing intents, not the consumer-derived
+        // effective values — presets record "what the user asked for"
+        // so replaying reproduces the same intent.
+        macros: { ...snapshot.macros.intents },
         session: snapshot.session,
         input: snapshot.input,
         savedAt: new Date().toISOString(),

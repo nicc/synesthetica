@@ -14,10 +14,20 @@
 // state://<label>/current.
 // -----------------------------------------------------------------
 
+/**
+ * Macro state, split into user intents and consumer-observed effective
+ * values. See EngineStateSnapshot in contracts/control/engineBridge.ts
+ * for the full contract; kept in sync here.
+ */
+export interface MacroState {
+  intents: Record<string, number | string>;
+  effective: Record<string, number | string>;
+}
+
 export interface StateSnapshot {
   instance: string;
-  /** Current macro values, keyed by macro id. */
-  macros: Record<string, number | string>;
+  /** Current macro values, split by intent vs consumer-observed effect. */
+  macros: MacroState;
   /** Prescribed musical frame. Nulls = not prescribed. */
   session: {
     tonic: number | null;

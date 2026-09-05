@@ -106,6 +106,17 @@ Together these turn "declared but not plumbed" from a class of silent bug into a
 
 Compound macros omit `consumers[]` — their `targets[]` fan out to leaf macros that have their own consumers, and coverage is transitive.
 
+### 1.9 State shape: intents vs effective
+
+`StateSnapshot.macros` is split into two views:
+
+- `intents: Record<string, number|string>` — the last value the user (LLM or panel) set for each macro via `set_macro` or `set_hue_for_pitch`. Includes compound macros, keyed by the compound id (leaves' intents are stored separately when set directly).
+- `effective: Record<string, number|string>` — sourced from consumer runtime on every state publish. `VisualPipeline.readEffectiveMacros(manifest.macros)` walks each macro's `consumers[]`, calls that consumer's `readMacros()`, and indexes by declared `macroKey`. Compound macros do NOT appear (they have no direct consumer).
+
+The split is the state-side answer to the same class of bug consumer declarations catch on the dispatch side. If a consumer silently ignores a setter, `effective` diverges from `intents` and the drift is visible in `state://` — both to the LLM (which reads it) and to whoever is reviewing session recordings. There is no mirror keeping a shadow copy; the effective view is always built from live consumer state.
+
+Presets record only `intents` — the user-facing values — because replaying a preset is "reproduce what the user asked for", not "reproduce a snapshot of implementation state".
+
 ## 2. Derivation: one manifest, many consumers
 
 The manifest at `productionManifest` is the sole source. Every derived surface reads from it at build time or startup, never duplicates the content.
@@ -180,8 +191,6 @@ Called out here rather than glossed over — the spec matches reality including 
 
 - **`rhythm:emphasis` targets `rhythm:pulse-intensity` + `rhythm:reference-linger`**: both wired end-to-end since commit `b96cb90`. Compound curves are linear defaults.
 - **Stabilizer macros beyond ChordDetectionStabilizer**: no other stabilizer accepts macros today. Add ones as macros land — the coverage test in §1.8 enforces it.
-- **State snapshot still mirror-sourced**: `state://` reads a browser-maintained mirror rather than consumer `readMacros()` getters. Consumers have the getters now (needed for the coverage test); switching the state builder to consume them is follow-up work that removes the drift risk between "state says the macro is X" and "the consumer is actually running with X".
-- **WS-level integration test**: the wiring-coverage test asserts pipeline.setMacro dispatch. A companion test driving the full MCP tool → wsBridge → WS → browser dispatch chain would catch bugs in the transport layer. Not written yet; the transport is already covered by `wsBridge.test.ts` in a separate axis.
 
 ## 5. Verification
 

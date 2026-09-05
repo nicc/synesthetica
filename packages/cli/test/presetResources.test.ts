@@ -7,9 +7,10 @@ import { buildPresetResources } from "../src/presets/presetResources.js";
 import type { StateSnapshot } from "../src/engine/engineHandle.js";
 
 function fakeSnapshot(): StateSnapshot {
+  const macroValues = { "harmony:linger": 5 };
   return {
     instance: "default",
-    macros: { "harmony:linger": 5 },
+    macros: { intents: { ...macroValues }, effective: { ...macroValues } },
     session: {
       tonic: 0,
       mode: "ionian",

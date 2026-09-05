@@ -35,7 +35,7 @@ class FakeBrowser {
   constructor(private port: number, private label: string) {
     this.state = {
       instance: label,
-      macros: {},
+      macros: { intents: {}, effective: {} },
       session: {
         tonic: null,
         mode: null,
@@ -79,9 +79,13 @@ class FakeBrowser {
         this.state.session.tonic = msg.args[0] as number | null;
         this.state.session.mode = msg.args[1] as string | null;
         break;
-      case "setMacro":
-        this.state.macros[msg.args[0] as string] = msg.args[1] as number | string;
+      case "setMacro": {
+        const k = msg.args[0] as string;
+        const v = msg.args[1] as number | string;
+        this.state.macros.intents[k] = v;
+        this.state.macros.effective[k] = v; // stub: fake browser mirrors both
         break;
+      }
       case "setChordMode":
         this.state.session.chordMode = msg.args[0] as "harmonic" | "bass-led";
         break;
@@ -106,7 +110,10 @@ class FakeBrowser {
     return {
       ...this.state,
       session: { ...this.state.session },
-      macros: { ...this.state.macros },
+      macros: {
+        intents: { ...this.state.macros.intents },
+        effective: { ...this.state.macros.effective },
+      },
     };
   }
 
@@ -165,7 +172,7 @@ describe("E2E: MCP tool → WS bridge → fake browser → back", () => {
     );
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.state.macros["harmony:linger"]).toBe(5);
+      expect(result.state.macros.intents["harmony:linger"]).toBe(5);
     }
   });
 

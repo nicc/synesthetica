@@ -331,7 +331,7 @@ class WSBackedEngineHandle implements EngineHandle {
 function emptyState(label: string): EngineStateSnapshot {
   return {
     instance: label,
-    macros: {},
+    macros: { intents: {}, effective: {} },
     session: {
       tonic: null,
       mode: null,

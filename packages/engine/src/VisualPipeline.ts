@@ -27,6 +27,7 @@ import type {
   Diagnostic,
   PrescribedKey,
   ChordInterpretationMode,
+  MacroAnnotation,
 } from "@synesthetica/contracts";
 import { createEmptyMusicalFrame as contractsCreateEmptyMusicalFrame } from "@synesthetica/contracts";
 
@@ -188,6 +189,44 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     }
     // Vocab dispatch.
     this.vocabulary?.setMacro?.(name, value);
+  }
+
+  /**
+   * Build the effective-macro map by walking the given macro list and,
+   * for each declared consumer, calling that consumer's readMacros()
+   * and indexing by macroKey. Skips compound macros (they have no
+   * direct consumer — their leaves do).
+   *
+   * Used by the state:// snapshot builder to source effective values
+   * from consumer runtime rather than from a mirror. See SPEC 014 §1.9.
+   */
+  readEffectiveMacros(macros: MacroAnnotation[]): Record<string, number | string> {
+    const consumers = this.buildConsumerLookup();
+    const out: Record<string, number | string> = {};
+    for (const macro of macros) {
+      if (macro.type === "compound") continue;
+      for (const c of macro.consumers) {
+        const instance = consumers.get(c.id);
+        const values = instance?.readMacros?.();
+        if (!values) continue;
+        const v = values[c.macroKey];
+        if (v !== undefined) {
+          out[macro.id] = v;
+          break; // first consumer that has a value wins
+        }
+      }
+    }
+    return out;
+  }
+
+  private buildConsumerLookup(): Map<string, { readMacros?(): Record<string, number | string> }> {
+    const lookup = new Map<string, { readMacros?(): Record<string, number | string> }>();
+    for (const g of this.grammars) lookup.set(g.id, g);
+    if (this.vocabulary) lookup.set(this.vocabulary.id, this.vocabulary);
+    for (const state of this.partStates.values()) {
+      for (const s of state.stabilizers) lookup.set(s.id, s);
+    }
+    return lookup;
   }
 
   /**

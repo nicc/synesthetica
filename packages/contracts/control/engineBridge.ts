@@ -48,10 +48,32 @@ export interface AvailableInput {
   sourceString: string;
 }
 
+/**
+ * Per-instance macro state, split by SPEC 014 §1.9 into user-intent
+ * and consumer-observed effective values.
+ *
+ * `intents` — the last value the user (LLM or panel) set via
+ *   set_macro or set_hue_for_pitch. Includes compound macros keyed
+ *   by the compound id (the leaves' intents are stored separately).
+ *   Reflects "what was asked for".
+ *
+ * `effective` — sourced from consumer.readMacros() every publish, so
+ *   it always reflects what the pipeline consumers are actually
+ *   running with. Keyed by macro id via the manifest's declared
+ *   consumers[]. If a consumer silently ignored a setter, `effective`
+ *   diverges from `intents` and the drift is visible in state://.
+ *   Compound macros do NOT appear in `effective` (they have no direct
+ *   consumer — their leaves do).
+ */
+export interface MacroState {
+  intents: Record<string, number | string>;
+  effective: Record<string, number | string>;
+}
+
 /** State snapshot shape (mirror of engine/engineHandle.ts). */
 export interface EngineStateSnapshot {
   instance: string;
-  macros: Record<string, number | string>;
+  macros: MacroState;
   session: {
     tonic: number | null;
     mode: string | null;

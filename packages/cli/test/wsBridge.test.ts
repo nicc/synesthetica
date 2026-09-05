@@ -111,7 +111,10 @@ describe("wsBridge — state-changed fan-out", () => {
       type: "state-changed",
       snapshot: {
         instance: "default",
-        macros: { "harmony:linger": 5 },
+        macros: {
+          intents: { "harmony:linger": 5 },
+          effective: { "harmony:linger": 5 },
+        },
         session: {
           tonic: null,
           mode: null,
@@ -138,7 +141,10 @@ describe("wsBridge — state-changed fan-out", () => {
     const ws = await connectAs("default");
     const snapshot = {
       instance: "default",
-      macros: { "harmony:linger": 4 },
+      macros: {
+        intents: { "harmony:linger": 4 },
+        effective: { "harmony:linger": 4 },
+      },
       session: {
         tonic: 2,
         mode: "dorian",
@@ -155,7 +161,8 @@ describe("wsBridge — state-changed fan-out", () => {
     await new Promise((r) => setTimeout(r, 20));
     const got = await handle.getStateSnapshot();
     expect(got.session.tempo).toBe(100);
-    expect(got.macros["harmony:linger"]).toBe(4);
+    expect(got.macros.intents["harmony:linger"]).toBe(4);
+    expect(got.macros.effective["harmony:linger"]).toBe(4);
     ws.close();
   });
 });
