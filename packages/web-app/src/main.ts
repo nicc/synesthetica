@@ -46,7 +46,11 @@ import {
   attachRecentEventsBuffer,
   type RecentEventsBuffer,
 } from "./engine/recentEvents.js";
-import { enumerateInputs, inputsToPanelOptions } from "./engine/enumerateInputs.js";
+import {
+  enumerateInputs,
+  enumerateInputsSync,
+  inputsToPanelOptions,
+} from "./engine/enumerateInputs.js";
 import type {
   EngineMethod,
   EngineStateSnapshot,
@@ -392,9 +396,13 @@ async function startMidiSession(deviceId: string): Promise<void> {
   setStatus(`MIDI: ${info.name}`, "success");
 }
 
-async function startAudioSession(): Promise<void> {
+async function startAudioSession(deviceId?: string): Promise<void> {
   stopSession();
-  setStatus("Loading audio model + requesting mic…");
+  setStatus(
+    deviceId
+      ? `Loading audio model + requesting device ${deviceId}…`
+      : "Loading audio model + requesting mic…",
+  );
   markSessionStarted();
   const audioDebug =
     new URLSearchParams(window.location.search).get("audio-debug") === "1";
@@ -405,11 +413,19 @@ async function startAudioSession(): Promise<void> {
     workerUrl: INFERENCE_WORKER_URL,
     workletUrl: AUDIO_CAPTURE_WORKLET_URL,
     debug: audioDebug,
+    deviceId,
   });
   try {
     await audioAdapter.start();
     buildAndStartPipeline(audioAdapter);
-    setStatus("Audio: microphone", "success");
+    setStatus(
+      deviceId ? `Audio: device ${deviceId}` : "Audio: microphone",
+      "success",
+    );
+    // Permission was just granted (or previously granted for this
+    // origin) — enumerateDevices now returns real labels. Refresh
+    // panel options so subsequent user selections see friendly names.
+    void refreshInputOptions();
   } catch (err) {
     setStatus(`Audio failed: ${err instanceof Error ? err.message : String(err)}`, "error");
     if (audioAdapter) {
@@ -462,6 +478,9 @@ function toggleMetronome(enabled: boolean): void {
 function handleInputSource(source: string): void {
   if (source === "audio") {
     void startAudioSession();
+  } else if (source.startsWith("audio:")) {
+    const deviceId = source.slice("audio:".length);
+    void startAudioSession(deviceId);
   } else if (source.startsWith("midi:")) {
     void startMidiSession(source.slice("midi:".length));
   } else {
@@ -473,8 +492,21 @@ function handleInputSource(source: string): void {
  * Panel wiring
  * ----------------------------------------------------------------- */
 function currentInputOptions(): Array<{ value: string; label: string }> {
-  // Single source of truth — same list the LLM sees via inputs://.
-  return inputsToPanelOptions(enumerateInputs(midiSource));
+  // Sync path — MIDI (which enumerates cheaply) + a default audio
+  // entry. Audio device enumeration is async (getUserMedia gate);
+  // refreshInputOptions() pushes the full list after each session.
+  return inputsToPanelOptions(enumerateInputsSync(midiSource));
+}
+
+/**
+ * Async option refresh — enumerates audio devices (with labels once
+ * permission is granted) and pushes the merged list into the
+ * basics panel widget. Called after MIDI state changes and after
+ * each audio session start.
+ */
+async function refreshInputOptions(): Promise<void> {
+  const inputs = await enumerateInputs(midiSource);
+  basicsPanel?.updateOptions("input:source", inputsToPanelOptions(inputs));
 }
 
 function mountPanels(): void {
@@ -553,11 +585,15 @@ async function initMidi(): Promise<void> {
       }, 5000);
     }
 
-    // Hydrate the input:source select in case the Basics panel is open.
+    // Hydrate the input:source select in case the Basics panel is
+    // open. Sync path first (immediate), then async refresh to pick
+    // up audio-device labels once permission is granted.
     basicsPanel?.updateOptions("input:source", currentInputOptions());
+    void refreshInputOptions();
     // Watch for device connects/disconnects.
     midiSource.onStateChange(() => {
       basicsPanel?.updateOptions("input:source", currentInputOptions());
+      void refreshInputOptions();
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

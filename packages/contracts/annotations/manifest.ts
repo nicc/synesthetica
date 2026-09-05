@@ -386,6 +386,7 @@ const sessionControls: SessionControlAnnotation[] = [
     nullable: false,
     notes: [
       "MIDI device or audio input. The web-app populates the widget's option list at runtime from connected devices; the LLM enumerates the same list via inputs://, and sees the currently-selected source in state://<label>/current.input.",
+      "Audio device labels only appear after getUserMedia permission is granted for the origin (i.e. after at least one audio session has started). Before that, additional audio entries surface as placeholder names ('Audio input 1', etc.) alongside a 'Default microphone' fallback.",
     ],
   },
 
@@ -896,7 +897,7 @@ const tools: ToolAnnotation[] = [
   {
     id: "set_input",
     description:
-      "Select the input source (MIDI device or audio input). Read inputs:// for the enumerated list of available devices — each entry carries a `sourceString` ready to pass here. Format: 'midi:<device-id>' or 'audio'. Current selection is available at state://<label>/current.input.",
+      "Select the input source (MIDI device or audio input). Read inputs:// for the enumerated list of available devices — each entry carries a `sourceString` ready to pass here. Format: 'midi:<device-id>', 'audio' (default microphone), or 'audio:<device-id>' (specific audio input). Current selection is available at state://<label>/current.input.",
     aliases: ["use", "listen to", "switch to", "input"],
     examples: [
       "set_input(source: 'midi:Yamaha P-125') — listen to that MIDI keyboard.",

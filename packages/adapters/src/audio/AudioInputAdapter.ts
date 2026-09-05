@@ -92,6 +92,14 @@ export interface AudioInputAdapterConfig {
   sessionStart: number;
 
   /**
+   * Optional specific audio-input device id (from
+   * MediaDeviceInfo.deviceId). When set, getUserMedia is constrained
+   * to that device via `deviceId: { exact: ... }`. When omitted, the
+   * browser picks the default input.
+   */
+  deviceId?: string;
+
+  /**
    * URL of the Basic Pitch model JSON (model.json). The InferenceWorker
    * fetches this via tf.loadGraphModel.
    */
@@ -165,6 +173,11 @@ const DEFAULT_CONFIG = {
   freshOnsetMaxAgeMs: DEFAULT_FRESH_ONSET_MAX_AGE_MS,
   restrikeGapMs: DEFAULT_RESTRIKE_GAP_MS,
   debug: false,
+  // deviceId is intentionally NOT defaulted — empty-string would be
+  // an "exact deviceId of ''" constraint that would fail. Users
+  // omit the field for default device; only set it when routing to
+  // a specific input.
+  deviceId: undefined as string | undefined,
 };
 
 export class AudioInputAdapter implements IRawSourceAdapter {
@@ -208,13 +221,18 @@ export class AudioInputAdapter implements IRawSourceAdapter {
     if (this.audioContext) return; // already running
 
     // 1. Request mic. Native rate is whatever the device provides;
-    // AudioContext resamples to its own rate downstream.
+    // AudioContext resamples to its own rate downstream. If a
+    // specific deviceId was requested, constrain to that device.
+    const audioConstraints: MediaTrackConstraints = {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+    };
+    if (this.config.deviceId) {
+      audioConstraints.deviceId = { exact: this.config.deviceId };
+    }
     this.mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-      },
+      audio: audioConstraints,
       video: false,
     });
 
