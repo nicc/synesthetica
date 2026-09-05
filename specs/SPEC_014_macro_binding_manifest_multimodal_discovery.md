@@ -79,11 +79,32 @@ Example: `set_macro("rhythm:pulse-intensity", 0.8)` reaches `RhythmGrammar.setMa
 
 Example: `set_macro("harmony:arpeggio-tolerance", 800)` reaches `ChordDetectionStabilizer.setMacro`, which calls `setConfig({pitchDecayMs: 800})`.
 
-Vocabulary-owned macros (currently `system:colour-mapping:reference`) route through `set_hue_for_pitch` as their canonical helper; direct `set_macro` writes them into `engineState` but the vocab-side setter is not yet wired. See "Known gaps" below.
+**Vocabulary.** The pipeline also invokes `vocabulary.setMacro(name, value)` on the configured vocab. Vocabs own colour/palette anchor macros (currently `system:colour-mapping:reference` on `MusicalVisualVocabulary`).
+
+Example: `set_macro("system:colour-mapping:reference", 240)` reaches `MusicalVisualVocabulary.setMacro`, which sets `referenceHue = 240` and pins `referencePc = 0`. `set_hue_for_pitch(pc, hue)` remains as a helper — it computes the equivalent reference-hue at PC=0 and calls `vocabulary.setHueForPitch(pc, hue)` directly.
 
 ### 1.7 Bare (unscoped) and `system:*` macros
 
 Bare macros like `time-horizon` and `system:colour-mapping:reference` don't route via grammar-id matching. They flow through both the grammar and stabilizer loops and no-op unless a consumer explicitly recognises them. Compound macros are always bare or otherwise-scoped; their leaves do the actual work, so the compound's own write is state-only.
+
+### 1.8 Declared consumers (SPEC 014 §Wiring coverage)
+
+Every non-compound macro's `MacroAnnotation` carries a required `consumers[]` array:
+
+```ts
+{ kind: "grammar" | "stabilizer" | "vocab", id: string, macroKey: string }
+```
+
+`id` is the consumer's runtime `id` field. `macroKey` is how the consumer addresses this macro — for grammars, the camelCase field name on their internal `macros` object (matching what `setMacros` accepts); for stabilizers and vocabs, the full qualified macro id (matching what `setMacro` switches on).
+
+This declaration is the manifest's promise about wiring. It's enforced two ways:
+
+1. **Build-time** — `validate-manifest.mjs` fails if any continuous or discrete macro is missing `consumers[]`, or if a consumer's `id` isn't a known grammar/stabilizer/vocab.
+2. **Runtime** — `packages/engine/test/wiringCoverage.test.ts` instantiates a full pipeline and, for every declared consumer, dispatches through `pipeline.setMacro(macroId, testValue)` and asserts `consumer.readMacros()[macroKey] === testValue`. A no-op setter can't accidentally pass because the test picks a value distinct from the current one.
+
+Together these turn "declared but not plumbed" from a class of silent bug into a class of build failure.
+
+Compound macros omit `consumers[]` — their `targets[]` fan out to leaf macros that have their own consumers, and coverage is transitive.
 
 ## 2. Derivation: one manifest, many consumers
 
@@ -157,23 +178,29 @@ Per-item `annotations://` reads remain available for on-demand precision (e.g. w
 
 Called out here rather than glossed over — the spec matches reality including reality's rough edges.
 
-- **Vocabulary-owned macros** (`system:colour-mapping:reference`): `set_macro` writes state but `MusicalVisualVocabulary` doesn't yet accept macro updates. `set_hue_for_pitch` is the working path today (computes the reference hue server-side and calls `setHueForPitch` on the vocab).
 - **`rhythm:emphasis` targets `rhythm:pulse-intensity` + `rhythm:reference-linger`**: both wired end-to-end since commit `b96cb90`. Compound curves are linear defaults.
-- **Stabilizer macros beyond ChordDetectionStabilizer**: no other stabilizer implements `setMacro` today. Add ones as macros land.
+- **Stabilizer macros beyond ChordDetectionStabilizer**: no other stabilizer accepts macros today. Add ones as macros land — the coverage test in §1.8 enforces it.
+- **State snapshot still mirror-sourced**: `state://` reads a browser-maintained mirror rather than consumer `readMacros()` getters. Consumers have the getters now (needed for the coverage test); switching the state builder to consume them is follow-up work that removes the drift risk between "state says the macro is X" and "the consumer is actually running with X".
+- **WS-level integration test**: the wiring-coverage test asserts pipeline.setMacro dispatch. A companion test driving the full MCP tool → wsBridge → WS → browser dispatch chain would catch bugs in the transport layer. Not written yet; the transport is already covered by `wsBridge.test.ts` in a separate axis.
 
 ## 5. Verification
 
 A macro is correctly wired iff:
 
-1. It appears in `productionManifest.<category>[]` with all required fields.
+1. It appears in `productionManifest.<category>[]` with all required fields, including `consumers[]` for continuous and discrete macros.
 2. `annotations://<category>/<id>` reads back its JSON verbatim.
 3. `set_macro(id, value)` returns `{ok: true, state: {...}}` with `state.macros[id] === value`.
-4. If it has a grammar consumer: the grammar's `setMacros` accepts the camelCase key.
-5. If it has a stabilizer consumer: the stabilizer's `setMacro` recognises the qualified id.
-6. The composed `guide://system-overview` prompt includes it in the appropriate section (## Macros | ## Session controls).
-7. If it's a session control or macro: the UI panel renders a widget for it (with hover-help concatenating every `notes[]` entry).
+4. **Every entry in `consumers[]` receives the value.** For each `{kind, id, macroKey}`, `pipeline.setMacro(macroId, testValue)` causes `consumer.readMacros()[macroKey]` to return `testValue`.
+5. The composed `guide://system-overview` prompt includes it in the appropriate section (## Macros | ## Session controls).
+6. If it's a session control or macro: the UI panel renders a widget for it (with hover-help concatenating every `notes[]` entry).
 
-Build-time validation (synesthetica-5l9) will assert (1) and part of (6). Runtime verification for (3)–(5) is covered by tests in `packages/cli/test/macroTools.test.ts` and `packages/engine/test/VisualPipeline.test.ts`. Manual verification for the composed prompt and the UI panel happens via the live-smoke command (`npm run start`).
+**Automated coverage:**
+- Build-time validation (`packages/contracts/scripts/validate-manifest.mjs`) asserts (1) — including that every non-compound macro has a non-empty `consumers[]` whose entries reference known grammar/stabilizer/vocab ids.
+- Runtime coverage test (`packages/engine/test/wiringCoverage.test.ts`) asserts (4) for every declared consumer of every non-compound macro. A no-op setter fails because the test picks a value distinct from the current one.
+- Existing `macroTools.test.ts` asserts (3).
+- Existing `renderPanel.test.ts` asserts (6).
+
+Manual verification for the composed prompt and the UI panel happens via the live-smoke command (`npm run start`).
 
 ## 6. References
 
@@ -184,7 +211,9 @@ Build-time validation (synesthetica-5l9) will assert (1) and part of (6). Runtim
 - `packages/cli/src/tools/macroTools.ts` — dispatch + fan-out.
 - `packages/cli/src/tools/registry.ts` — tool description override from manifest.
 - `packages/cli/src/resources/promptResources.ts` — composed prompt renderer.
-- `packages/engine/src/VisualPipeline.ts` — grammar + stabilizer dispatch.
+- `packages/engine/src/VisualPipeline.ts` — grammar + stabilizer + vocab dispatch.
 - `packages/engine/src/stabilizers/ChordDetectionStabilizer.ts` — stabilizer-side macro handling reference.
+- `packages/engine/src/vocabularies/MusicalVisualVocabulary.ts` — vocab-side macro handling (colour anchor).
+- `packages/engine/test/wiringCoverage.test.ts` — runtime coverage test for consumer declarations.
 - `packages/web-app/src/panel/aboutPanel.ts` — UI-subset rendering.
 - `packages/contracts/annotations/generatePanel.ts` — panel widget generation.
