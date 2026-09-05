@@ -127,7 +127,7 @@ interface RhythmGrammarMacros {
   /** Field of vision (0 = minimal, 1 = full) */
   horizon: number;
   /** Which subdivision to use for drift calculation */
-  subdivisionDepth: SubdivisionDepth;
+  quantiseResolution: SubdivisionDepth;
   /** How long reference window lingers beyond note window (multiplier).
    *  Range roughly [1.0, 3.0]; default 1.3. Higher values leave drift
    *  markers on-screen longer after the source note fades. */
@@ -178,7 +178,7 @@ export class RhythmGrammar implements IVisualGrammar {
 
   private macros: RhythmGrammarMacros = {
     horizon: 1.0, // Default to full view
-    subdivisionDepth: "16th", // Default to finest subdivision
+    quantiseResolution: "16th", // Default to finest subdivision
     referenceLinger: DEFAULT_REFERENCE_LINGER_MULTIPLIER,
     tightnessTolerance: TIGHT_TOLERANCE_DEFAULT_MS,
     pulseIntensity: PULSE_INTENSITY_DEFAULT,
@@ -207,6 +207,11 @@ export class RhythmGrammar implements IVisualGrammar {
 
   /** Get current macro values */
   getMacros(): RhythmGrammarMacros {
+    return { ...this.macros };
+  }
+
+  /** IVisualGrammar.readMacros — same shape as getMacros, widened. */
+  readMacros(): Record<string, number | string> {
     return { ...this.macros };
   }
 
@@ -837,12 +842,12 @@ export class RhythmGrammar implements IVisualGrammar {
 
     return {
       driftMs,
-      label: this.macros.subdivisionDepth,
+      label: this.macros.quantiseResolution,
     };
   }
 
   private getSubdivisionMs(beatMs: number): number {
-    switch (this.macros.subdivisionDepth) {
+    switch (this.macros.quantiseResolution) {
       case "quarter":
         return beatMs;
       case "8th":

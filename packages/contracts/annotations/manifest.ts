@@ -73,7 +73,7 @@ const macros: MacroAnnotation[] = [
     notes: [
       "Unit is chord detection window in ms.",
     ],
-    consumers: [{ kind: "stabilizer", id: "chord-detection-stabilizer", macroKey: "harmony:arpeggio-tolerance" }],
+    consumers: [{ kind: "stabilizer", id: "chord-detection", macroKey: "harmony:arpeggio-tolerance" }],
   },
 
   {
@@ -97,7 +97,7 @@ const macros: MacroAnnotation[] = [
     notes: [
       "Denotes the number of notes required to constitute a chord.",
     ],
-    consumers: [{ kind: "stabilizer", id: "chord-detection-stabilizer", macroKey: "harmony:note-threshold" }],
+    consumers: [{ kind: "stabilizer", id: "chord-detection", macroKey: "harmony:note-threshold" }],
   },
 
   {
@@ -122,7 +122,7 @@ const macros: MacroAnnotation[] = [
       "Hysteresis or lag on chord detection.",
       "Unit is ms.",
     ],
-    consumers: [{ kind: "stabilizer", id: "chord-detection-stabilizer", macroKey: "harmony:detection-stability" }],
+    consumers: [{ kind: "stabilizer", id: "chord-detection", macroKey: "harmony:detection-stability" }],
   },
 
   {
@@ -289,13 +289,13 @@ const macros: MacroAnnotation[] = [
       { value: "16th", label: "sixteenth notes (default)" },
       { value: "32nd", label: "thirty-second notes (finest)" },
     ],
-    default: "16th", // matches RhythmGrammar.macros.subdivisionDepth
+    default: "16th", // matches RhythmGrammar.macros.quantiseResolution
     affects: ["rhythm"],
     notes: [
       "Determines the reference subdivision for timing drift analysis.",
       "Coarser resolutions are more likely to show inaccurate timing due to fewer matching grid divisions, which counter-intuitively feels stricter but is actually an easier timing intent; finer resolutions will look more forgiving by matching to more grid divisions but is actually grading to a more difficult intent.",
     ],
-    consumers: [{ kind: "grammar", id: "rhythm-grammar", macroKey: "subdivisionDepth" }],
+    consumers: [{ kind: "grammar", id: "rhythm-grammar", macroKey: "quantiseResolution" }],
   },
 
   // -----------------------------------------------------------------

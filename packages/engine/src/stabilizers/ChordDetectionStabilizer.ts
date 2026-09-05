@@ -234,6 +234,16 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     }
   }
 
+  /** IMusicalStabilizer.readMacros — every macro this stabilizer owns,
+   *  keyed by the qualified macro id that setMacro takes. */
+  readMacros(): Record<string, number | string> {
+    return {
+      "harmony:arpeggio-tolerance": this.config.pitchDecayMs,
+      "harmony:note-threshold": this.config.minPitchClasses,
+      "harmony:detection-stability": this.config.hysteresisMs,
+    };
+  }
+
   getConfig(): Required<ChordDetectionConfig> {
     return { ...this.config };
   }

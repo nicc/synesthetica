@@ -95,6 +95,32 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
+  /** Apply a manifest macro. Currently handles
+   *  `system:colour-mapping:reference` — a degree on the colour wheel
+   *  anchored to pitch class 0 (C). Other macros are ignored. */
+  setMacro(name: string, value: number | string): void {
+    if (name === "system:colour-mapping:reference") {
+      const hue = ((Number(value) % 360) + 360) % 360;
+      this.config = { ...this.config, referencePc: 0, referenceHue: hue };
+    }
+  }
+
+  /** Anchor a specific pitch class to a specific hue. Derives the
+   *  equivalent referenceHue at PC=0 so subsequent readMacros returns
+   *  the value set_macro would need to reproduce this anchor. */
+  setHueForPitch(pc: number, hue: number): void {
+    const step = this.config.hueDirection === "cw" ? 30 : -30;
+    const derivedRefHue = (((hue - step * pc) % 360) + 360) % 360;
+    this.config = { ...this.config, referencePc: 0, referenceHue: derivedRefHue };
+  }
+
+  /** Return current values for every macro this vocab accepts. */
+  readMacros(): Record<string, number | string> {
+    return {
+      "system:colour-mapping:reference": this.config.referenceHue,
+    };
+  }
+
   annotate(frame: MusicalFrame): AnnotatedMusicalFrame {
     // Default harmonic context when stabilizer not in chain
     const defaultHarmonicContext = { ...EMPTY_HARMONIC_CONTEXT };

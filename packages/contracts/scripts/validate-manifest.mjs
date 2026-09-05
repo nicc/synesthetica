@@ -130,10 +130,10 @@ const grammarIds = new Set(productionManifest.grammars.map((g) => g.id));
 // the shipping set here. Adding a new one is a two-line change (this
 // list + the runtime coverage test).
 const stabilizerIds = new Set([
-  "chord-detection-stabilizer",
-  "note-tracking-stabilizer",
-  "harmony-stabilizer",
-  "dynamics-stabilizer",
+  "chord-detection",
+  "note-tracking",
+  "harmony",
+  "dynamics",
 ]);
 const vocabIds = new Set(["musical-visual"]);
 for (const m of productionManifest.macros) {

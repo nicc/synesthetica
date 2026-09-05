@@ -452,13 +452,13 @@ describe("RhythmGrammar", () => {
       });
 
       // At 16th subdivision (default), drift should be 0
-      grammar.setMacros({ subdivisionDepth: "16th" });
+      grammar.setMacros({ quantiseResolution: "16th" });
       const scene16 = grammar.update(frame, null);
       const note16 = scene16.entities.find((e) => e.data?.type === "note-strip");
       expect(note16?.data?.driftMs).toBe(0);
 
       // At quarter subdivision, drift should be 125ms
-      grammar.setMacros({ subdivisionDepth: "quarter" });
+      grammar.setMacros({ quantiseResolution: "quarter" });
       grammar.init(ctx);
       const sceneQ = grammar.update(frame, null);
       const noteQ = sceneQ.entities.find((e) => e.data?.type === "note-strip");
@@ -478,9 +478,9 @@ describe("RhythmGrammar snapshots", () => {
     grammar = new RhythmGrammar();
     grammar.init(ctx);
     // Snapshot tests describe drift against the quarter-note grid. The
-    // grammar's default subdivisionDepth is "16th"; override for these
+    // grammar's default quantiseResolution is "16th"; override for these
     // fixtures so onset offsets of ~100ms are clearly off-beat.
-    grammar.setMacros({ subdivisionDepth: "quarter" });
+    grammar.setMacros({ quantiseResolution: "quarter" });
   });
 
   it("renders basic beat grid (Tier 2)", () => {

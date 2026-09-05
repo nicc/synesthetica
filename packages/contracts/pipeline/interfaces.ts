@@ -95,6 +95,16 @@ export interface IMusicalStabilizer {
    * maps to ChordDetectionStabilizer.pitchDecayMs.
    */
   setMacro?(name: string, value: number | string): void;
+
+  /**
+   * Optional: return the current values of every macro this
+   * stabilizer accepts, keyed by the same string setMacro takes
+   * (typically the full qualified macro id, e.g. "harmony:arpeggio-tolerance").
+   * Used by state:// to source the effective-state view from
+   * consumers rather than a mirror; used by the wiring-coverage
+   * test to assert setMacro actually mutated something.
+   */
+  readMacros?(): Record<string, number | string>;
 }
 
 // ============================================================================
@@ -130,6 +140,20 @@ export interface IVisualVocabulary {
    * No internal state. Same input always produces same output.
    */
   annotate(frame: MusicalFrame): AnnotatedMusicalFrame;
+
+  /**
+   * Optional: apply a manifest macro. Vocab macros are typically
+   * colour/palette anchors (e.g. system:colour-mapping:reference).
+   * The pipeline calls this on every set_macro; vocabs that don't
+   * own the given macro ignore it silently. See IMusicalStabilizer.setMacro.
+   */
+  setMacro?(name: string, value: number | string): void;
+
+  /**
+   * Optional: return the current values of every macro this vocab
+   * accepts, keyed as setMacro takes them. See IMusicalStabilizer.readMacros.
+   */
+  readMacros?(): Record<string, number | string>;
 }
 
 /**
@@ -191,6 +215,21 @@ export interface IVisualGrammar {
 
   /** Schema for configurable parameters (optional) */
   paramsSchema?: Record<string, unknown>;
+
+  /**
+   * Optional: apply a partial macro update. Keys are the grammar's
+   * own camelCased param names (e.g. "linger", "pulseIntensity") —
+   * matching the manifest consumer entry's macroKey for grammar
+   * consumers. The pipeline translates a scope-prefixed macro id
+   * (harmony:linger) to `{ linger: value }` and calls this.
+   */
+  setMacros?(macros: Record<string, number | string>): void;
+
+  /**
+   * Optional: return the current values of every macro this grammar
+   * accepts, keyed by the same camelCase names setMacros uses.
+   */
+  readMacros?(): Record<string, number | string>;
 }
 
 /**

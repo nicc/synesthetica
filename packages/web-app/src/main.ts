@@ -74,6 +74,7 @@ const statusEl = document.getElementById("syn-status") as HTMLDivElement;
  * ----------------------------------------------------------------- */
 let midiSource: WebMidiSource | null = null;
 let pipeline: VisualPipeline | null = null;
+let vocabulary: MusicalVisualVocabulary | null = null;
 let renderer: ThreeJSRenderer | null = null;
 let metronome: Metronome | null = null;
 let audioAdapter: AudioInputAdapter | null = null;
@@ -208,7 +209,14 @@ async function applyEngineOp(
       break;
     }
     case "setHueForPitch": {
-      // Placeholder — engine plumbing lands with the hue-anchor macro.
+      const [pc, hue] = args as [number, number];
+      vocabulary?.setHueForPitch(pc, hue);
+      // Mirror into engineState.macros so state:// reports the
+      // equivalent reference value the LLM would have used with set_macro.
+      const derived = vocabulary?.readMacros()["system:colour-mapping:reference"];
+      if (typeof derived === "number") {
+        engineState.macros["system:colour-mapping:reference"] = derived;
+      }
       break;
     }
     case "switchPreset": {
@@ -316,7 +324,8 @@ function buildAndStartPipeline(
   pipeline.addStabilizerFactory(() => new DynamicsStabilizer({ partId }));
   pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
   pipeline.addStabilizerFactory(() => new HarmonyStabilizer({ partId }));
-  pipeline.setVocabulary(new MusicalVisualVocabulary());
+  vocabulary = new MusicalVisualVocabulary();
+  pipeline.setVocabulary(vocabulary);
   pipeline.addGrammar(new RhythmGrammar());
   pipeline.addGrammar(new HarmonyGrammar());
   pipeline.addGrammar(new DynamicsGrammar());

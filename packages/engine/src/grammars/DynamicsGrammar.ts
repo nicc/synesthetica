@@ -111,6 +111,11 @@ export class DynamicsGrammar implements IVisualGrammar {
     return { ...this.macros };
   }
 
+  /** IVisualGrammar.readMacros — same shape as getMacros, widened. */
+  readMacros(): Record<string, number | string> {
+    return { ...this.macros };
+  }
+
   update(input: AnnotatedMusicalFrame, _previous: SceneFrame | null): SceneFrame {
     const entities: Entity[] = [];
     const t = input.t;

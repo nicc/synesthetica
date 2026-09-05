@@ -386,6 +386,13 @@ export class HarmonyGrammar implements IVisualGrammar {
     return { ...this.macros };
   }
 
+  /** IVisualGrammar.readMacros — same shape as getMacros, widened to
+   *  the interface-level Record type. Used by state:// and the
+   *  wiring-coverage test. */
+  readMacros(): Record<string, number | string> {
+    return { ...this.macros };
+  }
+
   /**
    * Update the scene with chord shape and tension bar entities.
    * For full gradient rendering in tests, use renderToSVG() method.

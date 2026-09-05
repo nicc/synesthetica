@@ -146,7 +146,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
 
   /**
    * Route a manifest macro (id + value) to every consumer that
-   * declares interest — grammars AND stabilizers.
+   * declares interest — grammars, stabilizers, and vocab.
    *
    * Grammar routing: scope-prefixed name (`<scope>:<param>`) picks a
    * grammar whose id is `${scope}-grammar` or `${scope}`. The param
@@ -155,14 +155,15 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
    *
    * Stabilizer routing: pipeline invokes setMacro(name, value) on
    * every stabilizer across every partState. Stabilizers translate
-   * qualified macro ids to their internal config fields directly
-   * (see e.g. ChordDetectionStabilizer.setMacro for harmony:* macros
-   * that map to pitchDecayMs / minPitchClasses / hysteresisMs).
-   * Stabilizers ignore names they don't own.
+   * qualified macro ids to their internal config fields directly.
    *
-   * Bare (unscoped) and `system:*` macros aren't grammar-owned
-   * today; they flow through both loops and no-op. Vocabulary
-   * routing lands in a later chunk.
+   * Vocab routing: pipeline invokes setMacro(name, value) on the
+   * configured vocabulary. The vocab filters by name internally
+   * (e.g. system:colour-mapping:reference for MusicalVisualVocabulary).
+   *
+   * The manifest's per-macro `consumers[]` declares which loop
+   * catches each id — a build-time validator + runtime coverage
+   * test keep declaration and implementation in lockstep.
    */
   setMacro(name: string, value: number | string): void {
     // Grammar dispatch.
@@ -175,20 +176,18 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       );
       for (const grammar of this.grammars) {
         if (grammar.id === `${scope}-grammar` || grammar.id === scope) {
-          const g = grammar as unknown as {
-            setMacros?: (m: Record<string, number | string>) => void;
-          };
-          g.setMacros?.({ [paramCamel]: value });
+          grammar.setMacros?.({ [paramCamel]: value });
         }
       }
     }
-    // Stabilizer dispatch — every stabilizer in every partState gets
-    // a chance. They filter by name internally.
+    // Stabilizer dispatch.
     for (const state of this.partStates.values()) {
       for (const stabilizer of state.stabilizers) {
         stabilizer.setMacro?.(name, value);
       }
     }
+    // Vocab dispatch.
+    this.vocabulary?.setMacro?.(name, value);
   }
 
   /**
