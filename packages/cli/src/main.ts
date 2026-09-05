@@ -43,19 +43,53 @@ async function runStart(options: StartOptions): Promise<number> {
   const instanceLabel = options.instance ?? "default";
   writeErr(`starting synesthetica (instance=${instanceLabel})`);
 
-  const shutdownTasks: Array<() => Promise<void>> = [];
+  interface ShutdownTask {
+    name: string;
+    run: () => Promise<void>;
+  }
+  const shutdownTasks: ShutdownTask[] = [];
   let shuttingDown = false;
+
+  // Hard ceiling on shutdown: even if a task hangs, the process
+  // exits within FORCE_EXIT_MS. Intermittent hangs (synesthetica-cip)
+  // were traced to WS + Vite subprocess teardown occasionally
+  // blocking on open connections that never drop. Per-task timing
+  // logs make the culprit visible next time; the force-exit
+  // guarantee keeps the CLI responsive to Ctrl-C either way.
+  const FORCE_EXIT_MS = 5_000;
+
   const shutdown = async (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
     writeErr(`\nreceived ${signal}, shutting down...`);
+
+    // Arm the force-exit fallback BEFORE we start awaiting tasks.
+    // If we don't reach process.exit(0) below within FORCE_EXIT_MS,
+    // this fires and exits with a distinct code for observability.
+    const forceExitTimer = setTimeout(() => {
+      writeErr(
+        `shutdown exceeded ${FORCE_EXIT_MS}ms — forcing exit. Check logs for the task that hung.`,
+      );
+      process.exit(2);
+    }, FORCE_EXIT_MS);
+    // Don't let the fallback timer itself keep the process alive
+    // if all real work finished quickly.
+    forceExitTimer.unref();
+
     for (const task of shutdownTasks) {
+      const t0 = Date.now();
       try {
-        await task();
+        await task.run();
+        const dt = Date.now() - t0;
+        writeErr(`  ✓ ${task.name} (${dt}ms)`);
       } catch (e) {
-        writeErr(`shutdown task failed: ${e instanceof Error ? e.message : e}`);
+        const dt = Date.now() - t0;
+        writeErr(
+          `  ✗ ${task.name} (${dt}ms): ${e instanceof Error ? e.message : e}`,
+        );
       }
     }
+    clearTimeout(forceExitTimer);
     process.exit(0);
   };
   process.on("SIGINT", () => void shutdown("SIGINT"));
@@ -68,7 +102,7 @@ async function runStart(options: StartOptions): Promise<number> {
       port: options.wsPort,
       log: (line) => writeErr(line),
     });
-    shutdownTasks.push(() => bridge.close());
+    shutdownTasks.push({ name: "engine bridge (WS)", run: () => bridge.close() });
     writeErr(`engine bridge listening on ws://localhost:${bridge.port}`);
   } catch (err) {
     writeErr(`error starting engine bridge: ${err instanceof Error ? err.message : String(err)}`);
@@ -83,7 +117,7 @@ async function runStart(options: StartOptions): Promise<number> {
     webApp = await spawnWebApp({
       port: options.webAppPort ?? undefined,
     });
-    shutdownTasks.push(() => webApp.close());
+    shutdownTasks.push({ name: `web app (${webApp.mode})`, run: () => webApp.close() });
     const openUrl =
       webApp.url +
       `?ws-port=${bridge.port}&instance=${encodeURIComponent(instanceLabel)}`;
@@ -130,7 +164,7 @@ async function runStart(options: StartOptions): Promise<number> {
       options.transport,
       options.port,
     );
-    shutdownTasks.push(() => server.close());
+    shutdownTasks.push({ name: "MCP server", run: () => server.close() });
 
     writeErr(`MCP server ready on ${options.transport}`);
     await new Promise<void>(() => {

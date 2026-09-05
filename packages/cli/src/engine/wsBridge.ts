@@ -183,6 +183,19 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
     },
     async close() {
       for (const handle of handles.values()) handle.markClosed();
+      // wss.close() waits for open connections to drain — the
+      // browser tab may still be holding a socket, and Chrome's
+      // teardown of the WS on tab-close isn't instantaneous. Force
+      // any lingering sockets closed FIRST so wss.close resolves
+      // promptly. Fix for synesthetica-cip (intermittent hang on
+      // SIGINT).
+      for (const client of wss.clients) {
+        try {
+          client.terminate();
+        } catch {
+          // best-effort
+        }
+      }
       await new Promise<void>((resolve) => {
         wss.close(() => resolve());
       });
