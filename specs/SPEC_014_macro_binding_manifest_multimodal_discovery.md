@@ -96,7 +96,7 @@ The manifest at `productionManifest` is the sole source. Every derived surface r
 | MCP `tools/list` descriptions | `productionManifest.tools[i].description` | Applied in `buildToolRegistry` (overrides code default) |
 | Composed `guide://system-overview` prompt | Authored `system-overview.md` + generated sections per category | Composed at prompt-fetch time |
 | UI panel widgets | `productionManifest.macros + sessionControls` | `generatePanel(manifest)` at web-app startup |
-| UI panel widget hover-help | Per-widget `notes[0]` | `generatePanel` copies into descriptor |
+| UI panel widget hover-help | Per-widget `notes[]` (all paragraphs) | `generatePanel` copies into descriptor; renderer emits one `<p>` per note |
 | UI About panel appendices | `productionManifest.grammars + concepts` | Rendered at panel-open |
 
 A change to a macro's `directionality` or `notes` in the manifest flows to widget hover-help, the LLM primer, every per-URI resource read, and the annotations bundle in one build. No manual sync anywhere.
@@ -131,7 +131,7 @@ Per-item `annotations://` reads remain available for on-demand precision (e.g. w
 **Widgets (interactive control surface):**
 - `generatePanel(manifest)` reads `manifest.macros + manifest.sessionControls`.
 - Tools, concepts, grammars, resources, presets are DELIBERATELY excluded. The generator's input type (`ManifestForPanel`) accepts only macros + sessionControls, so misuse is a type error, not a runtime bug.
-- Each widget renders label + control + `?` hover-help (from `notes[0]`).
+- Each widget renders label + control + `?` hover-help. The help popover concatenates every entry in `notes[]` as a separate paragraph (plus low/high endpoint prose for sliders).
 
 **About panel (reference material):**
 - Authored `system-overview.md` prose (the LLM's narrative, useful for humans too).
@@ -160,7 +160,6 @@ Called out here rather than glossed over — the spec matches reality including 
 - **Vocabulary-owned macros** (`system:colour-mapping:reference`): `set_macro` writes state but `MusicalVisualVocabulary` doesn't yet accept macro updates. `set_hue_for_pitch` is the working path today (computes the reference hue server-side and calls `setHueForPitch` on the vocab).
 - **`rhythm:emphasis` targets `rhythm:pulse-intensity` + `rhythm:reference-linger`**: both wired end-to-end since commit `b96cb90`. Compound curves are linear defaults.
 - **Stabilizer macros beyond ChordDetectionStabilizer**: no other stabilizer implements `setMacro` today. Add ones as macros land.
-- **Input-source enumeration (`inputs://available`)**: shipped as `inputs://`. Per-device audio enumeration is follow-up work (synesthetica-l0v).
 
 ## 5. Verification
 
@@ -172,7 +171,7 @@ A macro is correctly wired iff:
 4. If it has a grammar consumer: the grammar's `setMacros` accepts the camelCase key.
 5. If it has a stabilizer consumer: the stabilizer's `setMacro` recognises the qualified id.
 6. The composed `guide://system-overview` prompt includes it in the appropriate section (## Macros | ## Session controls).
-7. If it's a session control or macro: the UI panel renders a widget for it (with hover-help from `notes[0]`).
+7. If it's a session control or macro: the UI panel renders a widget for it (with hover-help concatenating every `notes[]` entry).
 
 Build-time validation (synesthetica-5l9) will assert (1) and part of (6). Runtime verification for (3)–(5) is covered by tests in `packages/cli/test/macroTools.test.ts` and `packages/engine/test/VisualPipeline.test.ts`. Manual verification for the composed prompt and the UI panel happens via the live-smoke command (`npm run start`).
 

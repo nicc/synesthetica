@@ -76,7 +76,7 @@ export function createTestMusicalFrame(
 const NEUTRAL_VISUAL: VisualAnnotation = {
   palette: { id: "neutral", primary: { h: 0, s: 0, v: 0.5, a: 1 } },
   texture: { id: "neutral", grain: 0, smoothness: 1, density: 0 },
-  motion: { jitter: 0, pulse: 0, flow: 0 },
+  motion: { jitter: 0, pulse: 0 },
   uncertainty: 0,
 };
 

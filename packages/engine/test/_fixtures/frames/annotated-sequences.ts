@@ -76,19 +76,16 @@ const grainTexture: TextureRef = {
 const stableMotion: MotionAnnotation = {
   jitter: 0.05,
   pulse: 0.3,
-  flow: 0.1,
 };
 
 const activeMotion: MotionAnnotation = {
   jitter: 0.1,
   pulse: 0.6,
-  flow: 0.3,
 };
 
 const decayingMotion: MotionAnnotation = {
   jitter: 0.15,
   pulse: 0.2,
-  flow: -0.2,
 };
 
 // ============================================================================
@@ -284,7 +281,7 @@ export const frame1: AnnotatedMusicalFrame = {
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
-      motion: { jitter: 0, pulse: 0.6, flow: 0 },
+      motion: { jitter: 0, pulse: 0.6 },
       uncertainty: 0.1,
     },
   },
@@ -361,7 +358,7 @@ export const frame2: AnnotatedMusicalFrame = {
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
-      motion: { jitter: 0, pulse: 0.6, flow: 0 },
+      motion: { jitter: 0, pulse: 0.6 },
       uncertainty: 0.1,
     },
   },
@@ -475,7 +472,7 @@ export const frame3: AnnotatedMusicalFrame = {
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
-      motion: { jitter: 0, pulse: 0.6, flow: 0 },
+      motion: { jitter: 0, pulse: 0.6 },
       uncertainty: 0.1,
     },
   },
@@ -488,7 +485,7 @@ export const frame3: AnnotatedMusicalFrame = {
       visual: {
         palette: neutralPalette,
         texture: smoothTexture,
-        motion: { jitter: 0, pulse: 0.8, flow: 0 },
+        motion: { jitter: 0, pulse: 0.8 },
         uncertainty: 0.1,
       },
     },
@@ -563,7 +560,7 @@ export const frame4: AnnotatedMusicalFrame = {
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
-      motion: { jitter: 0, pulse: 0.6, flow: 0 },
+      motion: { jitter: 0, pulse: 0.6 },
       uncertainty: 0.1,
     },
   },
@@ -640,7 +637,7 @@ export const frame5: AnnotatedMusicalFrame = {
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
-      motion: { jitter: 0, pulse: 0.6, flow: 0 },
+      motion: { jitter: 0, pulse: 0.6 },
       uncertainty: 0.1,
     },
   },

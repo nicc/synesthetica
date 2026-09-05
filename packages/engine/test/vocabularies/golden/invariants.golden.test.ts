@@ -322,10 +322,6 @@ describe("Invariant: Note phase → motion mapping", () => {
       // Pulse should be [0, 1]
       expect(annotated!.visual.motion.pulse).toBeGreaterThanOrEqual(0);
       expect(annotated!.visual.motion.pulse).toBeLessThanOrEqual(1);
-
-      // Flow should be [-1, 1]
-      expect(annotated!.visual.motion.flow).toBeGreaterThanOrEqual(-1);
-      expect(annotated!.visual.motion.flow).toBeLessThanOrEqual(1);
     }
   });
 });

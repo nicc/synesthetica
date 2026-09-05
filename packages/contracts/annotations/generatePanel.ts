@@ -104,7 +104,7 @@ function macroWidget(m: MacroAnnotation): WidgetDescriptor {
   const base = {
     id: m.id,
     label: m.name ?? m.id,
-    tooltip: m.notes?.[0],
+    tooltip: m.notes,
     aliases: m.aliases ?? [],
   };
   switch (m.type) {
@@ -166,7 +166,7 @@ function sessionWidget(
   const base = {
     id: s.id,
     label: s.name ?? s.id,
-    tooltip: s.notes?.[0],
+    tooltip: s.notes,
     aliases: s.aliases ?? [],
   };
   switch (s.type) {
@@ -250,7 +250,7 @@ function pairWidget(
   return {
     id: s.id,
     label: s.name ?? s.id,
-    tooltip: s.notes?.[0],
+    tooltip: s.notes,
     aliases: s.aliases ?? [],
     kind: "pair",
     children: [sessionWidget(a, index), sessionWidget(b, index)],
@@ -316,6 +316,6 @@ function scopeTitle(scope: string): string {
 type WidgetBase = {
   id: string;
   label: string;
-  tooltip?: string;
+  tooltip?: string[];
   aliases: string[];
 };

@@ -229,9 +229,8 @@ export class TestChordProgressionGrammar implements IVisualGrammar {
     const pulseAmount = visual.motion.pulse * 20;
     const size = baseSize + pulseAmount * Math.sin(t / 200);
 
-    // Opacity based on phase and flow
-    let opacity = isDecaying ? 0.5 : 0.8;
-    opacity += visual.motion.flow * 0.1;
+    // Opacity based on phase.
+    const opacity = isDecaying ? 0.5 : 0.8;
 
     // Apply uncertainty as slight color variation
     const color = { ...visual.palette.primary };

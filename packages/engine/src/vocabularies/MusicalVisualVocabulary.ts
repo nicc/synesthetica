@@ -15,7 +15,7 @@
  * - Velocity → Brightness
  * - Chord quality → Warm (major) / Cool (minor) palettes
  * - Note phase → Motion jitter and texture smoothness
- * - Dynamics → Motion pulse and flow
+ * - Dynamics → Motion pulse
  *
  * NOTE: These mappings are provisional. See docs/vocabulary/semantic-mappings-v1.md
  * for analysis and open questions about the complete visual vocabulary.
@@ -214,7 +214,6 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     const motion: MotionAnnotation = {
       jitter: chord.phase === "active" ? 0.05 : 0.15,
       pulse: chord.phase === "active" ? 0.6 : 0.2,
-      flow: chord.phase === "active" ? 0.2 : -0.2,
     };
 
     // Build chord shape geometry (Invariant I18). Pass the bass so the
@@ -272,13 +271,6 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     const motion: MotionAnnotation = {
       jitter: 0.05,
       pulse: dynamics.level,
-      // `flow` was previously derived from dynamics.trend (rising →
-      // 0.3, falling → -0.3, stable → 0). trend was removed from the
-      // DynamicsState contract on 2026-09-05 (dead signal — no
-      // production grammar consumed motion.flow). Zero is the
-      // no-directional-cue default until a future grammar wants a
-      // dynamics-motion signal.
-      flow: 0,
     };
 
     return {
@@ -330,19 +322,16 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
         return {
           jitter: 0.1,
           pulse: basePulse,
-          flow: 0.3,
         };
       case "sustain":
         return {
           jitter: 0.05,
           pulse: basePulse * 0.3,
-          flow: 0.1,
         };
       case "release":
         return {
           jitter: 0.15,
           pulse: basePulse * 0.2,
-          flow: -0.2,
         };
     }
   }

@@ -68,7 +68,7 @@ function createTestFrame(
         primary: { h: (n.pc * 30) % 360, s: 0.7, v: 0.9, a: 1 },
       },
       texture: { id: "smooth", grain: 0.1, smoothness: 0.9, density: 0.5 },
-      motion: { jitter: 0.05, pulse: 0.3, flow: 0.1 },
+      motion: { jitter: 0.05, pulse: 0.3 },
       uncertainty: 0,
       label: `Note-${n.pc}`,
     },

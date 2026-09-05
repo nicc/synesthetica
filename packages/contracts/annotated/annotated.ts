@@ -74,8 +74,6 @@ export interface MotionAnnotation {
   jitter: number;
   /** Pulsing intensity for rhythmic elements (0-1) */
   pulse: number;
-  /** Flow direction/intensity (-1 = contracting, 0 = stable, 1 = expanding) */
-  flow: number;
 }
 
 /**

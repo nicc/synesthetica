@@ -243,24 +243,25 @@ function widgetShell(w: WidgetDescriptor): HTMLElement {
 }
 
 /**
- * Build the DOM body for the hover-help panel. Combines the widget's
- * primary tooltip (from annotation `notes[0]`) with slider endpoint
+ * Build the DOM body for the hover-help panel. Combines every
+ * annotation `notes[]` entry (one <p> each) with slider endpoint
  * hints (from directionality). Returns null when the widget has
  * nothing to say — the `?` icon is omitted in that case.
  */
 function buildHelpBody(w: WidgetDescriptor): HTMLElement | null {
-  const hasTooltip = Boolean(w.tooltip);
+  const notes = w.tooltip ?? [];
+  const hasNotes = notes.length > 0;
   const hasEndpoints =
     w.kind === "slider" && Boolean((w as SliderWidgetDescriptor).low || (w as SliderWidgetDescriptor).high);
-  if (!hasTooltip && !hasEndpoints) return null;
+  if (!hasNotes && !hasEndpoints) return null;
 
   const body = document.createElement("div");
   body.className = "syn-panel-widget-help-body";
 
-  if (hasTooltip) {
+  for (const note of notes) {
     const p = document.createElement("p");
     p.className = "syn-panel-widget-help-tooltip";
-    p.textContent = w.tooltip!;
+    p.textContent = note;
     body.appendChild(p);
   }
   if (hasEndpoints) {

@@ -82,7 +82,7 @@ function createTestChord(
         primary: { h: 0, s: 0.7, v: 0.85, a: 1 },
       },
       texture: { id: "chord", grain: 0.2, smoothness: 0.8, density: 0.5 },
-      motion: { jitter: 0.05, pulse: 0.6, flow: 0.2 },
+      motion: { jitter: 0.05, pulse: 0.6 },
       uncertainty: 0,
     },
     noteIds: chord.noteIds,
