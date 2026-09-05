@@ -210,6 +210,30 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     this.config = { ...this.config, ...patch };
   }
 
+  /**
+   * Manifest-macro binding. VisualPipeline calls this for every
+   * stabilizer on every set_macro dispatch; we translate the three
+   * harmony:* macros we own to setConfig fields and ignore others.
+   *
+   * Bindings:
+   *   harmony:arpeggio-tolerance  → pitchDecayMs
+   *   harmony:note-threshold      → minPitchClasses
+   *   harmony:detection-stability → hysteresisMs
+   */
+  setMacro(name: string, value: number | string): void {
+    switch (name) {
+      case "harmony:arpeggio-tolerance":
+        this.setConfig({ pitchDecayMs: Number(value) });
+        return;
+      case "harmony:note-threshold":
+        this.setConfig({ minPitchClasses: Number(value) });
+        return;
+      case "harmony:detection-stability":
+        this.setConfig({ hysteresisMs: Number(value) });
+        return;
+    }
+  }
+
   getConfig(): Required<ChordDetectionConfig> {
     return { ...this.config };
   }

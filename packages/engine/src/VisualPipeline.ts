@@ -145,41 +145,48 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
   }
 
   /**
-   * Route a manifest macro (id + value) to whichever grammar owns it.
+   * Route a manifest macro (id + value) to every consumer that
+   * declares interest — grammars AND stabilizers.
    *
-   * Names are scope-prefixed: `<grammarId>:<param>`. The grammar id
-   * matches the prefix of the grammar constant that consumes the
-   * param — `rhythm:*` routes to RhythmGrammar, `harmony:*` to
-   * HarmonyGrammar, `dynamics:*` to DynamicsGrammar.
+   * Grammar routing: scope-prefixed name (`<scope>:<param>`) picks a
+   * grammar whose id is `${scope}-grammar` or `${scope}`. The param
+   * is kebab→camelCased and passed to grammar.setMacros(). Grammars
+   * ignore keys they don't own.
    *
-   * The param name is converted from kebab-case to camelCase (e.g.
-   * `rhythm:pulse-intensity` → `{ pulseIntensity: value }`) and passed
-   * to `grammar.setMacros(...)`. Grammars ignore keys they don't own.
+   * Stabilizer routing: pipeline invokes setMacro(name, value) on
+   * every stabilizer across every partState. Stabilizers translate
+   * qualified macro ids to their internal config fields directly
+   * (see e.g. ChordDetectionStabilizer.setMacro for harmony:* macros
+   * that map to pitchDecayMs / minPitchClasses / hysteresisMs).
+   * Stabilizers ignore names they don't own.
    *
-   * Bare (unscoped) and `system:*` macros aren't grammar-owned; they
-   * flow to the vocabulary or land elsewhere in the pipeline. The
-   * router silently drops names it can't map — caller is responsible
-   * for schema-side validation.
+   * Bare (unscoped) and `system:*` macros aren't grammar-owned
+   * today; they flow through both loops and no-op. Vocabulary
+   * routing lands in a later chunk.
    */
   setMacro(name: string, value: number | string): void {
+    // Grammar dispatch.
     const colon = name.indexOf(":");
-    if (colon < 0) return;
-    const scope = name.slice(0, colon);
-    const paramKebab = name.slice(colon + 1);
-    // If the param itself contains further colons (e.g.
-    // "system:colour-mapping:reference"), the tail becomes the param
-    // to camelCase — but system-scope isn't grammar-owned, so it exits
-    // via the grammar loop as a no-op. Vocabulary routing lands in a
-    // later chunk.
-    const paramCamel = paramKebab.replace(/-([a-z])/g, (_, c: string) =>
-      c.toUpperCase(),
-    );
-    for (const grammar of this.grammars) {
-      if (grammar.id === `${scope}-grammar` || grammar.id === scope) {
-        const g = grammar as unknown as {
-          setMacros?: (m: Record<string, number | string>) => void;
-        };
-        g.setMacros?.({ [paramCamel]: value });
+    if (colon >= 0) {
+      const scope = name.slice(0, colon);
+      const paramKebab = name.slice(colon + 1);
+      const paramCamel = paramKebab.replace(/-([a-z])/g, (_, c: string) =>
+        c.toUpperCase(),
+      );
+      for (const grammar of this.grammars) {
+        if (grammar.id === `${scope}-grammar` || grammar.id === scope) {
+          const g = grammar as unknown as {
+            setMacros?: (m: Record<string, number | string>) => void;
+          };
+          g.setMacros?.({ [paramCamel]: value });
+        }
+      }
+    }
+    // Stabilizer dispatch — every stabilizer in every partState gets
+    // a chance. They filter by name internally.
+    for (const state of this.partStates.values()) {
+      for (const stabilizer of state.stabilizers) {
+        stabilizer.setMacro?.(name, value);
       }
     }
   }

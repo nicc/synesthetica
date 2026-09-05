@@ -82,6 +82,19 @@ export interface IMusicalStabilizer {
    * Reset internal state (e.g., on session restart or part reassignment).
    */
   reset(): void;
+
+  /**
+   * Optional: apply a manifest macro to this stabilizer's runtime
+   * config. Called by the pipeline for every stabilizer on every
+   * set_macro dispatch; stabilizers that don't own the given macro
+   * ignore it silently.
+   *
+   * Stabilizers own scope-prefixed macros (harmony:*, rhythm:*)
+   * whose parameters live on the stabilizer side of the pipeline
+   * rather than the grammar side — e.g. harmony:arpeggio-tolerance
+   * maps to ChordDetectionStabilizer.pitchDecayMs.
+   */
+  setMacro?(name: string, value: number | string): void;
 }
 
 // ============================================================================

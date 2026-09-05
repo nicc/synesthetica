@@ -330,5 +330,39 @@ describe("VisualPipeline", () => {
       pipeline.setMacro("harmony:linger", 4);
       expect(rhythm.getMacros()).toEqual(before);
     });
+
+    it("routes harmony:* stabilizer macros to ChordDetectionStabilizer.setConfig", async () => {
+      // Import + wire the stabilizer via addStabilizerFactory so the
+      // pipeline instantiates it into a partState we can then hit
+      // with setMacro.
+      const { ChordDetectionStabilizer } = await import(
+        "../src/stabilizers/ChordDetectionStabilizer"
+      );
+      pipeline.addAdapter(adapter);
+      pipeline.addStabilizerFactory(
+        () => new ChordDetectionStabilizer({ partId: "test-part" }),
+      );
+      // Force part-state creation by requesting a frame.
+      pipeline.requestFrame(0);
+
+      pipeline.setMacro("harmony:arpeggio-tolerance", 1200);
+      pipeline.setMacro("harmony:note-threshold", 4);
+      pipeline.setMacro("harmony:detection-stability", 150);
+
+      // Reach into the pipeline's part state to inspect the
+      // stabilizer's config directly.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const partStates = (pipeline as any).partStates as Map<string, { stabilizers: Array<{ id: string; getConfig?: () => Record<string, unknown> }> }>;
+      const state = partStates.get("test-part");
+      const chord = state?.stabilizers.find((s) => s.id === "chord-detection");
+      const cfg = chord?.getConfig?.() as {
+        pitchDecayMs: number;
+        minPitchClasses: number;
+        hysteresisMs: number;
+      };
+      expect(cfg.pitchDecayMs).toBe(1200);
+      expect(cfg.minPitchClasses).toBe(4);
+      expect(cfg.hysteresisMs).toBe(150);
+    });
   });
 });
