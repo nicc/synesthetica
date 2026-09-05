@@ -23,7 +23,6 @@ function createTestFrame(t: number, dynamics: DynamicsState) {
 const EMPTY_DYNAMICS: DynamicsState = {
   events: [],
   level: 0,
-  trend: "stable",
   contour: [],
   range: { min: 0, max: 0, variance: 0 },
 };
@@ -126,7 +125,6 @@ describe("DynamicsGrammar", () => {
           { t: 900, intensity: 0.7 },
         ],
         level: 0.7,
-        trend: "stable",
         contour: [
           { t: 800, level: 0.5 },
           { t: 900, level: 0.7 },
@@ -147,7 +145,6 @@ describe("DynamicsGrammar", () => {
           { t: 2000, intensity: 0.7 },
         ],
         level: 0.7,
-        trend: "stable",
         contour: [
           { t: 100, level: 0.5 },
           { t: 2000, level: 0.7 },

@@ -190,12 +190,9 @@ function createAnnotatedChord(
   };
 }
 
-function createDynamics(
-  level: number,
-  trend: "rising" | "falling" | "stable"
-): AnnotatedDynamics {
+function createDynamics(level: number): AnnotatedDynamics {
   return {
-    dynamics: { level, trend },
+    dynamics: { level },
     visual: {
       palette: neutralPalette,
       texture: smoothTexture,
@@ -295,7 +292,7 @@ export const frame1: AnnotatedMusicalFrame = {
   prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
   bars: [],
   phrases: [],
-  dynamics: createDynamics(0.7, "rising"),
+  dynamics: createDynamics(0.7),
 };
 
 /**
@@ -372,7 +369,7 @@ export const frame2: AnnotatedMusicalFrame = {
   prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
   bars: [],
   phrases: [],
-  dynamics: createDynamics(0.65, "stable"),
+  dynamics: createDynamics(0.65),
 };
 
 /**
@@ -497,7 +494,7 @@ export const frame3: AnnotatedMusicalFrame = {
     },
   ],
   phrases: [],
-  dynamics: createDynamics(0.6, "falling"),
+  dynamics: createDynamics(0.6),
 };
 
 /**
@@ -574,7 +571,7 @@ export const frame4: AnnotatedMusicalFrame = {
   prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
   bars: [],
   phrases: [],
-  dynamics: createDynamics(0.55, "stable"),
+  dynamics: createDynamics(0.55),
 };
 
 /**
@@ -651,7 +648,7 @@ export const frame5: AnnotatedMusicalFrame = {
   prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
   bars: [],
   phrases: [],
-  dynamics: createDynamics(0.3, "falling"),
+  dynamics: createDynamics(0.3),
 };
 
 /**

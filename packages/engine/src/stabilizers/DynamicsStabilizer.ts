@@ -36,18 +36,10 @@ export interface DynamicsStabilizerConfig {
 
   /** Window duration for event and contour history. @default 8000 */
   windowMs?: Ms;
-
-  /** Window for trend linear regression. @default 1000 */
-  trendWindowMs?: Ms;
-
-  /** Slope threshold below which trend is "stable". @default 0.1 */
-  trendDeadZone?: number;
 }
 
 const DEFAULT_CONFIG = {
   windowMs: 8000,
-  trendWindowMs: 1000,
-  trendDeadZone: 0.1,
 } as const;
 
 export class DynamicsStabilizer implements IMusicalStabilizer {
@@ -94,13 +86,11 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
     this.prune(t);
 
     // Compute aggregates
-    const trend = this.computeTrend();
     const range = this.computeRange();
 
     const dynamics: DynamicsState = {
       events: [...this.events],
       level: this.currentLevel,
-      trend,
       contour: [...this.contour],
       range,
     };
@@ -174,41 +164,6 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
     if (this.processedOnsets.size > 200) {
       this.processedOnsets.clear();
     }
-  }
-
-  private computeTrend(): DynamicsState["trend"] {
-    const windowMs = this.config.trendWindowMs;
-    const deadZone = this.config.trendDeadZone;
-
-    // Need at least 2 contour points in the trend window
-    const recentContour = this.contour.filter(
-      (p) => this.contour.length > 0 &&
-        p.t >= this.contour[this.contour.length - 1].t - windowMs
-    );
-
-    if (recentContour.length < 2) return "stable";
-
-    // Linear regression: slope of level over time
-    const n = recentContour.length;
-    let sumT = 0, sumL = 0, sumTL = 0, sumT2 = 0;
-    const t0 = recentContour[0].t;
-
-    for (const p of recentContour) {
-      const dt = (p.t - t0) / 1000; // seconds for interpretable slope
-      sumT += dt;
-      sumL += p.level;
-      sumTL += dt * p.level;
-      sumT2 += dt * dt;
-    }
-
-    const denom = n * sumT2 - sumT * sumT;
-    if (Math.abs(denom) < 1e-10) return "stable";
-
-    const slope = (n * sumTL - sumT * sumL) / denom;
-
-    if (slope > deadZone) return "rising";
-    if (slope < -deadZone) return "falling";
-    return "stable";
   }
 
   private computeRange(): DynamicsRange {

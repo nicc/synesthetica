@@ -35,8 +35,6 @@ describe("DynamicsStabilizer", () => {
     dynamics = new DynamicsStabilizer({
       partId: "test-part",
       windowMs: 8000,
-      trendWindowMs: 1000,
-      trendDeadZone: 0.1,
     });
     dynamics.init();
   });
@@ -172,39 +170,8 @@ describe("DynamicsStabilizer", () => {
     });
   });
 
-  describe("trend detection", () => {
-    it("reports stable when insufficient data", () => {
-      const result = applyBoth(makeFrame(100, [noteOn(60, 100, 100)]));
-      expect(result.dynamics.trend).toBe("stable");
-    });
-
-    it("detects rising dynamics", () => {
-      applyBoth(makeFrame(100, [noteOn(60, 30, 100)]));
-      applyBoth(makeFrame(300, [noteOn(62, 60, 300)]));
-      applyBoth(makeFrame(500, [noteOn(64, 90, 500)]));
-      const result = applyBoth(makeFrame(700, [noteOn(65, 127, 700)]));
-
-      expect(result.dynamics.trend).toBe("rising");
-    });
-
-    it("detects falling dynamics", () => {
-      applyBoth(makeFrame(100, [noteOn(60, 127, 100)]));
-      applyBoth(makeFrame(300, [noteOn(62, 90, 300)]));
-      applyBoth(makeFrame(500, [noteOn(64, 50, 500)]));
-      const result = applyBoth(makeFrame(700, [noteOn(65, 20, 700)]));
-
-      expect(result.dynamics.trend).toBe("falling");
-    });
-
-    it("reports stable for consistent dynamics", () => {
-      applyBoth(makeFrame(100, [noteOn(60, 80, 100)]));
-      applyBoth(makeFrame(300, [noteOn(62, 80, 300)]));
-      applyBoth(makeFrame(500, [noteOn(64, 80, 500)]));
-      const result = applyBoth(makeFrame(700, [noteOn(65, 80, 700)]));
-
-      expect(result.dynamics.trend).toBe("stable");
-    });
-  });
+  // Trend detection block removed on 2026-09-05 with the
+  // dynamics.trend field. Nothing in production consumed it.
 
   describe("dynamic range", () => {
     it("computes min and max from event intensities", () => {

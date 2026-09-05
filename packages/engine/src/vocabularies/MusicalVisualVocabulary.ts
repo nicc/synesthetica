@@ -272,12 +272,13 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     const motion: MotionAnnotation = {
       jitter: 0.05,
       pulse: dynamics.level,
-      flow:
-        dynamics.trend === "rising"
-          ? 0.3
-          : dynamics.trend === "falling"
-            ? -0.3
-            : 0,
+      // `flow` was previously derived from dynamics.trend (rising →
+      // 0.3, falling → -0.3, stable → 0). trend was removed from the
+      // DynamicsState contract on 2026-09-05 (dead signal — no
+      // production grammar consumed motion.flow). Zero is the
+      // no-directional-cue default until a future grammar wants a
+      // dynamics-motion signal.
+      flow: 0,
     };
 
     return {

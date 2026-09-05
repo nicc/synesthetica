@@ -720,6 +720,19 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
     };
   }
 
+  /**
+   * Computed but currently unconsumed by any production grammar —
+   * the visual renderer has an `updateTensionBar` handler waiting
+   * for a producer. Both sides get wired together in
+   * synesthetica-xc0 (harmony grammar extension: tension from
+   * functional harmony).
+   *
+   * How tension is derived may change with that work — the current
+   * dissonanceAlgorithm-of-active-chord approach was scaffolding;
+   * the xc0 extension will consider progression context (modal
+   * interchange arcs, dominant→tonic pulls, unresolved leading
+   * tones) rather than just the active chord's dissonance.
+   */
   private computeTension(chords: MusicalChord[]): number {
     if (chords.length === 0) return 0;
     const activeChord =

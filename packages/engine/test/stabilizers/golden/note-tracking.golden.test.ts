@@ -30,7 +30,7 @@ interface ExpectedNote {
 interface ExpectedOutput {
   noteCount: number;
   notes: ExpectedNote[];
-  dynamics: { level: number; trend: string };
+  dynamics: { level: number };
 }
 
 type StabilizerSequenceFixture = SequenceFixture<RawInputFrame, ExpectedOutput>;

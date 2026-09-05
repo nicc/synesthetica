@@ -198,7 +198,7 @@ export interface DynamicsRange {
  *
  * Separates constituents (raw observations) from aggregates (derived summaries).
  * Constituents are the individual velocity events; aggregates are smoothed level,
- * trend, contour history, and dynamic range.
+ * contour history, and dynamic range.
  *
  * The phrasing stabiliser downstream can consume both constituents and aggregates
  * to segment dynamics by phrase boundaries.
@@ -211,8 +211,6 @@ export interface DynamicsState {
   // --- Aggregates: derived from events ---
   /** Current dynamics level (max intensity of most recent onset), 0–1 */
   level: number;
-  /** Current trend direction over recent window */
-  trend: "rising" | "falling" | "stable";
   /** Level history, oldest first. One point per distinct onset time. */
   contour: DynamicsContourPoint[];
   /** Dynamic range within the contour window */
@@ -519,7 +517,6 @@ function pitchClassName(pc: PitchClass): string {
 export const EMPTY_DYNAMICS: Readonly<DynamicsState> = Object.freeze({
   events: [],
   level: 0,
-  trend: "stable" as const,
   contour: [],
   range: Object.freeze({ min: 0, max: 0, variance: 0 }),
 });

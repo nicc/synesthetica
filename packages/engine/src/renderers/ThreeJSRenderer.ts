@@ -1457,6 +1457,14 @@ export class ThreeJSRenderer implements IRenderer {
 
   /**
    * Render a tension bar.
+   *
+   * Currently no grammar emits 'tension-bar' entities — the handler
+   * exists ready for the harmony grammar's tension extension to
+   * light up. Producer + shape decisions live in
+   * synesthetica-xc0 (harmony grammar extension: tension from
+   * functional harmony); it will draw on the tension value already
+   * computed by HarmonyStabilizer.computeTension (also cross-
+   * referenced there).
    */
   private updateTensionBar(entity: Entity): void {
     if (!this.scene) return;

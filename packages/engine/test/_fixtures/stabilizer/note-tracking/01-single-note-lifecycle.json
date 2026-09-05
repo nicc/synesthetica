@@ -1,6 +1,6 @@
 {
   "name": "single-note-lifecycle",
-  "description": "Single note through attack → sustain → release → expiration",
+  "description": "Single note through attack \u2192 sustain \u2192 release \u2192 expiration",
   "config": {
     "partId": "default",
     "attackDurationMs": 50,
@@ -14,15 +14,30 @@
         "source": "midi",
         "stream": "test",
         "inputs": [
-          { "type": "midi_note_on", "t": 0, "note": 60, "velocity": 100, "channel": 0 }
+          {
+            "type": "midi_note_on",
+            "t": 0,
+            "note": 60,
+            "velocity": 100,
+            "channel": 0
+          }
         ]
       },
       "expected": {
         "noteCount": 1,
         "notes": [
-          { "pitch": { "pc": 0, "octave": 4 }, "phase": "attack", "velocity": 100 }
+          {
+            "pitch": {
+              "pc": 0,
+              "octave": 4
+            },
+            "phase": "attack",
+            "velocity": 100
+          }
         ],
-        "dynamics": { "level": 0.7874015748031497, "trend": "stable" }
+        "dynamics": {
+          "level": 0.7874015748031497
+        }
       }
     },
     {
@@ -36,9 +51,18 @@
       "expected": {
         "noteCount": 1,
         "notes": [
-          { "pitch": { "pc": 0, "octave": 4 }, "phase": "attack", "velocity": 100 }
+          {
+            "pitch": {
+              "pc": 0,
+              "octave": 4
+            },
+            "phase": "attack",
+            "velocity": 100
+          }
         ],
-        "dynamics": { "level": 0.7874015748031497, "trend": "stable" }
+        "dynamics": {
+          "level": 0.7874015748031497
+        }
       }
     },
     {
@@ -52,9 +76,18 @@
       "expected": {
         "noteCount": 1,
         "notes": [
-          { "pitch": { "pc": 0, "octave": 4 }, "phase": "sustain", "velocity": 100 }
+          {
+            "pitch": {
+              "pc": 0,
+              "octave": 4
+            },
+            "phase": "sustain",
+            "velocity": 100
+          }
         ],
-        "dynamics": { "level": 0.7874015748031497, "trend": "stable" }
+        "dynamics": {
+          "level": 0.7874015748031497
+        }
       }
     },
     {
@@ -64,15 +97,29 @@
         "source": "midi",
         "stream": "test",
         "inputs": [
-          { "type": "midi_note_off", "t": 200, "note": 60, "channel": 0 }
+          {
+            "type": "midi_note_off",
+            "t": 200,
+            "note": 60,
+            "channel": 0
+          }
         ]
       },
       "expected": {
         "noteCount": 1,
         "notes": [
-          { "pitch": { "pc": 0, "octave": 4 }, "phase": "release", "velocity": 100 }
+          {
+            "pitch": {
+              "pc": 0,
+              "octave": 4
+            },
+            "phase": "release",
+            "velocity": 100
+          }
         ],
-        "dynamics": { "level": 0.23622047244094488, "trend": "stable" }
+        "dynamics": {
+          "level": 0.23622047244094488
+        }
       }
     },
     {
@@ -86,9 +133,18 @@
       "expected": {
         "noteCount": 1,
         "notes": [
-          { "pitch": { "pc": 0, "octave": 4 }, "phase": "release", "velocity": 100 }
+          {
+            "pitch": {
+              "pc": 0,
+              "octave": 4
+            },
+            "phase": "release",
+            "velocity": 100
+          }
         ],
-        "dynamics": { "level": 0.23622047244094488, "trend": "stable" }
+        "dynamics": {
+          "level": 0.23622047244094488
+        }
       }
     },
     {
@@ -102,7 +158,9 @@
       "expected": {
         "noteCount": 0,
         "notes": [],
-        "dynamics": { "level": 0, "trend": "stable" }
+        "dynamics": {
+          "level": 0
+        }
       }
     }
   ]

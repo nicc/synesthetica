@@ -14,13 +14,20 @@
         "source": "midi",
         "stream": "test",
         "inputs": [
-          { "type": "midi_note_off", "t": 0, "note": 60, "channel": 0 }
+          {
+            "type": "midi_note_off",
+            "t": 0,
+            "note": 60,
+            "channel": 0
+          }
         ]
       },
       "expected": {
         "noteCount": 0,
         "notes": [],
-        "dynamics": { "level": 0, "trend": "stable" }
+        "dynamics": {
+          "level": 0
+        }
       }
     },
     {
@@ -30,15 +37,30 @@
         "source": "midi",
         "stream": "test",
         "inputs": [
-          { "type": "midi_note_on", "t": 100, "note": 64, "velocity": 80, "channel": 0 }
+          {
+            "type": "midi_note_on",
+            "t": 100,
+            "note": 64,
+            "velocity": 80,
+            "channel": 0
+          }
         ]
       },
       "expected": {
         "noteCount": 1,
         "notes": [
-          { "pitch": { "pc": 4, "octave": 4 }, "phase": "attack", "velocity": 80 }
+          {
+            "pitch": {
+              "pc": 4,
+              "octave": 4
+            },
+            "phase": "attack",
+            "velocity": 80
+          }
         ],
-        "dynamics": { "level": 0.6299212598425197, "trend": "stable" }
+        "dynamics": {
+          "level": 0.6299212598425197
+        }
       }
     },
     {
@@ -48,15 +70,29 @@
         "source": "midi",
         "stream": "test",
         "inputs": [
-          { "type": "midi_note_off", "t": 200, "note": 60, "channel": 0 }
+          {
+            "type": "midi_note_off",
+            "t": 200,
+            "note": 60,
+            "channel": 0
+          }
         ]
       },
       "expected": {
         "noteCount": 1,
         "notes": [
-          { "pitch": { "pc": 4, "octave": 4 }, "phase": "sustain", "velocity": 80 }
+          {
+            "pitch": {
+              "pc": 4,
+              "octave": 4
+            },
+            "phase": "sustain",
+            "velocity": 80
+          }
         ],
-        "dynamics": { "level": 0.6299212598425197, "trend": "stable" }
+        "dynamics": {
+          "level": 0.6299212598425197
+        }
       }
     }
   ]
