@@ -115,6 +115,8 @@ Compound macros omit `consumers[]` — their `targets[]` fan out to leaf macros 
 
 The split is the state-side answer to the same class of bug consumer declarations catch on the dispatch side. If a consumer silently ignores a setter, `effective` diverges from `intents` and the drift is visible in `state://` — both to the LLM (which reads it) and to whoever is reviewing session recordings. There is no mirror keeping a shadow copy; the effective view is always built from live consumer state.
 
+Divergence is not always a bug, though — legitimate causes include: a compound macro's intent is set and then one of its leaves is tweaked directly; a preset is applied and then a single macro is nudged; `set_hue_for_pitch` was used (intents records the derived reference-hue, effective mirrors it) followed by an unrelated `set_macro` on the same reference. LLM prose (see `renderToolResultShape` in `promptResources.ts`) tells the model to treat divergence as information rather than automatically flagging it.
+
 Presets record only `intents` — the user-facing values — because replaying a preset is "reproduce what the user asked for", not "reproduce a snapshot of implementation state".
 
 ## 2. Derivation: one manifest, many consumers
@@ -205,8 +207,8 @@ A macro is correctly wired iff:
 
 **Automated coverage:**
 - Build-time validation (`packages/contracts/scripts/validate-manifest.mjs`) asserts (1) — including that every non-compound macro has a non-empty `consumers[]` whose entries reference known grammar/stabilizer/vocab ids.
-- Runtime coverage test (`packages/engine/test/wiringCoverage.test.ts`) asserts (4) for every declared consumer of every non-compound macro. A no-op setter fails because the test picks a value distinct from the current one.
-- Existing `macroTools.test.ts` asserts (3).
+- Engine-level coverage test (`packages/engine/test/wiringCoverage.test.ts`) asserts (4) for every declared consumer via `pipeline.setMacro` directly. A no-op setter fails because the test picks a value distinct from the current one.
+- CLI-level integration test (`packages/cli/test/wsWiringCoverage.test.ts`) asserts (3) + (4) end-to-end: dispatches `setMacroTool.handle(...)` through the real wsBridge / WebSocket / browser-side pipeline stand-in, then reads `state.macros.effective` back and asserts the consumer received it. Catches transport-layer regressions the engine-only test can't see.
 - Existing `renderPanel.test.ts` asserts (6).
 
 Manual verification for the composed prompt and the UI panel happens via the live-smoke command (`npm run start`).
