@@ -110,6 +110,10 @@ function composeSystemOverview(): string {
     "",
     "MCP tools you can call. The description below matches what tools/list serves — this section adds aliases + notes + examples the LLM can lean on when interpreting user speech.",
     "",
+    "### Result shape (every tool)",
+    "",
+    renderToolResultShape(),
+    "",
     (productionManifest.tools ?? []).map(renderTool).join("\n\n"),
     "",
     "## Resources",
@@ -153,6 +157,40 @@ function renderSessionTimeGuidance(): string {
     "When no session is active, `startedAt` and `now` are null and events is `[]`. Check for null before doing math.",
     "",
     "Response latency doesn't complicate this: you always have `now` at the moment of read, so relative comparisons stay anchored regardless of how long you take to think.",
+  ].join("\n");
+}
+
+/**
+ * Result envelope every MCP tool returns. Codes are stable across
+ * releases per SPEC 015; message text may vary. LLM should match on
+ * `code`, not on message text. Kept in the prompt so the LLM doesn't
+ * have to hit an error before it knows the shape.
+ */
+function renderToolResultShape(): string {
+  return [
+    "Every tool returns one of:",
+    "- Success: `{ ok: true, state: <StateSnapshot> }` — the post-call state.",
+    "- Failure: `{ ok: false, error: { code, message, details? } }` — code is a stable SCREAMING_SNAKE_CASE string.",
+    "",
+    "Common codes (match on `code`, not on message text):",
+    "- `SCHEMA_INVALID` — argument shape / type wrong or required arg missing.",
+    "- `MACRO_UNKNOWN` — `set_macro` called with an unknown macro id. `details.available` lists valid ids for retry.",
+    "- `MACRO_VALUE_OUT_OF_RANGE` — continuous / compound value outside declared range (message includes the range).",
+    "- `MACRO_VALUE_WRONG_TYPE` — value shape wrong for the macro's type (e.g. string for continuous).",
+    "- `PRESET_NOT_FOUND` — `switch_preset` called with an unknown name. `details.available` lists preset names for retry.",
+    "- `KEY_INVALID_PAIR` — `set_key`: root and mode must be both null or both set.",
+    "- `TEMPO_OUT_OF_RANGE` — `set_tempo`: bpm outside [30, 240] (and not null).",
+    "- `METER_INVALID_PAIR` — `set_meter`: bpb and beat_value must be both null or both set.",
+    "- `METER_VALUE_UNSUPPORTED` — `set_meter`: beat_value not in {1, 2, 4, 8, 16}.",
+    "- `CHORD_MODE_UNKNOWN` — `set_chord_mode`: mode not in {harmonic, bass-led}.",
+    "- `INSTANCE_NOT_FOUND` — the `instance` arg doesn't match any running engine.",
+    "- `ENGINE_ERROR` — underlying engine / transport / filesystem failure. Read the message.",
+    "",
+    "Handling guidance:",
+    "- Use `details.available` (when present) to pick a valid retry value.",
+    "- Fall back to reading the message only when no code applies.",
+    "- Surface `SCHEMA_INVALID` errors as self-correct-and-retry (usually indicates a malformed call).",
+    "- Full spec: SPEC 015 (specs/SPEC_015_control_op_validation_errors.md).",
   ].join("\n");
 }
 

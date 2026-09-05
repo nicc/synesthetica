@@ -348,7 +348,7 @@ const macros: MacroAnnotation[] = [
   {
     id: "rhythm:emphasis",
     name: "Rhythm emphasis",
-    aliases: ["beat emphasis", "rhythm prominence", "pulse strength"],
+    aliases: ["beat emphasis", "rhythm prominence"],
     type: "compound",
     range: [0, 1],
     default: 0.5,
@@ -941,7 +941,7 @@ const tools: ToolAnnotation[] = [
     id: "switch_preset",
     description:
       "Load a named preset. Every control (macros, prescribed context, input source) snaps to the preset's stored value. Preset names are enumerable at presets://.",
-    aliases: ["load preset", "switch to", "recall"],
+    aliases: ["load preset", "switch preset", "recall"],
     notes: [
       "On failure the error's details.available field lists all preset names known to the store.",
       "Preset loads reset the active-preset marker on state://current so the LLM can see which preset is current.",
