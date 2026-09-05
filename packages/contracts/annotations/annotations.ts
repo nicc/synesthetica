@@ -139,6 +139,27 @@ export interface MacroDirectionality {
 }
 
 /**
+ * Runtime consumer of a macro — grammar, stabilizer, or vocabulary
+ * instance that actually receives the value and mutates behaviour.
+ *
+ * `id` must match the consumer's runtime id (e.g. "harmony-grammar",
+ * "chord-detection-stabilizer", "musical-visual"). `macroKey` must
+ * exist as a callable entry on that consumer's `macros` dispatch
+ * table — the build-time validator + engine-side coverage test
+ * assert both. Declaring a consumer here is a promise the code
+ * fulfils; the validator turns a broken promise into a build error.
+ */
+export type ConsumerKind = "grammar" | "stabilizer" | "vocab";
+
+export interface MacroConsumer {
+  kind: ConsumerKind;
+  id: string;
+  /** Key in consumer's macros dispatch table. Usually equals the
+   *  camelCased param name (e.g. "linger", "arpeggioTolerance"). */
+  macroKey: string;
+}
+
+/**
  * Fields common to every macro annotation regardless of shape.
  */
 interface MacroAnnotationBase {
@@ -164,6 +185,9 @@ export interface ContinuousMacroAnnotation extends MacroAnnotationBase {
    *  requests like "more" or "less" for the LLM. */
   default: number;
   directionality: MacroDirectionality;
+  /** Runtime consumers. Required — an unwired macro is a lie the
+   *  manifest can't tell. Validator enforces non-empty. */
+  consumers: MacroConsumer[];
 }
 
 /**
@@ -178,6 +202,8 @@ export interface DiscreteMacroAnnotation extends MacroAnnotationBase {
   /** Default value (also the launch-time value). Must be one of
    *  enumValues[i].value. */
   default: string | number;
+  /** Runtime consumers. Required — see ContinuousMacroAnnotation. */
+  consumers: MacroConsumer[];
 }
 
 /**

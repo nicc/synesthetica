@@ -119,6 +119,62 @@ for (const m of productionManifest.macros) {
 }
 
 /* -----------------------------------------------------------------
+ * 4b. Consumers declared on every non-compound macro.
+ *     Structural check — asserts a consumer entry exists and is
+ *     shaped correctly. Runtime coverage test in packages/engine
+ *     (SPEC 014 §Wiring coverage) asserts each entry's macros[key]
+ *     is actually implemented on the named consumer.
+ * ----------------------------------------------------------------- */
+const grammarIds = new Set(productionManifest.grammars.map((g) => g.id));
+// Stabilizer + vocab ids aren't listed in the manifest today; declare
+// the shipping set here. Adding a new one is a two-line change (this
+// list + the runtime coverage test).
+const stabilizerIds = new Set([
+  "chord-detection-stabilizer",
+  "note-tracking-stabilizer",
+  "harmony-stabilizer",
+  "dynamics-stabilizer",
+]);
+const vocabIds = new Set(["musical-visual"]);
+for (const m of productionManifest.macros) {
+  if (m.type === "compound") continue;
+  if (!Array.isArray(m.consumers) || m.consumers.length === 0) {
+    err(
+      "macro-consumers",
+      `${m.id}: consumers[] missing or empty — an unwired macro is a manifest lie`,
+    );
+    continue;
+  }
+  for (const c of m.consumers) {
+    if (!c || typeof c !== "object") {
+      err("macro-consumers", `${m.id}: consumer entry is not an object`);
+      continue;
+    }
+    if (!["grammar", "stabilizer", "vocab"].includes(c.kind)) {
+      err("macro-consumers", `${m.id}: unknown consumer kind '${c.kind}'`);
+    }
+    if (typeof c.id !== "string" || c.id.length === 0) {
+      err("macro-consumers", `${m.id}: consumer.id missing`);
+    }
+    if (typeof c.macroKey !== "string" || c.macroKey.length === 0) {
+      err("macro-consumers", `${m.id}: consumer.macroKey missing`);
+    }
+    const registry =
+      c.kind === "grammar"
+        ? grammarIds
+        : c.kind === "stabilizer"
+          ? stabilizerIds
+          : vocabIds;
+    if (!registry.has(c.id)) {
+      err(
+        "macro-consumers",
+        `${m.id}: consumer id '${c.id}' isn't a known ${c.kind} — add it to the validator's registry if it's new`,
+      );
+    }
+  }
+}
+
+/* -----------------------------------------------------------------
  * 5. Session control pair children exist
  * ----------------------------------------------------------------- */
 const sessionIds = new Set(productionManifest.sessionControls.map((s) => s.id));

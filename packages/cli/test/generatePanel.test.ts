@@ -165,10 +165,12 @@ describe("generatePanel — widget kinds", () => {
     expect(input.label).toBe("input:source");
   });
 
-  it("tooltip comes from notes[0]", () => {
+  it("tooltip carries every entry from notes[]", () => {
     const panel = generatePanel(productionManifest);
     const tempo = findWidget(panel, "session:tempo");
-    expect(tempo.tooltip).toContain("grid");
+    expect(Array.isArray(tempo.tooltip)).toBe(true);
+    // Should include the "grid" note verbatim as one of the paragraphs.
+    expect((tempo.tooltip as string[]).some((n) => n.includes("grid"))).toBe(true);
   });
 });
 
@@ -242,7 +244,7 @@ function findWidget(
   kind: "slider" | "select" | "toggle" | "number" | "pair";
   id: string;
   label: string;
-  tooltip?: string;
+  tooltip?: string[];
   aliases: string[];
   [k: string]: unknown;
 } {

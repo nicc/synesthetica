@@ -49,6 +49,7 @@ const macros: MacroAnnotation[] = [
       "Unit is bars when a tempo is prescribed, seconds otherwise.",
       "Capped by the stabilizer's progression window; asking for more silently clips.",
     ],
+    consumers: [{ kind: "grammar", id: "harmony-grammar", macroKey: "linger" }],
   },
 
   {
@@ -72,6 +73,7 @@ const macros: MacroAnnotation[] = [
     notes: [
       "Unit is chord detection window in ms.",
     ],
+    consumers: [{ kind: "stabilizer", id: "chord-detection-stabilizer", macroKey: "harmony:arpeggio-tolerance" }],
   },
 
   {
@@ -95,6 +97,7 @@ const macros: MacroAnnotation[] = [
     notes: [
       "Denotes the number of notes required to constitute a chord.",
     ],
+    consumers: [{ kind: "stabilizer", id: "chord-detection-stabilizer", macroKey: "harmony:note-threshold" }],
   },
 
   {
@@ -119,6 +122,7 @@ const macros: MacroAnnotation[] = [
       "Hysteresis or lag on chord detection.",
       "Unit is ms.",
     ],
+    consumers: [{ kind: "stabilizer", id: "chord-detection-stabilizer", macroKey: "harmony:detection-stability" }],
   },
 
   {
@@ -143,6 +147,7 @@ const macros: MacroAnnotation[] = [
       "Determines how long each note's velocity indicator lingers on the dynamics grammar.",
       "Unit is ms.",
     ],
+    consumers: [{ kind: "grammar", id: "dynamics-grammar", macroKey: "linger" }],
   },
 
   {
@@ -168,6 +173,7 @@ const macros: MacroAnnotation[] = [
       "Independent from the compound time-horizon macro. Use rhythm:horizon to isolate rhythm's history without touching harmony:linger or dynamics:linger.",
       "Unit is decimal fraction of available space.",
     ],
+    consumers: [{ kind: "grammar", id: "rhythm-grammar", macroKey: "horizon" }],
   },
 
   {
@@ -192,6 +198,7 @@ const macros: MacroAnnotation[] = [
       "Drift threshold in milliseconds. Notes whose onset falls within this window of the nearest beat subdivision render as 'tight' and suppress the streak-line motion cue.",
       "Unit is ms.",
     ],
+    consumers: [{ kind: "grammar", id: "rhythm-grammar", macroKey: "tightnessTolerance" }],
   },
 
   {
@@ -216,6 +223,7 @@ const macros: MacroAnnotation[] = [
       "Multiplier applied to the note-history window for reference lines and streak markers.",
       "Unit is dimensionless multiplier (1.0 = fades with the note; 2.0 = twice as long).",
     ],
+    consumers: [{ kind: "grammar", id: "rhythm-grammar", macroKey: "referenceLinger" }],
   },
 
   {
@@ -240,6 +248,7 @@ const macros: MacroAnnotation[] = [
       "Single dial that scales the beat-pulse decay, opacity boost, and value boost together. At 0.5 the pulse matches the historic baseline.",
       "Skipped in free-time mode (requires a prescribed tempo to have a beat to pulse on).",
     ],
+    consumers: [{ kind: "grammar", id: "rhythm-grammar", macroKey: "pulseIntensity" }],
   },
 
   {
@@ -263,6 +272,7 @@ const macros: MacroAnnotation[] = [
       "To anchor a different pitch class instead — e.g. 'make G red' — use set_hue_for_pitch(7, 0); the server computes the equivalent reference value.",
       "Unit is degree on the colour wheel with red at 0.",
     ],
+    consumers: [{ kind: "vocab", id: "musical-visual", macroKey: "system:colour-mapping:reference" }],
   },
 
   // -----------------------------------------------------------------
@@ -285,6 +295,7 @@ const macros: MacroAnnotation[] = [
       "Determines the reference subdivision for timing drift analysis.",
       "Coarser resolutions are more likely to show inaccurate timing due to fewer matching grid divisions, which counter-intuitively feels stricter but is actually an easier timing intent; finer resolutions will look more forgiving by matching to more grid divisions but is actually grading to a more difficult intent.",
     ],
+    consumers: [{ kind: "grammar", id: "rhythm-grammar", macroKey: "subdivisionDepth" }],
   },
 
   // -----------------------------------------------------------------
