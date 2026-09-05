@@ -96,9 +96,9 @@ describe("prompt resources", () => {
 
   it("serves all three canonical prompts", () => {
     expect(Object.keys(prompts).sort()).toEqual([
-      "guide://system-overview",
-      "posture://conversational",
-      "posture://quiet",
+      "conversational-posture",
+      "quiet-posture",
+      "system-overview",
     ]);
   });
 
@@ -112,14 +112,14 @@ describe("prompt resources", () => {
   });
 
   it("system-overview references the three grammars", () => {
-    const guide = prompts["guide://system-overview"].content;
+    const guide = prompts["system-overview"].content;
     expect(guide).toMatch(/dynamics/i);
     expect(guide).toMatch(/rhythm/i);
     expect(guide).toMatch(/harmony/i);
   });
 
   it("system-overview composes authored prose + auto-generated manifest reference", () => {
-    const guide = prompts["guide://system-overview"].content;
+    const guide = prompts["system-overview"].content;
     // Authored prose (from system-overview.md) present
     expect(guide).toContain("Synesthetica");
     // Generated reference block appears
@@ -131,7 +131,7 @@ describe("prompt resources", () => {
   });
 
   it("system-overview embeds every macro from the manifest with range + directionality", () => {
-    const guide = prompts["guide://system-overview"].content;
+    const guide = prompts["system-overview"].content;
     for (const m of productionManifest.macros) {
       expect(guide).toContain(m.id);
     }
@@ -149,14 +149,14 @@ describe("prompt resources", () => {
   });
 
   it("system-overview embeds every session control from the manifest", () => {
-    const guide = prompts["guide://system-overview"].content;
+    const guide = prompts["system-overview"].content;
     for (const s of productionManifest.sessionControls) {
       expect(guide).toContain(s.id);
     }
   });
 
   it("system-overview embeds every concept from the manifest", () => {
-    const guide = prompts["guide://system-overview"].content;
+    const guide = prompts["system-overview"].content;
     for (const c of productionManifest.concepts) {
       expect(guide).toContain(c.term);
     }

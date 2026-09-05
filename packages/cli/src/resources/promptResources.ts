@@ -55,23 +55,34 @@ export interface PromptEntry {
   content: string;
 }
 
+/**
+ * Prompt keys are the MCP-protocol `name` — what appears in
+ * Claude Desktop's prompt-picker menu AND what the client passes
+ * back to prompts/get. Kept as short lowercase-hyphenated
+ * identifiers rather than the URI-shaped strings we used earlier
+ * (guide://system-overview, posture://quiet) — the URI shape
+ * displayed badly in the picker (users saw literal 'guide://…'
+ * strings). URIs stay documented in each entry's description.
+ */
 export function buildPromptResources(): Record<string, PromptEntry> {
   return {
-    "posture://quiet": {
-      name: "Quiet posture",
-      description: "System prompt fragment for quiet-performance mode",
-      content: loadPrompt("posture-quiet.md"),
-    },
-    "posture://conversational": {
-      name: "Conversational posture",
-      description: "System prompt fragment for conversational mode",
-      content: loadPrompt("posture-conversational.md"),
-    },
-    "guide://system-overview": {
+    "system-overview": {
       name: "System overview",
       description:
-        "Pipeline narrative + full macro/session/concept/grammar reference. Attach at conversation start; primary bootstrap context.",
+        "Pipeline narrative + full macro/session/concept/grammar reference. Attach at conversation start; primary bootstrap context. (Was guide://system-overview.)",
       content: composeSystemOverview(),
+    },
+    "quiet-posture": {
+      name: "Quiet posture",
+      description:
+        "System prompt fragment for quiet-performance mode. (Was posture://quiet.)",
+      content: loadPrompt("posture-quiet.md"),
+    },
+    "conversational-posture": {
+      name: "Conversational posture",
+      description:
+        "System prompt fragment for conversational mode. (Was posture://conversational.)",
+      content: loadPrompt("posture-conversational.md"),
     },
   };
 }
