@@ -16,15 +16,20 @@ function makeSession() {
 }
 
 describe("tool registry — descriptions come from manifest", () => {
-  it("registered tools carry the manifest's description, not the code default", () => {
+  it("registered tools carry the manifest's description (with the get_started hint appended where applicable)", () => {
     const dir = mkdtempSync(join(tmpdir(), "tool-registry-"));
     const store = createPresetStore(dir);
     const registry = buildToolRegistry(store, makeSession());
-    // Every annotated tool's description should match the manifest.
+    const NO_HINT = new Set(["get_started", "start_session", "stop_session"]);
     for (const t of productionManifest.tools ?? []) {
       const registered = registry.get(t.id);
       expect(registered, `tool ${t.id} must be registered`).toBeDefined();
-      expect(registered!.description).toBe(t.description);
+      if (NO_HINT.has(t.id)) {
+        expect(registered!.description).toBe(t.description);
+      } else {
+        expect(registered!.description.startsWith(t.description)).toBe(true);
+        expect(registered!.description).toContain("get_started");
+      }
     }
     rmSync(dir, { recursive: true, force: true });
   });

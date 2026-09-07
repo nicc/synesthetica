@@ -65,13 +65,12 @@ export interface PromptEntry {
  * strings). URIs stay documented in each entry's description.
  */
 export function buildPromptResources(): Record<string, PromptEntry> {
+  // system-overview was dropped as a prompt (SPEC 014 §1.9 Route 1):
+  // the same content is now served by the `get_started` MCP tool,
+  // which is autonomously callable by the LLM and doesn't require
+  // manual attach. Posture prompts remain — they're situational
+  // system-instruction fragments the user attaches deliberately.
   return {
-    "system-overview": {
-      name: "System overview",
-      description:
-        "Pipeline narrative + full macro/session/concept/grammar reference. Attach at conversation start; primary bootstrap context. (Was guide://system-overview.)",
-      content: composeSystemOverview(),
-    },
     "quiet-posture": {
       name: "Quiet posture",
       description:

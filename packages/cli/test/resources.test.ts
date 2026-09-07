@@ -9,7 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { productionManifest } from "@synesthetica/contracts";
 import { buildAnnotationResources } from "../src/resources/annotationResources.js";
-import { buildPromptResources } from "../src/resources/promptResources.js";
+import { buildPromptResources, composeSystemOverview } from "../src/resources/promptResources.js";
 
 describe("annotation resource builder", () => {
   const resources = buildAnnotationResources(productionManifest);
@@ -94,11 +94,10 @@ describe("annotation resource builder", () => {
 describe("prompt resources", () => {
   const prompts = buildPromptResources();
 
-  it("serves all three canonical prompts", () => {
+  it("serves the two posture prompts (system-overview moved to the get_started tool)", () => {
     expect(Object.keys(prompts).sort()).toEqual([
       "conversational-posture",
       "quiet-posture",
-      "system-overview",
     ]);
   });
 
@@ -110,19 +109,26 @@ describe("prompt resources", () => {
       void uri;
     }
   });
+});
 
-  it("system-overview references the three grammars", () => {
-    const guide = prompts["system-overview"].content;
+/**
+ * The composed system-overview content used to live behind
+ * `guide://system-overview` / prompts["system-overview"]. It moved to
+ * the `get_started` MCP tool in Route 1 (SPEC 014 §Lifecycle) — the
+ * content generator itself is unchanged, so we keep exercising it
+ * directly to guard against regressions in shape.
+ */
+describe("composed system overview (used by get_started)", () => {
+  const guide = composeSystemOverview();
+
+  it("references the three grammars", () => {
     expect(guide).toMatch(/dynamics/i);
     expect(guide).toMatch(/rhythm/i);
     expect(guide).toMatch(/harmony/i);
   });
 
-  it("system-overview composes authored prose + auto-generated manifest reference", () => {
-    const guide = prompts["system-overview"].content;
-    // Authored prose (from system-overview.md) present
+  it("composes authored prose + auto-generated manifest reference", () => {
     expect(guide).toContain("Synesthetica");
-    // Generated reference block appears
     expect(guide).toContain("Full reference (auto-generated");
     expect(guide).toContain("## Macros");
     expect(guide).toContain("## Session controls");
@@ -130,13 +136,10 @@ describe("prompt resources", () => {
     expect(guide).toContain("## Grammars");
   });
 
-  it("system-overview embeds every macro from the manifest with range + directionality", () => {
-    const guide = prompts["system-overview"].content;
+  it("embeds every macro from the manifest with range + directionality", () => {
     for (const m of productionManifest.macros) {
       expect(guide).toContain(m.id);
     }
-    // Spot-check that at least one continuous macro's directionality
-    // and notes reached the prompt.
     const linger = productionManifest.macros.find(
       (m): m is Extract<typeof m, { type: "continuous" }> =>
         m.id === "harmony:linger" && m.type === "continuous",
@@ -148,15 +151,13 @@ describe("prompt resources", () => {
     }
   });
 
-  it("system-overview embeds every session control from the manifest", () => {
-    const guide = prompts["system-overview"].content;
+  it("embeds every session control from the manifest", () => {
     for (const s of productionManifest.sessionControls) {
       expect(guide).toContain(s.id);
     }
   });
 
-  it("system-overview embeds every concept from the manifest", () => {
-    const guide = prompts["system-overview"].content;
+  it("embeds every concept from the manifest", () => {
     for (const c of productionManifest.concepts) {
       expect(guide).toContain(c.term);
     }
