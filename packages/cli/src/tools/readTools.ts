@@ -45,6 +45,7 @@ function err(code: string, message: string, details?: unknown) {
  */
 export const getStartedTool: ToolSpec = {
   name: "get_started",
+  requiresSession: false,
   description:
     "Return the full Synesthetica primer: pipeline narrative + every macro (with range, default, directionality), session controls, system concepts, grammars, tools with aliases/notes/examples, resources, session-time semantics, and preset workflow. Call this once per conversation before acting on other Synesthetica tools — everything the LLM needs to interpret the user's musical requests is in this response.",
   inputSchema: {

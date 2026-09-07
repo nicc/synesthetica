@@ -971,6 +971,29 @@ const tools: ToolAnnotation[] = [
     ],
   },
 
+  // ---- Session lifecycle ----
+  //
+  // The MCP server is always-on and cheap; the pipeline (web-app + WS
+  // bridge + browser tab) sits behind these tools. LLM calls
+  // start_session when the user signals musical intent, stop_session
+  // when they're done. See SPEC 014 §Lifecycle.
+  {
+    id: "start_session",
+    description:
+      "Spawn the visualiser: open the web-app in a browser tab, start the WS bridge, and connect the engine. Call this when the user signals musical intent. Idempotent — a no-op if a session is already running. Every other engine tool (set_macro, set_key, get_state, etc.) requires a running session and returns ENGINE_NOT_STARTED otherwise.",
+    aliases: ["start", "let's play", "begin session", "open the visualiser"],
+    notes: [
+      "The browser tab opens automatically (Chrome by default) when the CLI is running under a windowed shell. Under headless / stdio-only conditions the visualiser URL is returned in the tool result's data.webAppUrl for manual open.",
+    ],
+  },
+
+  {
+    id: "stop_session",
+    description:
+      "Tear the visualiser down: close the web-app subprocess and WS bridge. Call this when the user says they're done. Idempotent. Preset saves remain valid across sessions.",
+    aliases: ["stop", "we're done", "close the visualiser", "end session"],
+  },
+
   // ---- Read surface (tool wrappers over resource content) ----
   //
   // MCP treats resources as a first-class primitive, but Claude

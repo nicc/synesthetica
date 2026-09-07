@@ -4,13 +4,22 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildToolRegistry } from "../src/tools/registry.js";
 import { createPresetStore } from "../src/presets/presetStore.js";
+import { SessionManager } from "../src/session/sessionManager.js";
 import { productionManifest } from "@synesthetica/contracts";
+
+function makeSession() {
+  return new SessionManager({
+    instanceLabel: "default",
+    openBrowser: false,
+    browser: "chrome",
+  });
+}
 
 describe("tool registry — descriptions come from manifest", () => {
   it("registered tools carry the manifest's description, not the code default", () => {
     const dir = mkdtempSync(join(tmpdir(), "tool-registry-"));
     const store = createPresetStore(dir);
-    const registry = buildToolRegistry(store);
+    const registry = buildToolRegistry(store, makeSession());
     // Every annotated tool's description should match the manifest.
     for (const t of productionManifest.tools ?? []) {
       const registered = registry.get(t.id);
@@ -23,7 +32,7 @@ describe("tool registry — descriptions come from manifest", () => {
   it("every code-registered tool has a manifest annotation (no orphans)", () => {
     const dir = mkdtempSync(join(tmpdir(), "tool-registry-"));
     const store = createPresetStore(dir);
-    const registry = buildToolRegistry(store);
+    const registry = buildToolRegistry(store, makeSession());
     const annotatedIds = new Set(
       (productionManifest.tools ?? []).map((t) => t.id),
     );

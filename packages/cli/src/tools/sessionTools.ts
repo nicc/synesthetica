@@ -36,6 +36,15 @@ export interface ToolSpec {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  /**
+   * When true (default), the MCP server checks the SessionManager
+   * for a running session and returns ENGINE_NOT_STARTED to the LLM
+   * if none exists — the tool handler is not called. When false,
+   * the tool runs regardless of session state and receives a stub
+   * engine that will throw if actually used. Used for get_started
+   * (content-only) and lifecycle tools (start_session / stop_session).
+   */
+  requiresSession?: boolean;
   handle(args: ToolInput, engine: EngineHandle): Promise<ToolResult>;
 }
 

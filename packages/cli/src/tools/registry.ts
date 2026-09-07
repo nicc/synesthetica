@@ -14,10 +14,15 @@ import { sessionTools } from "./sessionTools.js";
 import { macroTools } from "./macroTools.js";
 import { buildPresetTools } from "./presetTools.js";
 import { buildReadTools } from "./readTools.js";
+import { buildLifecycleTools } from "./lifecycleTools.js";
 import type { PresetStore } from "../presets/presetStore.js";
+import type { SessionManager } from "../session/sessionManager.js";
 import { productionManifest } from "@synesthetica/contracts";
 
-export function buildToolRegistry(presetStore: PresetStore): Map<string, ToolSpec> {
+export function buildToolRegistry(
+  presetStore: PresetStore,
+  session: SessionManager,
+): Map<string, ToolSpec> {
   const registry = new Map<string, ToolSpec>();
   const annotations = new Map(
     (productionManifest.tools ?? []).map((t) => [t.id, t] as const),
@@ -26,6 +31,7 @@ export function buildToolRegistry(presetStore: PresetStore): Map<string, ToolSpe
     const ann = annotations.get(t.name);
     registry.set(t.name, ann ? { ...t, description: ann.description } : t);
   };
+  for (const t of buildLifecycleTools(session)) add(t);
   for (const t of sessionTools) add(t);
   for (const t of macroTools) add(t);
   for (const t of buildPresetTools(presetStore)) add(t);

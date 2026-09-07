@@ -31,7 +31,7 @@ import {
   type PromptEntry,
 } from "./resources/promptResources.js";
 import { buildToolRegistry, type ToolSpec } from "./tools/registry.js";
-import type { EngineHandle } from "./engine/engineHandle.js";
+import type { EngineHandle, StateSnapshot } from "./engine/engineHandle.js";
 import {
   buildStateResources,
   type AsyncResourceEntry,
@@ -39,21 +39,23 @@ import {
 import type { PresetStore } from "./presets/presetStore.js";
 import { buildPresetResources } from "./presets/presetResources.js";
 import { buildInputResources } from "./inputs/inputResources.js";
+import type { SessionManager } from "./session/sessionManager.js";
+import { StubEngineHandle } from "./engine/stubEngineHandle.js";
 
 export interface McpServerConfig {
   serverName: string;
   serverVersion: string;
   /**
-   * Engine lookup for tool dispatch. Given an optional `instance`
-   * arg from the tool call, return the corresponding EngineHandle
-   * (or an error). Chunk C accepts a single engine; multi-instance
-   * routing lands in Phase 3.
+   * Session lifecycle owner. Tools with requiresSession !== false
+   * check session.isRunning() before dispatch; the LLM sees
+   * ENGINE_NOT_STARTED when it tries to touch the engine before
+   * calling start_session.
    */
-  resolveEngine: (instance?: string) => EngineHandle | { error: { code: string; message: string; details?: unknown } };
-  /** Every running engine at server-start, for state resource seeding. */
-  engines: EngineHandle[];
+  session: SessionManager;
   /** Filesystem preset store. */
   presetStore: PresetStore;
+  /** Server-level primer text; set as MCP initialize `instructions`. */
+  serverInstructions?: string;
 }
 
 export async function startMcpServer(
@@ -72,27 +74,30 @@ export async function startMcpServer(
         resources: { subscribe: true, listChanged: true },
         prompts: { listChanged: true },
       },
+      // Server-level primer surfaced by clients that honour the
+      // MCP `initialize.instructions` field (Claude Desktop /
+      // Claude Code). Kept intentionally short — the LLM is
+      // pointed at `get_started` for the full primer, so idle
+      // conversations that never touch music don't pay the full
+      // token cost.
+      instructions: config.serverInstructions,
     },
   );
 
   // -----------------------------------------------------------------
-  // Resources — annotations (Chunk B) + state (Chunk E)
+  // Resources — annotations (always) + state/input (session-scoped)
   // -----------------------------------------------------------------
   const annotationEntries: ResourceEntry[] = buildAnnotationResources(productionManifest);
-  const stateEntries: AsyncResourceEntry[] = config.engines.flatMap((e) =>
-    buildStateResources(e),
-  );
-  // Preset resources: fixed presets:// index + template-routed
-  // presets://<name>. Item routing lives in a matcher so we can
-  // dispatch template URIs without maintaining an entry per name.
+  // State + input resources are always advertised but read live
+  // against the session: when no session is running they surface
+  // a not-started marker. Route 1: state:// and inputs:// are for
+  // user-triggered attach; the LLM reaches equivalent content via
+  // get_state / list_inputs tools which apply ENGINE_NOT_STARTED
+  // gating at their own layer.
+  const lazyEngineForResources = buildSessionEngineProxy(config.session);
+  const stateEntries: AsyncResourceEntry[] = buildStateResources(lazyEngineForResources);
   const presetResources = buildPresetResources(config.presetStore);
-
-  // Input resources: fixed inputs:// entry per engine. The engine's
-  // getAvailableInputs() call bridges to the browser's live MIDI +
-  // audio enumeration via the WS bridge.
-  const inputEntries: AsyncResourceEntry[] = config.engines.flatMap((e) =>
-    buildInputResources(e),
-  );
+  const inputEntries: AsyncResourceEntry[] = buildInputResources(lazyEngineForResources);
 
   // Two indices — annotations are sync, state + presets index are
   // async. ReadResource dispatches based on which map the URI hits.
@@ -241,9 +246,13 @@ export async function startMcpServer(
     const prev = stateSubscribers.get(uri) ?? 0;
     stateSubscribers.set(uri, prev + 1);
     if (prev === 0) {
-      // Find the engine that owns this URI (state://<label>/current).
+      // Find the engine that owns this URI. Only one instance today,
+      // so match against the SessionManager's label. When no session
+      // is running the subscribe is a no-op — reactivated on next
+      // start_session by the resource proxy.
       const label = uri.replace(/^state:\/\//, "").split("/")[0];
-      const engine = config.engines.find((e) => e.label === label);
+      const engine =
+        label === config.session.instanceLabel ? config.session.getEngine() : null;
       if (engine) {
         const unsub = engine.subscribe("state-changed", () => {
           void server.notification({
@@ -305,9 +314,18 @@ export async function startMcpServer(
   });
 
   // -----------------------------------------------------------------
-  // Tools (Chunk C: session + input; Chunk D adds macros)
+  // Tools — session/setter/reader/lifecycle
+  //
+  // Route 1 (SPEC 014): the MCP server is always-on; the pipeline
+  // sits behind start_session. Tools with requiresSession !== false
+  // fail fast with ENGINE_NOT_STARTED when no session is running,
+  // pointing the LLM at start_session. Lifecycle tools (start_session,
+  // stop_session) and content tools (get_started) run regardless.
   // -----------------------------------------------------------------
-  const toolRegistry: Map<string, ToolSpec> = buildToolRegistry(config.presetStore);
+  const toolRegistry: Map<string, ToolSpec> = buildToolRegistry(
+    config.presetStore,
+    config.session,
+  );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: Array.from(toolRegistry.values()).map((t) => ({
@@ -336,19 +354,60 @@ export async function startMcpServer(
     }
     const args = (request.params.arguments ?? {}) as Record<string, unknown>;
     const instance = typeof args.instance === "string" ? args.instance : undefined;
-    const engineOrErr = config.resolveEngine(instance);
-    if ("error" in engineOrErr) {
+    if (instance !== undefined && instance !== config.session.instanceLabel) {
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({ ok: false, error: engineOrErr.error }, null, 2),
+            text: JSON.stringify(
+              {
+                ok: false,
+                error: {
+                  code: "INSTANCE_NOT_FOUND",
+                  message: `no instance labelled '${instance}' (only '${config.session.instanceLabel}' is configured)`,
+                },
+              },
+              null,
+              2,
+            ),
           },
         ],
         isError: true,
       };
     }
-    const result = await tool.handle(args, engineOrErr);
+
+    const requiresSession = tool.requiresSession !== false;
+    let engineForTool: EngineHandle;
+    if (requiresSession) {
+      const engine = config.session.getEngine();
+      if (!engine) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(
+                {
+                  ok: false,
+                  error: {
+                    code: "ENGINE_NOT_STARTED",
+                    message: `no session running for '${config.session.instanceLabel}'. Call start_session first.`,
+                  },
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+      engineForTool = engine;
+    } else {
+      // Lifecycle + content tools get a stub. They don't touch it.
+      engineForTool = lazyEngineForResources;
+    }
+
+    const result = await tool.handle(args, engineForTool);
     return {
       content: [
         {
@@ -379,3 +438,90 @@ export async function startMcpServer(
     },
   };
 }
+
+/**
+ * A live-lookup EngineHandle that reads from SessionManager at call
+ * time. When no session is running, each engine method throws with
+ * a NOT_STARTED marker the caller (tools / resource reads) can
+ * convert into ENGINE_NOT_STARTED. Used to advertise state:// and
+ * inputs:// resources even before start_session — user-triggered
+ * attach at that point shows the not-started state.
+ */
+function buildSessionEngineProxy(session: SessionManager): EngineHandle {
+  const notStarted = (): never => {
+    throw new Error(
+      "no session is running — call start_session before using this resource",
+    );
+  };
+  return {
+    get label() {
+      return session.instanceLabel;
+    },
+    get status() {
+      switch (session.getState()) {
+        case "running":
+          return "running" as const;
+        case "starting":
+          return "starting" as const;
+        case "stopping":
+          return "stopping" as const;
+        case "stopped":
+          return "starting" as const;
+      }
+    },
+    setMacro: async () => notStarted(),
+    setKey: async () => notStarted(),
+    setTempo: async () => notStarted(),
+    setMeter: async () => notStarted(),
+    setChordMode: async () => notStarted(),
+    setMetronome: async () => notStarted(),
+    setInput: async () => notStarted(),
+    setHueForPitch: async () => notStarted(),
+    switchPreset: async () => notStarted(),
+    savePreset: async () => notStarted(),
+    getStateSnapshot: async () => {
+      const engine = session.getEngine();
+      if (!engine) return emptyStubSnapshot(session.instanceLabel);
+      return engine.getStateSnapshot();
+    },
+    getRecentEvents: async (limit, since) => {
+      const engine = session.getEngine();
+      if (!engine) return { startedAt: null, now: null, events: [] };
+      return engine.getRecentEvents(limit, since);
+    },
+    getAvailableInputs: async () => {
+      const engine = session.getEngine();
+      if (!engine) return [];
+      return engine.getAvailableInputs();
+    },
+    subscribe: (event, callback) => {
+      const engine = session.getEngine();
+      if (!engine) return () => {};
+      return engine.subscribe(event, callback);
+    },
+    close: async () => {},
+  };
+}
+
+function emptyStubSnapshot(label: string): StateSnapshot {
+  return {
+    instance: label,
+    macros: { intents: {}, effective: {} },
+    session: {
+      tonic: null,
+      mode: null,
+      tempo: null,
+      beatsPerBar: null,
+      beatValue: null,
+      chordMode: "harmonic",
+      metronome: false,
+    },
+    input: null,
+    activePreset: null,
+    startedAt: null,
+    now: null,
+  };
+}
+
+// Retained import used by the proxy helper's return type inference above.
+void StubEngineHandle;
