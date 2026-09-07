@@ -3,6 +3,21 @@
 ## Overview
 Synesthetica listens to **MIDI note data** and **raw audio input** and generates **real-time visualisations**. The primary use case is as a *synesthetic aid for musical hearing and intuition* (e.g. mapping harmony played on a keyboard to colour/shape patterns that can be matched on guitar, illustrating harmonic tension over time, presenting chord qualities in a coherent visual format irrespective of key). A secondary use case is as a **custom visual component for live performance**.
 
+## Design intent (v1) — TODO folded into rewrite
+
+Synesthetica v1 ships as a CLI + MCP server + browser-tab visualiser, controlled via natural language through Claude Desktop (or another MCP client). This shape is deliberate and worth being explicit about.
+
+**Why not a native app?** The typical creative tool with LLM assistance is a native app that pulls an LLM in — the LLM lives inside the app. Synesthetica inverts that: the LLM lives outside, in Claude Desktop, and Synesthetica is a tool the LLM can reach for. The differentiator is *LLM-mediated control of a real-time creative tool*, not "a music visualiser that happens to talk to an LLM". A native app would obscure that point.
+
+**Trade-offs, honestly.**
+- **Slight token cost per Claude Desktop session.** The Synesthetica MCP server registers on connect. We minimise the handshake context — a one-sentence description of what Synesthetica is, plus a `get_started` tool to fetch the full primer on demand. Cost is ~50-80 tokens per conversation whether you touch music or not. Not zero, but honest to the inverted-pattern trade-off.
+- **Alt-tab between Claude Desktop and the browser tab during a session.** For real-time creative use (playing an instrument while a session is active), this is awkward. Acceptable for the v1 audience (technical viewers of a showcase); a v2 Electron shell removes it. See `synesthetica-l0mg`.
+- **The pipeline is lazy.** No web-app, no browser tab, no WS bridge until the LLM calls `start_session`. Every non-music conversation runs zero-cost. See `synesthetica-ure`.
+
+**Who this v1 is for.** Technical viewers evaluating the LLM-mediated-control idea; portfolio-shaped, not productised. Musicians who just want to play with visuals will be better served by a v2 native app.
+
+*(This section is a design note for the imminent README rewrite — captures the context of a 2026-09-07 conversation, not necessarily the final voice for public docs.)*
+
 ## The Pipeline
 
 Synesthetica processes musical input through a series of transformations. Each stage has a specific job and operates on well-defined data types.

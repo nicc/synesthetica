@@ -44,7 +44,10 @@ const DEFAULT_START_OPTIONS: StartOptions = {
   recentEventsBufferSize: 1000,
   logRetentionDays: 7,
   openBrowser: true,
-  browser: "default",
+  // Chrome is the default because Firefox needs the per-origin Web MIDI
+  // permission add-on installed and manually approved (see synesthetica-qko).
+  // Override with --browser default to use the system default.
+  browser: "chrome",
   webAppPort: null,
   wsPort: 0, // 0 = OS-assigned free port; browser reads via ?ws-port=
 };
@@ -217,7 +220,7 @@ start OPTIONS
   --log-retention-days <N>
                           days to retain rotated event logs (default 7)
   --no-open               do not open the browser automatically
-  --browser <target>      'default' (default) or 'chrome'
+  --browser <target>      'chrome' (default) or 'default' (system default)
   --chrome                shorthand for --browser chrome
   --web-app-port <port>   fix the web-app dev server port (default: auto)
   --ws-port <port>        engine bridge WebSocket port (default: auto)
