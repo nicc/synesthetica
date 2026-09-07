@@ -91,7 +91,14 @@ export function buildPromptResources(): Record<string, PromptEntry> {
  * Composition — narrative + generated reference
  * ------------------------------------------------------------------ */
 
-function composeSystemOverview(): string {
+/**
+ * Composes the full system-overview text: authored narrative +
+ * generated reference (macros, session controls, concepts, grammars,
+ * tools, resources, session-time, presets). Exported so the
+ * `get_started` MCP tool can return the same body without any
+ * duplication of content.
+ */
+export function composeSystemOverview(): string {
   const sections: string[] = [
     loadPrompt("system-overview.md").trimEnd(),
     "",
@@ -99,7 +106,7 @@ function composeSystemOverview(): string {
     "",
     "# Full reference (auto-generated from the annotation manifest)",
     "",
-    "Every macro, session control, concept, and grammar the engine exposes appears below. Ranges, directionality, and notes come directly from the manifest — use these values when composing tool calls. Per-URI `annotations://` reads remain available for the same content on demand.",
+    "Every macro, session control, concept, and grammar the engine exposes appears below. Ranges, directionality, and notes come directly from the manifest — use these values when composing tool calls. Per-URI `annotations://` reads carry the same content and remain available when a client proxies resource reads or the user attaches them explicitly; Claude Desktop currently reaches them only via user-triggered attach.",
     "",
     "## Macros",
     "",

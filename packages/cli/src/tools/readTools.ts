@@ -23,12 +23,73 @@
  * two enumerator tools.
  */
 
-import type { EngineHandle } from "../engine/engineHandle.js";
+import type { EngineHandle, StateSnapshot } from "../engine/engineHandle.js";
 import type { PresetStore } from "../presets/presetStore.js";
 import type { ToolSpec } from "./sessionTools.js";
+import { composeSystemOverview } from "../resources/promptResources.js";
 
 function err(code: string, message: string, details?: unknown) {
   return { ok: false as const, error: { code, message, ...(details ? { details } : {}) } };
+}
+
+/**
+ * get_started — returns the full Synesthetica primer as text. Advertised
+ * on connect via a strong `initialize.instructions` hint; the LLM should
+ * call this once per conversation before acting on other tools.
+ *
+ * Content is composed from the same authoritative annotation manifest
+ * that renders per-item annotations://* resources — no duplication.
+ * The primer includes ranges + types + enumValues for every macro,
+ * since annotations://macros/{id} per-item reads aren't reachable by
+ * the LLM in Claude Desktop.
+ */
+export const getStartedTool: ToolSpec = {
+  name: "get_started",
+  description:
+    "Return the full Synesthetica primer: pipeline narrative + every macro (with range, default, directionality), session controls, system concepts, grammars, tools with aliases/notes/examples, resources, session-time semantics, and preset workflow. Call this once per conversation before acting on other Synesthetica tools — everything the LLM needs to interpret the user's musical requests is in this response.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      instance: { type: "string", description: "Instance label (optional when only one is running)." },
+    },
+    additionalProperties: false,
+  },
+  async handle(_args, _engine: EngineHandle) {
+    // No engine call required — the primer is content, not state.
+    try {
+      const text = composeSystemOverview();
+      return { ok: true as const, state: emptyStateShaped(), data: text };
+    } catch (e) {
+      return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
+    }
+  },
+};
+
+/**
+ * get_started doesn't touch engine state, but the ToolResult shape
+ * requires `state` on success. Rather than round-tripping to the
+ * engine (which may not be started yet — get_started is the FIRST
+ * tool the LLM calls), return a defaulted empty snapshot. The LLM
+ * should call get_state separately when it needs current state.
+ */
+function emptyStateShaped(): StateSnapshot {
+  return {
+    instance: "default",
+    macros: { intents: {}, effective: {} },
+    session: {
+      tonic: null,
+      mode: null,
+      tempo: null,
+      beatsPerBar: null,
+      beatValue: null,
+      chordMode: "harmonic",
+      metronome: false,
+    },
+    input: null,
+    activePreset: null,
+    startedAt: null,
+    now: null,
+  };
 }
 
 export const getStateTool: ToolSpec = {
@@ -98,5 +159,5 @@ export function buildReadTools(presetStore: PresetStore): ToolSpec[] {
       }
     },
   };
-  return [getStateTool, listInputsTool, listPresetsTool];
+  return [getStartedTool, getStateTool, listInputsTool, listPresetsTool];
 }

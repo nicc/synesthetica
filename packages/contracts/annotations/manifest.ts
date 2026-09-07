@@ -979,6 +979,17 @@ const tools: ToolAnnotation[] = [
   // an autonomous read path. The underlying resource URIs remain for
   // user-triggered attachment and for clients that DO proxy resources.
   {
+    id: "get_started",
+    description:
+      "Return the full Synesthetica primer: pipeline narrative, every macro (range/default/directionality), session controls, system concepts, grammars, tools with aliases/notes/examples, resources, session-time semantics, and preset workflow. Call this once per conversation before acting on other Synesthetica tools — everything needed to interpret the user's musical requests is in this response.",
+    aliases: ["primer", "get started", "onboard", "what is synesthetica"],
+    notes: [
+      "Synesthetica advertises this tool with a strong hint in the MCP initialize instructions. Call it early — before set_macro, set_key, set_tempo, or any other tool — so the LLM has the ranges + directionality + tool aliases to interpret speech accurately.",
+      "The response is text (in `data`); `state` is a defaulted empty snapshot for shape compatibility. Call get_state separately to see current engine state.",
+    ],
+  },
+
+  {
     id: "get_state",
     description:
       "Return the current engine state: macros (intents + effective), prescribed session context (key, tempo, meter, chord mode, metronome), input source, active preset, and session-time anchors. Mirrors state://<label>/current; use this when your client doesn't proxy resource reads.",
