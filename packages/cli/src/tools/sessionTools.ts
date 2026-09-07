@@ -20,8 +20,16 @@
 import type { EngineHandle, StateSnapshot } from "../engine/engineHandle.js";
 
 type ToolInput = Record<string, unknown>;
+/**
+ * Uniform success/failure shape every tool returns.
+ *
+ * Setters populate `state` (the post-call snapshot). Read tools may
+ * additionally populate `data` with the read payload (device list,
+ * preset list, etc.). `get_state` uses `state` alone since it IS
+ * the state. Failure carries a stable `code` + human message.
+ */
 type ToolResult =
-  | { ok: true; state: StateSnapshot }
+  | { ok: true; state: StateSnapshot; data?: unknown }
   | { ok: false; error: { code: string; message: string; details?: unknown } };
 
 export interface ToolSpec {

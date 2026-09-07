@@ -970,6 +970,44 @@ const tools: ToolAnnotation[] = [
       "Captures: macro values, session state (key, tempo, meter, chord mode, metronome), input source.",
     ],
   },
+
+  // ---- Read surface (tool wrappers over resource content) ----
+  //
+  // MCP treats resources as a first-class primitive, but Claude
+  // Desktop only surfaces tools to the LLM as callable — resources
+  // land only via user-triggered attachment. These tools give the LLM
+  // an autonomous read path. The underlying resource URIs remain for
+  // user-triggered attachment and for clients that DO proxy resources.
+  {
+    id: "get_state",
+    description:
+      "Return the current engine state: macros (intents + effective), prescribed session context (key, tempo, meter, chord mode, metronome), input source, active preset, and session-time anchors. Mirrors state://<label>/current; use this when your client doesn't proxy resource reads.",
+    aliases: ["what's set", "current state", "read state", "how are things"],
+    notes: [
+      "macros.intents is the last user-set value per macro (what was asked for). macros.effective is what pipeline consumers are actually running with. Divergence is often legitimate (compound-then-leaf override, preset-then-tweak) — treat as information, not an automatic bug.",
+      "startedAt is null when no session is active. Call start_session to begin.",
+    ],
+  },
+
+  {
+    id: "list_inputs",
+    description:
+      "List connected MIDI + audio input devices. Each entry carries a sourceString ready to pass to set_input(source). Mirrors inputs://; use this when your client doesn't proxy resource reads.",
+    aliases: ["available inputs", "what inputs", "devices", "list devices"],
+    notes: [
+      "Read on demand — hot-plug notifications aren't wired yet. Audio device labels only appear after the browser has been granted microphone permission at least once for this origin.",
+    ],
+  },
+
+  {
+    id: "list_presets",
+    description:
+      "List saved presets by name, with savedAt + prescribed session context + input at save time. Use switch_preset(name) to load one. Mirrors presets://; use this when your client doesn't proxy resource reads.",
+    aliases: ["available presets", "what presets", "saved presets"],
+    notes: [
+      "Returns preset SUMMARIES (name + savedAt + session + input). To see a preset's macro values, load it with switch_preset then read get_state.",
+    ],
+  },
 ];
 
 // ============================================================================

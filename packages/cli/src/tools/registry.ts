@@ -13,6 +13,7 @@ import type { ToolSpec } from "./sessionTools.js";
 import { sessionTools } from "./sessionTools.js";
 import { macroTools } from "./macroTools.js";
 import { buildPresetTools } from "./presetTools.js";
+import { buildReadTools } from "./readTools.js";
 import type { PresetStore } from "../presets/presetStore.js";
 import { productionManifest } from "@synesthetica/contracts";
 
@@ -28,6 +29,7 @@ export function buildToolRegistry(presetStore: PresetStore): Map<string, ToolSpe
   for (const t of sessionTools) add(t);
   for (const t of macroTools) add(t);
   for (const t of buildPresetTools(presetStore)) add(t);
+  for (const t of buildReadTools(presetStore)) add(t);
   return registry;
 }
 
