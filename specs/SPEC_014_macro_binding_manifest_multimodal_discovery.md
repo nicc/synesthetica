@@ -119,6 +119,26 @@ Divergence is not always a bug, though — legitimate causes include: a compound
 
 Presets record only `intents` — the user-facing values — because replaying a preset is "reproduce what the user asked for", not "reproduce a snapshot of implementation state".
 
+### 1.10 Lifecycle (Route 1)
+
+Synesthetica is atypical among MCP servers: most creative-tool integrations are native apps that pull an LLM in for the session's duration, so the primer + pipeline are amortised across a session that IS the app. Synesthetica inverts that — the LLM lives in Claude Desktop, and Synesthetica is a tool the LLM can reach for. This means the server is present during many conversations that are not about music at all.
+
+**Route 1 handles this inversion**: the MCP server is always-on and cheap; the pipeline sits behind lifecycle tools the LLM invokes on demand.
+
+Concretely:
+
+1. `synesthetica start` boots ONLY the MCP server on stdio. No web-app, no WS bridge, no browser tab, no Vite subprocess. Idle cost is one Node process holding stdio and answering `tools/list`.
+2. `initialize.instructions` carries a short (~50-80 tokens) primer pointer: "Synesthetica is a real-time music visualiser controlled via this server. If the user mentions playing / instrument / rhythm / harmony / tempo / visualisation, call `get_started` for the full primer, then `start_session` to spawn the visualiser." Kept minimal so idle conversations don't pay to hold the full primer.
+3. `get_started` tool returns the full primer as text (via `data`). Same content that `guide://system-overview` used to render, delivered via the guaranteed tools channel (Claude Desktop does not proxy resource reads or prompt attach as autonomous LLM surfaces).
+4. `start_session` tool spawns the pipeline (web-app + WS bridge + browser tab). Idempotent.
+5. Every setter and reader tool declares `requiresSession: true` (default). The MCP server returns `ENGINE_NOT_STARTED` on cold calls, with a hint pointing at `start_session`. Non-gating — the LLM can start_session and re-issue the original call in one round-trip.
+6. `stop_session` tool tears the pipeline down. Idempotent.
+7. Each non-lifecycle tool description carries a "call get_started first if you haven't" tag (~5 tokens) so an LLM that reaches for `set_macro` without the primer still gets a discovery cue.
+
+The `SessionManager` in `packages/cli/src/session/sessionManager.ts` owns the state machine: `stopped → starting → running → stopping → stopped`. Partial-start failures tear down what was brought up before throwing.
+
+State resources (`state://`, `inputs://`) continue to advertise even before start_session — read handlers detect the not-started case via a session-engine proxy and return empty/default content. This matches the user-attach fallback the resources exist for; the LLM reaches equivalent content via `get_state` / `list_inputs` tools which apply `ENGINE_NOT_STARTED` gating at their own layer.
+
 ## 2. Derivation: one manifest, many consumers
 
 The manifest at `productionManifest` is the sole source. Every derived surface reads from it at build time or startup, never duplicates the content.

@@ -208,6 +208,7 @@ function renderToolResultShape(): string {
     "- `CHORD_MODE_UNKNOWN` — `set_chord_mode`: mode not in {harmonic, bass-led}.",
     "- `INSTANCE_NOT_FOUND` — the `instance` arg doesn't match any running engine.",
     "- `ENGINE_ERROR` — underlying engine / transport / filesystem failure. Read the message.",
+    "- `ENGINE_NOT_STARTED` — the pipeline isn't running. Call `start_session` and then re-issue the original call.",
     "",
     "Handling guidance:",
     "- Use `details.available` (when present) to pick a valid retry value.",

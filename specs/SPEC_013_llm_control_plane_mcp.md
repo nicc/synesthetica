@@ -84,11 +84,41 @@ SPEC 004 established the principle (annotation-driven, LLM interprets, engine ex
 
 ### Tools
 
-10 tools, per RFC 011 §What the MCP server exposes. All tools accept an optional `instance` parameter; when only one instance is running, it defaults to that instance's label. When multiple are running, `instance` is required; omitting it returns an error listing the available labels.
+16 tools organised in five families: **lifecycle** (start_session / stop_session), **onboarding** (get_started), **read surface** (get_state / list_inputs / list_presets), **setter surface** (set_key / set_tempo / set_meter / set_chord_mode / set_metronome / set_input / set_hue_for_pitch / set_macro), **preset surface** (switch_preset / save_preset). All tools accept an optional `instance` parameter defaulting to the single instance today.
 
 Every tool responds with either:
-- **Success**: `{ "ok": true, "state": <updated-state-snapshot> }` — the state snapshot lets the LLM reason without a separate read.
-- **Error**: `{ "ok": false, "error": { "code": <string>, "message": <string>, "details"?: <object> } }` — see §Error surfacing.
+- **Success**: `{ "ok": true, "state": <state-snapshot>, "data"?: <any> }` — setter tools populate `state` with the post-call snapshot; read tools may additionally populate `data` with the read payload (device list, preset list, primer text); lifecycle tools return a stub `state` with the instance label plus a `data` summary of what they did.
+- **Error**: `{ "ok": false, "error": { "code": <string>, "message": <string>, "details"?: <object> } }` — see SPEC 015.
+
+**Session gating.** Every tool carries a `requiresSession` boolean (default true). When true, the MCP server returns `ENGINE_NOT_STARTED` if no session is running — the LLM's cue to call `start_session` first. `get_started`, `start_session`, and `stop_session` set `requiresSession: false` and run regardless of session state. This is the Route 1 lifecycle: the MCP server is always-on and cheap; the pipeline sits behind `start_session`.
+
+#### `get_started(instance?)` — onboarding primer
+
+Returns the full Synesthetica primer as text (in `data`): pipeline narrative, every macro with range/default/directionality, session controls, system concepts, grammars, tools with aliases/notes/examples, resources, session-time semantics, and preset workflow. The LLM should call this once per conversation before acting on other Synesthetica tools.
+
+Advertised via a strong `initialize.instructions` hint on the MCP handshake. Does not touch the engine — `state` is a defaulted empty snapshot; call `get_state` separately for real state. `requiresSession: false`.
+
+#### `start_session(instance?)` — spawn pipeline
+
+Spawns the visualiser: opens the web-app in a browser tab, starts the WS bridge, connects the engine. `data` carries `{instanceLabel, wsPort, webAppUrl, openedInBrowser}`. Idempotent — a no-op when a session is already running. Every other engine tool requires this to have succeeded first.
+
+Errors: `ENGINE_ERROR` if spawning fails.
+
+#### `stop_session(instance?)` — tear down pipeline
+
+Closes the web-app subprocess and WS bridge. Idempotent. Preset saves remain valid across sessions.
+
+#### `get_state(instance?)` — mirror of state://<label>/current
+
+Returns the current engine state snapshot. Same content as `state://<label>/current`; exists as a tool because Claude Desktop doesn't proxy resource reads to the LLM as callable — resources land only via user-triggered attach. `state` is populated with the snapshot; `data` is not.
+
+#### `list_inputs(instance?)` — mirror of inputs://
+
+Returns available MIDI + audio input devices in `data`. Same content as `inputs://`.
+
+#### `list_presets(instance?)` — mirror of presets://
+
+Returns preset summaries (name + savedAt + session + input at save time) in `data`. Same content as `presets://`.
 
 #### `set_macro(name, value, instance?)`
 
@@ -219,7 +249,8 @@ Alias for `annotations://concepts/*`. Exposed as its own URI scheme because conc
 
 - `posture://quiet` — system prompt fragment for quiet-performance mode. Silent no-ops on ambiguity; short commands only; no clarifying questions.
 - `posture://conversational` — system prompt fragment for conversational mode. Tolerates ambiguity; may ask clarifying questions; explains changes.
-- `guide://system-overview` — a prose narrative describing how the pipeline flows, what each grammar illustrates, how prescribed context and confidence work. Read once by the LLM as context; not for lookup (that's `concepts://`).
+
+`guide://system-overview` was dropped in Route 1 (SPEC 014 §Lifecycle). The same content is now returned by the `get_started` MCP tool, which is autonomously callable by the LLM and doesn't require user attach. The MCP `initialize.instructions` field carries a short pointer to `get_started` so the LLM has the discovery cue on handshake.
 
 Prompt content is generated from source documentation (see §Annotation storage — generator step) rather than embedded in the MCP server code, so prompt refinement is a doc edit.
 
@@ -316,9 +347,11 @@ synesthetica help
 
 `--no-mcp` skips MCP server registration entirely — engine + web app + UI controls launch and work standalone; no LLM integration. See §UI Controls — standalone-launch.
 
-`start`:
-- First invocation: starts the MCP server, spawns one engine instance labelled `default` (or user-supplied), opens the browser tab.
-- Subsequent invocations: registers a new engine instance with the running MCP server, opens a new browser tab. `--instance <label>` required for the 2nd+ invocation; refuses without.
+`start` (Route 1 lifecycle, SPEC 014):
+- Starts ONLY the MCP server. The engine bridge, web-app, and browser tab are NOT spawned until the LLM calls the `start_session` tool.
+- This keeps the always-on cost of having Synesthetica configured in Claude Desktop minimal — an idle CLI holding stdio, nothing else, for conversations that never touch music.
+- `initialize.instructions` on the MCP handshake carries a short primer pointer telling the LLM to call `get_started` for the full primer and `start_session` before other tool calls.
+- `--no-mcp` uses the legacy eager path — WS bridge + web-app + browser tab spawn immediately, no MCP server — for standalone smoke testing without an LLM client.
 
 `stop`:
 - With `--instance`: tears down that engine instance, keeps others running.
