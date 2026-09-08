@@ -1133,8 +1133,7 @@ const resources: ResourceAnnotation[] = [
       "startedAt and now are null until session.phase reaches `input-active` — the pipeline can be up (phase `spawned`) with no input adapter yet, in which case both are still null. Check `phase` to distinguish 'no session' from 'session ready but idle'.",
     ],
     examples: [
-      "state://default/current — the primary instance's state.",
-      "state://piano/current — when the user has labelled an instance 'piano'.",
+      "state://default/current — the only instance today; multi-instance planned but not shipped.",
     ],
     subscribable: true,
   },
