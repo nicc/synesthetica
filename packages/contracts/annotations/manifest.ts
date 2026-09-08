@@ -1129,7 +1129,7 @@ const resources: ResourceAnnotation[] = [
     notes: [
       "User-attach surface. The LLM should call `get_state` instead — same content, autonomous read path.",
       "Setter tools return the resolved state in their `state` field on success, so an explicit read isn't needed right after a mutation.",
-      "startedAt is ISO wall-clock at session start; now is session-ms at the time the snapshot was constructed (roughly current — recent-events reads carry a fresher now).",
+      "startedAt is ISO wall-clock at session start; now is session-ms computed fresh at read time. Two consecutive reads will show `now` advancing.",
       "startedAt and now are null until session.phase reaches `input-active` — the pipeline can be up (phase `spawned`) with no input adapter yet, in which case both are still null. Check `phase` to distinguish 'no session' from 'session ready but idle'.",
     ],
     examples: [
