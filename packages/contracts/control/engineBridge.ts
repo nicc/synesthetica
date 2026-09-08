@@ -89,10 +89,37 @@ export interface MacroState {
  */
 export type SessionPhase = "no-session" | "spawned" | "input-active";
 
+/**
+ * Browser permission state for the input sources the pipeline uses.
+ * Matches the Permissions API's PermissionState enum. When the
+ * browser doesn't expose a queryable state for a source (some
+ * Firefox versions for Web MIDI without the add-on), the field
+ * defaults to "prompt" so the LLM's guidance ("click Allow") is
+ * still the right shape.
+ */
+export type PermissionState = "granted" | "prompt" | "denied";
+
+export interface SessionPermissions {
+  /** Web MIDI access — required for MIDI device enumeration + input. */
+  midi: PermissionState;
+  /** Microphone access — required for audio input via Basic Pitch. */
+  audio: PermissionState;
+}
+
 /** State snapshot shape (mirror of engine/engineHandle.ts). */
 export interface EngineStateSnapshot {
   instance: string;
   macros: MacroState;
+  /**
+   * Browser permissions the pipeline's input paths depend on.
+   * Populated by the browser on `pipeline-ready` from
+   * `navigator.permissions.query`; updated via `onchange` when the
+   * user clicks Allow / Block. When `list_inputs` returns fewer
+   * devices than the user expects, check this field before assuming
+   * a cable is unplugged — `midi: "prompt"` means the browser
+   * hasn't been authorised yet.
+   */
+  permissions: SessionPermissions;
   session: {
     tonic: number | null;
     mode: string | null;

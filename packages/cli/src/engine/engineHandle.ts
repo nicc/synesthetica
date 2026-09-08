@@ -28,6 +28,11 @@ export interface StateSnapshot {
   instance: string;
   /** Current macro values, split by intent vs consumer-observed effect. */
   macros: MacroState;
+  /** Browser permission states; see EngineStateSnapshot in contracts. */
+  permissions: {
+    midi: "granted" | "prompt" | "denied";
+    audio: "granted" | "prompt" | "denied";
+  };
   /** Prescribed musical frame. Nulls = not prescribed. */
   session: {
     tonic: number | null;

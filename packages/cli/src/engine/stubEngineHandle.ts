@@ -47,6 +47,7 @@ export class StubEngineHandle implements EngineHandle {
       // diverge from. Real handles rebuild effective from live
       // consumers on every publish.
       macros: { intents: { ...initial }, effective: { ...initial } },
+      permissions: { midi: "prompt", audio: "prompt" },
       session: {
         tonic: null,
         mode: null,

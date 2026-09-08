@@ -77,6 +77,7 @@ function emptyStateShaped(): StateSnapshot {
   return {
     instance: "default",
     macros: { intents: {}, effective: {} },
+    permissions: { midi: "prompt", audio: "prompt" },
     session: {
       tonic: null,
       mode: null,

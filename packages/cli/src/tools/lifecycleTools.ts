@@ -29,6 +29,7 @@ function shape<T>(session: SessionManager, data?: T) {
     state: {
       instance: session.instanceLabel,
       macros: { intents: {}, effective: {} },
+      permissions: { midi: "prompt" as const, audio: "prompt" as const },
       session: {
         tonic: null,
         mode: null,
@@ -64,6 +65,20 @@ export function buildLifecycleTools(session: SessionManager): ToolSpec[] {
     async handle(_args) {
       try {
         const summary = await session.start();
+        // Prefer the real engine state (pipeline is ready by now,
+        // permissions have been queried by the browser) over the
+        // stub — the LLM sees permission status + phase + macro
+        // state directly from the start_session return instead of
+        // needing a follow-up get_state.
+        const engine = session.getEngine();
+        if (engine) {
+          try {
+            const state = await engine.getStateSnapshot();
+            return { ok: true as const, state, data: summary };
+          } catch {
+            // Fall through to stub — shouldn't happen post-ready.
+          }
+        }
         return shape(session, summary);
       } catch (e) {
         return err(

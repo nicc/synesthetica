@@ -110,6 +110,7 @@ function clearRecentEvents(): void {
 const engineState: EngineStateSnapshot = {
   instance: "default",
   macros: { intents: {}, effective: {} },
+  permissions: { midi: "prompt", audio: "prompt" },
   session: {
     tonic: null,
     mode: null,
@@ -809,11 +810,55 @@ mountPanels();
 void initMidi();
 initializePipeline();
 mountWsReceiver();
+void queryPermissionsAndPublish();
 // Signal to the CLI that we're wired up and ready to receive engine
 // calls that actually take effect on consumers. SessionManager.start()
 // on the CLI awaits this before returning ok:true to the LLM, so a
 // subsequent set_macro doesn't race a null pipeline.
 wsReceiver?.publishPipelineReady();
+
+/**
+ * Query the browser's Permissions API for MIDI + microphone access,
+ * populate engineState.permissions, and subscribe to change events
+ * so a user clicking Allow / Block fires a state-changed push and
+ * the LLM sees the new state on its next read.
+ *
+ * Falls back to "prompt" for any query the browser refuses to answer
+ * (some Firefox / older-Chrome combos don't expose MIDI in the
+ * standard Permissions API). "prompt" is the safe default because
+ * the LLM's guidance ("click Allow in the tab") reads correctly for
+ * both an actual prompt state and an unqueryable one.
+ */
+async function queryPermissionsAndPublish(): Promise<void> {
+  const perms = (navigator as { permissions?: Permissions }).permissions;
+  if (!perms) return; // ancient browser; stays at defaults
+
+  const applyChange = (
+    kind: "midi" | "audio",
+    status: PermissionStatus,
+  ): void => {
+    engineState.permissions[kind] = status.state as "granted" | "prompt" | "denied";
+    publishState();
+  };
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const midiStatus = await perms.query({ name: "midi" as any });
+    applyChange("midi", midiStatus);
+    midiStatus.onchange = () => applyChange("midi", midiStatus);
+  } catch {
+    // Query unsupported — leave at "prompt".
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const micStatus = await perms.query({ name: "microphone" as any });
+    applyChange("audio", micStatus);
+    micStatus.onchange = () => applyChange("audio", micStatus);
+  } catch {
+    // Same.
+  }
+}
 
 function mountWsReceiver(): void {
   const params = new URLSearchParams(window.location.search);

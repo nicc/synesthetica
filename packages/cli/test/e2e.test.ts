@@ -36,6 +36,7 @@ class FakeBrowser {
     this.state = {
       instance: label,
       macros: { intents: {}, effective: {} },
+    permissions: { midi: "prompt", audio: "prompt" },
       session: {
         tonic: null,
         mode: null,

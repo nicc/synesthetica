@@ -68,6 +68,8 @@ Every setter tool (`set_macro`, `set_key`, etc.) and every reader tool (`get_sta
 
 Prefer `state.session.phase` over `startedAt`/`effective` inference when reporting session state to the user — it names the `spawned` intermediate the other signals miss.
 
+`state.permissions` carries the browser's authorisation state for MIDI and microphone (`granted | prompt | denied` each). `start_session` returns state directly, so you can read `state.permissions.midi` alongside `list_inputs` without a second call. When `list_inputs` looks shorter than expected — one entry (the microphone) when the user said a keyboard is plugged in — check permissions before assuming a cable problem: `midi: "prompt"` means the fix is "click Allow in the tab", not "check the cable".
+
 ---
 
 ## Prescribed context (what the user tells the analyser)

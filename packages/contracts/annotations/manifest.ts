@@ -1042,6 +1042,7 @@ const tools: ToolAnnotation[] = [
     aliases: ["available inputs", "what inputs", "devices", "list devices"],
     notes: [
       "Read on demand — hot-plug notifications aren't wired yet. Audio device labels only appear after the browser has been granted microphone permission at least once for this origin.",
+      "**If the list looks shorter than expected** (e.g. only the microphone when the user says a MIDI keyboard is plugged in), check `state.permissions.midi` before assuming a hardware problem. `prompt` means the browser hasn't been authorised — the fix is 'click Allow in the tab'. `denied` means blocked. `granted` with no MIDI entry is when to suspect a cable.",
     ],
   },
 
@@ -1214,6 +1215,18 @@ const presets: PresetAnnotation[] = [];
 // ============================================================================
 
 const derivedState: DerivedStateAnnotation[] = [
+  {
+    id: "permissions",
+    name: "Browser permissions",
+    aliases: ["midi permission", "microphone permission", "audio permission"],
+    derivedFrom: ["browser Permissions API"],
+    values: ["granted", "prompt", "denied"],
+    notes: [
+      "Browser permission state for the pipeline's input sources: `{ midi, audio }`. Each is `granted | prompt | denied`, following the standard Permissions API enum. Populated by the browser tab on pipeline-ready; updated on user Allow/Block via the API's onchange event, which triggers a state-changed push.",
+      "**Read this before diagnosing an unexpectedly-short `list_inputs`.** MIDI at `prompt` means the browser hasn't been authorised yet — the fix is 'click Allow in the tab' rather than 'check the cable'. Audio at `denied` means the user has blocked microphone access; the audio entry will still appear but capturing it will fail.",
+      "Some browser + input combos don't expose a queryable state (older Firefox for Web MIDI without the sysex add-on). Those default to `prompt` so the LLM's Allow guidance still reads correctly.",
+    ],
+  },
   {
     id: "session.phase",
     name: "Session phase",

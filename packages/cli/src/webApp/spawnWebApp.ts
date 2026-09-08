@@ -105,21 +105,64 @@ async function startDev(opts: SpawnWebAppOptions): Promise<WebAppHandle> {
  * Static mode: bundled dist + built-in HTTP server
  * ------------------------------------------------------------------ */
 
+/**
+ * Preferred port list. Tried in order before falling back to an
+ * OS-picked free port. Stabilises the browser origin across restarts
+ * so per-origin permissions (Web MIDI, microphone) persist — the
+ * browser only remembers a grant against `http://localhost:<port>`,
+ * and a new port on every launch means re-prompting every time.
+ *
+ * Range chosen to avoid the common dev-tool defaults (3000, 5173,
+ * 8000, 8080 …). Overridable via SYN_WEBAPP_PORTS=port1,port2,…
+ * on the CLI environment for anyone with a persistent collision.
+ */
+const DEFAULT_PREFERRED_STATIC_PORTS = [58721, 58722, 58723, 58724, 58725];
+
+function preferredStaticPorts(): number[] {
+  const raw = process.env.SYN_WEBAPP_PORTS;
+  if (!raw) return DEFAULT_PREFERRED_STATIC_PORTS;
+  const parsed = raw
+    .split(",")
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isInteger(n) && n > 0 && n < 65536);
+  return parsed.length > 0 ? parsed : DEFAULT_PREFERRED_STATIC_PORTS;
+}
+
 async function startStatic(opts: SpawnWebAppOptions): Promise<WebAppHandle> {
   const dir = opts.webAppDistDir ?? locateBundledWebApp();
   const log = opts.log ?? process.stderr;
-  const handle = await serveStatic({
-    root: dir,
-    port: opts.port ?? 0,
-    log: (line) => log.write(`${line}\n`),
-  });
-  return {
-    url: handle.url,
-    mode: "static",
-    async close() {
-      await handle.close();
-    },
-  };
+  const write = (line: string) => log.write(`${line}\n`);
+
+  // If the caller pinned a specific port, honour it (no fallback).
+  if (opts.port !== undefined) {
+    const handle = await serveStatic({ root: dir, port: opts.port, log: write });
+    return { url: handle.url, mode: "static", close: () => handle.close() };
+  }
+
+  // Try preferred ports in order, falling back to OS-picked (port 0)
+  // if all are in use. First success wins.
+  const candidates = [...preferredStaticPorts(), 0];
+  let lastErr: unknown;
+  for (const port of candidates) {
+    try {
+      const handle = await serveStatic({ root: dir, port, log: write });
+      if (port !== 0) write(`serveStatic: bound preferred port ${port}`);
+      return { url: handle.url, mode: "static", close: () => handle.close() };
+    } catch (err) {
+      lastErr = err;
+      if (isPortInUse(err)) {
+        write(`serveStatic: port ${port} in use, trying next`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr ?? new Error("serveStatic: could not bind any port");
+}
+
+function isPortInUse(err: unknown): boolean {
+  const code = (err as { code?: string })?.code;
+  return code === "EADDRINUSE" || code === "EACCES";
 }
 
 /* ------------------------------------------------------------------
