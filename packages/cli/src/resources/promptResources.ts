@@ -146,7 +146,7 @@ export function composeSystemOverview(): string {
     "",
     "## Resources",
     "",
-    "MCP resources you can read for data. Per-item annotation resources (annotations://macros/{id}, annotations://concepts/{term}, etc.) aren't repeated here — this section covers the state + preset-index + bundled-annotations surfaces. Each macro / session control / concept / grammar / preset also has its own annotations://* resource.",
+    "MCP resources — **user-attach surfaces**, not autonomous LLM reads. Claude Desktop doesn't proxy these through as callable; the user selects them via the + menu when they want to inspect something directly. Every reader tool above (`get_state`, `get_recent_events`, `list_inputs`, `list_presets`, `get_preset`) returns the same content as its matching resource — the LLM should use the tool. This section documents each resource's shape so you know what the user is looking at when they attach one. Per-item annotation resources (`annotations://macros/{id}`, `annotations://concepts/{term}`, etc.) aren't repeated here.",
     "",
     (productionManifest.resources ?? []).map(renderResource).join("\n\n"),
     "",
@@ -171,18 +171,18 @@ export function composeSystemOverview(): string {
  */
 function renderSessionTimeGuidance(): string {
   return [
-    "All timestamps in state resources are **milliseconds since session start** (a floating-point number). Absolute wall-clock time is available as `startedAt` (ISO 8601 string).",
+    "All timestamps in state are **milliseconds since session start** (a floating-point number). Absolute wall-clock time is available as `startedAt` (ISO 8601 string).",
     "",
     "Where these fields appear:",
-    "- `state://<label>/current` — carries `startedAt` (ISO, stable) and `now` (session-ms, roughly current — freshest as of the last state-changed event).",
-    "- `state://<label>/recent-events` — envelope is `{ startedAt, now, events }`. `now` here is FRESH (computed at read time). Each event's `t` is session-ms.",
+    "- `get_state` → `state.startedAt` (ISO, stable) and `state.now` (session-ms, roughly current — freshest as of the last state-changed event).",
+    "- `get_recent_events` → envelope `{ startedAt, now, events }`. `now` here is FRESH (computed at read time). Each event's `t` is session-ms.",
     "",
     "How to answer temporal questions:",
-    "- **\"N seconds ago\"** — read state://recent-events; `now - event.t` is the age of that event in ms. If the user just spoke, use the recent-events `now` as your zero; it's the freshest reading.",
+    "- **\"N seconds ago\"** — call `get_recent_events`; `now - event.t` is the age of that event in ms. If the user just spoke, use the envelope's `now` as your zero; it's the freshest reading.",
     "- **\"What time did I play that?\"** — reconstruct wall-clock as `new Date(startedAt) + event.t` (ms).",
-    "- **\"How long has the session been going?\"** — `now` on the current-state or recent-events envelope.",
+    "- **\"How long has the session been going?\"** — `now` on either surface.",
     "",
-    "When no session is active, `startedAt` and `now` are null and events is `[]`. Check for null before doing math.",
+    "`startedAt` and `now` are null until `state.session.phase` is `input-active` — the pipeline can exist (phase `spawned`) with no adapter running yet. Check `session.phase` when you're about to do temporal math and there's a chance no input has been selected. Once `input-active`, events accrue.",
     "",
     "Response latency doesn't complicate this: you always have `now` at the moment of read, so relative comparisons stay anchored regardless of how long you take to think.",
   ].join("\n");
@@ -275,9 +275,9 @@ function renderPresets(presets: readonly { id: string; name?: string; notes?: st
     "Presets are named snapshots of the full control surface — macro values, prescribed context (key / tempo / meter / chord mode / metronome), and input source. They're user-managed at runtime:",
   );
   lines.push("");
-  lines.push("- Read `presets://` for the list of preset summaries (name, savedAt, session, input).");
-  lines.push("- Read `presets://<name>` for one preset's full stored content.");
-  lines.push("- `switch_preset(name)` — load a preset; every control snaps to its stored value.");
+  lines.push("- `list_presets` — preset summaries (name, savedAt, session, input) for enumeration.");
+  lines.push("- `get_preset(name)` — one preset's full stored content, WITHOUT loading it. Use this to answer 'what's in my practice preset?' before deciding whether to switch.");
+  lines.push("- `switch_preset(name)` — load a preset; every control snaps to its stored value. Also repopulates `macros.intents` with the preset's stored values (so relative requests right after a load anchor on those, not on annotated defaults).");
   lines.push("- `save_preset(name)` — capture the current state under this name (overwrites if the name exists).");
   lines.push("");
   lines.push(

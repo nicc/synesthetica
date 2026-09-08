@@ -397,7 +397,7 @@ const sessionControls: SessionControlAnnotation[] = [
     dynamicOptions: true,
     nullable: false,
     notes: [
-      "MIDI device or audio input. The web-app populates the widget's option list at runtime from connected devices; the LLM enumerates the same list via inputs://, and sees the currently-selected source in `state://<label>/current.input`.",
+      "MIDI device or audio input. Enumerate connected devices via the `list_inputs` tool; the currently-selected source is on `state.input` from `get_state`. (The panel widget populates from the same device list.)",
       "Audio device labels only appear after getUserMedia permission is granted for the origin (i.e. after at least one audio session has started). Before that, additional audio entries surface as placeholder names ('Audio input 1', etc.) alongside a 'Default microphone' fallback.",
     ],
   },
@@ -912,7 +912,7 @@ const tools: ToolAnnotation[] = [
   {
     id: "set_input",
     description:
-      "Select the input source (MIDI device or audio input). Read inputs:// for the enumerated list of available devices — each entry carries a `sourceString` ready to pass here. Format: `midi:<device-id>`, 'audio' (default microphone), or `audio:<device-id>` (specific audio input). Current selection is available at `state://<label>/current.input`.",
+      "Select the input source (MIDI device or audio input). Use the `list_inputs` tool for the enumerated list of available devices — each entry carries a `sourceString` ready to pass here. Format: `midi:<device-id>`, 'audio' (default microphone), or `audio:<device-id>` (specific audio input). Current selection is on `state.input` from `get_state`.",
     aliases: ["use", "listen to", "switch to", "input"],
     examples: [
       "set_input(source: 'midi:Yamaha P-125') — listen to that MIDI keyboard.",
@@ -924,11 +924,11 @@ const tools: ToolAnnotation[] = [
   {
     id: "set_macro",
     description:
-      "Set any aesthetic macro (system:*, cross-cutting, or `<scope>:*`). Value shape depends on the macro's type: number for continuous / compound, string or number for discrete. See annotations://macros/{id} for each macro's range, default, and directionality.",
+      "Set any aesthetic macro (system:*, cross-cutting, or `<scope>:*`). Value shape depends on the macro's type: number for continuous / compound, string or number for discrete. Every macro's range, default, and directionality is embedded in the Macros section of the `get_started` primer.",
     aliases: ["adjust", "tune", "set macro", "change how"],
     notes: [
       "Compound macros fan out to leaf targets via a linear default curve; per-target inversion is applied when the compound's semantic runs opposite the leaf's natural range. See the compound's targets field in the manifest.",
-      "The state resource `state://<label>/current` reflects the value the LLM most recently set — including compound values, even when the underlying leaves also change.",
+      "`get_state` reflects the value the LLM most recently set — including compound values, even when the underlying leaves also change. Read `state.macros.intents` for what was asked for, `state.macros.effective` for what the pipeline is running with.",
       "**Compound-vs-leaf routing**: prefer the compound when the user's frame is cross-grammar ('everything more expansive' → time-horizon; 'harder rhythm practice' → rhythm:difficulty). Prefer the leaf when the request targets one grammar ('just the chord fade' → harmony:linger; 'only the rhythm horizon' → rhythm:horizon). Compounds do a linear fan-out — set a leaf directly when you want a specific value on one target without disturbing siblings.",
     ],
     examples: [
@@ -957,11 +957,11 @@ const tools: ToolAnnotation[] = [
   {
     id: "switch_preset",
     description:
-      "Load a named preset. Every control (macros, prescribed context, input source) snaps to the preset's stored value. Preset names are enumerable at presets://.",
+      "Load a named preset. Every control (macros, prescribed context, input source) snaps to the preset's stored value. Enumerate names via the `list_presets` tool; inspect one without loading via `get_preset(name)`.",
     aliases: ["load preset", "switch preset", "recall"],
     notes: [
       "On failure the error's details.available field lists all preset names known to the store.",
-      "Preset loads reset the active-preset marker on state://current so the LLM can see which preset is current.",
+      "A successful load sets `state.activePreset` (read via `get_state`) to the loaded name — so the LLM can see which preset is current without tracking it manually.",
       "**Anchoring after a load**: macros.intents is repopulated with the preset's stored values (that IS what the user just asked for). A relative request immediately after switch_preset ('a bit more chord linger') anchors on those loaded intents, not on the annotated defaults.",
     ],
   },
@@ -1021,18 +1021,18 @@ const tools: ToolAnnotation[] = [
   {
     id: "get_state",
     description:
-      "Return the current engine state: macros (intents + effective), prescribed session context (key, tempo, meter, chord mode, metronome), input source, active preset, and session-time anchors. Mirrors `state://<label>/current`; use this when your client doesn't proxy resource reads.",
+      "Return the current engine state: macros (intents + effective), prescribed session context (key, tempo, meter, chord mode, metronome), input source, active preset, phase, and session-time anchors. This is your autonomous read surface for state — the matching `state://<label>/current` resource carries the same content but exists for user-triggered attachment, not LLM reads.",
     aliases: ["what's set", "current state", "read state", "how are things"],
     notes: [
       "macros.intents is the last user-set value per macro (what was asked for). macros.effective is what pipeline consumers are actually running with. Divergence is often legitimate (compound-then-leaf override, preset-then-tweak) — treat as information, not an automatic bug.",
-      "startedAt is null when no session is active. Call start_session to begin.",
+      "startedAt is null until state.session.phase reaches `input-active` — the pipeline can be up (phase `spawned`) with no input selected, in which case startedAt stays null. Check `phase` to distinguish 'no session' from 'session ready but idle'.",
     ],
   },
 
   {
     id: "list_inputs",
     description:
-      "List connected MIDI + audio input devices. Each entry carries a sourceString ready to pass to set_input(source). Mirrors inputs://; use this when your client doesn't proxy resource reads.",
+      "List connected MIDI + audio input devices. Each entry carries a sourceString ready to pass to set_input(source). This is your autonomous read surface for enumerating devices — the matching `inputs://` resource carries the same content but exists for user-triggered attachment.",
     aliases: ["available inputs", "what inputs", "devices", "list devices"],
     notes: [
       "Read on demand — hot-plug notifications aren't wired yet. Audio device labels only appear after the browser has been granted microphone permission at least once for this origin.",
@@ -1042,7 +1042,7 @@ const tools: ToolAnnotation[] = [
   {
     id: "list_presets",
     description:
-      "List saved presets by name, with savedAt + prescribed session context + input at save time. Use switch_preset(name) to load one. Mirrors presets://; use this when your client doesn't proxy resource reads.",
+      "List saved presets by name, with savedAt + prescribed session context + input at save time. Use switch_preset(name) to load one. This is your autonomous read surface for preset enumeration — the matching `presets://` resource carries the same content but exists for user-triggered attachment.",
     aliases: ["available presets", "what presets", "saved presets"],
     notes: [
       "Returns preset SUMMARIES (name + savedAt + session + input) only. For a preset's macro values without loading it, use get_preset(name).",
@@ -1052,7 +1052,7 @@ const tools: ToolAnnotation[] = [
   {
     id: "get_preset",
     description:
-      "Return one preset's full stored content — macro values, session controls, input — WITHOUT loading it. Use to answer 'what's in my practice preset?' before deciding whether to switch. Mirrors presets://<name>.",
+      "Return one preset's full stored content — macro values, session controls, input — WITHOUT loading it. Use to answer 'what's in my practice preset?' before deciding whether to switch. This is your autonomous read surface for one preset's content — the matching `presets://<name>` resource carries the same content but exists for user-triggered attachment.",
     aliases: ["show preset", "preview preset", "what's in preset"],
     notes: [
       "Non-destructive read. The current control surface is untouched. On unknown name, error's details.available lists preset names for retry.",
@@ -1065,7 +1065,7 @@ const tools: ToolAnnotation[] = [
   {
     id: "get_recent_events",
     description:
-      "Return recent musical events (note-on/off, chord-detected/changed) wrapped in a temporal envelope `{startedAt, now, events}`. Each event's `t` is milliseconds since startedAt. Mirrors state://<label>/recent-events. Read this to answer 'what did I just play?', 'summarise the last few chords', 'how long ago was that?'.",
+      "Return recent musical events (note-on/off, chord-detected/changed) wrapped in a temporal envelope `{startedAt, now, events}`. Each event's `t` is milliseconds since startedAt. Read this to answer 'what did I just play?', 'summarise the last few chords', 'how long ago was that?'. This is your autonomous read surface for musical history — the matching `state://<label>/recent-events` resource carries the same content but exists for user-triggered attachment.",
     aliases: ["recent activity", "what did I play", "recent events"],
     notes: [
       "Pull-only per SPEC 013 §I30 — musical activity at pipeline cadence would pump inference in some clients. Read when the LLM decides it needs context.",
@@ -1101,7 +1101,7 @@ const resources: ResourceAnnotation[] = [
       "Currently-connected MIDI devices + audio inputs, as an array of { kind, name, id, sourceString }. `sourceString` is exactly what to pass to set_input(source) — no reconstruction needed. Pull-only for now (hot-plug notifications not wired yet).",
     aliases: ["available devices", "connected devices", "MIDI + audio list"],
     notes: [
-      "Read this before calling set_input if you don't already know the device name — otherwise you're guessing.",
+      "User-attach surface. The LLM should call `list_inputs` instead — same content, autonomous read path.",
       "The audio entry represents the default microphone routed through Basic Pitch; per-device audio enumeration isn't yet exposed.",
       "MIDI device availability depends on the browser hosting the engine — Chrome is the most reliable; some Firefox versions may miss devices (synesthetica-qko).",
     ],
@@ -1119,9 +1119,10 @@ const resources: ResourceAnnotation[] = [
       "Snapshot of the current control surface for one instance: macro values, prescribed context (key/tempo/meter/chord-mode/metronome), active preset, input source, and temporal frame (startedAt + now). Subscribable — the CLI pushes an update whenever any control changes.",
     aliases: ["current state", "state snapshot", "engine state"],
     notes: [
-      "Read after any control change to see the resolved state (compound macros write to their leaves + the compound itself).",
+      "User-attach surface. The LLM should call `get_state` instead — same content, autonomous read path.",
+      "Setter tools return the resolved state in their `state` field on success, so an explicit read isn't needed right after a mutation.",
       "startedAt is ISO wall-clock at session start; now is session-ms at the time the snapshot was constructed (roughly current — recent-events reads carry a fresher now).",
-      "When no session is active, startedAt and now are null.",
+      "startedAt and now are null until session.phase reaches `input-active` — the pipeline can be up (phase `spawned`) with no input adapter yet, in which case both are still null. Check `phase` to distinguish 'no session' from 'session ready but idle'.",
     ],
     examples: [
       "state://default/current — the primary instance's state.",
@@ -1137,10 +1138,10 @@ const resources: ResourceAnnotation[] = [
       "Musical event stream from the pipeline's MusicalFrame — note-on, note-off, chord-detected, chord-changed. Wrapped in a temporal envelope { startedAt, now, events }. Pull-only per SPEC 013 §I30 (subscribing would pump inference in some MCP clients).",
     aliases: ["recent events", "history", "recent playing", "musical history"],
     notes: [
+      "User-attach surface. The LLM should call `get_recent_events` instead — same content, autonomous read path.",
       "Musical-layer event stream — semantic facts (pitch classes, chord root/quality), not visual entities.",
       "Supports `?limit=N` (default 100, max 1000) and `?since=<id>` query params.",
       "Each event's `t` is session-ms; combine with envelope.startedAt for wall-clock, or with envelope.now for 'age' math.",
-      "Read on demand — e.g. before answering 'what did I just play?' or 'summarise the last few chords'.",
     ],
     examples: [
       "state://default/recent-events?limit=20 — most recent 20 events.",
@@ -1153,11 +1154,11 @@ const resources: ResourceAnnotation[] = [
     uri: "presets://",
     name: "Presets — index",
     description:
-      "List of saved preset summaries { name, savedAt, session, input } — the LLM's discovery surface for what presets exist before calling switch_preset.",
+      "List of saved preset summaries { name, savedAt, session, input }. User-attach surface — the LLM should call `list_presets` for the same content via the autonomous read path.",
     aliases: ["preset list", "available presets"],
     notes: [
+      "User-attach surface. The LLM should call `list_presets` instead — same content, autonomous read path.",
       "Presets are user-managed; the manifest doesn't ship defaults.",
-      "For one preset's full stored content, read `presets://<name>`.",
     ],
     subscribable: false,
   },
@@ -1166,7 +1167,7 @@ const resources: ResourceAnnotation[] = [
     uri: "presets://<name>",
     name: "Preset — one entry",
     description:
-      "Full stored content of one preset: macros, session (key/tempo/meter/…), input, savedAt. Read this if you need to know what a preset does before switching to it.",
+      "Full stored content of one preset: macros, session (key/tempo/meter/…), input, savedAt. User-attach surface — the LLM should call `get_preset(name)` for the same content via the autonomous read path.",
     subscribable: false,
   },
 
@@ -1177,7 +1178,7 @@ const resources: ResourceAnnotation[] = [
       "The full annotation manifest as one JSON document — macros, session controls, concepts, grammars, presets, tools, resources. Convenience for clients that prefer one fetch over per-URI browsing.",
     notes: [
       "Every individual macro / session control / concept / grammar / preset also has its own `annotations://<category>/<id>` resource for finer-grained reads.",
-      "The system-overview prompt already embeds this content — reading the bundle is only necessary when you need a specific field the prompt truncates.",
+      "The `get_started` tool response already embeds this content, so the LLM rarely needs the bundle — reserve it for user-triggered attach or clients that proxy resource reads natively.",
     ],
     subscribable: false,
   },
@@ -1215,6 +1216,7 @@ const derivedState: DerivedStateAnnotation[] = [
     notes: [
       "Where the session sits in its lifecycle. Distinguishes states a plain startedAt/null can't: `no-session` (no pipeline; call start_session), `spawned` (pipeline is up and setter tools take effect on consumers, but no input adapter is running — startedAt still null, no notes flowing), `input-active` (an input is selected, startedAt stamped, events accruing).",
       "When reporting session state to the user, prefer this field over inferring from startedAt or effective — it names the intermediate 'spawned' phase that both other signals miss.",
+      "**Tracks selection, not liveness.** Hot-plug isn't wired: if a MIDI device unplugs mid-session, phase stays `input-active` until the input is explicitly changed or the session stops. If the user reports 'nothing's happening' while phase reads `input-active`, treat their observation as the authority and suggest re-selecting the input or reconnecting the device — don't tell them the session is healthy on the strength of the field alone.",
     ],
   },
 ];

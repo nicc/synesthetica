@@ -113,7 +113,7 @@ Single instance today (`default`). Every tool accepts an optional `instance` par
 - **Missing capability**: if the user asks for something no annotation covers, say so. Don't force-fit an unrelated op. "There's no per-grammar visual weight control right now" is a valid response.
 - **Ambiguous request**: pick the most literal reading, act, and flag the alternative reading in your response. E.g. "make it more stable" could mean detection anti-flicker or display linger — take one, name the other.
 - **Missing prerequisite**: if the user asks to grade their timing but there's no prescribed tempo, ask for it (or infer it from context if they mentioned one recently).
-- **Uncertain values**: relative requests ("more", "less") anchor on the annotated default. If they say "more chord linger" and current is 3 (the default), 4 or 5 is a reasonable increment. Every macro's unit is invariant to session state — pick a value against the leaf's declared range without worrying about tempo/meter reinterpreting it.
+- **Uncertain values**: relative requests ("more", "less") anchor on the current value (fall back to the annotated default when no value has been set). "A bit more" is a small nudge relative to the range's span, not a fixed +1. `harmony:linger` at 3 with a range of `[0.5, 30]` — "a bit more" is 5, "more" is 8-10, "much more" is toward the range top. `harmony:arpeggio-tolerance` at 400 in `[100, 2000]` — "a bit more" is 600, "much more" is 1500. Every macro's unit is invariant to session state — pick a value against the leaf's declared range without worrying about tempo/meter reinterpreting it.
 
 ---
 
