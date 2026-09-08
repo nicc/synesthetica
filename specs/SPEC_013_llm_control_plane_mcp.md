@@ -84,7 +84,7 @@ SPEC 004 established the principle (annotation-driven, LLM interprets, engine ex
 
 ### Tools
 
-16 tools organised in five families: **lifecycle** (start_session / stop_session), **onboarding** (get_started), **read surface** (get_state / list_inputs / list_presets), **setter surface** (set_key / set_tempo / set_meter / set_chord_mode / set_metronome / set_input / set_hue_for_pitch / set_macro), **preset surface** (switch_preset / save_preset). All tools accept an optional `instance` parameter defaulting to the single instance today.
+18 tools organised in five families: **lifecycle** (start_session / stop_session), **onboarding** (get_started), **read surface** (get_state / get_recent_events / list_inputs / list_presets / get_preset), **setter surface** (set_key / set_tempo / set_meter / set_chord_mode / set_metronome / set_input / set_hue_for_pitch / set_macro), **preset surface** (switch_preset / save_preset). All tools accept an optional `instance` parameter defaulting to the single instance today.
 
 Every tool responds with either:
 - **Success**: `{ "ok": true, "state": <state-snapshot>, "data"?: <any> }` — setter tools populate `state` with the post-call snapshot; read tools may additionally populate `data` with the read payload (device list, preset list, primer text); lifecycle tools return a stub `state` with the instance label plus a `data` summary of what they did.
@@ -112,6 +112,10 @@ Closes the web-app subprocess and WS bridge. Idempotent. Preset saves remain val
 
 Returns the current engine state snapshot. Same content as `state://<label>/current`; exists as a tool because Claude Desktop doesn't proxy resource reads to the LLM as callable — resources land only via user-triggered attach. `state` is populated with the snapshot; `data` is not.
 
+#### `get_recent_events(limit?, since?, instance?)` — mirror of state://<label>/recent-events
+
+Returns the temporal envelope `{startedAt, now, events}` in `data`. Each event's `t` is milliseconds since `startedAt`. `now` is fresh at read time — anchors "how long ago" reasoning correctly regardless of think-time between events landing and the LLM reading. Pull-only per §I30.
+
 #### `list_inputs(instance?)` — mirror of inputs://
 
 Returns available MIDI + audio input devices in `data`. Same content as `inputs://`.
@@ -119,6 +123,10 @@ Returns available MIDI + audio input devices in `data`. Same content as `inputs:
 #### `list_presets(instance?)` — mirror of presets://
 
 Returns preset summaries (name + savedAt + session + input at save time) in `data`. Same content as `presets://`.
+
+#### `get_preset(name, instance?)` — mirror of presets://<name>
+
+Returns one preset's full stored content (macro values, session controls, input) in `data`, WITHOUT loading it. Non-destructive: the current control surface is untouched. On unknown name, error's `details.available` lists preset names for retry.
 
 #### `set_macro(name, value, instance?)`
 
@@ -218,18 +226,19 @@ Shared across all instances (the annotations describe the system, not an instanc
 
 #### `state://<instance>/*` — engine state per instance
 
-- `state://<label>/current` — a snapshot of current macro values, active preset, prescribed context (key/tempo/meter/chord-mode/metronome), and input source. **Subscribable** — see §State subscription protocol.
-- `state://<label>/recent-events?limit=<N>` — recent musical activity (see §Recent events). **Pull-only, not subscribable.** LLM reads when it wants context; `limit` defaults to 100, capped at 1000 for in-memory reads. `?since=<eventId>` returns events after a specific ID (for cursor-style consumption).
-- `state://<label>/recent-events/history?limit=<N>&before=<eventId>` — disk-backed deeper history (see §Recent events — disk log). Same shape as `recent-events` but reads from rotated log files.
+- `state://<label>/current` — a snapshot of current macro values, active preset, prescribed context (key/tempo/meter/chord-mode/metronome/phase), and input source. **Subscribable** — see §State subscription protocol. Also reachable via the `get_state` tool for Claude-Desktop-shaped clients that don't proxy resource reads.
+- `state://<label>/recent-events?limit=<N>` — recent musical activity (see §Recent events). **Pull-only, not subscribable.** `limit` defaults to 100, capped at 1000 for in-memory reads. `?since=<eventId>` returns events after a specific ID (for cursor-style consumption). Also reachable via the `get_recent_events` tool.
+- `state://<label>/recent-events/history?limit=<N>&before=<eventId>` — **Not yet implemented.** Planned: disk-backed deeper history (see §Recent events — disk log). Same shape as `recent-events` but reading from rotated log files.
 
 Instance labels are per §Multi-instance routing.
 
 #### `instances://` — instance registry
 
+**Not yet implemented.** Multi-instance routing is single-instance today (`default`); every tool accepts an optional `instance` parameter for the multi-instance future.
+
+Planned shape:
 - `instances://` — list of running instances (label, status, start-time, input-source).
 - `instances://<label>` — details for one instance (label, status, current preset, current input, MCP resource URIs it exposes).
-
-Not subscribable; the LLM re-fetches when it needs a fresh view.
 
 #### `inputs://` — available input devices
 

@@ -414,6 +414,6 @@ The original `MacroAnnotation` shape assumed a numeric 0–1 dial with direction
 
 **`SystemConceptAnnotation` (new)** — terminology dictionary. Kebab-case `term`, short prose `definition`, `related` cross-links, optional `examples`. Rendered as `concepts://<term>` MCP resources per SPEC 013.
 
-**System guide** (documentation artifact, not an annotation type) — a prose narrative of the pipeline flow, grammar semantics, prescribed-context meaning, and confidence handling. Loaded as `guide://system-overview` MCP prompt per SPEC 013. Structured lookup (concepts) and prose narrative (guide) serve different LLM needs.
+**System guide** (documentation artifact, not an annotation type) — a prose narrative of the pipeline flow, grammar semantics, prescribed-context meaning, and confidence handling. Returned as text by the `get_started` MCP tool (see SPEC 014 §Lifecycle — moved from a prompt to a tool since Claude Desktop doesn't proxy prompt attach as autonomous LLM surface). Structured lookup (concepts) and prose narrative (guide) serve different LLM needs.
 
 Refer to SPEC 013 for how these annotation types are delivered to the LLM (resource URIs, generator model, refresh semantics).

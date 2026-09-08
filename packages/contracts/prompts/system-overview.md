@@ -1,6 +1,6 @@
 # Synesthetica — system overview
 
-*This document is served as `guide://system-overview` — the LLM reads it once at connection time for pipeline context. Written for an LLM operator; keep specific and load-bearing, not aspirational.*
+*This document is the authored prose portion of the `get_started` MCP tool response. The LLM calls `get_started` once per conversation for pipeline context. Written for an LLM operator; keep specific and load-bearing, not aspirational.*
 
 ---
 
@@ -39,7 +39,25 @@ Input → Adapter → Stabiliser → Vocabulary → Grammar → Renderer → Scr
 - **Grammar**: turns the annotated frame into scene entities (note-strips, chord numerals, indicators).
 - **Renderer**: draws the scene to a WebGL canvas.
 
-You interact with this pipeline through **tools** (verbs — `set_macro`, `set_key`, etc.) and read state through **resources** (`state://<label>/current`, `state://<label>/recent-events`, `annotations://`, `concepts://`, `instances://`).
+You interact with this pipeline through **MCP tools** — verbs like `set_macro`, `set_key`, and reader tools like `get_state`, `get_recent_events`, `list_inputs`, `list_presets`, `get_preset`. The server also exposes matching **resources** (`state://<label>/current`, `state://<label>/recent-events`, `annotations://`, `concepts://`, `presets://`) for user-triggered attachment, but Claude Desktop does not proxy resource reads through to the LLM as callable — so the reader tools are your autonomous read surface. Use tools; leave resources for the user to attach when they want to inspect something directly.
+
+---
+
+## Session lifecycle
+
+The MCP server is always-on and cheap. The visualiser pipeline sits behind explicit tools:
+
+- **`start_session`** — spawns the web-app subprocess + WS bridge + browser tab. Call this when the user signals musical intent (mentions playing, an instrument, tempo, rhythm, harmony, visualisation). Idempotent — a no-op if a session is already running.
+- **`stop_session`** — tears everything down. Call when the user says they're done (thanks / that's it / stop / close). Idempotent.
+
+Every setter tool (`set_macro`, `set_key`, etc.) and every reader tool (`get_state`, `get_recent_events`) requires a running session. Calling them cold returns `ENGINE_NOT_STARTED` — the LLM's cue to call `start_session` first and re-issue the original request. Standard flow for a musical request is: call `get_started` (once per conversation) → call `start_session` → user picks an input via `set_input` → do the requested work.
+
+`state.session.phase` distinguishes three lifecycle states:
+- **`no-session`** — pipeline hasn't started; call `start_session`.
+- **`spawned`** — pipeline is up and setter tools take effect on consumers, but no input adapter is running yet. `startedAt` is still null, no notes flowing. This is a real intermediate state — the visualiser exists but has nothing to visualise.
+- **`input-active`** — an input is selected; `startedAt` is stamped; events accrue. This is when the temporal-arithmetic guidance below is meaningful.
+
+Prefer `state.session.phase` over `startedAt`/`effective` inference when reporting session state to the user — it names the `spawned` intermediate the other signals miss.
 
 ---
 
@@ -62,7 +80,7 @@ Three different kinds of thing you can adjust:
 
 - **Aesthetic macros** (`system:*`, bare cross-cutting, `<scope>:*`) — modulate how the grammars *look*. Set via `set_macro(name, value)`. Continuous or discrete or compound. Examples: `harmony:linger`, `rhythm:quantise-resolution`, `time-horizon`.
 - **Session controls** (`session:*`) — set the *musical frame* the analyser reads within. Categorical values, distinct MCP tools. Examples: `set_key`, `set_tempo`, `set_metronome`.
-- **Input controls** (`input:*`) — which device the pipeline is listening to. `set_input(source)`; read `inputs://` for the enumerated list of available MIDI + audio devices (each entry carries a `sourceString` ready to pass), and `state://<label>/current.input` for the current selection.
+- **Input controls** (`input:*`) — which device the pipeline is listening to. `set_input(source)`; use `list_inputs` for the enumerated list of available MIDI + audio devices (each entry carries a `sourceString` ready to pass), and `get_state` for the current selection (in `state.input`).
 
 When the user says something ambiguous, look at what surface they're asking about:
 
@@ -86,9 +104,7 @@ Every detected musical event carries a confidence value. MIDI events arrive at 1
 
 ## Multi-instance
 
-The user may run more than one Synesthetica instance under the same CLI — e.g. one visualising a piano input, one visualising a guitar the user is learning by ear. Each instance has a label (`default` for the first, user-supplied for subsequent). Tools take an optional `instance` parameter; omit it when only one instance is running, supply it when multiple are.
-
-When multi-instance, read `instances://` to see labels + status. State resources are per-instance (`state://piano/current`, `state://guitar/current`). Annotations, concepts, and presets are shared across instances.
+Single instance today (`default`). Every tool accepts an optional `instance` parameter for a multi-instance future — omit it and calls route to `default`. Multi-instance routing (per-instance state, `instances://` enumeration) isn't wired yet; if the user says "start another piano session" that's a gap to name, not a control op to execute.
 
 ---
 
@@ -106,5 +122,5 @@ When multi-instance, read `instances://` to see labels + status. State resources
 - **Infer tempo, key, or meter from the music.** All three are user-prescribed only. Don't offer to "detect" them.
 - **Switch or disable grammars.** All three grammars always run. You can only modulate them.
 - **Emphasise one grammar over another.** No per-grammar visual weighting exists yet. If the user asks, name it as a gap.
-- **Access historical events beyond the recent-events buffer.** For deep history, use `state://<label>/recent-events/history` — but there's no full-session replay.
+- **Access history beyond the in-memory recent-events buffer.** `get_recent_events` returns at most the buffer's capacity (~1000 events, roughly 30–60s of active playing). Poll for new events with the `since` arg, but there's no full-session replay or on-disk history.
 - **Change the pipeline architecture.** Adapter/stabiliser/grammar routing is fixed at engine start.
