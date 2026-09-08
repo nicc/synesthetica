@@ -101,10 +101,12 @@ function clearRecentEvents(): void {
 
 // State snapshot we publish back to the CLI over WS.
 //
-// `macros.intents` is the last user-set value (updated in
-// applyEngineOp). `macros.effective` is sourced from consumer
-// runtime on every publishState — see SPEC 014 §1.9. Everything
-// else is mirrored on the way through applyEngineOp.
+// `macros.intents` is the last value asked for per macro — populated
+// by any of set_macro, set_hue_for_pitch, switch_preset, or a panel
+// widget edit (the panel dispatches through applyEngineOp on the
+// same path as LLM tool calls). `macros.effective` is sourced from
+// consumer runtime on every publishState — see SPEC 014 §1.9.
+// Everything else is mirrored on the way through applyEngineOp.
 const engineState: EngineStateSnapshot = {
   instance: "default",
   macros: { intents: {}, effective: {} },

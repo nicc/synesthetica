@@ -110,7 +110,7 @@ Compound macros omit `consumers[]` — their `targets[]` fan out to leaf macros 
 
 `StateSnapshot.macros` is split into two views:
 
-- `intents: Record<string, number|string>` — the last value the user (LLM or panel) set for each macro via `set_macro` or `set_hue_for_pitch`. Includes compound macros, keyed by the compound id (leaves' intents are stored separately when set directly).
+- `intents: Record<string, number|string>` — the last value asked for per macro, populated by any of `set_macro`, `set_hue_for_pitch`, `switch_preset` (repopulates with the preset's stored values), or a panel widget edit (the user dragging a slider dispatches through the same path). Compound macros are keyed by the compound id; leaves' intents are stored separately when set directly.
 - `effective: Record<string, number|string>` — sourced from consumer runtime on every state publish. `VisualPipeline.readEffectiveMacros(manifest.macros)` walks each macro's `consumers[]`, calls that consumer's `readMacros()`, and indexes by declared `macroKey`. Compound macros do NOT appear (they have no direct consumer).
 
 The split is the state-side answer to the same class of bug consumer declarations catch on the dispatch side. If a consumer silently ignores a setter, `effective` diverges from `intents` and the drift is visible in `state://` — both to the LLM (which reads it) and to whoever is reviewing session recordings. There is no mirror keeping a shadow copy; the effective view is always built from live consumer state.

@@ -934,7 +934,7 @@ const tools: ToolAnnotation[] = [
     aliases: ["adjust", "tune", "set macro", "change how"],
     notes: [
       "Compound macros fan out to leaf targets via a linear default curve; per-target inversion is applied when the compound's semantic runs opposite the leaf's natural range. See the compound's targets field in the manifest.",
-      "`get_state` reflects the value the LLM most recently set — including compound values, even when the underlying leaves also change. Read `state.macros.intents` for what was asked for, `state.macros.effective` for what the pipeline is running with.",
+      "`get_state.macros.intents` reflects the last value asked for per macro — populated by any of `set_macro`, `set_hue_for_pitch`, `switch_preset`, or a panel widget edit. Compound macros are keyed by their compound id. `get_state.macros.effective` is what pipeline consumers are actually running with. Read `intents` to see what has been asked for (by anyone — you or the user via the panel); read `effective` to see what the pipeline is doing right now.",
       "**Compound-vs-leaf routing**: prefer the compound when the user's frame is cross-grammar ('everything more expansive' → time-horizon; 'harder rhythm practice' → rhythm:difficulty). Prefer the leaf when the request targets one grammar ('just the chord fade' → harmony:linger; 'only the rhythm horizon' → rhythm:horizon). Compounds do a linear fan-out — set a leaf directly when you want a specific value on one target without disturbing siblings.",
     ],
     examples: [
@@ -1030,7 +1030,7 @@ const tools: ToolAnnotation[] = [
       "Return the current engine state: macros (intents + effective), prescribed session context (key, tempo, meter, chord mode, metronome), input source, active preset, phase, and session-time anchors. This is your autonomous read surface for state — the matching `state://<label>/current` resource carries the same content but exists for user-triggered attachment, not LLM reads.",
     aliases: ["what's set", "current state", "read state", "how are things"],
     notes: [
-      "macros.intents is the last user-set value per macro (what was asked for). macros.effective is what pipeline consumers are actually running with. Divergence is often legitimate (compound-then-leaf override, preset-then-tweak) — treat as information, not an automatic bug.",
+      "`macros.intents` reflects the last value asked for per macro — populated by any of `set_macro`, `set_hue_for_pitch`, `switch_preset`, or a panel widget edit (the user dragging a slider in the visualiser tab dispatches through the same path as your tool calls). Compound macros are keyed by their compound id. `macros.effective` is what pipeline consumers are actually running with. Divergence between the two is often legitimate — a compound intent alongside a directly-set leaf, a preset apply + subsequent tweak, or the user editing a slider while you were reading state — treat as information, not an automatic bug.",
       "startedAt is null until state.session.phase reaches `input-active` — the pipeline can be up (phase `spawned`) with no input selected, in which case startedAt stays null. Check `phase` to distinguish 'no session' from 'session ready but idle'.",
     ],
   },

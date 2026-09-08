@@ -52,10 +52,13 @@ export interface AvailableInput {
  * Per-instance macro state, split by SPEC 014 §1.9 into user-intent
  * and consumer-observed effective values.
  *
- * `intents` — the last value the user (LLM or panel) set via
- *   set_macro or set_hue_for_pitch. Includes compound macros keyed
- *   by the compound id (the leaves' intents are stored separately).
- *   Reflects "what was asked for".
+ * `intents` — the last value asked for per macro, populated by any
+ *   of set_macro, set_hue_for_pitch, switch_preset (repopulates
+ *   with the preset's stored values), or a panel widget edit
+ *   (the user dragging a slider dispatches through the same path).
+ *   Compound macros are keyed by the compound id; leaves' intents
+ *   are stored separately when set directly. Reflects "what was
+ *   asked for" regardless of who did the asking.
  *
  * `effective` — sourced from consumer.readMacros() every publish, so
  *   it always reflects what the pipeline consumers are actually
