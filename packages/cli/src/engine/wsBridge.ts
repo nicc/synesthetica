@@ -45,6 +45,13 @@ export interface WsBridgeHandle {
   port: number;
   /** Get (or create) the engine handle for a given instance label. */
   handleFor(label: string): EngineHandle;
+  /**
+   * Resolve when the browser at `label` sends `pipeline-ready`.
+   * Rejects on timeout. Called by SessionManager.start() to hold
+   * `start_session` open until the pipeline can actually receive
+   * tool calls. Resolves immediately if already ready.
+   */
+  awaitPipelineReady(label: string, timeoutMs: number): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -55,6 +62,12 @@ interface BridgeConnection {
   state: EngineStateSnapshot;
   events: EngineRecentEvent[];
   eventCap: number;
+  /** True after the browser sends `pipeline-ready`. Setter tools
+   *  arriving before this hit a race (the tab is loading). */
+  pipelineReady: boolean;
+  /** Resolvers for callers awaiting pipeline-ready. Drained on the
+   *  arriving message; new calls resolve immediately when ready. */
+  readyWaiters: Array<() => void>;
 }
 
 interface PendingCall {
@@ -112,8 +125,10 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
         pendingByConn.set(ws, new Map());
         const existing = connections.get(label);
         if (existing) {
-          // Reconnect — replace the socket, keep the state snapshot.
+          // Reconnect — replace the socket, reset ready flag until
+          // the browser re-signals (a fresh tab is a fresh init).
           existing.ws = ws;
+          existing.pipelineReady = false;
         } else {
           connections.set(label, {
             label,
@@ -121,6 +136,8 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
             state: emptyState(label),
             events: [],
             eventCap: 1000,
+            pipelineReady: false,
+            readyWaiters: [],
           });
         }
         // Notify any waiting handle that a connection now exists.
@@ -145,6 +162,13 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
         conn.state = msg.snapshot;
         const handle = handles.get(label);
         handle?.publishStateChange(msg.snapshot);
+      } else if (msg.type === "pipeline-ready") {
+        conn.pipelineReady = true;
+        // Drain waiters — they were parked in awaitPipelineReady.
+        const waiters = conn.readyWaiters;
+        conn.readyWaiters = [];
+        for (const resolve of waiters) resolve();
+        log(`wsBridge: '${label}' pipeline ready`);
       }
     });
 
@@ -180,6 +204,57 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
         handles.set(label, handle);
       }
       return handle;
+    },
+    awaitPipelineReady(label: string, timeoutMs: number): Promise<void> {
+      return new Promise((resolve, reject) => {
+        const check = () => {
+          const conn = connections.get(label);
+          if (conn?.pipelineReady) {
+            resolve();
+            return true;
+          }
+          return false;
+        };
+        if (check()) return;
+        // Not yet connected — wait for the connection then park.
+        const timer = setTimeout(() => {
+          const conn = connections.get(label);
+          if (conn) {
+            conn.readyWaiters = conn.readyWaiters.filter((w) => w !== onReady);
+          }
+          reject(
+            new Error(
+              `timed out after ${timeoutMs}ms waiting for browser at '${label}' to signal pipeline-ready`,
+            ),
+          );
+        }, timeoutMs);
+        const onReady = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        // If the connection already exists but isn't ready yet, park directly.
+        const existing = connections.get(label);
+        if (existing) {
+          existing.readyWaiters.push(onReady);
+        } else {
+          // Poll shortly for the connection then park. In practice the
+          // browser hello arrives within a few hundred ms of start_session.
+          const pollInterval = setInterval(() => {
+            const conn = connections.get(label);
+            if (conn) {
+              clearInterval(pollInterval);
+              if (conn.pipelineReady) {
+                clearTimeout(timer);
+                resolve();
+              } else {
+                conn.readyWaiters.push(onReady);
+              }
+            }
+          }, 50);
+          // Ensure poll stops when timer fires.
+          timer.unref?.();
+        }
+      });
     },
     async close() {
       for (const handle of handles.values()) handle.markClosed();

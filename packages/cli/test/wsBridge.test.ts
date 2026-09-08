@@ -167,6 +167,55 @@ describe("wsBridge — state-changed fan-out", () => {
   });
 });
 
+describe("wsBridge — pipeline-ready gating", () => {
+  it("awaitPipelineReady resolves after the browser sends pipeline-ready", async () => {
+    const ws = await connectAs("default");
+    const readyPromise = bridge.awaitPipelineReady("default", 2_000);
+    // Give the promise a tick to arm.
+    await new Promise((r) => setTimeout(r, 20));
+    // Simulate the browser signalling ready.
+    ws.send(JSON.stringify({ type: "pipeline-ready", label: "default" }));
+    await expect(readyPromise).resolves.toBeUndefined();
+    ws.close();
+  });
+
+  it("awaitPipelineReady resolves immediately if already ready", async () => {
+    const ws = await connectAs("default");
+    ws.send(JSON.stringify({ type: "pipeline-ready", label: "default" }));
+    await new Promise((r) => setTimeout(r, 20));
+    // Second await returns without waiting.
+    await expect(bridge.awaitPipelineReady("default", 500)).resolves.toBeUndefined();
+    ws.close();
+  });
+
+  it("awaitPipelineReady rejects on timeout when no ready arrives", async () => {
+    // No browser at all — timeout should fire.
+    await expect(
+      bridge.awaitPipelineReady("ghost", 100),
+    ).rejects.toThrow(/timed out/);
+  });
+
+  it("reconnecting resets the ready flag (fresh tab is a fresh init)", async () => {
+    const ws1 = await connectAs("default");
+    ws1.send(JSON.stringify({ type: "pipeline-ready", label: "default" }));
+    await new Promise((r) => setTimeout(r, 20));
+    await bridge.awaitPipelineReady("default", 500);
+    // Reconnect — same label.
+    ws1.close();
+    await new Promise((r) => setTimeout(r, 20));
+    const ws2 = await connectAs("default");
+    // Should NOT be ready yet — the fresh tab hasn't re-signalled.
+    const pending = bridge.awaitPipelineReady("default", 500);
+    let resolved = false;
+    void pending.then(() => (resolved = true));
+    await new Promise((r) => setTimeout(r, 100));
+    expect(resolved).toBe(false);
+    ws2.send(JSON.stringify({ type: "pipeline-ready", label: "default" }));
+    await pending;
+    ws2.close();
+  });
+});
+
 describe("wsBridge — protocol guardrails", () => {
   it("rejects first-frame-not-hello with a close", async () => {
     const ws = new WebSocket(`ws://localhost:${bridge.port}`);

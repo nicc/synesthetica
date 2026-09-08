@@ -44,6 +44,14 @@ export interface WsReceiverHandle {
   isConnected(): boolean;
   /** Push a state change to the CLI (fanned out to subscribers). */
   publishStateChanged(snapshot: EngineStateSnapshot): void;
+  /**
+   * Signal to the CLI that the browser has finished wiring the
+   * VisualPipeline (grammars + vocab + stabilizer factories). The
+   * SessionManager holds `start_session` open awaiting this before
+   * returning ok:true to the LLM. Idempotent from the receiver's
+   * side — if already sent this connection, it's a no-op.
+   */
+  publishPipelineReady(): void;
   /** Close the connection and stop reconnecting. */
   close(): void;
 }
@@ -57,6 +65,7 @@ export function startWsReceiver(opts: WsReceiverOptions): WsReceiverHandle {
   let closed = false;
   let backoff = MIN_BACKOFF_MS;
   let connected = false;
+  let pipelineReadySent = false;
 
   const send = (msg: BrowserToCli) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -79,6 +88,9 @@ export function startWsReceiver(opts: WsReceiverOptions): WsReceiverHandle {
       send({ type: "hello", label: opts.label, protocol: ENGINE_BRIDGE_PROTOCOL });
       connected = true;
       backoff = MIN_BACKOFF_MS;
+      // Fresh connection = fresh handshake. The CLI resets its
+      // pipeline-ready flag on reconnect too; re-signal once ready.
+      pipelineReadySent = false;
       log(`wsReceiver: connected to ${opts.url} as '${opts.label}'`);
     });
     ws.addEventListener("close", () => {
@@ -130,6 +142,11 @@ export function startWsReceiver(opts: WsReceiverOptions): WsReceiverHandle {
     isConnected: () => connected,
     publishStateChanged(snapshot) {
       send({ type: "state-changed", snapshot });
+    },
+    publishPipelineReady() {
+      if (pipelineReadySent) return;
+      pipelineReadySent = true;
+      send({ type: "pipeline-ready", label: opts.label });
     },
     close() {
       closed = true;

@@ -171,10 +171,25 @@ export interface EngineStateChangedMessage {
   snapshot: EngineStateSnapshot;
 }
 
+/**
+ * Sent by the browser once it has instantiated the VisualPipeline
+ * with all grammars / vocab / stabilizer factories and is ready to
+ * receive engine calls that mutate consumer state. Distinct from
+ * `hello` (which is the pre-init WS handshake) — see SPEC 014
+ * §Lifecycle. SessionManager.start() on the CLI awaits this
+ * message before returning `ok: true` to the LLM.
+ */
+export interface EnginePipelineReadyMessage {
+  type: "pipeline-ready";
+  /** Instance label, matches the initial hello. */
+  label: string;
+}
+
 export type BrowserToCli =
   | EngineHelloMessage
   | EngineResultMessage
-  | EngineStateChangedMessage;
+  | EngineStateChangedMessage
+  | EnginePipelineReadyMessage;
 
 /** Current wire protocol version. Both ends must agree. */
 export const ENGINE_BRIDGE_PROTOCOL = 1 as const;

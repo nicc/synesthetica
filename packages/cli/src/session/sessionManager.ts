@@ -26,6 +26,13 @@ import { startWsBridge } from "../engine/wsBridge.js";
 
 export type SessionState = "stopped" | "starting" | "running" | "stopping";
 
+/**
+ * Time SessionManager.start() waits for the browser to signal
+ * `pipeline-ready` before failing. Generous — accommodates Chrome
+ * cold start + Vite first-request + pipeline init.
+ */
+const PIPELINE_READY_TIMEOUT_MS = 15_000;
+
 export interface SessionManagerOptions {
   instanceLabel: string;
   wsPort?: number;
@@ -102,6 +109,23 @@ export class SessionManager {
       if (this.options.openBrowser) {
         openBrowser(openUrl, this.options.browser);
         openedInBrowser = true;
+      }
+
+      // Wait for the browser to finish wiring the pipeline before
+      // returning ok:true. Prevents the "start_session succeeded but
+      // the next set_macro silent-writes into a null pipeline" race.
+      // 15 seconds is generous — enough for Chrome cold-start + Vite
+      // dev server first-request + our own pipeline init.
+      try {
+        await this.bridge.awaitPipelineReady(
+          this.options.instanceLabel,
+          PIPELINE_READY_TIMEOUT_MS,
+        );
+      } catch (e) {
+        this.log(
+          `pipeline-ready wait failed: ${e instanceof Error ? e.message : e}`,
+        );
+        throw e;
       }
 
       this.state = "running";

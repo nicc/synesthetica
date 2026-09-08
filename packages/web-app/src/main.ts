@@ -329,38 +329,69 @@ window.addEventListener("resize", () => {
 
 /* -----------------------------------------------------------------
  * Session lifecycle
- * ----------------------------------------------------------------- */
-function buildAndStartPipeline(
-  adapter: RawMidiAdapter | AudioInputAdapter,
-): void {
-  const partId = "main";
+ * -----------------------------------------------------------------
+ *
+ * Split into two phases (SPEC 014 §Lifecycle):
+ *
+ * 1. initializePipeline() — runs on page load. Builds the pipeline
+ *    with all consumers (grammars, vocab, stabilizer factories) but
+ *    NO adapter and NO render loop. LLM setter calls arriving after
+ *    this reach real consumers immediately.
+ *
+ * 2. attachAdapterAndStartRender(adapter) — runs when the user or
+ *    LLM picks an input. Adds the adapter, creates the renderer,
+ *    starts the render loop. Replays any macros already set into
+ *    engineState.macros.intents so the new adapter session inherits
+ *    what was asked for before it existed.
+ */
+
+const PIPELINE_PART_ID = "main";
+
+function initializePipeline(): void {
+  if (pipeline) return; // idempotent
   pipeline = new VisualPipeline({
     canvasSize: { width: canvas.width, height: canvas.height },
     rngSeed: Date.now(),
-    partId,
+    partId: PIPELINE_PART_ID,
   });
-  pipeline.addAdapter(adapter);
-  pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
-  pipeline.addStabilizerFactory(() => new DynamicsStabilizer({ partId }));
-  pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
-  pipeline.addStabilizerFactory(() => new HarmonyStabilizer({ partId }));
+  pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId: PIPELINE_PART_ID }));
+  pipeline.addStabilizerFactory(() => new DynamicsStabilizer({ partId: PIPELINE_PART_ID }));
+  pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId: PIPELINE_PART_ID }));
+  pipeline.addStabilizerFactory(() => new HarmonyStabilizer({ partId: PIPELINE_PART_ID }));
   vocabulary = new MusicalVisualVocabulary();
   pipeline.setVocabulary(vocabulary);
   pipeline.addGrammar(new RhythmGrammar());
   pipeline.addGrammar(new HarmonyGrammar());
   pipeline.addGrammar(new DynamicsGrammar());
   pipeline.setCompositor(new IdentityCompositor());
+}
+
+function attachAdapterAndStartRender(
+  adapter: RawMidiAdapter | AudioInputAdapter,
+): void {
+  if (!pipeline) initializePipeline();
+  pipeline!.addAdapter(adapter);
 
   renderer = new ThreeJSRenderer({ backgroundColor: 0x000000 });
   renderer.attach(canvas);
 
-  // Recent-events buffer: subscribes to the pipeline's musical-frame
-  // stream and diffs consecutive frames to derive note-on/off and
-  // chord-detected/changed events. Sized generously — ~1000 events
-  // covers 30-60 seconds of active playing.
-  recentEvents = attachRecentEventsBuffer(pipeline, { capacity: 1000 });
+  recentEvents = attachRecentEventsBuffer(pipeline!, { capacity: 1000 });
 
-  pipeline.reset();
+  pipeline!.reset();
+  // Prime a partState so stabilizers exist before we replay macros
+  // — pipeline.setMacro dispatches to stabilizers in partStates,
+  // which are lazily created inside requestFrame. Without this,
+  // stabilizer-owned macros (harmony:arpeggio-tolerance etc.) would
+  // not reach their targets on replay.
+  pipeline!.requestFrame(0);
+  // Replay macros captured before the adapter arrived — session
+  // controls (tempo/meter/key/etc) are already applied via the
+  // engineState.session fields on each frame construction, but
+  // macros need to be re-dispatched through pipeline.setMacro to
+  // reach the freshly-reset consumers.
+  for (const [name, value] of Object.entries(engineState.macros.intents)) {
+    pipeline!.setMacro(name, value);
+  }
   startRenderLoop();
 }
 
@@ -399,6 +430,12 @@ function stopSession(): void {
   engineState.startedAt = null;
   engineState.now = null;
   clearRecentEvents();
+  // Restore the "pipeline always exists after load" invariant so a
+  // subsequent LLM setter arriving before the user picks a new input
+  // still reaches consumers rather than silent-writing. Fresh grammars
+  // lose their macro state; the next attachAdapterAndStartRender
+  // replays engineState.macros.intents to catch them up.
+  initializePipeline();
 }
 
 /**
@@ -421,7 +458,7 @@ async function startMidiSession(deviceId: string): Promise<void> {
   markSessionStarted();
   const adapter = new RawMidiAdapter(midiSource, { sessionStart: sessionStartTime });
   adapter.start();
-  buildAndStartPipeline(adapter);
+  attachAdapterAndStartRender(adapter);
   setStatus(`MIDI: ${info.name}`, "success");
 }
 
@@ -446,7 +483,7 @@ async function startAudioSession(deviceId?: string): Promise<void> {
   });
   try {
     await audioAdapter.start();
-    buildAndStartPipeline(audioAdapter);
+    attachAdapterAndStartRender(audioAdapter);
     setStatus(
       deviceId ? `Audio: device ${deviceId}` : "Audio: microphone",
       "success",
@@ -725,7 +762,13 @@ function captureFrame(): void {
 // Bootstrap
 mountPanels();
 void initMidi();
+initializePipeline();
 mountWsReceiver();
+// Signal to the CLI that we're wired up and ready to receive engine
+// calls that actually take effect on consumers. SessionManager.start()
+// on the CLI awaits this before returning ok:true to the LLM, so a
+// subsequent set_macro doesn't race a null pipeline.
+wsReceiver?.publishPipelineReady();
 
 function mountWsReceiver(): void {
   const params = new URLSearchParams(window.location.search);
