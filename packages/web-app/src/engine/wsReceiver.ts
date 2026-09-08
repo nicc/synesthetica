@@ -65,12 +65,27 @@ export function startWsReceiver(opts: WsReceiverOptions): WsReceiverHandle {
   let closed = false;
   let backoff = MIN_BACKOFF_MS;
   let connected = false;
+  /**
+   * publishPipelineReady() may be called before the WS is open —
+   * main.ts fires it right after mountWsReceiver returns, which is
+   * synchronous while the socket takes a tick to open. We split
+   * "the caller wants us to send ready" from "we've actually sent
+   * it on this connection" so the open handler can flush.
+   */
+  let pipelineReadyIntended = false;
   let pipelineReadySent = false;
 
   const send = (msg: BrowserToCli) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(msg));
     }
+  };
+
+  const maybeFlushPipelineReady = () => {
+    if (!pipelineReadyIntended || pipelineReadySent) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    send({ type: "pipeline-ready", label: opts.label });
+    pipelineReadySent = true;
   };
 
   const connect = () => {
@@ -92,6 +107,10 @@ export function startWsReceiver(opts: WsReceiverOptions): WsReceiverHandle {
       // pipeline-ready flag on reconnect too; re-signal once ready.
       pipelineReadySent = false;
       log(`wsReceiver: connected to ${opts.url} as '${opts.label}'`);
+      // Flush any pipeline-ready intent that arrived before we opened
+      // (main.ts calls publishPipelineReady synchronously right after
+      // mountWsReceiver returns).
+      maybeFlushPipelineReady();
     });
     ws.addEventListener("close", () => {
       connected = false;
@@ -144,9 +163,8 @@ export function startWsReceiver(opts: WsReceiverOptions): WsReceiverHandle {
       send({ type: "state-changed", snapshot });
     },
     publishPipelineReady() {
-      if (pipelineReadySent) return;
-      pipelineReadySent = true;
-      send({ type: "pipeline-ready", label: opts.label });
+      pipelineReadyIntended = true;
+      maybeFlushPipelineReady();
     },
     close() {
       closed = true;
