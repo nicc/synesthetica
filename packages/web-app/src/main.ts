@@ -119,7 +119,7 @@ const engineState: EngineStateSnapshot = {
     beatValue: null,
     chordMode: "harmonic",
     metronome: false,
-      phase: "no-session",
+    phase: "no-session",
   },
   input: null,
   activePreset: null,
@@ -402,6 +402,17 @@ function initializePipeline(): void {
   pipeline.addGrammar(new HarmonyGrammar());
   pipeline.addGrammar(new DynamicsGrammar());
   pipeline.setCompositor(new IdentityCompositor());
+  // Publish the phase transition to "spawned" so the CLI's cached
+  // state reflects it. Without this the CLI stays at emptyState()
+  // (phase: "no-session") until the first LLM op fires publishState,
+  // which is set_input in the standard flow — so start_session's
+  // returned state, and any get_state read before set_input, would
+  // report "no-session" contradicting the successful spawn.
+  // wsReceiver may be null on the very first bootstrap call if
+  // mountWsReceiver hasn't run yet; publishState is a no-op in that
+  // case (optional chaining on the send). Bootstrap orders
+  // mountWsReceiver *before* initializePipeline for this reason.
+  publishState();
 }
 
 function attachAdapterAndStartRender(
@@ -806,15 +817,28 @@ function captureFrame(): void {
 }
 
 // Bootstrap
+//
+// mountWsReceiver runs BEFORE initializePipeline so that
+// initializePipeline's tail publishState() has a receiver to send
+// through. This is what puts the "spawned" phase into the CLI's
+// cached state before start_session unblocks — see the extended
+// comment inside initializePipeline for the "no-session on
+// start_session return" bug this ordering prevents.
+//
+// The CLI won't send any engine ops until it sees pipeline-ready,
+// so having mountWsReceiver live before the pipeline exists doesn't
+// create a null-pipeline race — pipeline-ready is the gate.
 mountPanels();
 void initMidi();
-initializePipeline();
 mountWsReceiver();
+initializePipeline();
 void queryPermissionsAndPublish();
 // Signal to the CLI that we're wired up and ready to receive engine
 // calls that actually take effect on consumers. SessionManager.start()
 // on the CLI awaits this before returning ok:true to the LLM, so a
-// subsequent set_macro doesn't race a null pipeline.
+// subsequent set_macro doesn't race a null pipeline. WS is ordered
+// per-connection, so the state-changed emitted by initializePipeline
+// above lands on the CLI's cache before this pipeline-ready.
 wsReceiver?.publishPipelineReady();
 
 /**
