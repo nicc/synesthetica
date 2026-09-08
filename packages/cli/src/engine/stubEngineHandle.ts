@@ -23,6 +23,21 @@ export interface StubOptions {
   initialMacros?: Record<string, number | string>;
 }
 
+/** Kept in sync with the web-app's deriveHarmonyLingerClipMax; the
+ *  stabilizer window is a fixed 60s and both surfaces need to compute
+ *  the same clip threshold when reporting state. */
+function deriveClipMax(
+  tempo: number | null,
+  beatsPerBar: number | null,
+): number | null {
+  if (tempo === null) return null;
+  const bpb = beatsPerBar ?? 4;
+  const barSeconds = (60 / tempo) * bpb;
+  const clipBars = 60 / barSeconds;
+  if (clipBars >= 8) return null;
+  return Number(clipBars.toFixed(2));
+}
+
 export class StubEngineHandle implements EngineHandle {
   readonly label: string;
   status: "starting" | "running" | "stopping" | "error" = "running";
@@ -55,6 +70,7 @@ export class StubEngineHandle implements EngineHandle {
         beatValue: null,
         chordMode: "harmonic",
       harmonyLingerUnit: "seconds",
+      harmonyLingerClipMax: null,
         metronome: false,
       },
       input: null,
@@ -96,12 +112,20 @@ export class StubEngineHandle implements EngineHandle {
     this.opLog.push({ method: "setTempo", args: [bpm] });
     this.state.session.tempo = bpm;
     this.state.session.harmonyLingerUnit = bpm === null ? "seconds" : "bars";
+    this.state.session.harmonyLingerClipMax = deriveClipMax(
+      bpm,
+      this.state.session.beatsPerBar,
+    );
     return this.publishState();
   }
   async setMeter(beatsPerBar: number | null, beatValue: number | null): Promise<StateSnapshot> {
     this.opLog.push({ method: "setMeter", args: [beatsPerBar, beatValue] });
     this.state.session.beatsPerBar = beatsPerBar;
     this.state.session.beatValue = beatValue;
+    this.state.session.harmonyLingerClipMax = deriveClipMax(
+      this.state.session.tempo,
+      beatsPerBar,
+    );
     return this.publishState();
   }
   async setChordMode(mode: "harmonic" | "bass-led"): Promise<StateSnapshot> {

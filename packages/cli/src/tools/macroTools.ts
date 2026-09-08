@@ -90,17 +90,45 @@ async function dispatchCompound(
   // Fan out to each target with a linear map. Last write wins per
   // SPEC 013 §Resolution — no accumulation, no priority. Per-target
   // `invert` flips the compound axis so the target's range runs in the
-  // opposite direction (used when a compound's semantics are the
-  // reverse of a leaf's natural range — e.g. rhythm:difficulty HIGH
-  // → rhythm:tightness-tolerance LOW).
+  // opposite direction. `realTimeUnit` normalises curve output to the
+  // leaf's current unit under session state (harmony:linger → bars
+  // when tempo is set) so the compound stays cross-grammar coherent.
+  const state = await engine.getStateSnapshot();
+  const tempo = state.session.tempo;
+  const beatsPerBar = state.session.beatsPerBar ?? 4;
+
   for (const rawTarget of compound.targets) {
-    const target = typeof rawTarget === "string"
-      ? { id: rawTarget, invert: false }
-      : { id: rawTarget.id, invert: rawTarget.invert === true };
+    const target =
+      typeof rawTarget === "string"
+        ? { id: rawTarget, invert: false, realTimeUnit: undefined as "seconds" | undefined }
+        : {
+            id: rawTarget.id,
+            invert: rawTarget.invert === true,
+            realTimeUnit: rawTarget.realTimeUnit,
+          };
     const compoundValue = target.invert
       ? compound.range[1] + compound.range[0] - value
       : value;
-    const targetValue = linearMapTo(compoundValue, compound.range, target.id);
+    let targetValue = linearMapTo(compoundValue, compound.range, target.id);
+    // Real-time normalisation: curve output is in target.realTimeUnit
+    // ("seconds" today). When the leaf's current unit differs from
+    // that, convert. Clamped to the leaf's range so the conversion
+    // stays valid at edge tempos.
+    if (
+      target.realTimeUnit === "seconds" &&
+      typeof targetValue === "number" &&
+      tempo !== null
+    ) {
+      const barSeconds = (60 / tempo) * beatsPerBar;
+      const converted = targetValue / barSeconds;
+      const leaf = macroById.get(target.id);
+      if (leaf && (leaf.type === "continuous" || leaf.type === "compound")) {
+        const [lo, hi] = leaf.range;
+        targetValue = Math.max(lo, Math.min(hi, converted));
+      } else {
+        targetValue = converted;
+      }
+    }
     await engine.setMacro(target.id, targetValue);
   }
   // Record the compound's own value last so state://current reflects

@@ -17,6 +17,7 @@ import type {
   PresetAnnotation,
   ToolAnnotation,
   ResourceAnnotation,
+  DerivedStateAnnotation,
 } from "./annotations";
 
 // ============================================================================
@@ -48,7 +49,7 @@ const macros: MacroAnnotation[] = [
     notes: [
       "**Unit shifts with prescribed tempo.** When session.tempo is null, the value is seconds. When session.tempo is set, the value is bars — so the SAME numeric value means different real-world durations either side of a set_tempo call. state.session.harmonyLingerUnit resolves the current interpretation.",
       "Consequence for relative adjustment: 'a bit more' means +1 in the current unit, but that unit may be about to change. When you're about to set_tempo (or clear it) at the same time as adjusting linger, re-anchor the value against the new unit rather than incrementing the old one.",
-      "Capped by the stabilizer's progression window; asking for more silently clips. macros.effective reflects the clipped value, so a divergence between intents and effective here signals you hit the ceiling.",
+      "Capped by the stabilizer's real-time progression window (60 seconds). In bars mode the clip threshold is tempo-dependent — at 30 BPM 4/4 you clip above ~7.5 bars; at 120 BPM never within the declared [0.5, 8] range. state.session.harmonyLingerClipMax carries the resolved ceiling under the current tempo/meter (null when unreachable). macros.effective reflects the clipped value, so intents/effective divergence here signals you hit that ceiling.",
     ],
     consumers: [{ kind: "grammar", id: "harmony-grammar", macroKey: "linger" }],
   },
@@ -309,7 +310,16 @@ const macros: MacroAnnotation[] = [
     type: "compound",
     range: [0, 1],
     default: 1.0,
-    targets: ["rhythm:horizon", "harmony:linger", "dynamics:linger"],
+    // harmony:linger carries a realTimeUnit hint so the dispatcher
+    // normalises the compound value to bars when a tempo is prescribed,
+    // keeping the compound's real-time memory consistent across all
+    // three grammars regardless of tempo. See annotations.ts
+    // CompoundTarget.realTimeUnit and SPEC 014 §Compound dispatch.
+    targets: [
+      "rhythm:horizon",
+      { id: "harmony:linger", realTimeUnit: "seconds" },
+      "dynamics:linger",
+    ],
     affects: ["rhythm", "harmony", "dynamics", "phrasing"],
     directionality: {
       low: {
@@ -397,7 +407,7 @@ const sessionControls: SessionControlAnnotation[] = [
     dynamicOptions: true,
     nullable: false,
     notes: [
-      "MIDI device or audio input. The web-app populates the widget's option list at runtime from connected devices; the LLM enumerates the same list via inputs://, and sees the currently-selected source in state://<label>/current.input.",
+      "MIDI device or audio input. The web-app populates the widget's option list at runtime from connected devices; the LLM enumerates the same list via inputs://, and sees the currently-selected source in `state://<label>/current.input`.",
       "Audio device labels only appear after getUserMedia permission is granted for the origin (i.e. after at least one audio session has started). Before that, additional audio entries surface as placeholder names ('Audio input 1', etc.) alongside a 'Default microphone' fallback.",
     ],
   },
@@ -909,7 +919,7 @@ const tools: ToolAnnotation[] = [
   {
     id: "set_input",
     description:
-      "Select the input source (MIDI device or audio input). Read inputs:// for the enumerated list of available devices — each entry carries a `sourceString` ready to pass here. Format: 'midi:<device-id>', 'audio' (default microphone), or 'audio:<device-id>' (specific audio input). Current selection is available at state://<label>/current.input.",
+      "Select the input source (MIDI device or audio input). Read inputs:// for the enumerated list of available devices — each entry carries a `sourceString` ready to pass here. Format: `midi:<device-id>`, 'audio' (default microphone), or `audio:<device-id>` (specific audio input). Current selection is available at `state://<label>/current.input`.",
     aliases: ["use", "listen to", "switch to", "input"],
     examples: [
       "set_input(source: 'midi:Yamaha P-125') — listen to that MIDI keyboard.",
@@ -921,11 +931,11 @@ const tools: ToolAnnotation[] = [
   {
     id: "set_macro",
     description:
-      "Set any aesthetic macro (system:*, cross-cutting, or <scope>:*). Value shape depends on the macro's type: number for continuous / compound, string or number for discrete. See annotations://macros/{id} for each macro's range, default, and directionality.",
+      "Set any aesthetic macro (system:*, cross-cutting, or `<scope>:*`). Value shape depends on the macro's type: number for continuous / compound, string or number for discrete. See annotations://macros/{id} for each macro's range, default, and directionality.",
     aliases: ["adjust", "tune", "set macro", "change how"],
     notes: [
       "Compound macros fan out to leaf targets via a linear default curve; per-target inversion is applied when the compound's semantic runs opposite the leaf's natural range. See the compound's targets field in the manifest.",
-      "The state resource state://<label>/current reflects the value the LLM most recently set — including compound values, even when the underlying leaves also change.",
+      "The state resource `state://<label>/current` reflects the value the LLM most recently set — including compound values, even when the underlying leaves also change.",
     ],
     examples: [
       "set_macro(name: 'harmony:linger', value: 6) — chord symbols linger visibly on the clock.",
@@ -967,7 +977,7 @@ const tools: ToolAnnotation[] = [
       "Save the current control-surface state as a named preset. Overwrites if the name already exists.",
     aliases: ["save as", "remember this", "save preset"],
     notes: [
-      "Name must be [a-zA-Z0-9_-]{1,64}. Stored on disk at $XDG_DATA_HOME/synesthetica/presets/<name>.json.",
+      "Name must be `[a-zA-Z0-9_-]{1,64}`. Stored on disk at `$XDG_DATA_HOME/synesthetica/presets/<name>.json`.",
       "Captures: macro values, session state (key, tempo, meter, chord mode, metronome), input source.",
     ],
   },
@@ -1016,7 +1026,7 @@ const tools: ToolAnnotation[] = [
   {
     id: "get_state",
     description:
-      "Return the current engine state: macros (intents + effective), prescribed session context (key, tempo, meter, chord mode, metronome), input source, active preset, and session-time anchors. Mirrors state://<label>/current; use this when your client doesn't proxy resource reads.",
+      "Return the current engine state: macros (intents + effective), prescribed session context (key, tempo, meter, chord mode, metronome), input source, active preset, and session-time anchors. Mirrors `state://<label>/current`; use this when your client doesn't proxy resource reads.",
     aliases: ["what's set", "current state", "read state", "how are things"],
     notes: [
       "macros.intents is the last user-set value per macro (what was asked for). macros.effective is what pipeline consumers are actually running with. Divergence is often legitimate (compound-then-leaf override, preset-then-tweak) — treat as information, not an automatic bug.",
@@ -1105,7 +1115,7 @@ const resources: ResourceAnnotation[] = [
     aliases: ["recent events", "history", "recent playing", "musical history"],
     notes: [
       "Musical-layer event stream — semantic facts (pitch classes, chord root/quality), not visual entities.",
-      "Supports ?limit=N (default 100, max 1000) and ?since=<id> query params.",
+      "Supports `?limit=N` (default 100, max 1000) and `?since=<id>` query params.",
       "Each event's `t` is session-ms; combine with envelope.startedAt for wall-clock, or with envelope.now for 'age' math.",
       "Read on demand — e.g. before answering 'what did I just play?' or 'summarise the last few chords'.",
     ],
@@ -1124,7 +1134,7 @@ const resources: ResourceAnnotation[] = [
     aliases: ["preset list", "available presets"],
     notes: [
       "Presets are user-managed; the manifest doesn't ship defaults.",
-      "For one preset's full stored content, read presets://<name>.",
+      "For one preset's full stored content, read `presets://<name>`.",
     ],
     subscribable: false,
   },
@@ -1143,7 +1153,7 @@ const resources: ResourceAnnotation[] = [
     description:
       "The full annotation manifest as one JSON document — macros, session controls, concepts, grammars, presets, tools, resources. Convenience for clients that prefer one fetch over per-URI browsing.",
     notes: [
-      "Every individual macro / session control / concept / grammar / preset also has its own annotations://<category>/<id> resource for finer-grained reads.",
+      "Every individual macro / session control / concept / grammar / preset also has its own `annotations://<category>/<id>` resource for finer-grained reads.",
       "The system-overview prompt already embeds this content — reading the bundle is only necessary when you need a specific field the prompt truncates.",
     ],
     subscribable: false,
@@ -1168,9 +1178,36 @@ const presets: PresetAnnotation[] = [];
 // Manifest (what the LLM consumes)
 // ============================================================================
 
+// ============================================================================
+// Derived state
+// ============================================================================
+
+const derivedState: DerivedStateAnnotation[] = [
+  {
+    id: "session.harmonyLingerUnit",
+    name: "Harmony linger unit",
+    aliases: ["linger unit", "chord linger unit"],
+    derivedFrom: ["session.tempo"],
+    values: ["bars", "seconds"],
+    notes: [
+      "Resolves the current interpretation of harmony:linger's numeric value: 'bars' when a tempo is prescribed, 'seconds' otherwise. Same numeric value means different real durations either side of set_tempo — read this field to know which unit applies before adjusting linger.",
+    ],
+  },
+  {
+    id: "session.harmonyLingerClipMax",
+    name: "Harmony linger clip ceiling",
+    aliases: ["linger clip", "harmony linger clip"],
+    derivedFrom: ["session.tempo", "session.beatsPerBar"],
+    notes: [
+      "The maximum harmony:linger value (in bars) that will NOT be clipped by the stabilizer's real-time progression window (60s hard cap). Null when clipping is not reachable — either seconds mode (max linger 8s < 60s window) or a tempo where the range's own ceiling stays under the clip. When non-null, setting linger above this value silently clips; effective reflects the clipped value, so intents/effective divergence at harmony:linger signals hitting this ceiling.",
+    ],
+  },
+];
+
 export const productionManifest = {
   macros,
   sessionControls,
+  derivedState,
   concepts,
   grammars,
   presets,

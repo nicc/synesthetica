@@ -116,6 +116,7 @@ const engineState: EngineStateSnapshot = {
     beatValue: null,
     chordMode: "harmonic",
       harmonyLingerUnit: "seconds",
+      harmonyLingerClipMax: null,
     metronome: false,
   },
   input: null,
@@ -154,6 +155,29 @@ function refreshEffectiveMacros(): void {
 }
 
 /**
+ * The stabilizer holds ~60s of real-time progression history. In
+ * bars-mode, harmony:linger values above `60s / barSeconds` bars
+ * silently clip at that ceiling — a real-world outcome the LLM
+ * should be able to see before it happens. Returns the max linger
+ * value (in bars) that will NOT clip, or null when clipping is
+ * unreachable from the declared range (seconds mode never hits the
+ * 60s window since max linger is 8s).
+ */
+function deriveHarmonyLingerClipMax(
+  tempo: number | null,
+  beatsPerBar: number | null,
+): number | null {
+  if (tempo === null) return null; // seconds mode caps at 8s, well under 60s
+  const bpb = beatsPerBar ?? 4;
+  const barSeconds = (60 / tempo) * bpb;
+  const clipBars = 60 / barSeconds;
+  // harmony:linger declared range is [0.5, 8]; clip only meaningful
+  // when threshold is inside that range.
+  if (clipBars >= 8) return null;
+  return Number(clipBars.toFixed(2));
+}
+
+/**
  * Single dispatch path — both the local panel and the CLI-over-WS
  * end up here. Updates local pipeline state, mirrors to engineState,
  * publishes to the CLI, and refreshes the panel widget.
@@ -185,11 +209,11 @@ async function applyEngineOp(
     case "setTempo": {
       const [bpm] = args as [number | null];
       engineState.session.tempo = bpm;
-      // harmony:linger unit shifts with tempo presence — see the
-      // macro's annotation. Surfacing the current unit in state
-      // lets the LLM re-anchor relative adjustments across a
-      // set_tempo call rather than assume continuity.
       engineState.session.harmonyLingerUnit = bpm === null ? "seconds" : "bars";
+      engineState.session.harmonyLingerClipMax = deriveHarmonyLingerClipMax(
+        bpm,
+        engineState.session.beatsPerBar,
+      );
       pipeline?.setTempo(bpm);
       metronome?.setTempo(bpm);
       break;
@@ -198,6 +222,11 @@ async function applyEngineOp(
       const [bpb, unit] = args as [number | null, number | null];
       engineState.session.beatsPerBar = bpb;
       engineState.session.beatValue = unit;
+      // Meter change reshuffles bar-length, so the clip threshold moves.
+      engineState.session.harmonyLingerClipMax = deriveHarmonyLingerClipMax(
+        engineState.session.tempo,
+        bpb,
+      );
       pipeline?.setMeter(bpb, unit ?? 4);
       if (bpb !== null) metronome?.setMeter(bpb);
       break;

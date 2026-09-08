@@ -38,6 +38,7 @@ function shape<T>(session: SessionManager, data?: T) {
         chordMode: "harmonic" as const,
         metronome: false,
         harmonyLingerUnit: "seconds" as const,
+      harmonyLingerClipMax: null,
       },
       input: null,
       activePreset: null,

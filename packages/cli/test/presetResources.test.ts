@@ -19,6 +19,7 @@ function fakeSnapshot(): StateSnapshot {
       beatValue: 4,
       chordMode: "harmonic",
         harmonyLingerUnit: "seconds",
+      harmonyLingerClipMax: null,
       metronome: false,
     },
     input: "midi:test",

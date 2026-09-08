@@ -216,6 +216,17 @@ export interface DiscreteMacroAnnotation extends MacroAnnotationBase {
 export interface CompoundTarget {
   id: string;
   invert?: boolean;
+  /**
+   * When the leaf macro's unit shifts with session state (currently
+   * only harmony:linger — bars when tempo prescribed, seconds
+   * otherwise), the compound's curve output is interpreted in a
+   * stable REAL-TIME unit and normalised to the leaf's current unit
+   * at dispatch. Set to "seconds" for time-horizon → harmony:linger
+   * so a single compound value produces consistent real-time memory
+   * across grammars regardless of tempo. See SPEC 014 §Compound
+   * dispatch for the composition rule with future custom curves.
+   */
+  realTimeUnit?: "seconds";
 }
 
 /**
@@ -246,6 +257,41 @@ export type MacroAnnotation =
   | ContinuousMacroAnnotation
   | DiscreteMacroAnnotation
   | CompoundMacroAnnotation;
+
+// ============================================================================
+// DerivedStateAnnotation — read-only fields the server computes from
+// other state, exposed for LLM discovery so it doesn't have to
+// re-derive them from primary fields.
+// ============================================================================
+
+/**
+ * Describes a read-only state field the server computes from other
+ * state (e.g. `session.harmonyLingerUnit` derives from
+ * `session.tempo`). Unlike session controls, these have no widget
+ * and no setter — the value updates automatically when its inputs
+ * change. Enumerable via the manifest so a client can discover what
+ * derived context exists without reading `state://<label>/current`
+ * blind.
+ *
+ * The "documentation compensating for state the system knows"
+ * pattern: when a computed answer would otherwise be derivable prose
+ * the operator has to remember, lift it into a field and describe
+ * the field here.
+ */
+export interface DerivedStateAnnotation {
+  /** Field path within EngineStateSnapshot, e.g. "session.harmonyLingerUnit". */
+  id: string;
+  /** Human-readable name. */
+  name?: string;
+  /** Aliases for filter / search. */
+  aliases?: string[];
+  /** Primary inputs the field is derived from (id references). */
+  derivedFrom: string[];
+  /** For enum-shaped fields, the set of possible values. */
+  values?: Array<string | number>;
+  /** Explanatory prose. */
+  notes?: string[];
+}
 
 // ============================================================================
 // SessionControlAnnotation

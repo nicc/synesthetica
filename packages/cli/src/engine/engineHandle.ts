@@ -39,6 +39,8 @@ export interface StateSnapshot {
     metronome: boolean;
     /** Derived from tempo; see EngineStateSnapshot.session.harmonyLingerUnit. */
     harmonyLingerUnit: "bars" | "seconds";
+    /** Clip ceiling for harmony:linger under current tempo; see EngineStateSnapshot. */
+    harmonyLingerClipMax: number | null;
   };
   /** Input source (e.g. "midi:Yamaha P-125", "audio:built-in-mic"). */
   input: string | null;

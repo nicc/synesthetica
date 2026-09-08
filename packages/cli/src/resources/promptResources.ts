@@ -33,6 +33,7 @@ import {
   type GrammarAnnotation,
   type ToolAnnotation,
   type ResourceAnnotation,
+  type DerivedStateAnnotation,
 } from "@synesthetica/contracts";
 
 const req = createRequire(import.meta.url);
@@ -114,6 +115,12 @@ export function composeSystemOverview(): string {
     "## Session controls",
     "",
     productionManifest.sessionControls.map(renderSessionControl).join("\n\n"),
+    "",
+    "## Derived session state",
+    "",
+    "Read-only fields the server computes from other state. Not settable — the value updates automatically when its inputs change. Enumerate here rather than deriving from primary fields blind.",
+    "",
+    productionManifest.derivedState.map(renderDerivedState).join("\n\n"),
     "",
     "## System concepts",
     "",
@@ -383,6 +390,21 @@ function renderSessionControl(s: SessionControlAnnotation): string {
   if (s.cautions?.length) {
     lines.push("Cautions:");
     for (const c of s.cautions) lines.push(`- ${c}`);
+  }
+  return lines.join("\n");
+}
+
+function renderDerivedState(d: DerivedStateAnnotation): string {
+  const lines: string[] = [`### \`${d.id}\``];
+  if (d.name) lines.push(`Name: ${d.name}`);
+  lines.push(`Derived from: ${d.derivedFrom.join(", ")}`);
+  if (d.values?.length) {
+    lines.push(`Values: ${d.values.map((v) => JSON.stringify(v)).join(" | ")}`);
+  }
+  if (d.aliases?.length) lines.push(`Aliases: ${d.aliases.join(", ")}`);
+  if (d.notes?.length) {
+    lines.push("Notes:");
+    for (const n of d.notes) lines.push(`- ${n}`);
   }
   return lines.join("\n");
 }

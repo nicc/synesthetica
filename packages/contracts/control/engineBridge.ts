@@ -92,6 +92,18 @@ export interface EngineStateSnapshot {
      * annotation notes for context.
      */
     harmonyLingerUnit: "bars" | "seconds";
+    /**
+     * The maximum harmony:linger value that will NOT be clipped by
+     * the stabilizer's real-time progression window (60s hard cap).
+     * Tempo-dependent — clipping only surfaces at low tempos with
+     * high linger values (e.g. below ~30 BPM at 4/4 with linger 8).
+     * Null when no tempo is prescribed AND the clip is not reachable
+     * from the current declared range (seconds mode caps at 8s <
+     * 60s window). When non-null, values above this clip and the
+     * effective value is the ceiling — visible as intents/effective
+     * divergence at harmony:linger.
+     */
+    harmonyLingerClipMax: number | null;
   };
   input: string | null;
   activePreset: string | null;

@@ -132,6 +132,52 @@ describe("set_macro — compound (linear fan-out)", () => {
   });
 });
 
+describe("time-horizon — tempo-aware normalisation of harmony:linger", () => {
+  it("in free time, harmony:linger is dispatched as-is (curve output in seconds)", async () => {
+    const engine = new StubEngineHandle();
+    const r = await setMacroTool.handle({ name: "time-horizon", value: 1.0 }, engine);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // No tempo prescribed → linger is in seconds, no conversion.
+    expect(r.state.macros.intents["harmony:linger"]).toBe(8);
+    expect(r.state.macros.intents["dynamics:linger"]).toBe(8000);
+  });
+
+  it("with tempo, harmony:linger is normalised to bars (compound stays real-time coherent)", async () => {
+    const engine = new StubEngineHandle();
+    // 120 BPM 4/4 → barSeconds = 2. Curve output 8s → 4 bars.
+    await engine.setTempo(120);
+    await engine.setMeter(4, 4);
+    const r = await setMacroTool.handle({ name: "time-horizon", value: 1.0 }, engine);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.macros.intents["harmony:linger"]).toBe(4); // 8 / 2
+    // dynamics:linger not tempo-normalised — stays at ms.
+    expect(r.state.macros.intents["dynamics:linger"]).toBe(8000);
+  });
+
+  it("normalised value is clamped to harmony:linger's leaf range", async () => {
+    const engine = new StubEngineHandle();
+    // 30 BPM 4/4 → barSeconds = 8. Curve output 8s → 1 bar. Fine.
+    // But at min compound value: 0.5s → 0.0625 bars → clamped to 0.5.
+    await engine.setTempo(30);
+    await engine.setMeter(4, 4);
+    const r = await setMacroTool.handle({ name: "time-horizon", value: 0 }, engine);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // 0.5s curve output / 8s per bar = 0.0625 → clamped to leaf min 0.5.
+    expect(r.state.macros.intents["harmony:linger"]).toBe(0.5);
+  });
+
+  it("state.session.harmonyLingerUnit tracks tempo transitions", async () => {
+    const engine = new StubEngineHandle();
+    const r1 = await engine.setTempo(120);
+    expect(r1.session.harmonyLingerUnit).toBe("bars");
+    const r2 = await engine.setTempo(null);
+    expect(r2.session.harmonyLingerUnit).toBe("seconds");
+  });
+});
+
 describe("set_macro — errors", () => {
   it("unknown macro name → MACRO_UNKNOWN", async () => {
     const r = await setMacroTool.handle({ name: "not:a:macro", value: 0 }, new StubEngineHandle());
