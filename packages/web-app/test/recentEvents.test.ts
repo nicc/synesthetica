@@ -75,6 +75,72 @@ describe("recent-events buffer — note-on capture", () => {
     const noteOns = buf.get(100).filter((e) => e.kind === "note-on");
     expect(noteOns).toHaveLength(1);
   });
+
+  it("stamps note-on with event time (t = onset) and frame time (frameT)", () => {
+    const { pipeline, adapter } = buildPipeline();
+    const buf = attachRecentEventsBuffer(pipeline, { capacity: 100 });
+
+    // Note-on event happens at t=3 (event clock), frame boundary at t=10.
+    adapter.emitNoteOn(60, 100, 3);
+    pipeline.requestFrame(10);
+
+    const [event] = buf.get(100).filter((e) => e.kind === "note-on");
+    expect(event.t).toBe(3);
+    expect(event.frameT).toBe(10);
+  });
+});
+
+describe("recent-events buffer — note-off capture", () => {
+  it("emits note-off on the sustain→release phase transition (not on prune)", () => {
+    const { pipeline, adapter } = buildPipeline();
+    const buf = attachRecentEventsBuffer(pipeline, { capacity: 100 });
+
+    adapter.emitNoteOn(60, 100, 0);
+    pipeline.requestFrame(10);
+    adapter.emitNoteOff(60, 500);
+    pipeline.requestFrame(510);
+
+    const noteOffs = buf.get(100).filter((e) => e.kind === "note-off");
+    expect(noteOffs).toHaveLength(1);
+    // Event clock = release time, NOT prune time (would be 10500ms).
+    expect(noteOffs[0].t).toBe(500);
+    // Frame clock = the frame boundary at which the buffer noticed.
+    expect(noteOffs[0].frameT).toBe(510);
+  });
+
+  it("note-off carries pitch, pitchClass, octave, velocity for standalone reads", () => {
+    const { pipeline, adapter } = buildPipeline();
+    const buf = attachRecentEventsBuffer(pipeline, { capacity: 100 });
+
+    adapter.emitNoteOn(64, 90, 0); // E4
+    pipeline.requestFrame(10);
+    adapter.emitNoteOff(64, 400);
+    pipeline.requestFrame(410);
+
+    const [off] = buf.get(100).filter((e) => e.kind === "note-off");
+    expect(off.pitch).toBe(64);
+    expect(off.pitchClass).toBe(4);
+    expect(off.octave).toBe(4);
+    expect(off.velocity).toBe(90);
+    expect(off.noteId).toBeTypeOf("string");
+  });
+
+  it("does NOT emit a duplicate note-off when the released note lingers across frames", () => {
+    const { pipeline, adapter } = buildPipeline();
+    const buf = attachRecentEventsBuffer(pipeline, { capacity: 100 });
+
+    adapter.emitNoteOn(60, 100, 0);
+    pipeline.requestFrame(10);
+    adapter.emitNoteOff(60, 500);
+    pipeline.requestFrame(510);
+    // Note stays in the frame during its release tail — must not
+    // re-emit note-off on subsequent frames.
+    pipeline.requestFrame(600);
+    pipeline.requestFrame(700);
+
+    const noteOffs = buf.get(100).filter((e) => e.kind === "note-off");
+    expect(noteOffs).toHaveLength(1);
+  });
 });
 
 describe("recent-events buffer — ring capacity + queries", () => {

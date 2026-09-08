@@ -13,7 +13,7 @@
  */
 
 import type { VisualPipeline } from "@synesthetica/engine";
-import type { MusicalFrame, EngineRecentEvent as RecentEvent } from "@synesthetica/contracts";
+import type { MusicalFrame, Note, EngineRecentEvent as RecentEvent } from "@synesthetica/contracts";
 
 export interface RecentEventsBufferOptions {
   /** Max events to retain — oldest evicted first. */
@@ -47,9 +47,13 @@ export function attachRecentEventsBuffer(
   let nextId = 0;
   let countCaptured = 0;
 
-  // Diff state — the previous frame's note ids + chord ids. Diff on
-  // each new frame to derive events.
-  let prevNoteIds = new Set<string>();
+  // Diff state — the previous frame's Note objects (keyed by id) and
+  // chord ids. We keep whole Notes rather than just ids so we can:
+  //   (1) detect the sustain→release phase transition by comparing
+  //       prev.release === null vs current.release !== null,
+  //   (2) fill in pitch/velocity on the vanish-fallback note-off,
+  //       where the note is no longer in the current frame.
+  let prevNotes = new Map<string, Note>();
   let prevChordIds = new Set<string>();
   let lastChordId: string | null = null;
 
@@ -61,13 +65,17 @@ export function attachRecentEventsBuffer(
   };
 
   const unsubscribe = pipeline.onMusicalFrame((frame: MusicalFrame) => {
-    const currentNoteIds = new Set(frame.notes.map((n) => n.id));
+    const currentNotes = new Map(frame.notes.map((n) => [n.id, n]));
 
-    // Note-on: notes present now, absent before.
+    // Note-on: notes present now, absent before. `t` is the raw event
+    // onset (MIDI event timestamp), `frameT` is the frame boundary
+    // that captured it. See EngineRecentEvent doc for the bitemporal
+    // rationale.
     for (const note of frame.notes) {
-      if (!prevNoteIds.has(note.id)) {
+      if (!prevNotes.has(note.id)) {
         push({
-          t: frame.t,
+          t: note.onset,
+          frameT: frame.t,
           kind: "note-on",
           part: frame.part,
           noteId: note.id,
@@ -81,19 +89,48 @@ export function attachRecentEventsBuffer(
       }
     }
 
-    // Note-off: notes present before, absent now (or transitioned
-    // into 'release' phase — the sustain→release transition marks
-    // the actual key release).
-    for (const prevId of prevNoteIds) {
-      if (!currentNoteIds.has(prevId)) {
-        // Note vanished — release completed / cleaned up. Best-effort
-        // note-off; we don't have the original pitch handy at this
-        // instant (frame no longer carries it).
+    // Note-off (phase-transition path): a previously-tracked note
+    // whose release timestamp has just been set. This is the normal
+    // path — NoteTrackingStabilizer sets `release` on the frame after
+    // the MIDI note-off arrives, and the note keeps rendering (for
+    // its release tail) inside the `activeNotes` map until pruning.
+    // Emitting here (not at prune time) means the LLM's note-off
+    // timestamp reflects the actual key-up, not the ~10s prune.
+    for (const note of frame.notes) {
+      const prev = prevNotes.get(note.id);
+      if (prev && prev.release === null && note.release !== null) {
+        push({
+          t: note.release,
+          frameT: frame.t,
+          kind: "note-off",
+          part: frame.part,
+          noteId: note.id,
+          pitch: note.pitch.pc + (note.pitch.octave + 1) * 12,
+          pitchClass: note.pitch.pc,
+          octave: note.pitch.octave,
+          velocity: note.velocity,
+        });
+      }
+    }
+
+    // Note-off (vanish fallback): a previously-tracked note that
+    // vanished from the frame without ever transitioning to release
+    // phase. Shouldn't happen in normal operation — belt-and-
+    // suspenders for pathological adapter/stabiliser bugs where a
+    // note disappears with `release === null`. Uses `frame.t` for
+    // both timestamps because we've lost the event clock entirely.
+    for (const [prevId, prev] of prevNotes) {
+      if (!currentNotes.has(prevId) && prev.release === null) {
         push({
           t: frame.t,
+          frameT: frame.t,
           kind: "note-off",
           part: frame.part,
           noteId: prevId,
+          pitch: prev.pitch.pc + (prev.pitch.octave + 1) * 12,
+          pitchClass: prev.pitch.pc,
+          octave: prev.pitch.octave,
+          velocity: prev.velocity,
         });
       }
     }
@@ -109,6 +146,7 @@ export function attachRecentEventsBuffer(
             : "chord-detected";
         push({
           t: chord.onset,
+          frameT: frame.t,
           kind,
           part: frame.part,
           chordId: chord.id,
@@ -131,7 +169,7 @@ export function attachRecentEventsBuffer(
       }
     }
 
-    prevNoteIds = currentNoteIds;
+    prevNotes = currentNotes;
     prevChordIds = new Set(frame.chords.map((c) => c.id));
   });
 
@@ -143,7 +181,7 @@ export function attachRecentEventsBuffer(
     },
     clear() {
       buffer.length = 0;
-      prevNoteIds = new Set();
+      prevNotes = new Map();
       prevChordIds = new Set();
       lastChordId = null;
     },

@@ -293,8 +293,9 @@ const macros: MacroAnnotation[] = [
     default: "16th", // matches RhythmGrammar.macros.quantiseResolution
     affects: ["rhythm"],
     notes: [
-      "Determines the reference subdivision for timing drift analysis.",
+      "Determines the reference subdivision for timing drift analysis. Drift is measured as the signed distance from the note's onset to the nearest subdivision (not the nearest beat) — `beatMs / 4` for the default `16th`, `beatMs / 2` for `8th`, `beatMs` for `quarter`, `beatMs / 8` for `32nd`.",
       "Coarser resolutions are more likely to show inaccurate timing due to fewer matching grid divisions, which counter-intuitively feels stricter but is actually an easier timing intent; finer resolutions will look more forgiving by matching to more grid divisions but is actually grading to a more difficult intent.",
+      "Read `state.macros.effective[\"rhythm:quantise-resolution\"]` before reporting drift verdicts to the user and name the actual subdivision in your answer — its value directly controls what the on-screen streak lines are measuring against.",
     ],
     consumers: [{ kind: "grammar", id: "rhythm-grammar", macroKey: "quantiseResolution" }],
   },
@@ -1077,7 +1078,8 @@ const tools: ToolAnnotation[] = [
     notes: [
       "Pull-only per SPEC 013 §I30 — musical activity at pipeline cadence would pump inference in some clients. Read when the LLM decides it needs context.",
       "The envelope's `now` is FRESH (computed at read time), so temporal reasoning like 'how long ago was that' anchors correctly regardless of think-time between events landing and the LLM reading.",
-      "**Event field shapes:** `note-on` carries `{ noteId, part, pitch (MIDI), pitchClass, octave, velocity, confidence }` — confidence is 1.0 for MIDI, model-reported for audio (< 1.0). `note-off` carries `{ noteId, part }`. `chord-detected` and `chord-changed` carry `{ chordId, part, voicing (MIDI), pitchClasses, bass, harmonic: {root, quality}, bassLed: {root, quality}, isInverted, inversion, previousChordId? }`. Chord events do NOT currently carry a confidence field — reason about note-level confidence from the constituent note-on events if you need it.",
+      "**Each event is bitemporal.** `event.t` is the **event clock** (raw MIDI/audio timestamp of the musical event — note.onset for note-on, note.release for note-off, chord.onset for chord events). `event.frameT` is the **observation clock** (the animation-frame boundary at which the buffer captured it). Use `t` for musical arithmetic (drift, IOI, duration). Use `frameT` for observation questions (\"N seconds ago\" from `now`, aligning with state-changed pushes). The two match only when the buffer lost the event clock (pathological fallback for a note that vanished without a release timestamp) — usually you don't need to notice.",
+      "**Event field shapes:** `note-on` carries `{ noteId, part, pitch (MIDI), pitchClass, octave, velocity, confidence }` — confidence is 1.0 for MIDI, model-reported for audio (< 1.0). `note-off` carries `{ noteId, part, pitch (MIDI), pitchClass, octave, velocity }` — pitch is repeated so the event stands alone; `noteId` matches the corresponding note-on if you need the confidence. `chord-detected` and `chord-changed` carry `{ chordId, part, voicing (MIDI), pitchClasses, bass, harmonic: {root, quality}, bassLed: {root, quality}, isInverted, inversion, previousChordId? }`. Chord events do NOT currently carry a confidence field — reason about note-level confidence from the constituent note-on events if you need it.",
       "`part` is a routing label (see the `part` concept). In v1 it's always `\"main\"` — don't group or filter by it and don't attempt to explain per-part behaviour to the user. Multi-part is planned but not shipped.",
     ],
     examples: [

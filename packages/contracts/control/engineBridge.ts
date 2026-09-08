@@ -145,12 +145,29 @@ export interface EngineStateSnapshot {
 
 /**
  * One captured musical event. Event stream is intentionally at the
- * musical layer, not the scene layer (see synesthetica-lnc). Payload
- * shape depends on `kind`.
+ * musical layer, not the scene layer (see synesthetica-lnc).
+ *
+ * Bitemporal: `t` is the event clock (raw MIDI / audio timestamp of
+ * the musical event itself — a note-on's `onset`, a note-off's
+ * `release`, a chord's `onset`); `frameT` is the observation clock
+ * (the animation-frame boundary at which the buffer noticed the
+ * event). Use `t` for drift arithmetic and any question about the
+ * music. Use `frameT` for "N seconds ago" and any question about the
+ * observation. The two match when we've lost the event clock (see
+ * the vanish-fallback path in recentEvents.ts) but usually differ by
+ * a few ms.
+ *
+ * Payload shape depends on `kind`:
+ * - `note-on`  → { noteId, pitch, pitchClass, octave, velocity, confidence, part }
+ * - `note-off` → { noteId, pitch, pitchClass, octave, velocity, part }
+ * - `chord-detected` / `chord-changed` → { chordId, voicing, pitchClasses, bass, harmonic, bassLed, isInverted, inversion, part, previousChordId? }
  */
 export interface EngineRecentEvent {
   id: number;
+  /** Event clock — the raw ms timestamp of the underlying musical event. */
   t: number;
+  /** Observation clock — the animation-frame boundary at which the buffer captured it. */
+  frameT: number;
   kind: "note-on" | "note-off" | "chord-detected" | "chord-changed" | string;
   [key: string]: unknown;
 }
