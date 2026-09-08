@@ -356,9 +356,14 @@ class WSBackedEngineHandle implements EngineHandle {
 
   async getStateSnapshot(): Promise<StateSnapshot> {
     const conn = this.deps.getConnection();
-    // Prefer the cached snapshot when available — it's always the
-    // most recent state-changed we saw and doesn't require a round trip.
-    if (conn) return conn.state as StateSnapshot;
+    if (conn) {
+      // The cached snapshot's `now` is from the last state-changed
+      // push, so two get_state reads within a quiet window return
+      // the same session-ms. Recompute `now` freshly from startedAt
+      // + wall-clock so temporal reasoning ("how long has this been
+      // going?") anchors on current time rather than stale write time.
+      return withFreshNow(conn.state as StateSnapshot);
+    }
     return this.call("getStateSnapshot", []) as Promise<StateSnapshot>;
   }
   async getRecentEvents(limit = 100, since?: number): Promise<RecentEventsEnvelope> {
@@ -401,6 +406,20 @@ class WSBackedEngineHandle implements EngineHandle {
     const msg: EngineCallMessage = { type: "call", id, method, args };
     return this.deps.sendCall(conn.ws, msg, id);
   }
+}
+
+/**
+ * Return the snapshot with a freshly-computed `now` field. When
+ * `startedAt` is set (session is input-active), now = ms since that
+ * ISO instant; otherwise leave it null. Non-mutating — returns a
+ * shallow-cloned session with the updated field so subscribers
+ * still see the shared cached `state` unchanged.
+ */
+function withFreshNow(snap: StateSnapshot): StateSnapshot {
+  if (!snap.startedAt) return snap;
+  const startedMs = Date.parse(snap.startedAt);
+  if (Number.isNaN(startedMs)) return snap;
+  return { ...snap, now: Date.now() - startedMs };
 }
 
 function emptyState(label: string): EngineStateSnapshot {

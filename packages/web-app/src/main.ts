@@ -255,6 +255,39 @@ async function applyEngineOp(
   return snapshotCopy();
 }
 
+/**
+ * Build a values map covering every panel-controlled field from the
+ * current engineState. Used to sync a freshly-rendered panel to
+ * whatever the LLM (or previous UI activity) has already changed —
+ * without this, opening the Basics or Advanced tab after some
+ * WS-driven writes shows widgets at their manifest defaults, not
+ * at the current values.
+ */
+function collectCurrentPanelValues(): Record<string, number | string | boolean | null> {
+  const values: Record<string, number | string | boolean | null> = {};
+  // Session controls.
+  values["session:tonic"] = engineState.session.tonic;
+  values["session:mode"] = engineState.session.mode;
+  values["session:tempo"] = engineState.session.tempo;
+  values["session:beats-per-bar"] = engineState.session.beatsPerBar;
+  values["session:beat-value"] = engineState.session.beatValue;
+  values["session:chord-mode"] = engineState.session.chordMode;
+  values["session:metronome"] = engineState.session.metronome;
+  // Input.
+  values["input:source"] = engineState.input;
+  // Macros — prefer effective (what consumers are actually running)
+  // over intents (what was asked for), since the widget's job is to
+  // show the current running value. Fall back to intents when
+  // effective is empty (compound macros don't appear in effective).
+  for (const [id, v] of Object.entries(engineState.macros.effective)) {
+    values[id] = v as number | string;
+  }
+  for (const [id, v] of Object.entries(engineState.macros.intents)) {
+    if (!(id in values)) values[id] = v as number | string;
+  }
+  return values;
+}
+
 function refreshPanelForMethod(method: EngineMethod, args: readonly unknown[]): void {
   const values: Record<string, number | string | boolean | null> = {};
   switch (method) {
@@ -602,6 +635,9 @@ function mountPanels(): void {
           optionsFor,
           sectionIds: ["input", "basics"],
         });
+        // Sync widgets from current engineState so LLM-driven changes
+        // made before this tab was first opened appear correctly.
+        basicsPanel.update(collectCurrentPanelValues());
         return basicsPanel.root;
       },
       advanced: () => {
@@ -611,6 +647,7 @@ function mountPanels(): void {
           optionsFor,
           sectionIds: ["advanced"],
         });
+        advancedPanel.update(collectCurrentPanelValues());
         return advancedPanel.root;
       },
       about: () => buildAboutPanel(),

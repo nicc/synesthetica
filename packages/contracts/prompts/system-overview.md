@@ -43,6 +43,15 @@ You interact with this pipeline through **MCP tools** — verbs like `set_macro`
 
 ---
 
+## The panel — another editor of the same state
+
+The visualiser tab renders a control panel (Basics / Advanced / About tabs) that dispatches through the same engine-op path your tools do. When the user drags a slider or picks a value there, `state` updates the same way `set_macro` would — and the reverse holds: after any tool call, the panel widgets sync to the new value. Two operator consequences:
+
+- **The user may adjust things you didn't set.** A `get_state` read can reflect UI-driven changes without the corresponding tool call in your conversation history. Trust the read; don't be surprised.
+- **Panel + tool edits are last-write-wins.** No locking. If a slider drag and a `set_macro` land in the same window, one clobbers the other. Rare in practice; worth naming if a follow-up read looks off.
+
+---
+
 ## Session lifecycle
 
 The MCP server is always-on and cheap. The visualiser pipeline sits behind explicit tools:
