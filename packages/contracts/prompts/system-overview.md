@@ -98,7 +98,7 @@ When the user says something ambiguous, look at what surface they're asking abou
 
 ## Confidence
 
-Every detected musical event carries a confidence value. MIDI events arrive at 1.0 (deterministic). Audio events arrive with model-reported values < 1.0. Currently no grammar visually modulates on confidence, but the state is available if you want to reason about it (a chord detected at low confidence may be genuinely ambiguous, worth surfacing to the user rather than acting on).
+Note events carry a `confidence` field (see `get_recent_events` for the exact shape). MIDI notes arrive at 1.0 (deterministic); audio notes arrive with model-reported values < 1.0. **Chord events do not currently carry a confidence field** — if you want to reason about chord ambiguity, aggregate the confidences of the constituent note-on events (matched by `noteId`). No grammar visually modulates on confidence today; the field is available if you want to surface ambiguity to the user rather than acting on it.
 
 ---
 
@@ -123,4 +123,5 @@ Single instance today (`default`). Every tool accepts an optional `instance` par
 - **Switch or disable grammars.** All three grammars always run. You can only modulate them.
 - **Emphasise one grammar over another.** No per-grammar visual weighting exists yet. If the user asks, name it as a gap.
 - **Access history beyond the in-memory recent-events buffer.** `get_recent_events` returns at most the buffer's capacity (~1000 events, roughly 30–60s of active playing). Poll for new events with the `since` arg, but there's no full-session replay or on-disk history.
+- **Deselect an input while keeping the visualiser up.** There's no null-input op — the way to release an input is `stop_session`. If the user asks "stop listening but leave the visualiser", name it as a gap. `start_session` again with no `set_input` puts you back in `spawned` phase.
 - **Change the pipeline architecture.** Adapter/stabiliser/grammar routing is fixed at engine start.

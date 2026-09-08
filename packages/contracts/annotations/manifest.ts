@@ -1065,11 +1065,12 @@ const tools: ToolAnnotation[] = [
   {
     id: "get_recent_events",
     description:
-      "Return recent musical events (note-on/off, chord-detected/changed) wrapped in a temporal envelope `{startedAt, now, events}`. Each event's `t` is milliseconds since startedAt. Read this to answer 'what did I just play?', 'summarise the last few chords', 'how long ago was that?'. This is your autonomous read surface for musical history — the matching `state://<label>/recent-events` resource carries the same content but exists for user-triggered attachment.",
+      "Return recent musical events (note-on/off, chord-detected/changed) wrapped in a temporal envelope `{startedAt, now, events}`. Each event's `t` is milliseconds since startedAt. Read this to answer 'what did I just play?', 'summarise the last few chords', 'how long ago was that?'. This is your autonomous read surface for musical history — the matching `state://<label>/recent-events` resource carries the same content but exists for user-triggered attachment. `limit` defaults to 100 and is capped at 1000 (the buffer's in-memory capacity, ~30–60s of active playing).",
     aliases: ["recent activity", "what did I play", "recent events"],
     notes: [
       "Pull-only per SPEC 013 §I30 — musical activity at pipeline cadence would pump inference in some clients. Read when the LLM decides it needs context.",
       "The envelope's `now` is FRESH (computed at read time), so temporal reasoning like 'how long ago was that' anchors correctly regardless of think-time between events landing and the LLM reading.",
+      "**Event field shapes:** `note-on` carries `{ noteId, part, pitch (MIDI), pitchClass, octave, velocity, confidence }` — confidence is 1.0 for MIDI, model-reported for audio (< 1.0). `note-off` carries `{ noteId, part }`. `chord-detected` and `chord-changed` carry `{ chordId, part, voicing (MIDI), pitchClasses, bass, harmonic: {root, quality}, bassLed: {root, quality}, isInverted, inversion, previousChordId? }`. Chord events do NOT currently carry a confidence field — reason about note-level confidence from the constituent note-on events if you need it.",
     ],
     examples: [
       "get_recent_events(limit: 20) — the last twenty events.",
