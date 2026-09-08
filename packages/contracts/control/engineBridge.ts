@@ -82,28 +82,6 @@ export interface EngineStateSnapshot {
     beatValue: number | null;
     chordMode: "harmonic" | "bass-led";
     metronome: boolean;
-    /**
-     * Current unit for the `harmony:linger` macro value. Derived
-     * from `tempo`: "bars" when tempo is set, "seconds" when null.
-     * Surfaced here because the same numeric linger value means
-     * different real durations either side of a set_tempo call —
-     * the LLM (and reader) should re-anchor rather than assume
-     * continuity across the transition. See the harmony:linger
-     * annotation notes for context.
-     */
-    harmonyLingerUnit: "bars" | "seconds";
-    /**
-     * The maximum harmony:linger value that will NOT be clipped by
-     * the stabilizer's real-time progression window (60s hard cap).
-     * Tempo-dependent — clipping only surfaces at low tempos with
-     * high linger values (e.g. below ~30 BPM at 4/4 with linger 8).
-     * Null when no tempo is prescribed AND the clip is not reachable
-     * from the current declared range (seconds mode caps at 8s <
-     * 60s window). When non-null, values above this clip and the
-     * effective value is the ceiling — visible as intents/effective
-     * divergence at harmony:linger.
-     */
-    harmonyLingerClipMax: number | null;
   };
   input: string | null;
   activePreset: string | null;

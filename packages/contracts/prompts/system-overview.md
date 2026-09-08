@@ -97,7 +97,7 @@ When multi-instance, read `instances://` to see labels + status. State resources
 - **Missing capability**: if the user asks for something no annotation covers, say so. Don't force-fit an unrelated op. "There's no per-grammar visual weight control right now" is a valid response.
 - **Ambiguous request**: pick the most literal reading, act, and flag the alternative reading in your response. E.g. "make it more stable" could mean detection anti-flicker or display linger — take one, name the other.
 - **Missing prerequisite**: if the user asks to grade their timing but there's no prescribed tempo, ask for it (or infer it from context if they mentioned one recently).
-- **Uncertain values**: relative requests ("more", "less") anchor on the annotated default. If they say "more chord linger" and current is 3 (the default), 4 or 5 is a reasonable increment — but re-anchor when the value's unit is context-dependent. `harmony:linger` in particular means seconds without tempo and bars with tempo (state.session.harmonyLingerUnit tells you which), so "a bit more" across a `set_tempo` transition isn't just +1 on the old number.
+- **Uncertain values**: relative requests ("more", "less") anchor on the annotated default. If they say "more chord linger" and current is 3 (the default), 4 or 5 is a reasonable increment. Every macro's unit is invariant to session state — pick a value against the leaf's declared range without worrying about tempo/meter reinterpreting it.
 
 ---
 

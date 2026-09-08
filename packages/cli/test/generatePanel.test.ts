@@ -98,7 +98,7 @@ describe("generatePanel — widget kinds", () => {
     const linger = findWidget(panel, "harmony:linger");
     expect(linger.kind).toBe("slider");
     if (linger.kind === "slider") {
-      expect(linger.range).toEqual([0.5, 8]);
+      expect(linger.range).toEqual([0.5, 30]);
       expect(linger.defaultValue).toBe(3);
       expect(linger.low).toMatch(/quickly/);
       expect(linger.high).toMatch(/linger/);

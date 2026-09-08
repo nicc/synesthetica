@@ -116,12 +116,16 @@ export function composeSystemOverview(): string {
     "",
     productionManifest.sessionControls.map(renderSessionControl).join("\n\n"),
     "",
-    "## Derived session state",
-    "",
-    "Read-only fields the server computes from other state. Not settable — the value updates automatically when its inputs change. Enumerate here rather than deriving from primary fields blind.",
-    "",
-    productionManifest.derivedState.map(renderDerivedState).join("\n\n"),
-    "",
+    ...(productionManifest.derivedState.length > 0
+      ? [
+          "## Derived session state",
+          "",
+          "Read-only fields the server computes from other state. Not settable — the value updates automatically when its inputs change. Enumerate here rather than deriving from primary fields blind.",
+          "",
+          productionManifest.derivedState.map(renderDerivedState).join("\n\n"),
+          "",
+        ]
+      : []),
     "## System concepts",
     "",
     productionManifest.concepts.map(renderConcept).join("\n\n"),

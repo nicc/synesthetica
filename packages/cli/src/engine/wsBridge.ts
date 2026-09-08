@@ -414,8 +414,6 @@ function emptyState(label: string): EngineStateSnapshot {
       beatsPerBar: null,
       beatValue: null,
       chordMode: "harmonic",
-      harmonyLingerUnit: "seconds",
-      harmonyLingerClipMax: null,
       metronome: false,
     },
     input: null,

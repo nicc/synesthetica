@@ -67,7 +67,7 @@ describe("set_macro — compound (linear fan-out)", () => {
     // At value=1.0, each target gets its range's max under the
     // linear default curve.
     expect(r.state.macros.intents["rhythm:horizon"]).toBe(1); // [0, 1] max
-    expect(r.state.macros.intents["harmony:linger"]).toBe(8); // [0.5, 8] max
+    expect(r.state.macros.intents["harmony:linger"]).toBe(30); // [0.5, 30] max
     expect(r.state.macros.intents["dynamics:linger"]).toBe(8000); // [500, 8000] max
     expect(r.state.macros.intents["time-horizon"]).toBe(1);
   });
@@ -132,49 +132,26 @@ describe("set_macro — compound (linear fan-out)", () => {
   });
 });
 
-describe("time-horizon — tempo-aware normalisation of harmony:linger", () => {
-  it("in free time, harmony:linger is dispatched as-is (curve output in seconds)", async () => {
-    const engine = new StubEngineHandle();
-    const r = await setMacroTool.handle({ name: "time-horizon", value: 1.0 }, engine);
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    // No tempo prescribed → linger is in seconds, no conversion.
-    expect(r.state.macros.intents["harmony:linger"]).toBe(8);
-    expect(r.state.macros.intents["dynamics:linger"]).toBe(8000);
-  });
+describe("time-horizon — leaf outputs are unit-invariant across tempo", () => {
+  it("compound dispatch produces the same harmony:linger regardless of tempo", async () => {
+    // harmony:linger is always seconds; no tempo-aware normalisation.
+    // A single compound value should produce the same leaf value in
+    // free time and with a prescribed tempo — that's the point.
+    const freeTime = new StubEngineHandle();
+    await setMacroTool.handle({ name: "time-horizon", value: 1.0 }, freeTime);
+    const freeState = await freeTime.getStateSnapshot();
+    const freeLinger = freeState.macros.intents["harmony:linger"];
 
-  it("with tempo, harmony:linger is normalised to bars (compound stays real-time coherent)", async () => {
-    const engine = new StubEngineHandle();
-    // 120 BPM 4/4 → barSeconds = 2. Curve output 8s → 4 bars.
-    await engine.setTempo(120);
-    await engine.setMeter(4, 4);
-    const r = await setMacroTool.handle({ name: "time-horizon", value: 1.0 }, engine);
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.state.macros.intents["harmony:linger"]).toBe(4); // 8 / 2
-    // dynamics:linger not tempo-normalised — stays at ms.
-    expect(r.state.macros.intents["dynamics:linger"]).toBe(8000);
-  });
+    const withTempo = new StubEngineHandle();
+    await withTempo.setTempo(120);
+    await withTempo.setMeter(4, 4);
+    await setMacroTool.handle({ name: "time-horizon", value: 1.0 }, withTempo);
+    const tempoState = await withTempo.getStateSnapshot();
+    const tempoLinger = tempoState.macros.intents["harmony:linger"];
 
-  it("normalised value is clamped to harmony:linger's leaf range", async () => {
-    const engine = new StubEngineHandle();
-    // 30 BPM 4/4 → barSeconds = 8. Curve output 8s → 1 bar. Fine.
-    // But at min compound value: 0.5s → 0.0625 bars → clamped to 0.5.
-    await engine.setTempo(30);
-    await engine.setMeter(4, 4);
-    const r = await setMacroTool.handle({ name: "time-horizon", value: 0 }, engine);
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    // 0.5s curve output / 8s per bar = 0.0625 → clamped to leaf min 0.5.
-    expect(r.state.macros.intents["harmony:linger"]).toBe(0.5);
-  });
-
-  it("state.session.harmonyLingerUnit tracks tempo transitions", async () => {
-    const engine = new StubEngineHandle();
-    const r1 = await engine.setTempo(120);
-    expect(r1.session.harmonyLingerUnit).toBe("bars");
-    const r2 = await engine.setTempo(null);
-    expect(r2.session.harmonyLingerUnit).toBe("seconds");
+    expect(freeLinger).toBe(tempoLinger);
+    // Also at max compound value, linger should be at leaf max (30s).
+    expect(freeLinger).toBe(30);
   });
 });
 

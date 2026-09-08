@@ -506,19 +506,10 @@ export class HarmonyGrammar implements IVisualGrammar {
     }
 
     if (key && progression.length > 0) {
-      // Compute fade window: bars if tempo set, seconds otherwise.
-      // Base value from macros.linger (default PROGRESSION_FADE_VALUE).
-      const tempo = input.prescribedTempo;
-      const lingerValue = this.macros.linger;
-      let fadeMs: number;
-      if (tempo !== null) {
-        const beatMs = 60000 / tempo;
-        const meter = input.prescribedMeter;
-        const barMs = beatMs * (meter?.beatsPerBar ?? 4);
-        fadeMs = lingerValue * barMs;
-      } else {
-        fadeMs = lingerValue * 1000;
-      }
+      // Fade window is seconds — the linger macro is unit-invariant
+      // by design (SPEC 014 §Harmony linger). LLM/panel do any
+      // bars↔seconds conversion at input time; state stays in seconds.
+      const fadeMs = this.macros.linger * 1000;
 
       entities.push(
         ...this.createProgressionClock(

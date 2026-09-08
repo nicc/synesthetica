@@ -33,8 +33,8 @@ const macros: MacroAnnotation[] = [
     name: "Harmony linger",
     aliases: ["chord linger", "chord fade", "harmony persistence"],
     type: "continuous",
-    range: [0.5, 8],
-    default: 3, // matches HarmonyGrammar.PROGRESSION_FADE_VALUE
+    range: [0.5, 30],
+    default: 3, // seconds
     affects: ["harmony", "phrasing"],
     directionality: {
       low: {
@@ -47,9 +47,8 @@ const macros: MacroAnnotation[] = [
       },
     },
     notes: [
-      "**Unit shifts with prescribed tempo.** When session.tempo is null, the value is seconds. When session.tempo is set, the value is bars — so the SAME numeric value means different real-world durations either side of a set_tempo call. state.session.harmonyLingerUnit resolves the current interpretation.",
-      "Consequence for relative adjustment: 'a bit more' means +1 in the current unit, but that unit may be about to change. When you're about to set_tempo (or clear it) at the same time as adjusting linger, re-anchor the value against the new unit rather than incrementing the old one.",
-      "Capped by the stabilizer's real-time progression window (60 seconds). In bars mode the clip threshold is tempo-dependent — at 30 BPM 4/4 you clip above ~7.5 bars; at 120 BPM never within the declared [0.5, 8] range. state.session.harmonyLingerClipMax carries the resolved ceiling under the current tempo/meter (null when unreachable). macros.effective reflects the clipped value, so intents/effective divergence here signals you hit that ceiling.",
+      "Seconds of chord memory. The value is always seconds regardless of prescribed tempo — do the bars↔seconds arithmetic yourself if the user asks in bars.",
+      "Range comfortably under the stabilizer's 60-second progression window, so values here never silently clip.",
     ],
     consumers: [{ kind: "grammar", id: "harmony-grammar", macroKey: "linger" }],
   },
@@ -310,16 +309,7 @@ const macros: MacroAnnotation[] = [
     type: "compound",
     range: [0, 1],
     default: 1.0,
-    // harmony:linger carries a realTimeUnit hint so the dispatcher
-    // normalises the compound value to bars when a tempo is prescribed,
-    // keeping the compound's real-time memory consistent across all
-    // three grammars regardless of tempo. See annotations.ts
-    // CompoundTarget.realTimeUnit and SPEC 014 §Compound dispatch.
-    targets: [
-      "rhythm:horizon",
-      { id: "harmony:linger", realTimeUnit: "seconds" },
-      "dynamics:linger",
-    ],
+    targets: ["rhythm:horizon", "harmony:linger", "dynamics:linger"],
     affects: ["rhythm", "harmony", "dynamics", "phrasing"],
     directionality: {
       low: {
@@ -1182,27 +1172,10 @@ const presets: PresetAnnotation[] = [];
 // Derived state
 // ============================================================================
 
-const derivedState: DerivedStateAnnotation[] = [
-  {
-    id: "session.harmonyLingerUnit",
-    name: "Harmony linger unit",
-    aliases: ["linger unit", "chord linger unit"],
-    derivedFrom: ["session.tempo"],
-    values: ["bars", "seconds"],
-    notes: [
-      "Resolves the current interpretation of harmony:linger's numeric value: 'bars' when a tempo is prescribed, 'seconds' otherwise. Same numeric value means different real durations either side of set_tempo — read this field to know which unit applies before adjusting linger.",
-    ],
-  },
-  {
-    id: "session.harmonyLingerClipMax",
-    name: "Harmony linger clip ceiling",
-    aliases: ["linger clip", "harmony linger clip"],
-    derivedFrom: ["session.tempo", "session.beatsPerBar"],
-    notes: [
-      "The maximum harmony:linger value (in bars) that will NOT be clipped by the stabilizer's real-time progression window (60s hard cap). Null when clipping is not reachable — either seconds mode (max linger 8s < 60s window) or a tempo where the range's own ceiling stays under the clip. When non-null, setting linger above this value silently clips; effective reflects the clipped value, so intents/effective divergence at harmony:linger signals hitting this ceiling.",
-    ],
-  },
-];
+// No derived-state fields today — the category exists for future
+// fields the server computes from primary state (e.g. resolved
+// compound values, effective clip ceilings once real ones exist).
+const derivedState: DerivedStateAnnotation[] = [];
 
 export const productionManifest = {
   macros,
