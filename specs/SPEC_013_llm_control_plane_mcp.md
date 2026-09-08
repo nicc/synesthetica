@@ -444,7 +444,7 @@ Musical events (notes, chords, dynamics) arrive at 10s of Hz. Subscribing would 
 
 Typical usage: LLM reads `recent-events?limit=20` before making a decision, or when a user says something ambiguous ("did I play what I think I just played?"). If the LLM wants continuous awareness, it polls at its own cadence.
 
-If we later find pull is insufficient (e.g. a genuine "quiet posture where the LLM watches the music" mode), we add subscription then with an explicit rate-contract and coalescing rule. Not designed for v1.
+If we later find pull is insufficient (e.g. a use case where the LLM watches the music continuously without being asked), we add subscription then with an explicit rate-contract and coalescing rule. Not designed for v1.
 
 ### `inputs://available` — subscribable
 

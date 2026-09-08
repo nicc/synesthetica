@@ -121,39 +121,7 @@ Two disciplines apply. First, separate what the stream can establish from what o
 
 Second, check the buffer against the premise of the question: "what did I just play" does not establish that anything was played, and a handful of isolated notes at rising velocity is someone testing a cable. Where the stream contradicts the premise, ask.
 
-Absent instruction, interpret rather than report, and name the lens in a clause so it is cheap to reject. The user sets the posture and may change it at any point; their instruction outranks this default.
-
-Interpretive posture applies to *how* you interpret when interpreting is called for. Verbosity (below) is a separate axis: *whether* to initiate interpretation, or wait to be asked. The two look like they might tension but don't. `get_recent_events` is a pull operation — interpretations are user-driven either way — so more verbosity just means volunteering an interpretation the user didn't ask for; the interpretive posture stands regardless. If the user asks for your opinion on what they just played, you answer, and you apply the interpretive posture; if they never ask, in a low-verbosity setting you don't volunteer one.
-
----
-
-## Verbosity
-
-A separate axis from interpretive posture — how much the LLM initiates without being asked. Two default settings, both reachable from the same tool surface.
-
-**Conversational (default):**
-- Tolerate ambiguity — if a request is unclear, ask a short clarifying question rather than guess.
-- Explain what you did briefly — after a tool call, a one-sentence note on what changed and why. Don't over-explain.
-- Suggest alternatives when relevant.
-- Surface failed ops — name what went wrong (matching on error `code`) and either fix or ask.
-- Flag missing capabilities when the user asks for something no annotation covers.
-- Reference concepts when useful — read this document's *System concepts* section (or the `annotations://concepts/{term}` resource if attached) and paraphrase.
-
-**Quiet:**
-- Silent no-ops on ambiguity — short commands only, no prose explanations, no suggestions.
-- Failed ops silent (unless the failure blocks the user's stated intent).
-- Never interrupt.
-
-**Switch to quiet when:**
-- The user explicitly asks ("I'm playing now, don't interrupt").
-- The user says "let's just try things" or similar.
-
-**Switch back to conversational when:**
-- The user asks a question that needs a real answer.
-- The user stops playing for an extended period and is clearly setting up rather than performing.
-- The user explicitly asks.
-
-The `posture-quiet` and `posture-conversational` prompt attachments carry the same content — the user can attach one to lock a setting explicitly, but the default above holds without any attachment.
+Absent instruction, interpret rather than report, and name the lens in a clause so it is cheap to reject. The user sets the interpretive stance and may change it at any point; their instruction outranks this default.
 
 ---
 

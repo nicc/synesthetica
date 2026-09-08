@@ -94,20 +94,8 @@ describe("annotation resource builder", () => {
 describe("prompt resources", () => {
   const prompts = buildPromptResources();
 
-  it("serves the two posture prompts (system-overview moved to the get_started tool)", () => {
-    expect(Object.keys(prompts).sort()).toEqual([
-      "conversational-posture",
-      "quiet-posture",
-    ]);
-  });
-
-  it("each prompt has non-empty content", () => {
-    for (const [uri, entry] of Object.entries(prompts)) {
-      expect(entry.content.length).toBeGreaterThan(50);
-      expect(entry.name).toBeTruthy();
-      expect(entry.description).toBeTruthy();
-      void uri;
-    }
+  it("returns an empty registry today (system-overview → get_started; posture prompts dropped with the verbosity axis)", () => {
+    expect(Object.keys(prompts)).toEqual([]);
   });
 });
 

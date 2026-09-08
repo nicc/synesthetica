@@ -1,25 +1,22 @@
 /**
- * Prompt resources per SPEC 013 §Prompts.
+ * Prompt resources — currently empty.
  *
- *   posture://quiet             — quiet-performance posture prompt
- *   posture://conversational    — conversational posture prompt
- *   guide://system-overview     — pipeline narrative + auto-generated
- *                                 macro / session / concept / grammar
- *                                 reference, composed from the
- *                                 authoritative manifest
+ * `guide://system-overview` was moved to the `get_started` MCP tool
+ * so it's autonomously callable rather than user-attach-only
+ * (SPEC 014 §Lifecycle / Route 1). The posture prompts
+ * (quiet / conversational) were dropped when the verbosity concept
+ * itself was removed from the primer — the LLM operator reported
+ * that a switchable verbosity axis muddled its behaviour more than
+ * it helped, and the interpretive-posture guidance covers what
+ * actually matters (how to interpret rather than whether to
+ * initiate).
  *
- * Bodies live in `@synesthetica/contracts/prompts/*.md`. The CLI and
- * the web-app both read the same authoritative copy — no duplication.
- * Resolution uses createRequire so this works both in the monorepo
- * (workspace symlink) and after npm install; unlike import.meta.resolve
- * it also works under vitest.
+ * The `buildPromptResources` function and the MCP prompt handlers
+ * stay wired for future prompt content; today it returns {} and
+ * MCP `prompts/list` reports an empty list.
  *
- * The system-overview prompt composes the authored prose with a
- * generated reference block. This puts every macro's directionality,
- * range, and notes into the LLM's context on connection, so per-macro
- * `annotations://` reads become optional detail rather than the only
- * path to those facts. Manifest edits flow into the prompt
- * automatically — no drift.
+ * The composed system-overview generator remains here — it's what
+ * `get_started` returns via readFileSync of the same `system-overview.md`.
  */
 
 import { readFileSync } from "node:fs";
@@ -57,34 +54,13 @@ export interface PromptEntry {
 }
 
 /**
- * Prompt keys are the MCP-protocol `name` — what appears in
- * Claude Desktop's prompt-picker menu AND what the client passes
- * back to prompts/get. Kept as short lowercase-hyphenated
- * identifiers rather than the URI-shaped strings we used earlier
- * (guide://system-overview, posture://quiet) — the URI shape
- * displayed badly in the picker (users saw literal 'guide://…'
- * strings). URIs stay documented in each entry's description.
+ * Prompt registry currently empty — see the file-level doc for the
+ * history (system-overview moved to a tool; posture prompts dropped
+ * with the verbosity axis). MCP prompt handlers stay wired so a
+ * future prompt can slot in without re-plumbing.
  */
 export function buildPromptResources(): Record<string, PromptEntry> {
-  // system-overview was dropped as a prompt (SPEC 014 §1.9 Route 1):
-  // the same content is now served by the `get_started` MCP tool,
-  // which is autonomously callable by the LLM and doesn't require
-  // manual attach. Posture prompts remain — they're situational
-  // system-instruction fragments the user attaches deliberately.
-  return {
-    "quiet-posture": {
-      name: "Quiet posture",
-      description:
-        "System prompt fragment for quiet-performance mode. (Was posture://quiet.)",
-      content: loadPrompt("posture-quiet.md"),
-    },
-    "conversational-posture": {
-      name: "Conversational posture",
-      description:
-        "System prompt fragment for conversational mode. (Was posture://conversational.)",
-      content: loadPrompt("posture-conversational.md"),
-    },
-  };
+  return {};
 }
 
 /* ------------------------------------------------------------------

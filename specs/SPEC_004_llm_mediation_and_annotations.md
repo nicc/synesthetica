@@ -43,7 +43,7 @@ The LLM should adopt different postures based on context:
 | **Quiet** | Zero tolerance for ambiguity; short commands only; failures are silent no-ops; no suggestions |
 | **Conversational** | Tolerates ambiguity; may ask clarifying questions; suggests alternatives; explains changes |
 
-**This is purely an LLM behavioural mode** — the engine does not track or enforce postures. The LLM infers appropriate posture from conversation context (e.g., user says "I'm performing now" → adopt quiet posture).
+**This is purely an LLM behavioural mode** — the engine does not track or enforce postures. Any behavioural stance the LLM adopts is inferred from conversation context; the server has no notion of a "posture" and no enum for it. (Historical note: earlier drafts shipped `posture-quiet` and `posture-conversational` prompt attachments; removed once the LLM operator reported that a switchable verbosity axis muddled its behaviour more than it helped.)
 
 Posture guidance is documented in system prompts and LLM training materials, not in engine state.
 
