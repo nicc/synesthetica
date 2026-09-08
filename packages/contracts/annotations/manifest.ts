@@ -711,6 +711,12 @@ const concepts: SystemConceptAnnotation[] = [
     definition:
       "The rhythm grammar's mode when no tempo is prescribed. Notes scroll through the now-line with no beat grid, no reference lines, no drift analysis. Grid + drift features re-enable when the user prescribes a tempo.",
     related: ["prescribed-context", "now-line", "drift"],
+  },
+  {
+    term: "part",
+    definition:
+      "A logical routing target within a single Synesthetica instance — think 'voice' or 'channel' rather than 'instance'. Every musical event, entity, and adapter carries a partId (string). The v1 shape ships a single part called \"main\": all notes and chords route to it, and every event you'll see in get_recent_events has `part: \"main\"`. Multi-part routing (\"this is the guitar, apply X to guitar\") is designed for but not shipped — see PartSelector in the contracts. Don't try to filter or group by `part` today; if the user asks about per-instrument routing, name it as planned-not-shipped.",
+    related: ["prescribed-context"],
   }
 ];
 
@@ -1071,6 +1077,7 @@ const tools: ToolAnnotation[] = [
       "Pull-only per SPEC 013 §I30 — musical activity at pipeline cadence would pump inference in some clients. Read when the LLM decides it needs context.",
       "The envelope's `now` is FRESH (computed at read time), so temporal reasoning like 'how long ago was that' anchors correctly regardless of think-time between events landing and the LLM reading.",
       "**Event field shapes:** `note-on` carries `{ noteId, part, pitch (MIDI), pitchClass, octave, velocity, confidence }` — confidence is 1.0 for MIDI, model-reported for audio (< 1.0). `note-off` carries `{ noteId, part }`. `chord-detected` and `chord-changed` carry `{ chordId, part, voicing (MIDI), pitchClasses, bass, harmonic: {root, quality}, bassLed: {root, quality}, isInverted, inversion, previousChordId? }`. Chord events do NOT currently carry a confidence field — reason about note-level confidence from the constituent note-on events if you need it.",
+      "`part` is a routing label (see the `part` concept). In v1 it's always `\"main\"` — don't group or filter by it and don't attempt to explain per-part behaviour to the user. Multi-part is planned but not shipped.",
     ],
     examples: [
       "get_recent_events(limit: 20) — the last twenty events.",
