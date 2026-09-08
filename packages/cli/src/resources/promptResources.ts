@@ -205,6 +205,7 @@ function renderToolResultShape(): string {
     "- `effective`: sourced from consumer runtime — the values grammars/stabilizers/vocab are actually running with. Compound macros do NOT appear here (their leaves do).",
     "- Read `intents` to answer 'what has the user asked for?'. Read `effective` to answer 'what is the pipeline actually doing right now?'.",
     "- The two views can legitimately disagree — e.g. a compound macro was set (intents holds the compound id) and then one of its leaves was overridden directly (effective holds the newer leaf value; the compound's intent is stale but not wrong). Similarly after preset apply + tweak. Treat divergence as information, not automatically as a bug; only surface it if the user asks or if it clearly contradicts a value they just set.",
+    "- **Reporting policy when reading back to the user**: when you just set a value and effective matches intents, state the value plainly ('linger's at 6 now'). When they differ AND the user just asked, name both ('you asked for 8 but the pipeline's showing 6'). When they differ silently (unrelated read), stay quiet unless the delta looks large or contradicts a recent instruction.",
     "",
     "Common codes (match on `code`, not on message text):",
     "- `SCHEMA_INVALID` — argument shape / type wrong or required arg missing.",

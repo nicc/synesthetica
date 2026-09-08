@@ -44,6 +44,7 @@ class FakeBrowser {
         beatValue: null,
         chordMode: "harmonic",
         metronome: false,
+      phase: "no-session",
       },
       input: null,
       activePreset: null,

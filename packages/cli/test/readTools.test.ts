@@ -4,7 +4,75 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { StubEngineHandle } from "../src/engine/stubEngineHandle.js";
 import { createPresetStore } from "../src/presets/presetStore.js";
-import { getStartedTool, getStateTool, listInputsTool, buildReadTools } from "../src/tools/readTools.js";
+import { getStartedTool, getStateTool, listInputsTool, getRecentEventsTool, buildReadTools } from "../src/tools/readTools.js";
+
+describe("get_recent_events", () => {
+  it("returns the temporal envelope in data + current state in state", async () => {
+    const engine = new StubEngineHandle();
+    engine.startSession(Date.now() - 100);
+    engine.injectEvent("note-on", { pitch: 60 });
+    engine.injectEvent("chord-detected", { name: "Cmaj7" });
+    const r = await getRecentEventsTool.handle({}, engine);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const env = r.data as { startedAt: string | null; now: number | null; events: Array<{ kind: string }> };
+    expect(env.events).toHaveLength(2);
+    expect(env.events[1].kind).toBe("chord-detected");
+    expect(env.startedAt).toBeTruthy();
+    expect(env.now).toBeGreaterThanOrEqual(0);
+    expect(r.state.instance).toBe("default");
+  });
+
+  it("honours limit and since args", async () => {
+    const engine = new StubEngineHandle();
+    for (let i = 0; i < 10; i++) engine.injectEvent("note-on", { pitch: 60 + i });
+    const withLimit = await getRecentEventsTool.handle({ limit: 3 }, engine);
+    expect(withLimit.ok).toBe(true);
+    if (!withLimit.ok) return;
+    const env = withLimit.data as { events: unknown[] };
+    expect(env.events).toHaveLength(3);
+  });
+});
+
+describe("get_preset", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "get-preset-"));
+  });
+
+  it("returns full preset content without loading it", async () => {
+    const store = createPresetStore(dir);
+    const engine = new StubEngineHandle();
+    await engine.setMacro("harmony:linger", 7);
+    const snap = await engine.getStateSnapshot();
+    store.save("practice", snap);
+    // Reset engine to a different value to prove get_preset doesn't load.
+    await engine.setMacro("harmony:linger", 3);
+    const getPreset = buildReadTools(store).find((t) => t.name === "get_preset")!;
+    const r = await getPreset.handle({ name: "practice" }, engine);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const content = r.data as { macros: Record<string, number> };
+    expect(content.macros["harmony:linger"]).toBe(7);
+    // Engine's own state should be UNCHANGED.
+    expect(r.state.macros.intents["harmony:linger"]).toBe(3);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("returns PRESET_NOT_FOUND with details.available on unknown name", async () => {
+    const store = createPresetStore(dir);
+    const engine = new StubEngineHandle();
+    const snap = await engine.getStateSnapshot();
+    store.save("known", snap);
+    const getPreset = buildReadTools(store).find((t) => t.name === "get_preset")!;
+    const r = await getPreset.handle({ name: "unknown" }, engine);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error.code).toBe("PRESET_NOT_FOUND");
+    expect((r.error.details as { available: string[] }).available).toContain("known");
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
 
 describe("get_started", () => {
   it("returns the composed primer text and includes every macro id", async () => {

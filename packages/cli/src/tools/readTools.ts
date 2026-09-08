@@ -85,6 +85,7 @@ function emptyStateShaped(): StateSnapshot {
       beatValue: null,
       chordMode: "harmonic",
       metronome: false,
+      phase: "no-session",
     },
     input: null,
     activePreset: null,
@@ -138,6 +139,42 @@ export const listInputsTool: ToolSpec = {
   },
 };
 
+export const getRecentEventsTool: ToolSpec = {
+  name: "get_recent_events",
+  description:
+    "Return recent musical events (note-on/off, chord-detected/changed) wrapped in a temporal envelope: {startedAt: ISO wall-clock at session start, now: session-ms at read time, events: [...]}. Each event's `t` is milliseconds since startedAt. Same content as state://<label>/recent-events. Read this to answer 'what did I just play?', 'summarise the last few chords', 'how long ago was that?'. Pull-only per SPEC 013 §I30 — musical activity at pipeline cadence would pump inference in some MCP clients.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      instance: { type: "string" },
+      limit: {
+        type: "integer",
+        minimum: 1,
+        maximum: 1000,
+        description: "Maximum events to return (default 100, max 1000).",
+      },
+      since: {
+        type: "integer",
+        description: "Return only events with id > this. Useful for polling.",
+      },
+    },
+    additionalProperties: false,
+  },
+  async handle(args, engine: EngineHandle) {
+    try {
+      const limit = typeof args.limit === "number" ? args.limit : 100;
+      const since = typeof args.since === "number" ? args.since : undefined;
+      const [state, envelope] = await Promise.all([
+        engine.getStateSnapshot(),
+        engine.getRecentEvents(limit, since),
+      ]);
+      return { ok: true as const, state, data: envelope };
+    } catch (e) {
+      return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
+    }
+  },
+};
+
 export function buildReadTools(presetStore: PresetStore): ToolSpec[] {
   const listPresetsTool: ToolSpec = {
     name: "list_presets",
@@ -160,5 +197,48 @@ export function buildReadTools(presetStore: PresetStore): ToolSpec[] {
       }
     },
   };
-  return [getStartedTool, getStateTool, listInputsTool, listPresetsTool];
+
+  const getPresetTool: ToolSpec = {
+    name: "get_preset",
+    description:
+      "Return one preset's full stored content — macro values, session controls, input — without loading it. Use to answer 'what's in my practice preset?' before deciding whether to switch. Same content as presets://<name>. On unknown name, error's details.available lists the preset names for retry.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Preset name." },
+        instance: { type: "string" },
+      },
+      required: ["name"],
+      additionalProperties: false,
+    },
+    async handle(args, engine: EngineHandle) {
+      const name = args.name;
+      if (typeof name !== "string" || name.length === 0) {
+        return err("SCHEMA_INVALID", "name must be a non-empty string");
+      }
+      try {
+        const content = presetStore.load(name);
+        if (!content) {
+          return err(
+            "PRESET_NOT_FOUND",
+            `preset '${name}' not found`,
+            { available: presetStore.list() },
+          );
+        }
+        const state = await engine.getStateSnapshot();
+        return { ok: true as const, state, data: content };
+      } catch (e) {
+        return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
+      }
+    },
+  };
+
+  return [
+    getStartedTool,
+    getStateTool,
+    getRecentEventsTool,
+    listInputsTool,
+    listPresetsTool,
+    getPresetTool,
+  ];
 }

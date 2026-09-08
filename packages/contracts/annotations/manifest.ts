@@ -867,6 +867,7 @@ const tools: ToolAnnotation[] = [
     notes: [
       "Range 30–240 BPM. The system never infers tempo from onset patterns — it must be set explicitly.",
       "Also drives the metronome click when session:metronome is enabled.",
+      "**BPM convention**: the value counts quarter notes per minute (not beat-value units). So a bar's duration in seconds is `beats_per_bar × 60/BPM × 4/beat_value`. In 4/4 the `4/beat_value` term is 1 and it collapses to `beats_per_bar × 60/BPM`; in 6/8 at 120 BPM a bar is `6 × 60/120 × 4/8 = 1.5 seconds`. Use this when converting user requests in bars to a seconds-valued macro.",
     ],
     examples: [
       "set_tempo(bpm: 120) — standard mid-tempo.",
@@ -882,10 +883,12 @@ const tools: ToolAnnotation[] = [
     notes: [
       "beat_value must be one of {1, 2, 4, 8, 16}. Both args must be both null (clear) or both set.",
       "Defaults to 4/4 when a tempo is set without an explicit meter.",
+      "Nomenclature: 'cut time' → set_meter(2, 2); 'common time' → (4, 4); 'compound' phrasing usually means /8 with beats_per_bar in {6, 9, 12} (dotted-quarter feel). See set_tempo for how BPM interacts with beat_value.",
     ],
     examples: [
       "set_meter(beats_per_bar: 6, beat_value: 8) — 6/8.",
       "set_meter(beats_per_bar: 3, beat_value: 4) — waltz.",
+      "set_meter(beats_per_bar: 2, beat_value: 2) — cut time.",
     ],
   },
 
@@ -926,6 +929,7 @@ const tools: ToolAnnotation[] = [
     notes: [
       "Compound macros fan out to leaf targets via a linear default curve; per-target inversion is applied when the compound's semantic runs opposite the leaf's natural range. See the compound's targets field in the manifest.",
       "The state resource `state://<label>/current` reflects the value the LLM most recently set — including compound values, even when the underlying leaves also change.",
+      "**Compound-vs-leaf routing**: prefer the compound when the user's frame is cross-grammar ('everything more expansive' → time-horizon; 'harder rhythm practice' → rhythm:difficulty). Prefer the leaf when the request targets one grammar ('just the chord fade' → harmony:linger; 'only the rhythm horizon' → rhythm:horizon). Compounds do a linear fan-out — set a leaf directly when you want a specific value on one target without disturbing siblings.",
     ],
     examples: [
       "set_macro(name: 'harmony:linger', value: 6) — chord symbols linger visibly on the clock.",
@@ -958,6 +962,7 @@ const tools: ToolAnnotation[] = [
     notes: [
       "On failure the error's details.available field lists all preset names known to the store.",
       "Preset loads reset the active-preset marker on state://current so the LLM can see which preset is current.",
+      "**Anchoring after a load**: macros.intents is repopulated with the preset's stored values (that IS what the user just asked for). A relative request immediately after switch_preset ('a bit more chord linger') anchors on those loaded intents, not on the annotated defaults.",
     ],
   },
 
@@ -1040,7 +1045,35 @@ const tools: ToolAnnotation[] = [
       "List saved presets by name, with savedAt + prescribed session context + input at save time. Use switch_preset(name) to load one. Mirrors presets://; use this when your client doesn't proxy resource reads.",
     aliases: ["available presets", "what presets", "saved presets"],
     notes: [
-      "Returns preset SUMMARIES (name + savedAt + session + input). To see a preset's macro values, load it with switch_preset then read get_state.",
+      "Returns preset SUMMARIES (name + savedAt + session + input) only. For a preset's macro values without loading it, use get_preset(name).",
+    ],
+  },
+
+  {
+    id: "get_preset",
+    description:
+      "Return one preset's full stored content — macro values, session controls, input — WITHOUT loading it. Use to answer 'what's in my practice preset?' before deciding whether to switch. Mirrors presets://<name>.",
+    aliases: ["show preset", "preview preset", "what's in preset"],
+    notes: [
+      "Non-destructive read. The current control surface is untouched. On unknown name, error's details.available lists preset names for retry.",
+    ],
+    examples: [
+      "get_preset(name: 'practice') — inspect what practice would restore before deciding.",
+    ],
+  },
+
+  {
+    id: "get_recent_events",
+    description:
+      "Return recent musical events (note-on/off, chord-detected/changed) wrapped in a temporal envelope `{startedAt, now, events}`. Each event's `t` is milliseconds since startedAt. Mirrors state://<label>/recent-events. Read this to answer 'what did I just play?', 'summarise the last few chords', 'how long ago was that?'.",
+    aliases: ["recent activity", "what did I play", "recent events"],
+    notes: [
+      "Pull-only per SPEC 013 §I30 — musical activity at pipeline cadence would pump inference in some clients. Read when the LLM decides it needs context.",
+      "The envelope's `now` is FRESH (computed at read time), so temporal reasoning like 'how long ago was that' anchors correctly regardless of think-time between events landing and the LLM reading.",
+    ],
+    examples: [
+      "get_recent_events(limit: 20) — the last twenty events.",
+      "get_recent_events(since: 143) — poll for events after the last id seen.",
     ],
   },
 ];
@@ -1172,10 +1205,19 @@ const presets: PresetAnnotation[] = [];
 // Derived state
 // ============================================================================
 
-// No derived-state fields today — the category exists for future
-// fields the server computes from primary state (e.g. resolved
-// compound values, effective clip ceilings once real ones exist).
-const derivedState: DerivedStateAnnotation[] = [];
+const derivedState: DerivedStateAnnotation[] = [
+  {
+    id: "session.phase",
+    name: "Session phase",
+    aliases: ["session state", "lifecycle phase", "session status"],
+    derivedFrom: ["start_session", "set_input", "stop_session"],
+    values: ["no-session", "spawned", "input-active"],
+    notes: [
+      "Where the session sits in its lifecycle. Distinguishes states a plain startedAt/null can't: `no-session` (no pipeline; call start_session), `spawned` (pipeline is up and setter tools take effect on consumers, but no input adapter is running — startedAt still null, no notes flowing), `input-active` (an input is selected, startedAt stamped, events accruing).",
+      "When reporting session state to the user, prefer this field over inferring from startedAt or effective — it names the intermediate 'spawned' phase that both other signals miss.",
+    ],
+  },
+];
 
 export const productionManifest = {
   macros,

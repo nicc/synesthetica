@@ -116,6 +116,7 @@ const engineState: EngineStateSnapshot = {
     beatValue: null,
     chordMode: "harmonic",
     metronome: false,
+      phase: "no-session",
   },
   input: null,
   activePreset: null,
@@ -349,6 +350,7 @@ const PIPELINE_PART_ID = "main";
 
 function initializePipeline(): void {
   if (pipeline) return; // idempotent
+  engineState.session.phase = "spawned";
   pipeline = new VisualPipeline({
     canvasSize: { width: canvas.width, height: canvas.height },
     rngSeed: Date.now(),
@@ -429,6 +431,9 @@ function stopSession(): void {
   sessionStartedAtIso = null;
   engineState.startedAt = null;
   engineState.now = null;
+  // Adapter is gone; back to spawned phase (pipeline still exists per
+  // the invariant restored below).
+  engineState.session.phase = "spawned";
   clearRecentEvents();
   // Restore the "pipeline always exists after load" invariant so a
   // subsequent LLM setter arriving before the user picks a new input
@@ -448,6 +453,7 @@ function markSessionStarted(): void {
   sessionStartedAtIso = new Date().toISOString();
   engineState.startedAt = sessionStartedAtIso;
   engineState.now = 0;
+  engineState.session.phase = "input-active";
 }
 
 async function startMidiSession(deviceId: string): Promise<void> {

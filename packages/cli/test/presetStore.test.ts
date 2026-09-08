@@ -18,6 +18,7 @@ function fakeSnapshot(): StateSnapshot {
       beatValue: 4,
       chordMode: "harmonic",
       metronome: false,
+      phase: "no-session",
     },
     input: "midi:test-device",
     activePreset: null,

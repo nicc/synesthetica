@@ -37,6 +37,8 @@ export interface StateSnapshot {
     beatValue: number | null;
     chordMode: "harmonic" | "bass-led";
     metronome: boolean;
+    /** Session lifecycle phase; see SessionPhase in contracts. */
+    phase: "no-session" | "spawned" | "input-active";
   };
   /** Input source (e.g. "midi:Yamaha P-125", "audio:built-in-mic"). */
   input: string | null;

@@ -70,6 +70,22 @@ export interface MacroState {
   effective: Record<string, number | string>;
 }
 
+/**
+ * Where the session is in its lifecycle. Distinguishes the boot-time
+ * ambiguity a plain `startedAt: null` can't resolve — pipeline can
+ * exist and receive tool calls before any input adapter is running,
+ * which is a distinct state from "no session at all".
+ *
+ * - `no-session`  — start_session hasn't been called (or was stopped).
+ *                   The MCP server holds stdio; no pipeline exists.
+ * - `spawned`     — start_session has succeeded and the pipeline is
+ *                   wired, but no input adapter has been picked yet.
+ *                   Setters take effect on consumers; no notes flowing.
+ * - `input-active`— an input source is selected and the render loop
+ *                   is running; startedAt is stamped and events accrue.
+ */
+export type SessionPhase = "no-session" | "spawned" | "input-active";
+
 /** State snapshot shape (mirror of engine/engineHandle.ts). */
 export interface EngineStateSnapshot {
   instance: string;
@@ -82,6 +98,8 @@ export interface EngineStateSnapshot {
     beatValue: number | null;
     chordMode: "harmonic" | "bass-led";
     metronome: boolean;
+    /** Session lifecycle phase — see SessionPhase. */
+    phase: SessionPhase;
   };
   input: string | null;
   activePreset: string | null;
