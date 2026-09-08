@@ -82,6 +82,16 @@ export interface EngineStateSnapshot {
     beatValue: number | null;
     chordMode: "harmonic" | "bass-led";
     metronome: boolean;
+    /**
+     * Current unit for the `harmony:linger` macro value. Derived
+     * from `tempo`: "bars" when tempo is set, "seconds" when null.
+     * Surfaced here because the same numeric linger value means
+     * different real durations either side of a set_tempo call —
+     * the LLM (and reader) should re-anchor rather than assume
+     * continuity across the transition. See the harmony:linger
+     * annotation notes for context.
+     */
+    harmonyLingerUnit: "bars" | "seconds";
   };
   input: string | null;
   activePreset: string | null;

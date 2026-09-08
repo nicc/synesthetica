@@ -46,8 +46,9 @@ const macros: MacroAnnotation[] = [
       },
     },
     notes: [
-      "Unit is bars when a tempo is prescribed, seconds otherwise.",
-      "Capped by the stabilizer's progression window; asking for more silently clips.",
+      "**Unit shifts with prescribed tempo.** When session.tempo is null, the value is seconds. When session.tempo is set, the value is bars — so the SAME numeric value means different real-world durations either side of a set_tempo call. state.session.harmonyLingerUnit resolves the current interpretation.",
+      "Consequence for relative adjustment: 'a bit more' means +1 in the current unit, but that unit may be about to change. When you're about to set_tempo (or clear it) at the same time as adjusting linger, re-anchor the value against the new unit rather than incrementing the old one.",
+      "Capped by the stabilizer's progression window; asking for more silently clips. macros.effective reflects the clipped value, so a divergence between intents and effective here signals you hit the ceiling.",
     ],
     consumers: [{ kind: "grammar", id: "harmony-grammar", macroKey: "linger" }],
   },
@@ -170,7 +171,7 @@ const macros: MacroAnnotation[] = [
     },
     notes: [
       "Determines how much note history is shown on the vertically-scrolling rhythm grammar.",
-      "Independent from the compound time-horizon macro. Use rhythm:horizon to isolate rhythm's history without touching harmony:linger or dynamics:linger.",
+      "Can be set independently of the compound time-horizon macro (which fans out to this leaf plus harmony:linger and dynamics:linger). Use rhythm:horizon to isolate rhythm's history without touching the other two grammars.",
       "Unit is decimal fraction of available space.",
     ],
     consumers: [{ kind: "grammar", id: "rhythm-grammar", macroKey: "horizon" }],

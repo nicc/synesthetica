@@ -115,6 +115,7 @@ const engineState: EngineStateSnapshot = {
     beatsPerBar: null,
     beatValue: null,
     chordMode: "harmonic",
+      harmonyLingerUnit: "seconds",
     metronome: false,
   },
   input: null,
@@ -184,6 +185,11 @@ async function applyEngineOp(
     case "setTempo": {
       const [bpm] = args as [number | null];
       engineState.session.tempo = bpm;
+      // harmony:linger unit shifts with tempo presence — see the
+      // macro's annotation. Surfacing the current unit in state
+      // lets the LLM re-anchor relative adjustments across a
+      // set_tempo call rather than assume continuity.
+      engineState.session.harmonyLingerUnit = bpm === null ? "seconds" : "bars";
       pipeline?.setTempo(bpm);
       metronome?.setTempo(bpm);
       break;

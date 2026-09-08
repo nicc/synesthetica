@@ -37,6 +37,8 @@ export interface StateSnapshot {
     beatValue: number | null;
     chordMode: "harmonic" | "bass-led";
     metronome: boolean;
+    /** Derived from tempo; see EngineStateSnapshot.session.harmonyLingerUnit. */
+    harmonyLingerUnit: "bars" | "seconds";
   };
   /** Input source (e.g. "midi:Yamaha P-125", "audio:built-in-mic"). */
   input: string | null;

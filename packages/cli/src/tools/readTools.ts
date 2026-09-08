@@ -84,6 +84,7 @@ function emptyStateShaped(): StateSnapshot {
       beatsPerBar: null,
       beatValue: null,
       chordMode: "harmonic",
+      harmonyLingerUnit: "seconds",
       metronome: false,
     },
     input: null,

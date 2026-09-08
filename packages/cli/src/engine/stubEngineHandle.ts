@@ -54,6 +54,7 @@ export class StubEngineHandle implements EngineHandle {
         beatsPerBar: null,
         beatValue: null,
         chordMode: "harmonic",
+      harmonyLingerUnit: "seconds",
         metronome: false,
       },
       input: null,
@@ -94,6 +95,7 @@ export class StubEngineHandle implements EngineHandle {
   async setTempo(bpm: number | null): Promise<StateSnapshot> {
     this.opLog.push({ method: "setTempo", args: [bpm] });
     this.state.session.tempo = bpm;
+    this.state.session.harmonyLingerUnit = bpm === null ? "seconds" : "bars";
     return this.publishState();
   }
   async setMeter(beatsPerBar: number | null, beatValue: number | null): Promise<StateSnapshot> {
