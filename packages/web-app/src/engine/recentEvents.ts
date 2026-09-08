@@ -57,15 +57,27 @@ export function attachRecentEventsBuffer(
   let prevChordIds = new Set<string>();
   let lastChordId: string | null = null;
 
-  const push = (event: Omit<RecentEvent, "id">): void => {
-    const withId: RecentEvent = { ...event, id: nextId++ };
-    buffer.push(withId);
-    countCaptured++;
-    if (buffer.length > opts.capacity) buffer.shift();
+  const flush = (batch: Array<Omit<RecentEvent, "id">>): void => {
+    // Sort within-frame by event clock (t), then assign monotonic
+    // ids and push. Ordering guarantee: ids are monotonic (poll-safe
+    // via `since:`), and within a single frame batch `t` and `id`
+    // agree. Across batches `frameT` is monotonic but `t` isn't —
+    // Basic Pitch onsets can lag `frameT` by model latency. Sorting
+    // globally would break append-only. Sorting within-batch fixes
+    // the free case (adjacent-in-frame events out of `t` order) and
+    // leaves the bounded cross-batch audio case to be documented.
+    batch.sort((a, b) => a.t - b.t);
+    for (const event of batch) {
+      const withId: RecentEvent = { ...event, id: nextId++ };
+      buffer.push(withId);
+      countCaptured++;
+      if (buffer.length > opts.capacity) buffer.shift();
+    }
   };
 
   const unsubscribe = pipeline.onMusicalFrame((frame: MusicalFrame) => {
     const currentNotes = new Map(frame.notes.map((n) => [n.id, n]));
+    const batch: Array<Omit<RecentEvent, "id">> = [];
 
     // Note-on: notes present now, absent before. `t` is the raw event
     // onset (MIDI event timestamp), `frameT` is the frame boundary
@@ -73,7 +85,7 @@ export function attachRecentEventsBuffer(
     // rationale.
     for (const note of frame.notes) {
       if (!prevNotes.has(note.id)) {
-        push({
+        batch.push({
           t: note.onset,
           frameT: frame.t,
           kind: "note-on",
@@ -99,7 +111,7 @@ export function attachRecentEventsBuffer(
     for (const note of frame.notes) {
       const prev = prevNotes.get(note.id);
       if (prev && prev.release === null && note.release !== null) {
-        push({
+        batch.push({
           t: note.release,
           frameT: frame.t,
           kind: "note-off",
@@ -121,7 +133,7 @@ export function attachRecentEventsBuffer(
     // both timestamps because we've lost the event clock entirely.
     for (const [prevId, prev] of prevNotes) {
       if (!currentNotes.has(prevId) && prev.release === null) {
-        push({
+        batch.push({
           t: frame.t,
           frameT: frame.t,
           kind: "note-off",
@@ -144,7 +156,7 @@ export function attachRecentEventsBuffer(
           lastChordId !== null && lastChordId !== chord.id
             ? "chord-changed"
             : "chord-detected";
-        push({
+        batch.push({
           t: chord.onset,
           frameT: frame.t,
           kind,
@@ -169,6 +181,7 @@ export function attachRecentEventsBuffer(
       }
     }
 
+    flush(batch);
     prevNotes = currentNotes;
     prevChordIds = new Set(frame.chords.map((c) => c.id));
   });

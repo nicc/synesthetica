@@ -30,6 +30,19 @@ class FakeAdapter implements IRawSourceAdapter {
   emitNoteOff(midi: number, t: number): void {
     this.push(t, { type: "midi_note_off", t, note: midi, channel: 0 });
   }
+  /** Queue a single raw frame carrying multiple inputs. Used to exercise
+   *  within-frame ordering: the pipeline collects one raw frame per
+   *  requestFrame(), so multiple emitNoteOn/Off calls queue *separate*
+   *  frames — this helper is the way to put two events in the same
+   *  batch as far as the buffer is concerned. */
+  emitFrame(t: number, inputs: RawInput[]): void {
+    this.queue.push({
+      t,
+      source: this.source,
+      stream: this.stream,
+      inputs,
+    });
+  }
 }
 
 function buildPipeline(): { pipeline: VisualPipeline; adapter: FakeAdapter } {
@@ -123,6 +136,28 @@ describe("recent-events buffer — note-off capture", () => {
     expect(off.octave).toBe(4);
     expect(off.velocity).toBe(90);
     expect(off.noteId).toBeTypeOf("string");
+  });
+
+  it("within a single frame batch, events are sorted by t before ids are assigned", () => {
+    const { pipeline, adapter } = buildPipeline();
+    const buf = attachRecentEventsBuffer(pipeline, { capacity: 100 });
+
+    // Two note-ons in the same raw frame — order them back-to-front
+    // relative to their event clocks. The buffer must reorder them
+    // so ids agree with t.
+    adapter.emitFrame(30, [
+      { type: "midi_note_on", t: 20, note: 60, velocity: 100, channel: 0 },
+      { type: "midi_note_on", t: 5, note: 64, velocity: 100, channel: 0 },
+    ]);
+    pipeline.requestFrame(30);
+
+    const events = buf.get(100).filter((e) => e.kind === "note-on");
+    expect(events).toHaveLength(2);
+    // Ids monotonic — always.
+    expect(events[1].id).toBeGreaterThan(events[0].id);
+    // Within-batch, id order agrees with t order.
+    expect(events[0].t).toBe(5);
+    expect(events[1].t).toBe(20);
   });
 
   it("does NOT emit a duplicate note-off when the released note lingers across frames", () => {

@@ -158,6 +158,8 @@ function renderSessionTimeGuidance(): string {
     "- **`frameT` — for anything about the observation.** \"N seconds ago\" from the current `now` (`now - event.frameT`), aligning events to state-changed pushes (also frame-boundary). Consistent with the rest of the observation clock.",
     "- The two match on `note-off` when the buffer had to fall back because the release timestamp was lost (a pathological adapter/stabiliser case); usually you don't need to notice.",
     "",
+    "**Ordering:** `id` is strictly monotonic (`get_recent_events(since: N)` never returns an id ≤ N). Within a single frame batch (events sharing a `frameT`), `t` and `id` agree. Across batches, `frameT` is monotonic but `t` is not guaranteed to be for audio-derived events — Basic Pitch reports onsets from a rolling model buffer, so an audio note-on can carry a `t` older than the previous batch's `frameT`. MIDI events don't have this. If strict musical order matters for cross-batch reasoning on an audio session, sort by `t`.",
+    "",
     "How to answer temporal questions:",
     "- **\"N seconds ago\"** — call `get_recent_events`; `now - event.frameT` is the age of that event in ms. If the user just spoke, use the envelope's `now` as your zero.",
     "- **\"What time did I play that?\"** — reconstruct wall-clock as `new Date(startedAt) + event.t` (ms). Use the event clock for musical questions like this one.",
