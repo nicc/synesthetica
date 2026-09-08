@@ -2,15 +2,16 @@
  * Serves the web-app engine tab.
  *
  * Two modes:
+ *   - Static (default): serve the bundled `dist/static/` via the
+ *     built-in HTTP server. No subprocess. Works identically
+ *     whether the CLI came from `npm install` or a git checkout,
+ *     and doesn't need a working Node+Vite environment inside the
+ *     launching context (e.g. Claude Desktop's stripped subprocess
+ *     env, which historically crashed the Vite spawn silently).
  *   - Dev: locate the web-app source in the monorepo, spawn Vite as
- *     a subprocess for HMR. Used when running from a git checkout.
- *   - Static: locate a bundled `dist/webapp/` inside the CLI's own
- *     install and serve it with the built-in HTTP server. Used when
- *     the CLI is installed via npm.
- *
- * Detection prefers dev (Vite bin exists next to a web-app source
- * package.json). Falling back to static keeps the shipped CLI
- * self-contained — no extra `npm install` required.
+ *     a subprocess for HMR. Only useful when actively iterating on
+ *     the web-app code — opt in explicitly with `SYN_WEBAPP_MODE=dev`
+ *     or the `--dev-webapp` CLI flag.
  *
  * Both modes send the same COOP/COEP headers so SharedArrayBuffer
  * (SPEC 012 polyphonic audio) is available.
@@ -61,17 +62,14 @@ export async function spawnWebApp(
 }
 
 function detectMode(opts: SpawnWebAppOptions): "dev" | "static" {
-  // If the caller pointed at a specific web-app source dir, honour
-  // that and use dev mode.
+  // Explicit source-dir override implies dev iteration.
   if (opts.webAppDir && existsSync(opts.webAppDir)) return "dev";
-  // Try to find Vite in the monorepo layout; if present, dev mode.
-  try {
-    const dir = locateWebAppDir();
-    locateViteBin(dir);
-    return "dev";
-  } catch {
-    return "static";
-  }
+  // Explicit env-var opt-in for dev mode. Preferred over the previous
+  // auto-detect-monorepo behaviour, which lit up dev mode whenever
+  // the CLI happened to run from a git checkout — including under
+  // Claude Desktop, where the Vite subprocess spawn is fragile.
+  if (process.env.SYN_WEBAPP_MODE === "dev") return "dev";
+  return "static";
 }
 
 /* ------------------------------------------------------------------
