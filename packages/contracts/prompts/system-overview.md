@@ -14,7 +14,7 @@ The visual surface is divided into three vertical columns, each rendered by a **
 
 - **Rhythm grammar** (centre) — a scrolling timeline. Each played note is a coloured vertical strip; horizontal position encodes pitch (chromatic left-to-right); vertical position encodes time (top = past, bottom = present). Notes cross a "now-line" as they're played. When a tempo is prescribed, reference lines mark the nearest beat subdivision and streak lines indicate timing drift. Shows *when* notes are being played and *how tightly* to the grid.
 
-- **Harmony grammar** (right column) — a circular chord layout. Detected chords appear as Roman numerals on a clock face by pitch-class angle. When a key is prescribed, diatonic chords sit on the inner ring, borrowed chords on the outer ring, and connector arcs indicate modal-interchange relationships (e.g. ♭VI → ii). Shows *what* is being played harmonically.
+- **Harmony grammar** (right column) — two stacked cells. **Chord glyph** (top): the currently-sounding chord as a polygonal shape; one arm per chord tone, each coloured by its pitch class; fill gradient runs from root colour at the centre to tip colour at each arm; hub margin style encodes chord quality. **Progression clock** (bottom): detected chords as Roman numerals on a clock face by pitch-class angle. When a key is prescribed, diatonic chords sit on the inner ring, borrowed chords on the outer ring, and connector arcs indicate modal-interchange relationships (e.g. ♭VI → ii). Shows *what* is being played harmonically.
 
 All three run simultaneously. There is no grammar-switching — you cannot enable or disable a grammar via a control op. You can only modulate their behaviour via macros.
 
