@@ -39,21 +39,13 @@ export function composeSystemOverview(sourceMd: string): string {
     "",
     "# Full reference (auto-generated from the annotation manifest)",
     "",
-    "Every macro, session control, concept, and lens the engine exposes appears below. Ranges, directionality, and notes come directly from the manifest — use these values when composing tool calls. Per-URI `annotations://` reads carry the same content and remain available when a client proxies resource reads or the user attaches them explicitly; Claude Desktop currently reaches them only via user-triggered attach.",
-    "",
-    "## Macros",
-    "",
-    productionManifest.macros.map(renderMacro).join("\n\n"),
-    "",
-    "## Session controls",
-    "",
-    productionManifest.sessionControls.map(renderSessionControl).join("\n\n"),
+    "Same content as the per-URI `annotations://` resources (user-attach only in Claude Desktop). Ordered so foundational vocabulary comes first, tool + macro details later.",
     "",
     ...(productionManifest.derivedState.length > 0
       ? [
           "## Derived session state",
           "",
-          "Read-only fields the server computes from other state. Not settable — the value updates automatically when its inputs change. Enumerate here rather than deriving from primary fields blind.",
+          "Read-only fields; server-computed. Prefer these over inferring from primary fields.",
           "",
           productionManifest.derivedState.map(renderDerivedState).join("\n\n"),
           "",
@@ -67,22 +59,6 @@ export function composeSystemOverview(sourceMd: string): string {
     "",
     productionManifest.lenses.map(renderLens).join("\n\n"),
     "",
-    "## Tools",
-    "",
-    "MCP tools you can call. The description below matches what tools/list serves — this section adds aliases + notes + examples the LLM can lean on when interpreting user speech.",
-    "",
-    "### Result shape (every tool)",
-    "",
-    renderToolResultShape(),
-    "",
-    (productionManifest.tools ?? []).map(renderTool).join("\n\n"),
-    "",
-    "## Resources",
-    "",
-    "MCP resources — **user-attach surfaces**, not autonomous LLM reads. Claude Desktop doesn't proxy these through as callable; the user selects them via the + menu when they want to inspect something directly. Every reader tool above (`get_state`, `get_recent_events`, `list_inputs`, `list_presets`, `get_preset`) returns the same content as its matching resource — the LLM should use the tool. This section documents each resource's shape so you know what the user is looking at when they attach one. Per-item annotation resources (`annotations://macros/{id}`, `annotations://concepts/{term}`, etc.) aren't repeated here.",
-    "",
-    (productionManifest.resources ?? []).map(renderResource).join("\n\n"),
-    "",
     "## Session time",
     "",
     renderSessionTimeGuidance(),
@@ -90,6 +66,28 @@ export function composeSystemOverview(sourceMd: string): string {
     "## Presets",
     "",
     renderPresets(productionManifest.presets ?? []),
+    "",
+    "## Session controls",
+    "",
+    productionManifest.sessionControls.map(renderSessionControl).join("\n\n"),
+    "",
+    "## Tools",
+    "",
+    "### Result shape (every tool)",
+    "",
+    renderToolResultShape(),
+    "",
+    (productionManifest.tools ?? []).map(renderTool).join("\n\n"),
+    "",
+    "## Macros",
+    "",
+    productionManifest.macros.map(renderMacro).join("\n\n"),
+    "",
+    "## Resources",
+    "",
+    "User-attach only in Claude Desktop; the reader tools above return the same content. Per-item annotation resources (`annotations://macros/{id}` etc.) aren't repeated here.",
+    "",
+    (productionManifest.resources ?? []).map(renderResource).join("\n\n"),
     "",
   ];
   return sections.join("\n");
@@ -101,27 +99,20 @@ export function composeSystemOverview(sourceMd: string): string {
 
 function renderSessionTimeGuidance(): string {
   return [
-    "All timestamps in state are **milliseconds since session start** (a floating-point number). Absolute wall-clock time is available as `startedAt` (ISO 8601 string).",
+    "All timestamps in state are **milliseconds since session start**. Wall-clock is on `startedAt` (ISO 8601 string). `now` is session-ms, computed fresh on every read (two consecutive `get_state` reads show `now` advancing). Both fields appear on `get_state` and on the `get_recent_events` envelope. Both are null until `state.session.phase` is `input-active`; check phase before temporal math when the pipeline may not yet have an adapter.",
     "",
-    "Where these fields appear:",
-    "- `get_state` → `state.startedAt` (ISO, stable) and `state.now` (session-ms, computed fresh at read time — two consecutive reads will show `now` advancing).",
-    "- `get_recent_events` → envelope `{ startedAt, now, events }`. `now` here is also fresh at read time.",
+    "**Each event is bitemporal.** `event.t` is the **event clock** — the raw MIDI/audio timestamp of the musical event itself (note-on's onset, note-off's release, chord's onset). `event.frameT` is the **observation clock** — the animation-frame boundary at which the buffer captured it. The two usually differ by a few ms because frames capture at ~60Hz (~17ms) while events arrive between frames.",
+    "- **`t` — musical arithmetic.** Drift (`event.t mod subdivMs`), inter-onset intervals (`b.t - a.t`), duration (`noteOff.t - noteOn.t`). Higher precision, matches what the player did.",
+    "- **`frameT` — observation questions.** \"N seconds ago\" (`now - event.frameT`), aligning events to state-changed pushes (also frame-boundary).",
+    "- The two match on `note-off` only in a pathological fallback (buffer lost the release timestamp) — usually no need to notice.",
     "",
-    "**Each event is bitemporal**: `event.t` is the **event clock** (the raw MIDI/audio timestamp of the musical event itself — a note-on's onset, a note-off's release, a chord's onset), and `event.frameT` is the **observation clock** (the animation-frame boundary at which the buffer captured it). The two usually differ by a few ms because the buffer captures at frame boundaries (~60Hz = ~17ms) while musical events arrive between frames. When to use which:",
-    "- **`t` — for anything about the music.** Drift arithmetic (event.t mod subdivMs), inter-onset intervals (`b.t - a.t`), duration (`noteOff.t - noteOn.t`). Higher precision, matches what the player did.",
-    "- **`frameT` — for anything about the observation.** \"N seconds ago\" from the current `now` (`now - event.frameT`), aligning events to state-changed pushes (also frame-boundary). Consistent with the rest of the observation clock.",
-    "- The two match on `note-off` when the buffer had to fall back because the release timestamp was lost (a pathological adapter/stabiliser case); usually you don't need to notice.",
+    "**Ordering.** `id` is strictly monotonic (`get_recent_events(since: N)` never returns an id ≤ N). Within a single frame batch, `t` and `id` agree. Across batches, `frameT` is monotonic but `t` is not guaranteed to be for audio-derived events — Basic Pitch reports onsets from a rolling model buffer so an audio note-on can carry a `t` older than the previous batch's `frameT`. MIDI is real-time and doesn't have this. Sort by `t` if strict musical order matters across batches on an audio session.",
     "",
-    "**Ordering:** `id` is strictly monotonic (`get_recent_events(since: N)` never returns an id ≤ N). Within a single frame batch (events sharing a `frameT`), `t` and `id` agree. Across batches, `frameT` is monotonic but `t` is not guaranteed to be for audio-derived events — Basic Pitch reports onsets from a rolling model buffer, so an audio note-on can carry a `t` older than the previous batch's `frameT`. MIDI events don't have this. If strict musical order matters for cross-batch reasoning on an audio session, sort by `t`.",
+    "**How to answer temporal questions.**",
+    "- \"What time did I play that?\" — `new Date(startedAt) + event.t` (wall-clock).",
+    "- \"How long has the session been going?\" — `now`.",
     "",
-    "How to answer temporal questions:",
-    "- **\"N seconds ago\"** — call `get_recent_events`; `now - event.frameT` is the age of that event in ms. If the user just spoke, use the envelope's `now` as your zero.",
-    "- **\"What time did I play that?\"** — reconstruct wall-clock as `new Date(startedAt) + event.t` (ms). Use the event clock for musical questions like this one.",
-    "- **\"How long has the session been going?\"** — `now` on either surface.",
-    "",
-    "`startedAt` and `now` are null until `state.session.phase` is `input-active` — the pipeline can exist (phase `spawned`) with no adapter running yet. Check `session.phase` when you're about to do temporal math and there's a chance no input has been selected. Once `input-active`, events accrue.",
-    "",
-    "Response latency doesn't complicate this: you always have `now` at the moment of read, so relative comparisons stay anchored regardless of how long you take to think.",
+    "Response latency doesn't complicate this: `now` is fresh at every read, so relative comparisons stay anchored regardless of think-time.",
   ].join("\n");
 }
 
@@ -132,11 +123,10 @@ function renderToolResultShape(): string {
     "- Failure: `{ ok: false, error: { code, message, details? } }` — code is a stable SCREAMING_SNAKE_CASE string.",
     "",
     "StateSnapshot's `macros` field is split into two views:",
-    "- `intents`: the last value asked for per macro — populated by `set_macro`, `set_hue_for_pitch`, `switch_preset` (repopulates with the preset's stored values), AND panel widget edits (the user dragging a slider in the visualiser tab dispatches through the same path as the LLM tools). Includes compound macros keyed by their compound id.",
-    "- `effective`: sourced from consumer runtime — the values lenses/stabilizers/vocab are actually running with. Compound macros do NOT appear here (their leaves do).",
-    "- Read `intents` to answer 'what has been asked for?' (by anyone — you or the user via the panel). Read `effective` to answer 'what is the pipeline actually doing right now?'.",
-    "- The two views can legitimately disagree — a compound macro was set (intents holds the compound id) and then one of its leaves was overridden directly (via a tool call, a panel edit, or a preset apply + tweak). Treat divergence as information, not automatically as a bug; only surface it if the user asks or if it clearly contradicts a value they just set.",
-    "- **Reporting policy when reading back to the user**: when you just set a value and effective matches intents, state the value plainly ('linger's at 6 now'). When they differ AND the user just asked, name both ('you asked for 8 but the pipeline's showing 6'). When they differ silently (unrelated read), stay quiet unless the delta looks large or contradicts a recent instruction.",
+    "- `intents`: last value asked for per macro (by `set_macro`, `set_hue_for_pitch`, `switch_preset`, or a panel widget edit). Includes compound macros keyed by their compound id.",
+    "- `effective`: sourced from consumer runtime — what lenses/stabilizers/vocab are actually running with. Compound macros don't appear here; their leaves do.",
+    "- The two can legitimately disagree (a compound set then a leaf overridden; a preset apply + tweak). Treat divergence as information, not a bug.",
+    "- **Reporting to the user**: when you just set a value and they match, state it plainly ('linger's at 6 now'). When they differ AND the user just asked, name both ('you asked for 8 but the pipeline's showing 6'). Silent divergence — stay quiet unless the delta is large or contradicts a recent instruction.",
     "",
     "Common codes (match on `code`, not on message text):",
     "- `SCHEMA_INVALID` — argument shape / type wrong or required arg missing.",
@@ -198,17 +188,7 @@ function renderTool(t: ToolAnnotation): string {
 function renderPresets(presets: readonly PresetAnnotation[]): string {
   const lines: string[] = [];
   lines.push(
-    "Presets are named snapshots of the aesthetic + musical control surface — macro values and prescribed context (key / tempo / meter / chord mode / metronome). **Input source is deliberately NOT part of a preset**: a preset saved on a MIDI keyboard should still be loadable on a mic-only setup, and loading one shouldn't hijack the pipeline's current listening surface. Whichever input the user has selected stays selected across a switch_preset. They're user-managed at runtime:",
-  );
-  lines.push("");
-  lines.push("- `list_presets` — preset summaries (name, savedAt, session) for enumeration.");
-  lines.push("- `get_preset(name)` — one preset's full stored content, WITHOUT loading it. Use this to answer 'what's in my practice preset?' before deciding whether to switch.");
-  lines.push("- `switch_preset(name)` — load a preset; macros and session controls snap to stored values, input is left alone. Also repopulates `macros.intents` with the preset's stored values (so relative requests right after a load anchor on those, not on annotated defaults).");
-  lines.push("- `save_preset(name)` — capture the current macros + session state under this name (overwrites if the name exists). Input source not captured.");
-  lines.push("- `delete_preset(name)` — remove a preset from disk. Errors with PRESET_NOT_FOUND if the name isn't known (details.available lists what is).");
-  lines.push("");
-  lines.push(
-    "Presets persist on disk (~/Library/Application Support/synesthetica/presets on macOS; XDG_DATA_HOME/synesthetica/presets on Linux). They're per-user, not per-instance.",
+    "Named snapshots of macros + prescribed context (key / tempo / meter / chord mode / metronome). **Input source is NOT captured** — loading a preset never changes what the pipeline is listening to (so a preset saved on a MIDI keyboard is loadable on a mic-only setup). User-managed at runtime; per-user disk storage. See `list_presets` / `get_preset` / `switch_preset` / `save_preset` / `delete_preset` under Tools for the operations.",
   );
   if (presets.length === 0) {
     lines.push("");
