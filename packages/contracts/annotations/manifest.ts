@@ -967,12 +967,13 @@ const tools: ToolAnnotation[] = [
   {
     id: "switch_preset",
     description:
-      "Load a named preset. Every control (macros, prescribed context, input source) snaps to the preset's stored value. Enumerate names via the `list_presets` tool; inspect one without loading via `get_preset(name)`.",
+      "Load a named preset. Every macro and prescribed control (key, tempo, meter, chord mode, metronome) snaps to the preset's stored value. **Input source is NOT part of a preset** — whichever input the user has selected stays selected. Enumerate names via the `list_presets` tool; inspect one without loading via `get_preset(name)`.",
     aliases: ["load preset", "switch preset", "recall"],
     notes: [
       "On failure the error's details.available field lists all preset names known to the store.",
       "A successful load sets `state.activePreset` (read via `get_state`) to the loaded name — so the LLM can see which preset is current without tracking it manually.",
       "**Anchoring after a load**: macros.intents is repopulated with the preset's stored values (that IS what the user just asked for). A relative request immediately after switch_preset ('a bit more chord linger') anchors on those loaded intents, not on the annotated defaults.",
+      "Input is deliberately excluded from presets so that loading one doesn't hijack the pipeline's current listening surface — a preset saved on a MIDI keyboard should still be usable on a microphone-only setup, and vice versa.",
     ],
   },
 
@@ -983,7 +984,7 @@ const tools: ToolAnnotation[] = [
     aliases: ["save as", "remember this", "save preset"],
     notes: [
       "Name must be `[a-zA-Z0-9_-]{1,64}`. Stored on disk at `$XDG_DATA_HOME/synesthetica/presets/<name>.json`.",
-      "Captures: macro values, session state (key, tempo, meter, chord mode, metronome), input source.",
+      "Captures: macro values + session state (key, tempo, meter, chord mode, metronome). **Input source is NOT captured** — presets are aesthetic/musical state, not device selection. See switch_preset notes for the rationale.",
     ],
   },
 
@@ -1053,17 +1054,18 @@ const tools: ToolAnnotation[] = [
   {
     id: "list_presets",
     description:
-      "List saved presets by name, with savedAt + prescribed session context + input at save time. Use switch_preset(name) to load one. This is your autonomous read surface for preset enumeration — the matching `presets://` resource carries the same content but exists for user-triggered attachment.",
+      "List saved presets by name, with savedAt + prescribed session context at save time. Use switch_preset(name) to load one. This is your autonomous read surface for preset enumeration — the matching `presets://` resource carries the same content but exists for user-triggered attachment.",
     aliases: ["available presets", "what presets", "saved presets"],
     notes: [
-      "Returns preset SUMMARIES (name + savedAt + session + input) only. For a preset's macro values without loading it, use get_preset(name).",
+      "Returns preset SUMMARIES (name + savedAt + session) only. For a preset's macro values without loading it, use get_preset(name).",
+      "Input source is not part of preset content — loading a preset never changes what the pipeline is listening to.",
     ],
   },
 
   {
     id: "get_preset",
     description:
-      "Return one preset's full stored content — macro values, session controls, input — WITHOUT loading it. Use to answer 'what's in my practice preset?' before deciding whether to switch. This is your autonomous read surface for one preset's content — the matching `presets://<name>` resource carries the same content but exists for user-triggered attachment.",
+      "Return one preset's full stored content — macro values + session controls — WITHOUT loading it. Use to answer 'what's in my practice preset?' before deciding whether to switch. Input source is not part of a preset. This is your autonomous read surface for one preset's content — the matching `presets://<name>` resource carries the same content but exists for user-triggered attachment.",
     aliases: ["show preset", "preview preset", "what's in preset"],
     notes: [
       "Non-destructive read. The current control surface is untouched. On unknown name, error's details.available lists preset names for retry.",
@@ -1168,11 +1170,12 @@ const resources: ResourceAnnotation[] = [
     uri: "presets://",
     name: "Presets — index",
     description:
-      "List of saved preset summaries { name, savedAt, session, input }. User-attach surface — the LLM should call `list_presets` for the same content via the autonomous read path.",
+      "List of saved preset summaries { name, savedAt, session }. User-attach surface — the LLM should call `list_presets` for the same content via the autonomous read path.",
     aliases: ["preset list", "available presets"],
     notes: [
       "User-attach surface. The LLM should call `list_presets` instead — same content, autonomous read path.",
       "Presets are user-managed; the manifest doesn't ship defaults.",
+      "Input source is intentionally excluded from preset content — loading a preset never changes what the pipeline is listening to.",
     ],
     subscribable: false,
   },
@@ -1181,7 +1184,7 @@ const resources: ResourceAnnotation[] = [
     uri: "presets://<name>",
     name: "Preset — one entry",
     description:
-      "Full stored content of one preset: macros, session (key/tempo/meter/…), input, savedAt. User-attach surface — the LLM should call `get_preset(name)` for the same content via the autonomous read path.",
+      "Full stored content of one preset: macros + session (key/tempo/meter/chord-mode/metronome) + savedAt. User-attach surface — the LLM should call `get_preset(name)` for the same content via the autonomous read path. Input source is not part of a preset.",
     subscribable: false,
   },
 

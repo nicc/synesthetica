@@ -39,8 +39,16 @@ describe("preset store", () => {
     expect(loaded).not.toBeNull();
     expect(loaded!.macros["harmony:linger"]).toBe(5);
     expect(loaded!.session.tempo).toBe(120);
-    expect(loaded!.input).toBe("midi:test-device");
     expect(loaded!.version).toBe(1);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("does NOT capture input source in preset content", () => {
+    const store = createPresetStore(dir);
+    store.save("no-input", fakeSnapshot()); // snapshot has input: "midi:test-device"
+    const loaded = store.load("no-input") as unknown as Record<string, unknown>;
+    expect(loaded).not.toBeNull();
+    expect(loaded.input).toBeUndefined();
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -84,7 +92,7 @@ describe("preset store", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("listWithMeta returns name + savedAt + session + input per preset", () => {
+  it("listWithMeta returns name + savedAt + session per preset (no input)", () => {
     const store = createPresetStore(dir);
     store.save("a", fakeSnapshot());
     store.save("b", fakeSnapshot());
@@ -93,7 +101,7 @@ describe("preset store", () => {
     expect(meta.map((m) => m.name).sort()).toEqual(["a", "b"]);
     expect(meta[0].savedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(meta[0].session.tempo).toBe(120);
-    expect(meta[0].input).toBe("midi:test-device");
+    expect((meta[0] as unknown as Record<string, unknown>).input).toBeUndefined();
     rmSync(dir, { recursive: true, force: true });
   });
 

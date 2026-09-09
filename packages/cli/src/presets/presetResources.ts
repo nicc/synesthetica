@@ -2,8 +2,12 @@
  * MCP resources backed by the preset store.
  *
  *   presets://                — fixed URI, list of preset summaries
- *                                (name, savedAt, session, input)
+ *                                (name, savedAt, session)
  *   presets://<name>          — template URI, full preset content
+ *
+ * Input source is intentionally NOT part of preset content (see
+ * presetStore.ts header) — loading a preset never changes what the
+ * pipeline is listening to.
  *
  * The switch/save/load surface stays as MCP tools (verbs); this
  * exposes the READ surface (nouns) — the piece the LLM needs to
@@ -34,7 +38,7 @@ export function buildPresetResources(store: PresetStore): PresetResourceHandlers
       uri: "presets://",
       name: "Presets — index",
       description:
-        "List of saved preset summaries (name + savedAt + session + input at save time). Use switch_preset(name) to load one, or read presets://<name> for the full content.",
+        "List of saved preset summaries (name + savedAt + session at save time). Use switch_preset(name) to load one, or read presets://<name> for the full content. Input source is not part of a preset — loading never changes what the pipeline is listening to.",
       mimeType: "application/json",
       subscribable: false,
       async read() {

@@ -255,13 +255,13 @@ function renderTool(t: ToolAnnotation): string {
 function renderPresets(presets: readonly { id: string; name?: string; notes?: string[] }[]): string {
   const lines: string[] = [];
   lines.push(
-    "Presets are named snapshots of the full control surface — macro values, prescribed context (key / tempo / meter / chord mode / metronome), and input source. They're user-managed at runtime:",
+    "Presets are named snapshots of the aesthetic + musical control surface — macro values and prescribed context (key / tempo / meter / chord mode / metronome). **Input source is deliberately NOT part of a preset**: a preset saved on a MIDI keyboard should still be loadable on a mic-only setup, and loading one shouldn't hijack the pipeline's current listening surface. Whichever input the user has selected stays selected across a switch_preset. They're user-managed at runtime:",
   );
   lines.push("");
-  lines.push("- `list_presets` — preset summaries (name, savedAt, session, input) for enumeration.");
+  lines.push("- `list_presets` — preset summaries (name, savedAt, session) for enumeration.");
   lines.push("- `get_preset(name)` — one preset's full stored content, WITHOUT loading it. Use this to answer 'what's in my practice preset?' before deciding whether to switch.");
-  lines.push("- `switch_preset(name)` — load a preset; every control snaps to its stored value. Also repopulates `macros.intents` with the preset's stored values (so relative requests right after a load anchor on those, not on annotated defaults).");
-  lines.push("- `save_preset(name)` — capture the current state under this name (overwrites if the name exists).");
+  lines.push("- `switch_preset(name)` — load a preset; macros and session controls snap to stored values, input is left alone. Also repopulates `macros.intents` with the preset's stored values (so relative requests right after a load anchor on those, not on annotated defaults).");
+  lines.push("- `save_preset(name)` — capture the current macros + session state under this name (overwrites if the name exists). Input source not captured.");
   lines.push("");
   lines.push(
     "Presets persist on disk (~/Library/Application Support/synesthetica/presets on macOS; XDG_DATA_HOME/synesthetica/presets on Linux). They're per-user, not per-instance.",

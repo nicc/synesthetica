@@ -84,6 +84,31 @@ describe("switch_preset", () => {
     cleanup();
   });
 
+  it("does NOT change the engine's input source when loading a preset", async () => {
+    const store = createPresetStore(dir);
+    const [switchP, save] = buildPresetTools(store);
+
+    // Save from an engine that had a MIDI input set. The store drops
+    // input by design; verify the load path doesn't touch input on
+    // the target engine.
+    const source = new StubEngineHandle({ label: "s" });
+    await source.setInput("midi:source-device");
+    await source.setMacro("harmony:linger", 5);
+    await save.handle({ name: "no-input-swap" }, source);
+
+    // Target has a different input selected. Loading the preset must
+    // leave that in place.
+    const target = new StubEngineHandle({ label: "t" });
+    await target.setInput("audio:target-mic");
+    const result = await switchP.handle({ name: "no-input-swap" }, target);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.state.input).toBe("audio:target-mic");
+      expect(result.state.macros.intents["harmony:linger"]).toBe(5);
+    }
+    cleanup();
+  });
+
   it("PRESET_NOT_FOUND details lists available presets", async () => {
     const store = createPresetStore(dir);
     const [switchP, save] = buildPresetTools(store);

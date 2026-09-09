@@ -34,7 +34,7 @@ export function buildPresetTools(store: PresetStore): ToolSpec[] {
     {
       name: "switch_preset",
       description:
-        "Load a named preset into the target engine. Preset content replaces current macro values, prescribed context, and input source.",
+        "Load a named preset into the target engine. Preset content replaces current macro values and prescribed context (key, tempo, meter, chord mode, metronome). Input source is NOT part of a preset — whichever input the user has selected stays selected. Loading a preset doesn't change what the pipeline is listening to.",
       inputSchema: {
         type: "object",
         properties: {
@@ -55,8 +55,9 @@ export function buildPresetTools(store: PresetStore): ToolSpec[] {
             available: store.list(),
           });
         }
-        // Apply preset content: macros first, then session, then input.
-        // The engine records each change and publishes state after each.
+        // Apply preset content: macros first, then session. Input is
+        // intentionally not applied — presets are aesthetic/musical
+        // state, not device selection.
         try {
           for (const [macroName, value] of Object.entries(content.macros)) {
             await engine.setMacro(macroName, value);
@@ -66,9 +67,6 @@ export function buildPresetTools(store: PresetStore): ToolSpec[] {
           await engine.setMeter(content.session.beatsPerBar, content.session.beatValue);
           await engine.setChordMode(content.session.chordMode);
           await engine.setMetronome(content.session.metronome);
-          if (content.input !== null) {
-            await engine.setInput(content.input);
-          }
           const finalState = await engine.switchPreset(name);
           return { ok: true, state: finalState };
         } catch (e) {
