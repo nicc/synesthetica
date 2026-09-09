@@ -75,13 +75,18 @@ describe("get_preset", () => {
 });
 
 describe("get_started", () => {
-  it("returns the composed primer text and includes every macro id", async () => {
+  it("returns { primer, token } and includes every macro id in the primer", async () => {
     const engine = new StubEngineHandle();
     const r = await getStartedTool.handle({}, engine);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(typeof r.data).toBe("string");
-    const text = r.data as string;
+    expect(typeof r.data).toBe("object");
+    const data = r.data as { primer: string; token: string };
+    expect(typeof data.primer).toBe("string");
+    expect(typeof data.token).toBe("string");
+    // Token shape: 16 hex chars (SHA-256 truncated).
+    expect(data.token).toMatch(/^[0-9a-f]{16}$/);
+    const text = data.primer;
     // Spot check: authored prose section header must be present.
     expect(text).toContain("Full reference");
     // Every declared macro id appears in the primer body so the LLM

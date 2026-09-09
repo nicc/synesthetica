@@ -26,7 +26,10 @@
 import type { EngineHandle, StateSnapshot } from "../engine/engineHandle.js";
 import type { PresetStore } from "../presets/presetStore.js";
 import type { ToolSpec } from "./sessionTools.js";
-import { composeSystemOverview } from "../resources/promptResources.js";
+import {
+  composeSystemOverview,
+  computePrimerToken,
+} from "../resources/promptResources.js";
 
 function err(code: string, message: string, details?: unknown) {
   return { ok: false as const, error: { code, message, ...(details ? { details } : {}) } };
@@ -58,8 +61,19 @@ export const getStartedTool: ToolSpec = {
   async handle(_args, _engine: EngineHandle) {
     // No engine call required — the primer is content, not state.
     try {
-      const text = composeSystemOverview();
-      return { ok: true as const, state: emptyStateShaped(), data: text };
+      const primer = composeSystemOverview();
+      const token = computePrimerToken(primer);
+      // data.primer is the human-readable prose the LLM reads;
+      // data.token is the argument every other tool now requires
+      // (`primer`). Server rejects any non-get_started call whose
+      // `primer` token doesn't match the current text's fingerprint,
+      // so the LLM must read the primer before it acts. Editing the
+      // primer invalidates outstanding tokens for free.
+      return {
+        ok: true as const,
+        state: emptyStateShaped(),
+        data: { primer, token },
+      };
     } catch (e) {
       return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
     }

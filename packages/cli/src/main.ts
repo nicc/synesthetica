@@ -34,9 +34,11 @@ const SERVER_VERSION = "0.1.0";
 const SERVER_INSTRUCTIONS =
   "Synesthetica is a real-time music visualiser controlled via this server. " +
   "If the user mentions playing an instrument, music, rhythm, harmony, tempo, " +
-  "or visualisation, call `get_started` for the full primer, then " +
-  "`start_session` to spawn the visualiser before other tool calls. " +
-  "When the user is done, call `stop_session` to close it down.";
+  "or visualisation, call `get_started` for the full primer AND a `primer` " +
+  "token that every other tool in this server requires. Pass that token as " +
+  "the `primer` argument on every subsequent call — the server refuses " +
+  "non-get_started calls without a valid token. Then `start_session` to " +
+  "spawn the visualiser, and `stop_session` when the user is done.";
 
 export async function runCli(argv: readonly string[]): Promise<number> {
   const cmd = parseArgs(argv);

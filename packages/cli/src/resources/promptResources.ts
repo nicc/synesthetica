@@ -19,6 +19,7 @@
  * `get_started` returns via readFileSync of the same `system-overview.md`.
  */
 
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
@@ -66,6 +67,25 @@ export function buildPromptResources(): Record<string, PromptEntry> {
 /* ------------------------------------------------------------------
  * Composition — narrative + generated reference
  * ------------------------------------------------------------------ */
+
+/**
+ * Fingerprint of the current primer text — a stable, short hex string
+ * derived from the composed system-overview content. Returned by
+ * `get_started` and required as the `primer` argument on every other
+ * tool call so the server can refuse work from callers that haven't
+ * called `get_started` for this primer version.
+ *
+ * Uses SHA-256 truncated to 16 hex chars (64 bits) — this is a
+ * fingerprint, not a secret, so the truncation is fine and the
+ * shorter form saves LLM tokens across many calls. Recomputing at
+ * call time makes primer edits invalidate outstanding tokens for
+ * free: change system-overview.md or a manifest annotation, and the
+ * next tool call is rejected with the fresh primer + fresh token
+ * attached — the LLM re-reads and retries with the new token.
+ */
+export function computePrimerToken(text: string): string {
+  return createHash("sha256").update(text).digest("hex").slice(0, 16);
+}
 
 /**
  * Composes the full system-overview text: authored narrative +
@@ -204,6 +224,7 @@ function renderToolResultShape(): string {
     "- `INSTANCE_NOT_FOUND` — the `instance` arg doesn't match any running engine.",
     "- `ENGINE_ERROR` — underlying engine / transport / filesystem failure. Read the message.",
     "- `ENGINE_NOT_STARTED` — the pipeline isn't running. Call `start_session` and then re-issue the original call.",
+    "- `PRIMER_INVALID` — the `primer` argument was missing or stale. Every tool except `get_started` requires the token returned by `get_started` as its `primer` argument. `details.primer` + `details.token` carry the fresh values — read the primer and retry with the new token in one round-trip (no need to call `get_started` again manually).",
     "",
     "Handling guidance:",
     "- Use `details.available` (when present) to pick a valid retry value.",

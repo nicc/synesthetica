@@ -16,19 +16,35 @@ function makeSession() {
 }
 
 describe("tool registry — descriptions come from manifest", () => {
-  it("registered tools carry the manifest's description (with the get_started hint appended where applicable)", () => {
+  it("registered tools carry the manifest's description verbatim", () => {
     const dir = mkdtempSync(join(tmpdir(), "tool-registry-"));
     const store = createPresetStore(dir);
     const registry = buildToolRegistry(store, makeSession());
-    const NO_HINT = new Set(["get_started", "start_session", "stop_session"]);
     for (const t of productionManifest.tools ?? []) {
       const registered = registry.get(t.id);
       expect(registered, `tool ${t.id} must be registered`).toBeDefined();
-      if (NO_HINT.has(t.id)) {
-        expect(registered!.description).toBe(t.description);
+      expect(registered!.description).toBe(t.description);
+    }
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("every non-get_started tool has `primer` as a required inputSchema field", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tool-registry-primer-"));
+    const store = createPresetStore(dir);
+    const registry = buildToolRegistry(store, makeSession());
+    for (const [name, spec] of registry) {
+      const schema = spec.inputSchema as {
+        properties?: Record<string, unknown>;
+        required?: string[];
+      };
+      if (name === "get_started") {
+        expect(schema.properties?.primer).toBeUndefined();
       } else {
-        expect(registered!.description.startsWith(t.description)).toBe(true);
-        expect(registered!.description).toContain("get_started");
+        expect(schema.properties?.primer, `${name} must declare primer property`).toBeDefined();
+        expect(
+          schema.required?.includes("primer"),
+          `${name} must require primer`,
+        ).toBe(true);
       }
     }
     rmSync(dir, { recursive: true, force: true });

@@ -7,6 +7,11 @@
  * (they need TypeScript). At registration time we look up each tool
  * id in the manifest and override its description; missing entries
  * fall back to the code default.
+ *
+ * Every non-get_started tool has its inputSchema augmented here with
+ * a required `primer` string parameter — the token returned by
+ * get_started. The mcpServer dispatch enforces it before calling the
+ * handler; see PRIMER_EXEMPT below for the set that skips the gate.
  */
 
 import type { ToolSpec } from "./sessionTools.js";
@@ -19,16 +24,28 @@ import type { PresetStore } from "../presets/presetStore.js";
 import type { SessionManager } from "../session/sessionManager.js";
 import { productionManifest } from "@synesthetica/contracts";
 
+/** Tools that DON'T require the primer token — get_started only. */
+export const PRIMER_EXEMPT: ReadonlySet<string> = new Set(["get_started"]);
+
 /**
- * Tools that skip the "call get_started first" description tag —
- * either because they ARE the onboarding surface (get_started) or
- * because they operate outside a session context (start_session,
- * stop_session). The tag is a low-cost hint on every other tool so
- * the LLM has a discovery cue attached to whichever tool it hovers
- * over first.
+ * Inject the required `primer` field into a tool's inputSchema.
+ * Kept out-of-band from the tool definitions so every tool doesn't
+ * have to remember to declare it. The mcpServer dispatch validates
+ * the token before calling the handler; the handler receives args
+ * with `primer` stripped.
  */
-const NO_HINT_TAG = new Set(["get_started", "start_session", "stop_session"]);
-const GET_STARTED_HINT = " (Call get_started first if you haven't — it returns the full Synesthetica primer.)";
+function withPrimerParam(schema: Record<string, unknown>): Record<string, unknown> {
+  const props = { ...(schema.properties as Record<string, unknown> | undefined) };
+  props.primer = {
+    type: "string",
+    description:
+      "Primer token from get_started's response. Required on every tool call. If your token is stale or missing the server rejects with PRIMER_INVALID and returns the fresh primer + token in details.",
+  };
+  const required = Array.isArray(schema.required)
+    ? Array.from(new Set([...(schema.required as string[]), "primer"]))
+    : ["primer"];
+  return { ...schema, properties: props, required };
+}
 
 export function buildToolRegistry(
   presetStore: PresetStore,
@@ -41,8 +58,10 @@ export function buildToolRegistry(
   const add = (t: ToolSpec) => {
     const ann = annotations.get(t.name);
     const description = ann ? ann.description : t.description;
-    const tagged = NO_HINT_TAG.has(t.name) ? description : description + GET_STARTED_HINT;
-    registry.set(t.name, { ...t, description: tagged });
+    const inputSchema = PRIMER_EXEMPT.has(t.name)
+      ? t.inputSchema
+      : withPrimerParam(t.inputSchema);
+    registry.set(t.name, { ...t, description, inputSchema });
   };
   for (const t of buildLifecycleTools(session)) add(t);
   for (const t of sessionTools) add(t);

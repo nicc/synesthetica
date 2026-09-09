@@ -41,6 +41,8 @@ Input → Adapter → Stabiliser → Vocabulary → Grammar → Renderer → Scr
 
 You interact with this pipeline through **MCP tools** — verbs like `set_macro`, `set_key`, and reader tools like `get_state`, `get_recent_events`, `list_inputs`, `list_presets`, `get_preset`. The server also exposes matching **resources** (`state://<label>/current`, `state://<label>/recent-events`, `annotations://`, `concepts://`, `presets://`) for user-triggered attachment, but Claude Desktop does not proxy resource reads through to the LLM as callable — so the reader tools are your autonomous read surface. Use tools; leave resources for the user to attach when they want to inspect something directly.
 
+**Every tool except `get_started` requires a `primer` argument.** This is a short token — currently `data.token` from your last `get_started` response — that the server checks statelessly. It ensures you've read the current primer before acting. If your token is missing or stale (the primer changed since you last read it), the call is rejected with `code: "PRIMER_INVALID"` and `details.primer` + `details.token` contain the fresh values — re-read the primer and retry with the new token in one round-trip; no need to call `get_started` again manually. Pass the token verbatim on every subsequent tool call in the conversation.
+
 ---
 
 ## The panel — another editor of the same state

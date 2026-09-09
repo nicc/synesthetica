@@ -28,9 +28,15 @@ import {
 } from "./resources/annotationResources.js";
 import {
   buildPromptResources,
+  composeSystemOverview,
+  computePrimerToken,
   type PromptEntry,
 } from "./resources/promptResources.js";
-import { buildToolRegistry, type ToolSpec } from "./tools/registry.js";
+import {
+  buildToolRegistry,
+  PRIMER_EXEMPT,
+  type ToolSpec,
+} from "./tools/registry.js";
 import type { EngineHandle, StateSnapshot } from "./engine/engineHandle.js";
 import {
   buildStateResources,
@@ -353,6 +359,51 @@ export async function startMcpServer(
       };
     }
     const args = (request.params.arguments ?? {}) as Record<string, unknown>;
+
+    // Primer gate: every non-get_started tool requires a valid primer
+    // token. A missing or stale token is refused; the response body
+    // carries the current primer text + fresh token so the LLM can
+    // resync in a single round-trip (read the primer, retry with the
+    // new token — no manual get_started call needed to recover).
+    // The token is a SHA-256 fingerprint of the primer text truncated
+    // to 16 hex chars — changes whenever the primer content changes,
+    // which invalidates outstanding tokens automatically.
+    if (!PRIMER_EXEMPT.has(tool.name)) {
+      const currentPrimer = composeSystemOverview();
+      const currentToken = computePrimerToken(currentPrimer);
+      const provided = typeof args.primer === "string" ? args.primer : "";
+      if (provided !== currentToken) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(
+                {
+                  ok: false,
+                  error: {
+                    code: "PRIMER_INVALID",
+                    message: provided.length === 0
+                      ? "Missing `primer` argument. Every tool except get_started requires a `primer` token (from get_started's response). The current primer + token are attached to this error's details — read the primer and retry with the new token."
+                      : "Stale `primer` token — the primer has changed since you last called get_started. Read the primer text attached to this error's details and retry with the new token.",
+                    details: {
+                      primer: currentPrimer,
+                      token: currentToken,
+                    },
+                  },
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+          isError: true,
+        };
+      }
+      // Strip primer from args so downstream handlers don't need to
+      // know about the gate — they see the same schema as before.
+      delete args.primer;
+    }
+
     const instance = typeof args.instance === "string" ? args.instance : undefined;
     if (instance !== undefined && instance !== config.session.instanceLabel) {
       return {
