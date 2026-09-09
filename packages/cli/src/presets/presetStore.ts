@@ -25,6 +25,7 @@ import {
   writeFileSync,
   readdirSync,
   existsSync,
+  unlinkSync,
 } from "node:fs";
 import { join } from "node:path";
 import { homedir, platform } from "node:os";
@@ -50,6 +51,10 @@ export interface PresetSummary {
 export interface PresetStore {
   save(name: string, snapshot: StateSnapshot): void;
   load(name: string): PresetContent | null;
+  /** Remove a preset from disk. Returns true if a file was deleted,
+   *  false if no preset by that name existed. Throws on invalid name
+   *  (same rules as save). */
+  delete(name: string): boolean;
   list(): string[];
   /** Same as list() but with saved metadata — used by the presets:// MCP resource. */
   listWithMeta(): PresetSummary[];
@@ -92,6 +97,18 @@ export function createPresetStore(overrideDir?: string): PresetStore {
         throw new Error(`unsupported preset version: ${parsed.version} (expected 1)`);
       }
       return parsed;
+    },
+
+    delete(name) {
+      if (!NAME_RE.test(name)) {
+        throw new Error(
+          `invalid preset name '${name}' — alphanumeric, hyphens, underscores; max 64 chars`,
+        );
+      }
+      const path = join(dir, `${name}.json`);
+      if (!existsSync(path)) return false;
+      unlinkSync(path);
+      return true;
     },
 
     list() {

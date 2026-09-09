@@ -262,6 +262,7 @@ function renderPresets(presets: readonly { id: string; name?: string; notes?: st
   lines.push("- `get_preset(name)` — one preset's full stored content, WITHOUT loading it. Use this to answer 'what's in my practice preset?' before deciding whether to switch.");
   lines.push("- `switch_preset(name)` — load a preset; macros and session controls snap to stored values, input is left alone. Also repopulates `macros.intents` with the preset's stored values (so relative requests right after a load anchor on those, not on annotated defaults).");
   lines.push("- `save_preset(name)` — capture the current macros + session state under this name (overwrites if the name exists). Input source not captured.");
+  lines.push("- `delete_preset(name)` — remove a preset from disk. Errors with PRESET_NOT_FOUND if the name isn't known (details.available lists what is).");
   lines.push("");
   lines.push(
     "Presets persist on disk (~/Library/Application Support/synesthetica/presets on macOS; XDG_DATA_HOME/synesthetica/presets on Linux). They're per-user, not per-instance.",

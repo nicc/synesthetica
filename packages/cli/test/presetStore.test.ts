@@ -81,6 +81,29 @@ describe("preset store", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("delete removes a saved preset from disk and returns true", () => {
+    const store = createPresetStore(dir);
+    store.save("gone-soon", fakeSnapshot());
+    expect(store.list()).toContain("gone-soon");
+    expect(store.delete("gone-soon")).toBe(true);
+    expect(store.list()).not.toContain("gone-soon");
+    expect(store.load("gone-soon")).toBeNull();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("delete returns false when preset does not exist", () => {
+    const store = createPresetStore(dir);
+    expect(store.delete("never-existed")).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("delete throws on invalid preset name (same rules as save)", () => {
+    const store = createPresetStore(dir);
+    expect(() => store.delete("has space")).toThrow();
+    expect(() => store.delete("../escape")).toThrow();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("save overwrites existing preset", () => {
     const store = createPresetStore(dir);
     store.save("x", fakeSnapshot());

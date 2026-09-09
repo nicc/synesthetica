@@ -988,6 +988,17 @@ const tools: ToolAnnotation[] = [
     ],
   },
 
+  {
+    id: "delete_preset",
+    description:
+      "Delete a saved preset by name. Errors with PRESET_NOT_FOUND if no preset by that name exists. Doesn't touch `state.activePreset` — the label may still reference the deleted name, since it's informational (nothing continues to live from a preset once it's loaded).",
+    aliases: ["remove preset", "forget preset", "delete preset"],
+    notes: [
+      "Preset files live on disk (`$XDG_DATA_HOME/synesthetica/presets/<name>.json`). Deletion is immediate and unrecoverable — no trash / undo layer.",
+      "On PRESET_NOT_FOUND the error's `details.available` lists all preset names known to the store, in case the user typo'd the name.",
+    ],
+  },
+
   // ---- Session lifecycle ----
   //
   // The MCP server is always-on and cheap; the pipeline (web-app + WS

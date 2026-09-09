@@ -49,6 +49,40 @@ describe("save_preset", () => {
   });
 });
 
+describe("delete_preset", () => {
+  it("removes a preset and returns updated engine state", async () => {
+    const store = createPresetStore(dir);
+    const [, save, del] = buildPresetTools(store);
+    await save.handle({ name: "junk" }, new StubEngineHandle());
+    expect(store.list()).toContain("junk");
+    const result = await del.handle({ name: "junk" }, new StubEngineHandle());
+    expect(result.ok).toBe(true);
+    expect(store.list()).not.toContain("junk");
+    cleanup();
+  });
+
+  it("errors PRESET_NOT_FOUND on unknown name; details.available lists what exists", async () => {
+    const store = createPresetStore(dir);
+    const [, save, del] = buildPresetTools(store);
+    await save.handle({ name: "keep" }, new StubEngineHandle());
+    const result = await del.handle({ name: "missing" }, new StubEngineHandle());
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("PRESET_NOT_FOUND");
+      expect(result.error.details).toEqual({ available: ["keep"] });
+    }
+    cleanup();
+  });
+
+  it("errors SCHEMA_INVALID on empty name", async () => {
+    const [, , del] = buildPresetTools(createPresetStore(dir));
+    const result = await del.handle({ name: "" }, new StubEngineHandle());
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("SCHEMA_INVALID");
+    cleanup();
+  });
+});
+
 describe("switch_preset", () => {
   it("loads preset state into the engine", async () => {
     const store = createPresetStore(dir);

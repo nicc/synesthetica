@@ -109,5 +109,44 @@ export function buildPresetTools(store: PresetStore): ToolSpec[] {
         });
       },
     },
+
+    {
+      name: "delete_preset",
+      description:
+        "Delete a saved preset by name. If the preset is currently `state.activePreset`, that reference remains — activePreset is a runtime label, not a live handle. Errors with PRESET_NOT_FOUND if no preset by that name exists.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          instance: { type: "string" },
+        },
+        required: ["name"],
+        additionalProperties: false,
+      },
+      async handle(args, engine): Promise<ToolResult> {
+        const name = args.name;
+        if (typeof name !== "string" || name.length === 0) {
+          return err("SCHEMA_INVALID", "name must be a non-empty string");
+        }
+        try {
+          const removed = store.delete(name);
+          if (!removed) {
+            return err("PRESET_NOT_FOUND", `no preset named '${name}'`, {
+              available: store.list(),
+            });
+          }
+        } catch (e) {
+          return err(
+            "ENGINE_ERROR",
+            e instanceof Error ? e.message : String(e),
+          );
+        }
+        // Return the current engine state so the LLM has an updated
+        // snapshot in the same round-trip. activePreset intentionally
+        // untouched — the user may want to re-save under the same
+        // name, or the label is informational.
+        return safeCall(async () => engine.getStateSnapshot());
+      },
+    },
   ];
 }
