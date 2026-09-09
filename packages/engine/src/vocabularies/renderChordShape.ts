@@ -1,8 +1,8 @@
 /**
  * Chord Shape Rendering Utility
  *
- * Renders ChordShapeGeometry to SVG paths. This utility is called BY grammars,
- * not the vocabulary. Grammars can use this for standard rendering or implement
+ * Renders ChordShapeGeometry to SVG paths. This utility is called BY lenses,
+ * not the vocabulary. Lenses can use this for standard rendering or implement
  * their own rendering logic using the geometry data directly.
  *
  * Implements the hub-styled chord shape visualization from SPEC_010.
@@ -54,7 +54,7 @@ export interface ChordShapeRenderResult {
   fillPath: string;
   /** SVG paths for chromatic lines (if any) */
   linePaths: Array<{ path: string; color: ColorHSVA }>;
-  /** Per-element paths with colors (for grammars that want per-arm control) */
+  /** Per-element paths with colors (for lenses that want per-arm control) */
   elements: Array<{
     path: string;
     color: ColorHSVA;
@@ -395,7 +395,7 @@ export function renderChordShape(
 
 /**
  * Convert ColorHSVA to CSS color string.
- * Useful for grammars rendering to SVG or Canvas.
+ * Useful for lenses rendering to SVG or Canvas.
  */
 export function colorToCSS(color: ColorHSVA): string {
   const { h, s, v, a = 1 } = color;

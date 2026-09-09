@@ -273,7 +273,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
 
   // Rhythm annotation removed 2026-08-20 with the removal of BPM
   // inference — RhythmicAnalysis was populated only by inference paths
-  // that never had a stabilizer. RhythmGrammar computes its own
+  // that never had a stabilizer. RhythmLens computes its own
   // drift analysis inline from prescribed tempo, not from an
   // AnnotatedRhythm.
 

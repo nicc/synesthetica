@@ -2,7 +2,7 @@
  * ThreeJSRenderer Simulation Tests (Principle 8: Experiential Feedback Through Simulation)
  *
  * These tests exercise the ThreeJSRenderer with realistic frame sequences
- * that simulate actual grammar output. By simulating various visual scenarios,
+ * that simulate actual lens output. By simulating various visual scenarios,
  * we expose edge cases and lifecycle issues that unit tests would miss.
  *
  * Categories tested:

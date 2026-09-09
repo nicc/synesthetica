@@ -2,10 +2,10 @@
  * End-to-end pipeline golden test.
  *
  * Wires the full production pipeline (all stabilizers, real
- * vocabulary, all three grammars, IdentityCompositor) and drives it
+ * vocabulary, all three lenses, IdentityCompositor) and drives it
  * with a scripted MIDI sequence. Asserts on the shape of the
  * SceneFrame at each step — proves the entire chain from
- * RawInputFrame → SceneFrame produces the entities each grammar is
+ * RawInputFrame → SceneFrame produces the entities each lens is
  * expected to produce.
  *
  * Deliberately simple assertions (kinds + counts + spot checks on
@@ -23,9 +23,9 @@ import {
   ChordDetectionStabilizer,
   HarmonyStabilizer,
   MusicalVisualVocabulary,
-  RhythmGrammar,
-  HarmonyGrammar,
-  DynamicsGrammar,
+  RhythmLens,
+  HarmonyLens,
+  DynamicsLens,
   IdentityCompositor,
 } from "../src";
 import type { IRawSourceAdapter } from "@synesthetica/engine";
@@ -83,9 +83,9 @@ function buildProductionPipeline(): {
   pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
   pipeline.addStabilizerFactory(() => new HarmonyStabilizer({ partId }));
   pipeline.setVocabulary(new MusicalVisualVocabulary());
-  pipeline.addGrammar(new RhythmGrammar());
-  pipeline.addGrammar(new HarmonyGrammar());
-  pipeline.addGrammar(new DynamicsGrammar());
+  pipeline.addLens(new RhythmLens());
+  pipeline.addLens(new HarmonyLens());
+  pipeline.addLens(new DynamicsLens());
   pipeline.setCompositor(new IdentityCompositor());
   pipeline.reset();
   return { pipeline, adapter };
@@ -103,7 +103,7 @@ describe("end-to-end pipeline — RawInputFrame → SceneFrame", () => {
     const frame = pipeline.requestFrame(100);
     expect(frame).toBeDefined();
     expect(frame.t).toBe(100);
-    // NOW line is always rendered by RhythmGrammar even with no notes.
+    // NOW line is always rendered by RhythmLens even with no notes.
     const nowLine = frame.entities.find((e) => e.id.includes("now-line"));
     expect(nowLine).toBeDefined();
   });
@@ -118,8 +118,8 @@ describe("end-to-end pipeline — RawInputFrame → SceneFrame", () => {
     expect(noteStrips.length).toBeGreaterThan(0);
   });
 
-  it("C major triad played simultaneously drives all three grammars", () => {
-    // HarmonyGrammar only renders the clock (guide rings, slot ticks,
+  it("C major triad played simultaneously drives all three lenses", () => {
+    // HarmonyLens only renders the clock (guide rings, slot ticks,
     // chord numerals) when a key is prescribed — otherwise it stays
     // dormant. Set C major so the end-to-end wiring exercises the
     // full harmony path.
@@ -132,18 +132,18 @@ describe("end-to-end pipeline — RawInputFrame → SceneFrame", () => {
     pipeline.requestFrame(100);
     const frame = pipeline.requestFrame(200);
 
-    // Rhythm grammar: three note-strips (one per pitch).
+    // Rhythm lens: three note-strips (one per pitch).
     const noteStrips = frame.entities.filter(
       (e) => e.data?.type === "note-strip",
     );
     expect(noteStrips.length).toBeGreaterThanOrEqual(3);
 
-    // Harmony grammar: at MINIMUM the progression guide rings +
+    // Harmony lens: at MINIMUM the progression guide rings +
     // slot ticks are rendered unconditionally. Chord-specific
     // entities (chord-label, chord-shape, roman-numeral) may take
     // several frames to appear as ChordDetectionStabilizer's
     // hysteresis clears — assert on the scaffold that's guaranteed
-    // whenever HarmonyGrammar is running.
+    // whenever HarmonyLens is running.
     const harmonyEntities = frame.entities.filter(
       (e) =>
         e.data?.type === "progression-guide-ring" ||
@@ -154,7 +154,7 @@ describe("end-to-end pipeline — RawInputFrame → SceneFrame", () => {
     );
     expect(harmonyEntities.length).toBeGreaterThan(0);
 
-    // Dynamics grammar: at least a dynamics indicator per note.
+    // Dynamics lens: at least a dynamics indicator per note.
     const dynamics = frame.entities.filter(
       (e) => e.data?.type === "dynamics-indicator",
     );
@@ -189,14 +189,14 @@ describe("end-to-end pipeline — RawInputFrame → SceneFrame", () => {
     expect(Array.isArray(frame.diagnostics)).toBe(true);
   });
 
-  it("compositor merges entity streams from all grammars into one SceneFrame", () => {
+  it("compositor merges entity streams from all lenses into one SceneFrame", () => {
     adapter.noteOn(60, 100, 0);
     adapter.noteOn(64, 100, 0);
     adapter.noteOn(67, 100, 0);
     pipeline.requestFrame(50);
     const frame = pipeline.requestFrame(100);
 
-    // One SceneFrame contains entities from ALL grammars — kinds are
+    // One SceneFrame contains entities from ALL lenses — kinds are
     // heterogeneous but every entity carries a stable id.
     expect(frame.entities.length).toBeGreaterThan(0);
     for (const e of frame.entities) {

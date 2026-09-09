@@ -1,5 +1,5 @@
 /**
- * DynamicsGrammar — vertical dynamics bar visualization
+ * DynamicsLens — vertical dynamics bar visualization
  *
  * Renders a vertical bar on the left of the screen. Each note onset appears as
  * a horizontal indicator line at the corresponding velocity position (higher =
@@ -17,8 +17,8 @@
 
 import type {
   AnnotatedMusicalFrame,
-  IVisualGrammar,
-  GrammarContext,
+  IVisualLens,
+  LensContext,
   SceneFrame,
   Entity,
   ColorHSVA,
@@ -75,26 +75,26 @@ export const OUTLINE_THICKNESS = 0.001;
 const INDICATOR_COLOR: ColorHSVA = { h: 200, s: 0.5, v: 0.9, a: 1.0 };
 
 // ============================================================================
-// Grammar Implementation
+// Lens Implementation
 // ============================================================================
 
-/** Macro parameters for the grammar. Mirrors RhythmGrammar's pattern
- *  — grammar-local property names; the mapping from semantic macro
+/** Macro parameters for the lens. Mirrors RhythmLens's pattern
+ *  — lens-local property names; the mapping from semantic macro
  *  IDs (e.g. `dynamics:linger`) to these fields happens at the
  *  dispatcher layer. */
-interface DynamicsGrammarMacros {
+interface DynamicsLensMacros {
   /** Fade window for indicator lines in ms. */
   linger: number;
 }
 
-export class DynamicsGrammar implements IVisualGrammar {
-  readonly id = "dynamics-grammar";
+export class DynamicsLens implements IVisualLens {
+  readonly id = "dynamics-lens";
 
-  private macros: DynamicsGrammarMacros = {
+  private macros: DynamicsLensMacros = {
     linger: DEFAULT_FADE_MS,
   };
 
-  init(_ctx: GrammarContext): void {
+  init(_ctx: LensContext): void {
     // Stateless — reads events directly each frame
   }
 
@@ -103,15 +103,15 @@ export class DynamicsGrammar implements IVisualGrammar {
   }
 
   /** Set macros. Partial — only supplied fields update. */
-  setMacros(macros: Partial<DynamicsGrammarMacros>): void {
+  setMacros(macros: Partial<DynamicsLensMacros>): void {
     this.macros = { ...this.macros, ...macros };
   }
 
-  getMacros(): DynamicsGrammarMacros {
+  getMacros(): DynamicsLensMacros {
     return { ...this.macros };
   }
 
-  /** IVisualGrammar.readMacros — same shape as getMacros, widened. */
+  /** IVisualLens.readMacros — same shape as getMacros, widened. */
   readMacros(): Record<string, number | string> {
     return { ...this.macros };
   }

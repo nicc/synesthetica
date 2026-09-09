@@ -1,19 +1,19 @@
 /**
- * RhythmGrammar Tests
+ * RhythmLens Tests
  *
- * Tests the production rhythm grammar with various inputs and macro settings.
+ * Tests the production rhythm lens with various inputs and macro settings.
  * Run with GENERATE_SNAPSHOTS=1 to generate SVG files for visual review.
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { RhythmGrammar } from "../../src/grammars/RhythmGrammar";
+import { RhythmLens } from "../../src/lenses/RhythmLens";
 import {
   maybeWriteSnapshot,
   extractMetrics,
   formatMetrics,
 } from "../_harness/svg-snapshot";
 import type {
-  GrammarContext,
+  LensContext,
   AnnotatedNote,
   PitchClass,
 } from "@synesthetica/contracts";
@@ -23,7 +23,7 @@ import { createTestAnnotatedFrame } from "../_harness/frames";
 // Test Fixtures
 // ============================================================================
 
-const ctx: GrammarContext = {
+const ctx: LensContext = {
   canvasSize: { width: 800, height: 600 },
   rngSeed: 12345,
   part: "main",
@@ -93,18 +93,18 @@ function createTestFrame(
 // Tests
 // ============================================================================
 
-describe("RhythmGrammar", () => {
-  let grammar: RhythmGrammar;
+describe("RhythmLens", () => {
+  let lens: RhythmLens;
 
   beforeEach(() => {
-    grammar = new RhythmGrammar();
-    grammar.init(ctx);
+    lens = new RhythmLens();
+    lens.init(ctx);
   });
 
   describe("basic structure", () => {
     it("produces entities for empty frame", () => {
       const frame = createTestFrame(1000, { tempo: 120 });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       // Should have at least the NOW line
       expect(scene.entities.length).toBeGreaterThan(0);
@@ -114,7 +114,7 @@ describe("RhythmGrammar", () => {
 
     it("produces beat grid lines at Tier 2", () => {
       const frame = createTestFrame(2000, { tempo: 120 });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       const beatLines = scene.entities.filter((e) => e.data?.type === "beat-line");
       expect(beatLines.length).toBeGreaterThan(0);
@@ -128,7 +128,7 @@ describe("RhythmGrammar", () => {
         tempo: 120,
         meter: { beatsPerBar: 4, beatUnit: 4 },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       const barLines = scene.entities.filter((e) => e.data?.type === "bar-line");
       expect(barLines.length).toBeGreaterThan(0);
@@ -142,7 +142,7 @@ describe("RhythmGrammar", () => {
         // no tempo prescribed
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       const nowLine = scene.entities.find((e) => e.data?.type === "now-line");
       const beatLines = scene.entities.filter((e) => e.data?.type === "beat-line");
@@ -171,7 +171,7 @@ describe("RhythmGrammar", () => {
         ],
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const notes = scene.entities.filter((e) => e.data?.type === "note-strip");
 
       expect(notes.length).toBe(3);
@@ -200,7 +200,7 @@ describe("RhythmGrammar", () => {
         ],
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const notes = scene.entities.filter((e) => e.data?.type === "note-strip");
 
       const oldNote = notes.find((n) => n.data?.noteId === "old");
@@ -229,7 +229,7 @@ describe("RhythmGrammar", () => {
         notes: [{ id: "late", pc: 0, onset: 550 }],
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       const streaks = scene.entities.filter((e) => e.data?.type === "streak");
       expect(streaks.length).toBeGreaterThan(0);
@@ -244,7 +244,7 @@ describe("RhythmGrammar", () => {
         notes: [{ id: "tight", pc: 0, onset: 510 }],
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       const refLines = scene.entities.filter((e) => e.data?.type === "reference-line");
       expect(refLines.length).toBe(1);
@@ -257,7 +257,7 @@ describe("RhythmGrammar", () => {
         notes: [{ id: "tight", pc: 0, onset: 510 }],
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       const streaks = scene.entities.filter((e) => e.data?.type === "streak");
       expect(streaks.length).toBe(0);
@@ -271,7 +271,7 @@ describe("RhythmGrammar", () => {
         tempo: 120,
         notes: [{ id: "n1", pc: 0, onset: 550 }],
       });
-      const scene1 = grammar.update(frame1, null);
+      const scene1 = lens.update(frame1, null);
       const note1 = scene1.entities.find((e) => e.data?.type === "note-strip");
       expect(note1?.data?.driftMs as number).toBeCloseTo(50, 6);
 
@@ -281,7 +281,7 @@ describe("RhythmGrammar", () => {
         tempo: 100,
         notes: [{ id: "n1", pc: 0, onset: 550 }],
       });
-      const scene2 = grammar.update(frame2, null);
+      const scene2 = lens.update(frame2, null);
       const note2 = scene2.entities.find((e) => e.data?.type === "note-strip");
       expect(note2?.data?.driftMs as number).toBeCloseTo(50, 6);
     });
@@ -292,7 +292,7 @@ describe("RhythmGrammar", () => {
         tempo: 120,
         notes: [{ id: "n1", pc: 0, onset: 550 }],
       });
-      const scene1 = grammar.update(frame1, null);
+      const scene1 = lens.update(frame1, null);
       const streaks1 = scene1.entities.filter((e) => e.data?.type === "streak");
       expect(streaks1.length).toBeGreaterThan(0);
 
@@ -301,7 +301,7 @@ describe("RhythmGrammar", () => {
       const frame2 = createTestFrame(1100, {
         notes: [{ id: "n1", pc: 0, onset: 550 }],
       });
-      const scene2 = grammar.update(frame2, null);
+      const scene2 = lens.update(frame2, null);
       const streaks2 = scene2.entities.filter((e) => e.data?.type === "streak");
       expect(streaks2.length).toBeGreaterThan(0);
     });
@@ -312,14 +312,14 @@ describe("RhythmGrammar", () => {
         tempo: 120,
         notes: [{ id: "n1", pc: 0, onset: 550 }],
       });
-      grammar.update(frame1, null);
+      lens.update(frame1, null);
 
       // Frame 2: note gone (pruned by stabilizer)
       const frame2 = createTestFrame(2000, {
         tempo: 120,
         notes: [],
       });
-      grammar.update(frame2, null);
+      lens.update(frame2, null);
 
       // Frame 3: same note ID reappears with a different onset and so a
       // different drift. Should compute fresh from the grid, not return
@@ -328,7 +328,7 @@ describe("RhythmGrammar", () => {
         tempo: 120,
         notes: [{ id: "n1", pc: 0, onset: 2470 }], // 30ms early vs 2500
       });
-      const scene3 = grammar.update(frame3, null);
+      const scene3 = lens.update(frame3, null);
       const note3 = scene3.entities.find((e) => e.data?.type === "note-strip");
       expect(note3?.data?.driftMs as number).toBeCloseTo(-30, 6);
     });
@@ -341,7 +341,7 @@ describe("RhythmGrammar", () => {
         notes: [{ id: "n1", pc: 0, onset: 800 }],
       });
 
-      const scene1 = grammar.update(frame1, null);
+      const scene1 = lens.update(frame1, null);
 
       // Frame 2: same note, slightly later — entity IDs must be identical
       const frame2 = createTestFrame(1050, {
@@ -349,7 +349,7 @@ describe("RhythmGrammar", () => {
         notes: [{ id: "n1", pc: 0, onset: 800 }],
       });
 
-      const scene2 = grammar.update(frame2, null);
+      const scene2 = lens.update(frame2, null);
 
       // Every entity present in both frames should have the same ID
       // Filter to note-related entities (beat lines shift with time)
@@ -372,12 +372,12 @@ describe("RhythmGrammar", () => {
         notes: [{ id: "n1", pc: 0, onset: 800 }],
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       // Entity IDs should not end with incrementing counters
       for (const entity of scene.entities) {
-        // IDs should follow pattern "grammar-id:descriptive-base"
-        // not "grammar-id:descriptive-base:0", "grammar-id:descriptive-base:1", etc.
+        // IDs should follow pattern "lens-id:descriptive-base"
+        // not "lens-id:descriptive-base:0", "lens-id:descriptive-base:1", etc.
         const parts = entity.id.split(":");
         const lastPart = parts[parts.length - 1];
         expect(lastPart).not.toMatch(/^\d+$/);
@@ -387,7 +387,7 @@ describe("RhythmGrammar", () => {
 
   describe("horizon macro", () => {
     it("shows full history at max horizon", () => {
-      grammar.setMacros({ horizon: 1.0 });
+      lens.setMacros({ horizon: 1.0 });
 
       const frame = createTestFrame(8000, {
         tempo: 120,
@@ -397,7 +397,7 @@ describe("RhythmGrammar", () => {
         ],
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const notes = scene.entities.filter((e) => e.data?.type === "note-strip");
 
       // Both notes should be visible
@@ -405,7 +405,7 @@ describe("RhythmGrammar", () => {
     });
 
     it("shows limited history at min horizon", () => {
-      grammar.setMacros({ horizon: 0.0 });
+      lens.setMacros({ horizon: 0.0 });
 
       // At t=10000 with 8000ms scroll horizon, notes ending before t=2000
       // have scrolled off the top of the screen (endY < 0)
@@ -417,7 +417,7 @@ describe("RhythmGrammar", () => {
         ],
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const notes = scene.entities.filter((e) => e.data?.type === "note-strip");
 
       // Only recent note should be visible (old note scrolled off top of screen)
@@ -428,13 +428,13 @@ describe("RhythmGrammar", () => {
     it("reduces beat line visibility at min horizon", () => {
       const frame = createTestFrame(4000, { tempo: 120 });
 
-      grammar.setMacros({ horizon: 1.0 });
-      const sceneMax = grammar.update(frame, null);
+      lens.setMacros({ horizon: 1.0 });
+      const sceneMax = lens.update(frame, null);
       const beatLinesMax = sceneMax.entities.filter((e) => e.data?.type === "beat-line");
 
-      grammar.setMacros({ horizon: 0.0 });
-      grammar.init(ctx); // Reset state
-      const sceneMin = grammar.update(frame, null);
+      lens.setMacros({ horizon: 0.0 });
+      lens.init(ctx); // Reset state
+      const sceneMin = lens.update(frame, null);
       const beatLinesMin = sceneMin.entities.filter((e) => e.data?.type === "beat-line");
 
       // Should have fewer beat lines at min horizon
@@ -452,15 +452,15 @@ describe("RhythmGrammar", () => {
       });
 
       // At 16th subdivision (default), drift should be 0
-      grammar.setMacros({ quantiseResolution: "16th" });
-      const scene16 = grammar.update(frame, null);
+      lens.setMacros({ quantiseResolution: "16th" });
+      const scene16 = lens.update(frame, null);
       const note16 = scene16.entities.find((e) => e.data?.type === "note-strip");
       expect(note16?.data?.driftMs).toBe(0);
 
       // At quarter subdivision, drift should be 125ms
-      grammar.setMacros({ quantiseResolution: "quarter" });
-      grammar.init(ctx);
-      const sceneQ = grammar.update(frame, null);
+      lens.setMacros({ quantiseResolution: "quarter" });
+      lens.init(ctx);
+      const sceneQ = lens.update(frame, null);
       const noteQ = sceneQ.entities.find((e) => e.data?.type === "note-strip");
       expect(noteQ?.data?.driftMs).toBe(125);
     });
@@ -471,21 +471,21 @@ describe("RhythmGrammar", () => {
 // Visual Snapshot Tests
 // ============================================================================
 
-describe("RhythmGrammar snapshots", () => {
-  let grammar: RhythmGrammar;
+describe("RhythmLens snapshots", () => {
+  let lens: RhythmLens;
 
   beforeEach(() => {
-    grammar = new RhythmGrammar();
-    grammar.init(ctx);
+    lens = new RhythmLens();
+    lens.init(ctx);
     // Snapshot tests describe drift against the quarter-note grid. The
-    // grammar's default quantiseResolution is "16th"; override for these
+    // lens's default quantiseResolution is "16th"; override for these
     // fixtures so onset offsets of ~100ms are clearly off-beat.
-    grammar.setMacros({ quantiseResolution: "quarter" });
+    lens.setMacros({ quantiseResolution: "quarter" });
   });
 
   it("renders basic beat grid (Tier 2)", () => {
     const frame = createTestFrame(2000, { tempo: 120 });
-    const scene = grammar.update(frame, null);
+    const scene = lens.update(frame, null);
 
     const svg = maybeWriteSnapshot("rhythm-basic-grid", scene);
     const metrics = extractMetrics(scene);
@@ -507,7 +507,7 @@ describe("RhythmGrammar snapshots", () => {
       ],
     });
 
-    const scene = grammar.update(frame, null);
+    const scene = lens.update(frame, null);
     maybeWriteSnapshot("rhythm-pitch-spread", scene);
     const metrics = extractMetrics(scene);
 
@@ -530,7 +530,7 @@ describe("RhythmGrammar snapshots", () => {
       ],
     });
 
-    const scene = grammar.update(frame, null);
+    const scene = lens.update(frame, null);
     maybeWriteSnapshot("rhythm-drift-streaks", scene);
     const metrics = extractMetrics(scene);
 
@@ -554,7 +554,7 @@ describe("RhythmGrammar snapshots", () => {
       ],
     });
 
-    const scene = grammar.update(frame, null);
+    const scene = lens.update(frame, null);
     maybeWriteSnapshot("rhythm-tier3-bars", scene);
     const metrics = extractMetrics(scene);
 
@@ -564,7 +564,7 @@ describe("RhythmGrammar snapshots", () => {
   });
 
   it("renders at minimum horizon", () => {
-    grammar.setMacros({ horizon: 0.0 });
+    lens.setMacros({ horizon: 0.0 });
 
     const frame = createTestFrame(4000, {
       tempo: 120,
@@ -574,7 +574,7 @@ describe("RhythmGrammar snapshots", () => {
       ],
     });
 
-    const scene = grammar.update(frame, null);
+    const scene = lens.update(frame, null);
     maybeWriteSnapshot("rhythm-min-horizon", scene);
     const metrics = extractMetrics(scene);
 
@@ -601,7 +601,7 @@ describe("RhythmGrammar snapshots", () => {
       notes,
     });
 
-    const scene = grammar.update(frame, null);
+    const scene = lens.update(frame, null);
     maybeWriteSnapshot("rhythm-dense-notes", scene);
     const metrics = extractMetrics(scene);
 
@@ -622,7 +622,7 @@ describe("RhythmGrammar snapshots", () => {
       ],
     });
 
-    const scene = grammar.update(frame, null);
+    const scene = lens.update(frame, null);
     maybeWriteSnapshot("rhythm-sustained-notes", scene);
     const metrics = extractMetrics(scene);
 
@@ -646,7 +646,7 @@ describe("RhythmGrammar snapshots", () => {
       ],
     });
 
-    const scene = grammar.update(frame, null);
+    const scene = lens.update(frame, null);
     maybeWriteSnapshot("rhythm-streak-direction", scene);
     const metrics = extractMetrics(scene);
 
@@ -667,7 +667,7 @@ describe("RhythmGrammar snapshots", () => {
     // - Notes at t=1000-2000 are 3000-4000ms old
     // - At horizon=0.5, noteHistoryMs ≈ 4250ms, streakHistoryMs ≈ 5525ms
     // - Notes should be visible but fading; reference elements still visible
-    grammar.setMacros({ horizon: 0.5 });
+    lens.setMacros({ horizon: 0.5 });
 
     const frame = createTestFrame(5000, {
       tempo: 120,
@@ -678,7 +678,7 @@ describe("RhythmGrammar snapshots", () => {
       ],
     });
 
-    const scene = grammar.update(frame, null);
+    const scene = lens.update(frame, null);
     maybeWriteSnapshot("rhythm-reference-window", scene);
     const metrics = extractMetrics(scene);
 
@@ -692,7 +692,7 @@ describe("RhythmGrammar snapshots", () => {
   });
 
   it("renders at middle horizon (0.5)", () => {
-    grammar.setMacros({ horizon: 0.5 });
+    lens.setMacros({ horizon: 0.5 });
 
     const frame = createTestFrame(4000, {
       tempo: 120,
@@ -705,7 +705,7 @@ describe("RhythmGrammar snapshots", () => {
       ],
     });
 
-    const scene = grammar.update(frame, null);
+    const scene = lens.update(frame, null);
     maybeWriteSnapshot("rhythm-mid-horizon", scene);
     const metrics = extractMetrics(scene);
 
@@ -723,7 +723,7 @@ describe("RhythmGrammar snapshots", () => {
     // - Notes >8000ms old are OUTSIDE note window (no bars)
     // - But INSIDE reference window (<10400ms) so reference lines visible
     // - Recent notes show both bars AND reference lines for comparison
-    grammar.setMacros({ horizon: 1.0 });
+    lens.setMacros({ horizon: 1.0 });
 
     const frame = createTestFrame(10000, {
       tempo: 120,
@@ -740,7 +740,7 @@ describe("RhythmGrammar snapshots", () => {
       ],
     });
 
-    const scene = grammar.update(frame, null);
+    const scene = lens.update(frame, null);
     maybeWriteSnapshot("rhythm-linger-effect", scene);
     const metrics = extractMetrics(scene);
 

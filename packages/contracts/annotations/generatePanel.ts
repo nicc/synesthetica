@@ -22,7 +22,7 @@
  *   - Tools (productionManifest.tools). Tools are MCP VERBS, not
  *     adjustable controls; they flow to LLM clients via tools/list
  *     only.
- *   - Concepts, grammars, presets — reference material, not controls.
+ *   - Concepts, lenses, presets — reference material, not controls.
  * The `ManifestForPanel` shape below reflects this: it only accepts
  * macros + sessionControls, so a caller can never accidentally hand
  * the generator something that would render tools as widgets.

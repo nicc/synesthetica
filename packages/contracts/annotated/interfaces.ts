@@ -10,6 +10,6 @@
 // Re-export the canonical interfaces
 export type {
   IVisualRuleset,
-  IVisualGrammar,
-  GrammarContext,
+  IVisualLens,
+  LensContext,
 } from "../pipeline/interfaces";

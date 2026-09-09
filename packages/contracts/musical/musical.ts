@@ -87,7 +87,7 @@ export type ChordId = string;
  * reading (chord rooted on the bass note).
  *
  * Every voicing admits multiple valid readings. See SPEC_010 for the mode
- * toggle that selects which interpretation grammars render.
+ * toggle that selects which interpretation lenses render.
  */
 export interface ChordInterpretation {
   /** Harmonic root of this reading */
@@ -112,7 +112,7 @@ export interface ChordInterpretation {
  *
  * Carries BOTH a harmonic and a bass-led interpretation of the voicing.
  * When bass equals the harmonic root, the two interpretations converge
- * (populated with the same values). Grammars pick which to render via a
+ * (populated with the same values). Lenses pick which to render via a
  * runtime mode setting.
  */
 export interface MusicalChord {
@@ -155,7 +155,7 @@ export interface TimeSignature {
 //
 // Historic types RhythmicAnalysis / OnsetDrift / SubdivisionDrift and
 // their EMPTY_RHYTHMIC_ANALYSIS default removed; no consumer remained
-// after RhythmGrammar's tempo inference was removed. RFC 007 (beat
+// after RhythmLens's tempo inference was removed. RFC 007 (beat
 // detection redesign) and RFC 008 (per-onset drift analysis) are
 // superseded by this decision.
 
@@ -280,7 +280,7 @@ export interface PrescribedKey {
 
 /**
  * Chord interpretation mode. Selects which reading of a voicing the
- * grammar renders.
+ * lens renders.
  * - "harmonic": simplest chord that explains the notes, bass-agnostic
  *   (EbM/G renders as Eb major, first inversion)
  * - "bass-led": force root = bass; voicing read from the bass up
@@ -324,7 +324,7 @@ export type FunctionalRelationType =
 
 /**
  * A weighted directed edge from a source chord to a target slot on
- * the harmony clock (SPEC 011). The grammar renders this as a single
+ * the progression clock (SPEC 011). The lens renders this as a single
  * connector strip at the target slot, carrying the full source ↔
  * target hue gradient. The target chord may or may not have been
  * played — resolution is perceptual, not tracked as state.
@@ -383,7 +383,7 @@ export interface HarmonicContext {
   /**
    * Active functional edges (SPEC 011). Each edge originates from a
    * borrowed chord in the progression and points to a slot on the
-   * harmony clock. Edges share their source chord's lifecycle —
+   * progression clock. Edges share their source chord's lifecycle —
    * present while the source is in the progression window, removed
    * when it falls out.
    */
@@ -430,14 +430,14 @@ export interface MusicalFrame {
   /**
    * User-prescribed tempo in BPM.
    * Set via control op. Null means no explicit tempo.
-   * When null, grammars should not show drift or beat-grid visuals.
+   * When null, lenses should not show drift or beat-grid visuals.
    */
   prescribedTempo: number | null;
 
   /**
    * User-prescribed time signature.
    * Set via control op. Null means no explicit meter.
-   * When null, grammars should not show bar-boundary visuals.
+   * When null, lenses should not show bar-boundary visuals.
    */
   prescribedMeter: TimeSignature | null;
 
@@ -449,7 +449,7 @@ export interface MusicalFrame {
   prescribedKey: PrescribedKey | null;
 
   /**
-   * Selected chord interpretation mode. Grammars that render chords use
+   * Selected chord interpretation mode. Lenses that render chords use
    * this to pick between MusicalChord.harmonic and MusicalChord.bassLed.
    * Defaults to "harmonic" — the simplest chord that explains the voicing.
    */

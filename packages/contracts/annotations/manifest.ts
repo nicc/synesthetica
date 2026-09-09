@@ -1,6 +1,6 @@
 /**
  * Production annotation manifest — the deployed macro / session /
- * concept / grammar annotations shipped to LLMs (via MCP resources)
+ * concept / lens annotations shipped to LLMs (via MCP resources)
  * and rendered as UI controls (via the panel generator).
  *
  * Single source of truth: MCP tool advertisement, UI widget generation,
@@ -13,7 +13,7 @@ import type {
   MacroAnnotation,
   SessionControlAnnotation,
   SystemConceptAnnotation,
-  GrammarAnnotation,
+  LensAnnotation,
   PresetAnnotation,
   ToolAnnotation,
   ResourceAnnotation,
@@ -50,7 +50,7 @@ const macros: MacroAnnotation[] = [
       "Seconds of chord memory. The value is always seconds regardless of prescribed tempo — do the bars↔seconds arithmetic yourself if the user asks in bars.",
       "Range comfortably under the stabilizer's 60-second progression window, so values here never silently clip.",
     ],
-    consumers: [{ kind: "grammar", id: "harmony-grammar", macroKey: "linger" }],
+    consumers: [{ kind: "lens", id: "harmony-lens", macroKey: "linger" }],
   },
 
   {
@@ -132,7 +132,7 @@ const macros: MacroAnnotation[] = [
     aliases: ["velocity fade", "dynamics persistence"],
     type: "continuous",
     range: [500, 8000],
-    default: 2000, // matches DynamicsGrammar.DEFAULT_FADE_MS
+    default: 2000, // matches DynamicsLens.DEFAULT_FADE_MS
     affects: ["dynamics"],
     directionality: {
       low: {
@@ -145,10 +145,10 @@ const macros: MacroAnnotation[] = [
       },
     },
     notes: [
-      "Determines how long each note's velocity indicator lingers on the dynamics grammar.",
+      "Determines how long each note's velocity indicator lingers on the dynamics lens.",
       "Unit is ms.",
     ],
-    consumers: [{ kind: "grammar", id: "dynamics-grammar", macroKey: "linger" }],
+    consumers: [{ kind: "lens", id: "dynamics-lens", macroKey: "linger" }],
   },
 
   {
@@ -170,11 +170,11 @@ const macros: MacroAnnotation[] = [
       },
     },
     notes: [
-      "Determines how much note history is shown on the vertically-scrolling rhythm grammar.",
-      "Can be set independently of the compound time-horizon macro (which fans out to this leaf plus harmony:linger and dynamics:linger). Use rhythm:horizon to isolate rhythm's history without touching the other two grammars.",
+      "Determines how much note history is shown on the vertically-scrolling rhythm lens.",
+      "Can be set independently of the compound time-horizon macro (which fans out to this leaf plus harmony:linger and dynamics:linger). Use rhythm:horizon to isolate rhythm's history without touching the other two lenses.",
       "Unit is decimal fraction of available space.",
     ],
-    consumers: [{ kind: "grammar", id: "rhythm-grammar", macroKey: "horizon" }],
+    consumers: [{ kind: "lens", id: "rhythm-lens", macroKey: "horizon" }],
   },
 
   {
@@ -183,7 +183,7 @@ const macros: MacroAnnotation[] = [
     aliases: ["strictness threshold", "grading tolerance", "drift threshold"],
     type: "continuous",
     range: [10, 100],
-    default: 30, // matches RhythmGrammar TIGHT_TOLERANCE_DEFAULT_MS
+    default: 30, // matches RhythmLens TIGHT_TOLERANCE_DEFAULT_MS
     affects: ["rhythm", "articulation"],
     directionality: {
       low: {
@@ -199,7 +199,7 @@ const macros: MacroAnnotation[] = [
       "Drift threshold in milliseconds. Notes whose onset falls within this window of the nearest beat subdivision render as 'tight' and suppress the streak-line motion cue.",
       "Unit is ms.",
     ],
-    consumers: [{ kind: "grammar", id: "rhythm-grammar", macroKey: "tightnessTolerance" }],
+    consumers: [{ kind: "lens", id: "rhythm-lens", macroKey: "tightnessTolerance" }],
   },
 
   {
@@ -208,7 +208,7 @@ const macros: MacroAnnotation[] = [
     aliases: ["drift-marker trail", "reference trail"],
     type: "continuous",
     range: [1.0, 3.0],
-    default: 1.3, // matches RhythmGrammar DEFAULT_REFERENCE_LINGER_MULTIPLIER
+    default: 1.3, // matches RhythmLens DEFAULT_REFERENCE_LINGER_MULTIPLIER
     affects: ["rhythm"],
     directionality: {
       low: {
@@ -224,7 +224,7 @@ const macros: MacroAnnotation[] = [
       "Multiplier applied to the note-history window for reference lines and streak markers.",
       "Unit is dimensionless multiplier (1.0 = fades with the note; 2.0 = twice as long).",
     ],
-    consumers: [{ kind: "grammar", id: "rhythm-grammar", macroKey: "referenceLinger" }],
+    consumers: [{ kind: "lens", id: "rhythm-lens", macroKey: "referenceLinger" }],
   },
 
   {
@@ -249,7 +249,7 @@ const macros: MacroAnnotation[] = [
       "Single dial that scales the beat-pulse decay, opacity boost, and value boost together. At 0.5 the pulse matches the historic baseline.",
       "Skipped in free-time mode (requires a prescribed tempo to have a beat to pulse on).",
     ],
-    consumers: [{ kind: "grammar", id: "rhythm-grammar", macroKey: "pulseIntensity" }],
+    consumers: [{ kind: "lens", id: "rhythm-lens", macroKey: "pulseIntensity" }],
   },
 
   {
@@ -290,14 +290,14 @@ const macros: MacroAnnotation[] = [
       { value: "16th", label: "sixteenth notes (default)" },
       { value: "32nd", label: "thirty-second notes (finest)" },
     ],
-    default: "16th", // matches RhythmGrammar.macros.quantiseResolution
+    default: "16th", // matches RhythmLens.macros.quantiseResolution
     affects: ["rhythm"],
     notes: [
       "Determines the reference subdivision for timing drift analysis. Drift is measured as the signed distance from the note's onset to the nearest subdivision (not the nearest beat) — `beatMs / 4` for the default `16th`, `beatMs / 2` for `8th`, `beatMs` for `quarter`, `beatMs / 8` for `32nd`.",
       "Coarser resolutions are more likely to show inaccurate timing due to fewer matching grid divisions, which counter-intuitively feels stricter but is actually an easier timing intent; finer resolutions will look more forgiving by matching to more grid divisions but is actually grading to a more difficult intent.",
       "Read `state.macros.effective[\"rhythm:quantise-resolution\"]` before reporting drift verdicts to the user and name the actual subdivision in your answer — its value directly controls what the on-screen streak lines are measuring against.",
     ],
-    consumers: [{ kind: "grammar", id: "rhythm-grammar", macroKey: "quantiseResolution" }],
+    consumers: [{ kind: "lens", id: "rhythm-lens", macroKey: "quantiseResolution" }],
   },
 
   // -----------------------------------------------------------------
@@ -314,16 +314,16 @@ const macros: MacroAnnotation[] = [
     affects: ["rhythm", "harmony", "dynamics", "phrasing"],
     directionality: {
       low: {
-        description: "tight NOW across all three grammars; little history, no lookahead",
+        description: "tight NOW across all three lenses; little history, no lookahead",
         tendsTo: ["emphasise the current moment", "reduce visual load"],
       },
       high: {
-        description: "generous history and future context on all three grammars",
+        description: "generous history and future context on all three lenses",
         tendsTo: ["emphasise pattern over moment", "increase visual density"],
       },
     },
     notes: [
-      "Cross-grammar shortcut. When you want to isolate one grammar's history, use the per-grammar macros (rhythm:horizon, harmony:linger, dynamics:linger) instead.",
+      "Cross-lens shortcut. When you want to isolate one lens's history, use the per-lens macros (rhythm:horizon, harmony:linger, dynamics:linger) instead.",
     ],
   },
 
@@ -546,11 +546,11 @@ const sessionControls: SessionControlAnnotation[] = [
 // ============================================================================
 
 const concepts: SystemConceptAnnotation[] = [
-  // ------- Rhythm grammar concepts -------
+  // ------- Rhythm lens concepts -------
   {
     term: "note-strip",
     definition:
-      "The vertical coloured bar rendered per played note in the rhythm grammar. Horizontal position encodes pitch (chromatic left-to-right, octave agnostic); vertical position encodes time (top = onset, bottom = release); colour encodes pitch class (via the pitch-hue mapping).",
+      "The vertical coloured bar rendered per played note in the rhythm lens. Horizontal position encodes pitch (chromatic left-to-right, octave agnostic); vertical position encodes time (top = onset, bottom = release); colour encodes pitch class (via the pitch-hue mapping).",
     related: ["now-line", "reference-line", "drift", "pitch-hue-mapping"],
   },
 
@@ -593,26 +593,26 @@ const concepts: SystemConceptAnnotation[] = [
     related: ["now-line", "rhythm-emphasis"],
   },
 
-  // ------- Harmony grammar concepts -------
+  // ------- Harmony lens concepts -------
   {
-    term: "harmony-clock",
+    term: "progression-clock",
     definition:
-      "The circular chord progression layout in the harmony grammar. Chord numerals sit around a clock face by pitch-class angle (I at 0). When a key is prescribed, an inner ring shows diatonic degrees (I–vii) and an outer ring shows borrowed chords; connector arcs indicate modal-interchange relationships between them.",
+      "The circular chord progression layout in the bottom cell of the harmony lens (also called the harmony clock). Chord numerals sit around a clock face by pitch-class angle (I at 0). When a key is prescribed, an inner ring shows diatonic degrees (I–vii) and an outer ring shows borrowed chords; connector arcs indicate modal-interchange relationships between them.",
     related: ["guide-ring", "connector-strip", "borrowed-chord", "modal-interchange"],
   },
 
   {
     term: "guide-ring",
     definition:
-      "One of three faint circles on the harmony clock (inner / middle / outer). The middle ring anchors the diatonic numerals; the outer ring anchors borrowed numerals. Provides structural bearings for the eye.",
-    related: ["harmony-clock"],
+      "One of three faint circles on the progression clock (inner / middle / outer). The middle ring anchors the diatonic numerals; the outer ring anchors borrowed numerals. Provides structural bearings for the eye.",
+    related: ["progression-clock"],
   },
 
   {
     term: "borrowed-chord",
     definition:
-      "A chord drawn from outside the current diatonic key. E.g. in C major, an A♭ major chord (♭VI) is borrowed from C minor. Borrowed chords render on the outer ring of the harmony clock rather than the inner ring, and often carry connector arcs to the diatonic destinations they imply.",
-    related: ["modal-interchange", "harmony-clock", "guide-ring"],
+      "A chord drawn from outside the current diatonic key. E.g. in C major, an A♭ major chord (♭VI) is borrowed from C minor. Borrowed chords render on the outer ring of the progression clock rather than the inner ring, and often carry connector arcs to the diatonic destinations they imply.",
+    related: ["modal-interchange", "progression-clock", "guide-ring"],
     examples: [
       "♭VI in C major is A♭ major (borrowed from the parallel minor).",
       "♭VII in C major is B♭ major (a common subdominant borrowing).",
@@ -622,8 +622,8 @@ const concepts: SystemConceptAnnotation[] = [
   {
     term: "modal-interchange",
     definition:
-      "A functional-harmony relationship where a borrowed chord implies resolution toward one or more diatonic chords. Rendered as a directional connector arc + terminating strip on the harmony clock, arcing from the borrowed chord's position toward the target degree's position.",
-    related: ["borrowed-chord", "connector-strip", "connector-arc", "harmony-clock"],
+      "A functional-harmony relationship where a borrowed chord implies resolution toward one or more diatonic chords. Rendered as a directional connector arc + terminating strip on the progression clock, arcing from the borrowed chord's position toward the target degree's position.",
+    related: ["borrowed-chord", "connector-strip", "connector-arc", "progression-clock"],
     examples: [
       "♭VI often pulls toward ii or IV (subdominant borrowing).",
       "♭VII typically pulls toward IV.",
@@ -633,7 +633,7 @@ const concepts: SystemConceptAnnotation[] = [
   {
     term: "connector-arc",
     definition:
-      "The animated arc that draws from a borrowed chord's position on the harmony clock toward its implied resolution target. Coloured by the source chord's hue. Terminates in a connector-strip at the target. Only borrowed chords with a modal interchange relationship to a diatonic chord spawn connector arcs and connector strips.",
+      "The animated arc that draws from a borrowed chord's position on the progression clock toward its implied resolution target. Coloured by the source chord's hue. Terminates in a connector-strip at the target. Only borrowed chords with a modal interchange relationship to a diatonic chord spawn connector arcs and connector strips.",
     related: ["modal-interchange", "connector-strip"],
   },
 
@@ -647,8 +647,8 @@ const concepts: SystemConceptAnnotation[] = [
   {
     term: "chord-quality-glyph",
     definition:
-      "The radial visual language rendered in the upper section of the harmony grammar, illustrating the QUALITY (nature) of the currently-detected chord — major, minor, sus, dominant seventh, etc. Composed of a central hub and outward spokes: the hub encodes the overall chord quality; each spoke represents one note of the chord (by its degree relative to the root, not its absolute pitch), oriented at a fixed angle around the hub with the root at 0°. Independent of the functional-harmony clock below it — the glyph describes what the chord IS; the clock describes what the chord DOES in the key.",
-    related: ["glyph-spoke", "glyph-hub", "harmony-clock"],
+      "The radial visual language rendered in the upper section of the harmony lens, illustrating the QUALITY (nature) of the currently-detected chord — major, minor, sus, dominant seventh, etc. Composed of a central hub and outward spokes: the hub encodes the overall chord quality; each spoke represents one note of the chord (by its degree relative to the root, not its absolute pitch), oriented at a fixed angle around the hub with the root at 0°. Independent of the progression clock below it — the glyph describes what the chord IS; the clock describes what the chord DOES in the key.",
+    related: ["glyph-spoke", "glyph-hub", "progression-clock"],
     examples: [
       "A C major triad shows a hub coded 'major' and three long spokes at the root, third, and fifth positions.",
       "A Cmaj7 shows the same triad shape plus one medium-length spoke at the seventh.",
@@ -670,11 +670,11 @@ const concepts: SystemConceptAnnotation[] = [
     related: ["chord-quality-glyph", "glyph-spoke"],
   },
 
-  // ------- Dynamics grammar concepts -------
+  // ------- Dynamics lens concepts -------
   {
     term: "dynamics-indicator",
     definition:
-      "A short horizontal mark in the dynamics grammar (vertical bar on the left of the view) rendered per note onset. Its vertical position encodes velocity — higher up = louder. Fades out over the dynamics:linger window.",
+      "A short horizontal mark in the dynamics lens (vertical bar on the left of the view) rendered per note onset. Its vertical position encodes velocity — higher up = louder. Fades out over the dynamics:linger window.",
     related: ["dynamics-linger"],
   },
 
@@ -682,7 +682,7 @@ const concepts: SystemConceptAnnotation[] = [
   {
     term: "pitch-hue-mapping",
     definition:
-      "The scheme by which each of the twelve pitch classes maps to a hue on the colour wheel. Anchored on pitch C (pitch class 0); the anchor hue defaults to red. Other pitches are derived by rotating around the wheel (+30° per semitone, clockwise by default). Consistent across all grammars.",
+      "The scheme by which each of the twelve pitch classes maps to a hue on the colour wheel. Anchored on pitch C (pitch class 0); the anchor hue defaults to red. Other pitches are derived by rotating around the wheel (+30° per semitone, clockwise by default). Consistent across all lenses.",
     related: ["colour-anchor"],
   },
 
@@ -696,21 +696,21 @@ const concepts: SystemConceptAnnotation[] = [
   {
     term: "prescribed-context",
     definition:
-      "The user-set musical frame the analyser reads within: key (tonic + mode), tempo, meter, chord-interpretation mode. These are never inferred — the user sets them via session:* controls. Without a prescribed key, functional harmony analysis is disabled; without a tempo, the rhythm grammar runs in free-time (no beat grid, no drift analysis).",
+      "The user-set musical frame the analyser reads within: key (tonic + mode), tempo, meter, chord-interpretation mode. These are never inferred — the user sets them via session:* controls. Without a prescribed key, functional harmony analysis is disabled; without a tempo, the rhythm lens runs in free-time (no beat grid, no drift analysis).",
     related: ["free-time", "key-aware"],
   },
 
   {
     term: "key-aware",
     definition:
-      "When a key is prescribed, the harmony grammar enables functional analysis: chord degrees (I, ii, ♭VI, etc.), borrowed classification, and modal-interchange relationships. Without a key, chords are shown by name only.",
-    related: ["prescribed-context", "harmony-clock", "borrowed-chord"],
+      "When a key is prescribed, the progression clock (bottom cell of the harmony lens) enables functional analysis: chord degrees (I, ii, ♭VI, etc.), borrowed classification, and modal-interchange relationships. Without a key, the progression clock shows chord names only. The chord glyph (top cell) is key-independent.",
+    related: ["prescribed-context", "progression-clock", "borrowed-chord"],
   },
 
   {
     term: "free-time",
     definition:
-      "The rhythm grammar's mode when no tempo is prescribed. Notes scroll through the now-line with no beat grid, no reference lines, no drift analysis. Grid + drift features re-enable when the user prescribes a tempo.",
+      "The rhythm lens's mode when no tempo is prescribed. Notes scroll through the now-line with no beat grid, no reference lines, no drift analysis. Grid + drift features re-enable when the user prescribes a tempo.",
     related: ["prescribed-context", "now-line", "drift"],
   },
   {
@@ -722,13 +722,13 @@ const concepts: SystemConceptAnnotation[] = [
 ];
 
 // ============================================================================
-// Grammars
+// Lenses
 // ============================================================================
 
-const grammars: GrammarAnnotation[] = [
+const lenses: LensAnnotation[] = [
   {
-    id: "rhythm-grammar",
-    name: "Rhythm grammar",
+    id: "rhythm-lens",
+    name: "Rhythm lens",
     aliases: ["rhythm view", "timeline"],
     illustrates: ["rhythm", "articulation", "phrasing"],
     traits: ["directional", "reactive", "high-contrast"],
@@ -774,9 +774,9 @@ const grammars: GrammarAnnotation[] = [
   },
 
   {
-    id: "harmony-grammar",
-    name: "Harmony grammar",
-    aliases: ["harmony clock", "chord view"],
+    id: "harmony-lens",
+    name: "Harmony lens",
+    aliases: ["chord view"],
     illustrates: ["harmony", "phrasing"],
     traits: ["layered", "persistent", "stable"],
     notes: [
@@ -813,8 +813,8 @@ const grammars: GrammarAnnotation[] = [
   },
 
   {
-    id: "dynamics-grammar",
-    name: "Dynamics grammar",
+    id: "dynamics-lens",
+    name: "Dynamics lens",
     aliases: ["dynamics bar", "velocity view"],
     illustrates: ["dynamics", "articulation"],
     traits: ["transient", "reactive", "minimal"],
@@ -854,11 +854,11 @@ const tools: ToolAnnotation[] = [
   {
     id: "set_key",
     description:
-      "Set the prescribed key (tonic + mode) so the harmony grammar can perform functional analysis (I, ii, ♭VI degrees; borrowed-chord classification; modal-interchange arcs). Both null to clear.",
+      "Set the prescribed key (tonic + mode) so the progression clock (bottom cell of the harmony lens) can perform functional analysis (I, ii, ♭VI degrees; borrowed-chord classification; modal-interchange arcs). Both null to clear.",
     aliases: ["set key", "in the key of", "we're in", "change key"],
     notes: [
       "root: pitch class 0..11 (0=C, 1=C♯/D♭, …, 11=B). mode: 'ionian' | 'dorian' | 'phrygian' | 'lydian' | 'mixolydian' | 'aeolian' | 'locrian'. Set both together as a pair.",
-      "Clearing (both null) disables numerals and borrowed classification — the harmony grammar shows chord names only.",
+      "Clearing (both null) disables numerals and borrowed classification — the progression clock shows chord names only. The chord glyph (top cell) is unaffected.",
     ],
     examples: [
       "set_key(root: 5, mode: 'aeolian') — F minor.",
@@ -869,7 +869,7 @@ const tools: ToolAnnotation[] = [
   {
     id: "set_tempo",
     description:
-      "Set the prescribed tempo in BPM. Enables the rhythm grammar's beat grid, drift analysis, and beat pulse. Null clears (rhythm falls back to free-time; grid features disable).",
+      "Set the prescribed tempo in BPM. Enables the rhythm lens's beat grid, drift analysis, and beat pulse. Null clears (rhythm falls back to free-time; grid features disable).",
     aliases: ["set bpm", "set tempo", "change tempo", "we're at"],
     notes: [
       "Range 30–240 BPM. The system never infers tempo from onset patterns — it must be set explicitly.",
@@ -878,7 +878,7 @@ const tools: ToolAnnotation[] = [
     ],
     examples: [
       "set_tempo(bpm: 120) — standard mid-tempo.",
-      "set_tempo(bpm: null) — clear; rhythm grammar goes free-time.",
+      "set_tempo(bpm: null) — clear; rhythm lens goes free-time.",
     ],
   },
 
@@ -939,7 +939,7 @@ const tools: ToolAnnotation[] = [
     notes: [
       "Compound macros fan out to leaf targets via a linear default curve; per-target inversion is applied when the compound's semantic runs opposite the leaf's natural range. See the compound's targets field in the manifest.",
       "`get_state.macros.intents` reflects the last value asked for per macro — populated by any of `set_macro`, `set_hue_for_pitch`, `switch_preset`, or a panel widget edit. Compound macros are keyed by their compound id. `get_state.macros.effective` is what pipeline consumers are actually running with. Read `intents` to see what has been asked for (by anyone — you or the user via the panel); read `effective` to see what the pipeline is doing right now.",
-      "**Compound-vs-leaf routing**: prefer the compound when the user's frame is cross-grammar ('everything more expansive' → time-horizon; 'harder rhythm practice' → rhythm:difficulty). Prefer the leaf when the request targets one grammar ('just the chord fade' → harmony:linger; 'only the rhythm horizon' → rhythm:horizon). Compounds do a linear fan-out — set a leaf directly when you want a specific value on one target without disturbing siblings.",
+      "**Compound-vs-leaf routing**: prefer the compound when the user's frame is cross-lens ('everything more expansive' → time-horizon; 'harder rhythm practice' → rhythm:difficulty). Prefer the leaf when the request targets one lens ('just the chord fade' → harmony:linger; 'only the rhythm horizon' → rhythm:horizon). Compounds do a linear fan-out — set a leaf directly when you want a specific value on one target without disturbing siblings.",
     ],
     examples: [
       "set_macro(name: 'harmony:linger', value: 6) — chord symbols linger visibly on the clock.",
@@ -1113,7 +1113,7 @@ const tools: ToolAnnotation[] = [
 //
 // Editorial voice for MCP resources whose content isn't already
 // covered by a per-item annotation. Each macro / session control /
-// concept / grammar / preset already carries its OWN annotation and
+// concept / lens / preset already carries its OWN annotation and
 // becomes an annotations://* resource — those don't need entries
 // here. This section is for the state + preset-index + annotations-
 // bundle URIs.
@@ -1204,9 +1204,9 @@ const resources: ResourceAnnotation[] = [
     uri: "annotations://manifest",
     name: "Annotation manifest (bundled)",
     description:
-      "The full annotation manifest as one JSON document — macros, session controls, concepts, grammars, presets, tools, resources. Convenience for clients that prefer one fetch over per-URI browsing.",
+      "The full annotation manifest as one JSON document — macros, session controls, concepts, lenses, presets, tools, resources. Convenience for clients that prefer one fetch over per-URI browsing.",
     notes: [
-      "Every individual macro / session control / concept / grammar / preset also has its own `annotations://<category>/<id>` resource for finer-grained reads.",
+      "Every individual macro / session control / concept / lens / preset also has its own `annotations://<category>/<id>` resource for finer-grained reads.",
       "The `get_started` tool response already embeds this content, so the LLM rarely needs the bundle — reserve it for user-triggered attach or clients that proxy resource reads natively.",
     ],
     subscribable: false,
@@ -1271,7 +1271,7 @@ export const productionManifest = {
   sessionControls,
   derivedState,
   concepts,
-  grammars,
+  lenses,
   presets,
   tools,
   resources,

@@ -745,10 +745,10 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
   }
 
   /**
-   * Computed but currently unconsumed by any production grammar —
+   * Computed but currently unconsumed by any production lens —
    * the visual renderer has an `updateTensionBar` handler waiting
    * for a producer. Both sides get wired together in
-   * synesthetica-xc0 (harmony grammar extension: tension from
+   * synesthetica-xc0 (harmony lens extension: tension from
    * functional harmony).
    *
    * How tension is derived may change with that work — the current

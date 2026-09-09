@@ -13,8 +13,8 @@ export interface Preset {
   id: string;
   name: string;
 
-  grammars: Array<{
-    grammarId: string;
+  lenses: Array<{
+    lensId: string;
     enabled: boolean;
     params?: Record<string, unknown>;
     priority?: number;
@@ -50,7 +50,7 @@ export interface PresetMeta {
 export interface ValidationResult {
   valid: boolean;
   errors?: string[];
-  warnings?: string[];  // e.g. "grammar 'foo' not found"
+  warnings?: string[];  // e.g. "lens 'foo' not found"
 }
 
 /**

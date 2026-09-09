@@ -1,20 +1,20 @@
-# Grammars
+# Lenses
 
-Grammars transform `AnnotatedMusicalFrame` into `SceneFrame`. Each grammar interprets musical data and produces visual entities according to its focus.
+Lenses transform `AnnotatedMusicalFrame` into `SceneFrame`. Each lens interprets musical data and produces visual entities according to its focus.
 
 ## Layout
 
-Grammars share a three-column layout defined in `layout.ts`:
+Lenses share a three-column layout defined in `layout.ts`:
 
-- **Left column** — `DynamicsGrammar` (VU-meter bar with fading velocity indicators)
-- **Center column** — `RhythmGrammar` (pitch-class note strips, beat grid, now-line)
-- **Right column** — `HarmonyGrammar` (chord shape top cell, progression placeholder bottom cell)
+- **Left column** — `DynamicsLens` (VU-meter bar with fading velocity indicators)
+- **Center column** — `RhythmLens` (pitch-class note strips, beat grid, now-line)
+- **Right column** — `HarmonyLens` (chord shape top cell, progression placeholder bottom cell)
 
 See `layout.ts` for exact coordinates and proportions.
 
 ## Development Approach
 
-Grammar development uses an incremental process with multiple feedback mechanisms:
+Lens development uses an incremental process with multiple feedback mechanisms:
 
 ### 0. Design Partnership
 
@@ -22,7 +22,7 @@ Before any implementation, use conversation to develop the visual concept. The u
 
 ### 1. ASCII Diagrams for Intent
 
-Once the concept is clear, describe visual intent using ASCII/text diagrams. This establishes shared understanding of what the grammar should produce.
+Once the concept is clear, describe visual intent using ASCII/text diagrams. This establishes shared understanding of what the lens should produce.
 
 ### 2. SVG Snapshots for Visual Feedback
 
@@ -44,7 +44,7 @@ Key visual parameters are exposed as adjustable constants. During development, t
 
 ### 5. Incremental Building
 
-Grammars are built one visual element at a time:
+Lenses are built one visual element at a time:
 1. Implement the simplest element
 2. Generate snapshots and review
 3. Iterate until correct
@@ -55,16 +55,16 @@ This avoids large changes that are hard to debug and keeps feedback loops tight.
 
 ## Compositing Considerations
 
-Grammars produce entities that are composed with other grammars. The compositor merges entity lists from all active grammars into a single `SceneFrame` for the renderer.
+Lenses produce entities that are composed with other lenses. The compositor merges entity lists from all active lenses into a single `SceneFrame` for the renderer.
 
 Design entities with composability in mind:
 - Use meaningful `kind` values (field, particle, glyph)
-- Position entities within the grammar's column (see `layout.ts`)
-- Avoid assumptions about being the only grammar
+- Position entities within the lens's column (see `layout.ts`)
+- Avoid assumptions about being the only lens
 
 ## Test Fixtures
 
-Grammar tests should cover a wide range of inputs:
+Lens tests should cover a wide range of inputs:
 - Sparse notes (1-2 notes)
 - Dense notes (many simultaneous)
 - Silence (no active notes)
@@ -74,9 +74,9 @@ Grammar tests should cover a wide range of inputs:
 
 See `test/_fixtures/` for fixture format and `test/_harness/frames.ts` for shared frame factories.
 
-## Current Grammars
+## Current Lenses
 
-- `RhythmGrammar` — Pitch-class note strips with beat/bar grid, drift streaks, and now-line
-- `HarmonyGrammar` — Chord shape visualization with radial geometry and gradient fill
-- `DynamicsGrammar` — Vertical VU-meter bar with fading velocity indicators
-- `TestChordProgressionGrammar` — Legacy toy grammar for chord visualization (to be retired)
+- `RhythmLens` — Pitch-class note strips with beat/bar grid, drift streaks, and now-line
+- `HarmonyLens` — Chord shape visualization with radial geometry and gradient fill
+- `DynamicsLens` — Vertical VU-meter bar with fading velocity indicators
+- `TestChordProgressionLens` — Legacy toy lens for chord visualization (to be retired)

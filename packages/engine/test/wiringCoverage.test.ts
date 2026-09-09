@@ -32,14 +32,14 @@ import {
   ChordDetectionStabilizer,
   HarmonyStabilizer,
   MusicalVisualVocabulary,
-  RhythmGrammar,
-  HarmonyGrammar,
-  DynamicsGrammar,
+  RhythmLens,
+  HarmonyLens,
+  DynamicsLens,
   IdentityCompositor,
 } from "../src";
 import type {
   IMusicalStabilizer,
-  IVisualGrammar,
+  IVisualLens,
   IVisualVocabulary,
 } from "@synesthetica/contracts";
 
@@ -52,9 +52,9 @@ import type {
 function buildPipeline() {
   const partId = "test-part" as const;
 
-  const rhythmGrammar = new RhythmGrammar();
-  const harmonyGrammar = new HarmonyGrammar();
-  const dynamicsGrammar = new DynamicsGrammar();
+  const rhythmLens = new RhythmLens();
+  const harmonyLens = new HarmonyLens();
+  const dynamicsLens = new DynamicsLens();
   const vocabulary = new MusicalVisualVocabulary();
 
   const pipeline = new VisualPipeline({
@@ -69,9 +69,9 @@ function buildPipeline() {
   pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
   pipeline.addStabilizerFactory(() => new HarmonyStabilizer({ partId }));
   pipeline.setVocabulary(vocabulary);
-  pipeline.addGrammar(rhythmGrammar);
-  pipeline.addGrammar(harmonyGrammar);
-  pipeline.addGrammar(dynamicsGrammar);
+  pipeline.addLens(rhythmLens);
+  pipeline.addLens(harmonyLens);
+  pipeline.addLens(dynamicsLens);
   pipeline.setCompositor(new IdentityCompositor());
 
   // Trigger partState creation so stabilizer instances exist and
@@ -89,11 +89,11 @@ function buildPipeline() {
 
   const consumerLookup = new Map<
     string,
-    IVisualGrammar | IMusicalStabilizer | IVisualVocabulary
+    IVisualLens | IMusicalStabilizer | IVisualVocabulary
   >();
-  consumerLookup.set(rhythmGrammar.id, rhythmGrammar);
-  consumerLookup.set(harmonyGrammar.id, harmonyGrammar);
-  consumerLookup.set(dynamicsGrammar.id, dynamicsGrammar);
+  consumerLookup.set(rhythmLens.id, rhythmLens);
+  consumerLookup.set(harmonyLens.id, harmonyLens);
+  consumerLookup.set(dynamicsLens.id, dynamicsLens);
   consumerLookup.set(vocabulary.id, vocabulary);
   for (const s of stabilizers) consumerLookup.set(s.id, s);
 

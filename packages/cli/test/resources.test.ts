@@ -22,7 +22,7 @@ describe("annotation resource builder", () => {
     expect(parsed.macros).toBeInstanceOf(Array);
     expect(parsed.sessionControls).toBeInstanceOf(Array);
     expect(parsed.concepts).toBeInstanceOf(Array);
-    expect(parsed.grammars).toBeInstanceOf(Array);
+    expect(parsed.lenses).toBeInstanceOf(Array);
   });
 
   it("serves one URI per macro under annotations://macros/{id}", () => {
@@ -56,9 +56,9 @@ describe("annotation resource builder", () => {
     expect(parsed[0]).toHaveProperty("definition");
   });
 
-  it("serves one URI per grammar", () => {
-    for (const g of productionManifest.grammars) {
-      expect(uris.has(`annotations://grammars/${encodeURIComponent(g.id)}`)).toBe(true);
+  it("serves one URI per lens", () => {
+    for (const g of productionManifest.lenses) {
+      expect(uris.has(`annotations://lenses/${encodeURIComponent(g.id)}`)).toBe(true);
     }
   });
 
@@ -109,7 +109,7 @@ describe("prompt resources", () => {
 describe("composed system overview (used by get_started)", () => {
   const guide = composeSystemOverview();
 
-  it("references the three grammars", () => {
+  it("references the three lenses", () => {
     expect(guide).toMatch(/dynamics/i);
     expect(guide).toMatch(/rhythm/i);
     expect(guide).toMatch(/harmony/i);
@@ -121,7 +121,7 @@ describe("composed system overview (used by get_started)", () => {
     expect(guide).toContain("## Macros");
     expect(guide).toContain("## Session controls");
     expect(guide).toContain("## System concepts");
-    expect(guide).toContain("## Grammars");
+    expect(guide).toContain("## Lenses");
   });
 
   it("embeds every macro from the manifest with range + directionality", () => {

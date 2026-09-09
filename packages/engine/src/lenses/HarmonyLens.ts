@@ -1,5 +1,5 @@
 /**
- * Harmony Grammar
+ * Harmony Lens
  *
  * Visualizes chord shapes and functional harmony progression.
  *
@@ -21,8 +21,8 @@
  */
 
 import type {
-  IVisualGrammar,
-  GrammarContext,
+  IVisualLens,
+  LensContext,
   AnnotatedMusicalFrame,
   AnnotatedChord,
   SceneFrame,
@@ -145,13 +145,13 @@ const BORROWED_SCALE = 1 / 1.618033988749895;
 const VIEWPORT_ASPECT = 100 / 75;
 
 /** Opacity for the always-on structural elements of the harmony clock
- *  (guide rings + slot ticks). Matches DynamicsGrammar's OUTLINE_OPACITY
- *  so the structural cues across grammars share a consistent weight. */
+ *  (guide rings + slot ticks). Matches DynamicsLens's OUTLINE_OPACITY
+ *  so the structural cues across lenses share a consistent weight. */
 const STRUCTURE_OPACITY = 0.25;
 
 /** Colour for the always-on structural elements of the harmony clock.
- *  Matches DynamicsGrammar's OUTLINE_COLOR (cool muted grey) so the
- *  structural cues across grammars look identical, not just similar. */
+ *  Matches DynamicsLens's OUTLINE_COLOR (cool muted grey) so the
+ *  structural cues across lenses look identical, not just similar. */
 const STRUCTURE_COLOR: ColorHSVA = { h: 200, s: 0.2, v: 0.4, a: 1 };
 
 // ============================================================================
@@ -198,7 +198,7 @@ const ARROW_HEIGHT_MULTIPLIER = 2;
  * Assumed renderer worldWidth. The strip renderer uses worldWidth to
  * convert normalized radial coords to world units, and its angular
  * width (strip_arc_width / mean_radius_world) then depends on that
- * assumption. The grammar needs the same assumption to compute where
+ * assumption. The lens needs the same assumption to compute where
  * the arc should stop flush with the strip's near edge. Kept as a
  * named constant rather than magic 100 so this coupling is legible.
  * If the renderer's worldWidth ever changes, update this too.
@@ -295,7 +295,7 @@ function longerSignedArc(shorterSweep: number): number {
 // Configuration
 // ============================================================================
 
-export interface HarmonyGrammarConfig {
+export interface HarmonyLensConfig {
   /**
    * Viewport width in pixels.
    * @default 800
@@ -321,7 +321,7 @@ export interface HarmonyGrammarConfig {
   strokeWidth?: number;
 }
 
-const DEFAULT_CONFIG: Required<HarmonyGrammarConfig> = {
+const DEFAULT_CONFIG: Required<HarmonyLensConfig> = {
   width: 800,
   height: 600,
   backgroundColor: "#1a1a2e",
@@ -329,18 +329,18 @@ const DEFAULT_CONFIG: Required<HarmonyGrammarConfig> = {
 };
 
 // ============================================================================
-// Grammar Implementation
+// Lens Implementation
 // ============================================================================
 
 /** How long the chord shape + label fade out after a chord ends.
  * Purely to smooth the hard cut — not a lingering temporal trace. */
 const CHORD_FADE_OUT_MS = 120;
 
-/** Macro parameters for the grammar. Mirrors RhythmGrammar's pattern
- *  — grammar-local property names; the mapping from semantic macro
+/** Macro parameters for the lens. Mirrors RhythmLens's pattern
+ *  — lens-local property names; the mapping from semantic macro
  *  IDs (e.g. `harmony:linger`) to these fields happens at the
  *  dispatcher layer. */
-interface HarmonyGrammarMacros {
+interface HarmonyLensMacros {
   /** Fade window value. Interpretation depends on prescribed tempo:
    *  - With tempo set: value is in bars (default 3 bars)
    *  - Without tempo: value is in seconds (default 3 s)
@@ -348,13 +348,13 @@ interface HarmonyGrammarMacros {
   linger: number;
 }
 
-export class HarmonyGrammar implements IVisualGrammar {
-  readonly id = "harmony-grammar";
+export class HarmonyLens implements IVisualLens {
+  readonly id = "harmony-lens";
 
-  private config: Required<HarmonyGrammarConfig>;
-  private ctx: GrammarContext | null = null;
+  private config: Required<HarmonyLensConfig>;
+  private ctx: LensContext | null = null;
 
-  private macros: HarmonyGrammarMacros = {
+  private macros: HarmonyLensMacros = {
     linger: PROGRESSION_FADE_VALUE,
   };
 
@@ -363,11 +363,11 @@ export class HarmonyGrammar implements IVisualGrammar {
   private fadingChord: AnnotatedChord | null = null;
   private fadingChordEndTime: number | null = null;
 
-  constructor(config: HarmonyGrammarConfig = {}) {
+  constructor(config: HarmonyLensConfig = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
-  init(ctx: GrammarContext): void {
+  init(ctx: LensContext): void {
     this.ctx = ctx;
   }
 
@@ -378,15 +378,15 @@ export class HarmonyGrammar implements IVisualGrammar {
   }
 
   /** Set macros. Partial — only supplied fields update. */
-  setMacros(macros: Partial<HarmonyGrammarMacros>): void {
+  setMacros(macros: Partial<HarmonyLensMacros>): void {
     this.macros = { ...this.macros, ...macros };
   }
 
-  getMacros(): HarmonyGrammarMacros {
+  getMacros(): HarmonyLensMacros {
     return { ...this.macros };
   }
 
-  /** IVisualGrammar.readMacros — same shape as getMacros, widened to
+  /** IVisualLens.readMacros — same shape as getMacros, widened to
    *  the interface-level Record type. Used by state:// and the
    *  wiring-coverage test. */
   readMacros(): Record<string, number | string> {
@@ -1048,9 +1048,9 @@ export class HarmonyGrammar implements IVisualGrammar {
    *   class at low opacity.
    * - A mini Roman numeral glyph anchored at the onset Y.
    *
-   * Glyphs scroll upward in sync with the rhythm grammar's timeline
+   * Glyphs scroll upward in sync with the rhythm lens's timeline
    * and fade out as they approach the top edge (matching the rhythm
-   * grammar's own top-edge opacity gradient).
+   * lens's own top-edge opacity gradient).
    */
   private createScrollingRomans(
     progression: FunctionalChord[],

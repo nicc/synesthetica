@@ -26,8 +26,8 @@ describe("Web App Smoke Tests", () => {
       expect(engine.NoteTrackingStabilizer).toBeDefined();
       expect(engine.ChordDetectionStabilizer).toBeDefined();
       expect(engine.MusicalVisualVocabulary).toBeDefined();
-      expect(engine.RhythmGrammar).toBeDefined();
-      expect(engine.TestChordProgressionGrammar).toBeDefined();
+      expect(engine.RhythmLens).toBeDefined();
+      expect(engine.TestChordProgressionLens).toBeDefined();
       expect(engine.Canvas2DRenderer).toBeDefined();
     });
 
@@ -76,22 +76,22 @@ describe("Web App Smoke Tests", () => {
       expect(ruleset.id).toBe("musical-visual");
     });
 
-    it("can create grammars", async () => {
-      const { RhythmGrammar, TestChordProgressionGrammar } = await import(
+    it("can create lenses", async () => {
+      const { RhythmLens, TestChordProgressionLens } = await import(
         "@synesthetica/engine"
       );
 
-      const rhythmGrammar = new RhythmGrammar();
-      const chordGrammar = new TestChordProgressionGrammar();
+      const rhythmLens = new RhythmLens();
+      const chordLens = new TestChordProgressionLens();
 
-      expect(rhythmGrammar).toBeDefined();
-      expect(rhythmGrammar.id).toBe("rhythm-grammar");
+      expect(rhythmLens).toBeDefined();
+      expect(rhythmLens.id).toBe("rhythm-lens");
 
-      expect(chordGrammar).toBeDefined();
-      expect(chordGrammar.id).toBe("test-chord-progression-grammar");
+      expect(chordLens).toBeDefined();
+      expect(chordLens.id).toBe("test-chord-progression-lens");
 
-      rhythmGrammar.dispose();
-      chordGrammar.dispose();
+      rhythmLens.dispose();
+      chordLens.dispose();
     });
   });
 

@@ -1,6 +1,6 @@
 /**
  * Annotations are advisory metadata designed to help an LLM operator
- * choose grammars/presets/macros that fit user intent, and to describe
+ * choose lenses/presets/macros that fit user intent, and to describe
  * the session controls and system vocabulary the LLM can operate on
  * and reason about.
  *
@@ -33,18 +33,18 @@ export interface MacroResponse {
 }
 
 // ============================================================================
-// GrammarAnnotation
+// LensAnnotation
 // ============================================================================
 
-export interface GrammarAnnotation {
-  id: string;                 // grammar id
+export interface LensAnnotation {
+  id: string;                 // lens id
   name?: string;
   aliases?: string[];         // user-facing synonyms: "style", "look", "effect"
   illustrates?: MusicalConcept[];
   traits?: VisualTrait[];
   notes?: string[];
   cautions?: string[];
-  /** How this grammar responds to each macro (helps LLM choose adjustments) */
+  /** How this lens responds to each macro (helps LLM choose adjustments) */
   macroResponses?: Record<string, MacroResponse>;
 }
 
@@ -56,7 +56,7 @@ export interface GrammarAnnotation {
  * Describes an MCP resource — the LLM-facing description, aliases,
  * notes, and shape guidance. Covers the state + preset-index +
  * annotations-bundle URIs that don't have their own per-item
- * annotation (unlike macros, session controls, concepts, grammars,
+ * annotation (unlike macros, session controls, concepts, lenses,
  * presets which each carry their own annotation).
  *
  * Resources are NOUNS (state://<label>/current, presets://). This is
@@ -139,17 +139,17 @@ export interface MacroDirectionality {
 }
 
 /**
- * Runtime consumer of a macro — grammar, stabilizer, or vocabulary
+ * Runtime consumer of a macro — lens, stabilizer, or vocabulary
  * instance that actually receives the value and mutates behaviour.
  *
- * `id` must match the consumer's runtime id (e.g. "harmony-grammar",
+ * `id` must match the consumer's runtime id (e.g. "harmony-lens",
  * "chord-detection-stabilizer", "musical-visual"). `macroKey` must
  * exist as a callable entry on that consumer's `macros` dispatch
  * table — the build-time validator + engine-side coverage test
  * assert both. Declaring a consumer here is a promise the code
  * fulfils; the validator turns a broken promise into a build error.
  */
-export type ConsumerKind = "grammar" | "stabilizer" | "vocab";
+export type ConsumerKind = "lens" | "stabilizer" | "vocab";
 
 export interface MacroConsumer {
   kind: ConsumerKind;
@@ -175,7 +175,7 @@ interface MacroAnnotationBase {
 /**
  * A macro exposed as a continuous 0..1 (or range-limited) dial. The
  * LLM picks a numeric value; the dispatcher maps to the underlying
- * grammar/stabilizer parameter.
+ * lens/stabilizer parameter.
  */
 export interface ContinuousMacroAnnotation extends MacroAnnotationBase {
   type: "continuous";

@@ -6,7 +6,7 @@
  * chords on an outer ring between adjacent diatonic slots, coloured by
  * root hue (I14), fading with age (Principle 9).
  *
- * This is a design prototype — no grammar or renderer code. Just SVG
+ * This is a design prototype — no lens or renderer code. Just SVG
  * generation for visual review.
  *
  * Run: GENERATE_SNAPSHOTS=1 npm test -w packages/engine -- -t "Progression Clock"
@@ -46,7 +46,7 @@ const SVG_SIZE = 440;
 /** Glyph scale (glyph units → SVG pixels) */
 const GLYPH_SCALE = 28;
 
-/** Fade window in ms — matches dynamics grammar */
+/** Fade window in ms — matches dynamics lens */
 const FADE_MS = 4000;
 
 /**

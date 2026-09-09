@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { VisualPipeline } from "../src/VisualPipeline";
 import { NoteTrackingStabilizer } from "../src/stabilizers/NoteTrackingStabilizer";
 import { MusicalVisualVocabulary } from "../src/vocabularies/MusicalVisualVocabulary";
-import { RhythmGrammar } from "../src/grammars/RhythmGrammar";
+import { RhythmLens } from "../src/lenses/RhythmLens";
 import { IdentityCompositor } from "../src/stubs/IdentityCompositor";
 import type {
   IRawSourceAdapter,
@@ -114,11 +114,11 @@ describe("VisualPipeline", () => {
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
       pipeline.setRuleset(new MusicalVisualVocabulary());
-      pipeline.addGrammar(new RhythmGrammar());
+      pipeline.addLens(new RhythmLens());
 
       const frame = pipeline.requestFrame(1000);
 
-      // RhythmGrammar always produces a NOW line even with no notes
+      // RhythmLens always produces a NOW line even with no notes
       const noteEntities = frame.entities.filter(
         (e) => e.data?.type === "note-strip"
       );
@@ -133,22 +133,22 @@ describe("VisualPipeline", () => {
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
       pipeline.setRuleset(new MusicalVisualVocabulary());
-      pipeline.addGrammar(new RhythmGrammar());
+      pipeline.addLens(new RhythmLens());
 
       // Frame drains one raw frame per adapter's nextFrame() call and
       // creates partStates as a side effect. Establish that partStates
       // exist by requesting a frame.
       pipeline.requestFrame(0);
 
-      // Drop the first adapter — grammars, vocab, stabilizer, and
+      // Drop the first adapter — lenses, vocab, stabilizer, and
       // partStates all persist (no dispose was called).
       pipeline.removeAdapter(adapter);
 
       // Second adapter still delivers frames through the surviving
-      // pipeline; grammars still emit entities.
+      // pipeline; lenses still emit entities.
       const frame = pipeline.requestFrame(100);
       expect(frame.t).toBe(100);
-      // Rhythm grammar always emits its now-line entity when active.
+      // Rhythm lens always emits its now-line entity when active.
       expect(frame.entities.length).toBeGreaterThan(0);
     });
 
@@ -170,7 +170,7 @@ describe("VisualPipeline", () => {
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
       pipeline.setRuleset(new MusicalVisualVocabulary());
-      pipeline.addGrammar(new RhythmGrammar());
+      pipeline.addLens(new RhythmLens());
       pipeline.setCompositor(new IdentityCompositor());
     });
 
@@ -179,7 +179,7 @@ describe("VisualPipeline", () => {
 
       const frame = pipeline.requestFrame(1000);
 
-      // RhythmGrammar creates note-strip entities for notes
+      // RhythmLens creates note-strip entities for notes
       expect(frame.entities.length).toBeGreaterThan(0);
       expect(frame.entities[0].part).toBe("test-part");
     });
@@ -228,7 +228,7 @@ describe("VisualPipeline", () => {
 
       // The pipeline processes all three notes through the stabilizer
       // and into distinct note-strip entities. Velocity does not
-      // currently modulate visual output in RhythmGrammar (strips are
+      // currently modulate visual output in RhythmLens (strips are
       // uniform-width by design); pitch class differentiates the three
       // via hue (see Invariant I15 in SPEC 004 for the hue vs
       // brightness roles).
@@ -250,7 +250,7 @@ describe("VisualPipeline", () => {
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
       pipeline.setRuleset(new MusicalVisualVocabulary());
-      pipeline.addGrammar(new RhythmGrammar());
+      pipeline.addLens(new RhythmLens());
     });
 
     it("tracks activity when notes are played", () => {
@@ -274,7 +274,7 @@ describe("VisualPipeline", () => {
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
       pipeline.setRuleset(new MusicalVisualVocabulary());
-      pipeline.addGrammar(new RhythmGrammar());
+      pipeline.addLens(new RhythmLens());
 
       adapter.addNoteOn(60, 100, 1000);
       pipeline.requestFrame(1000);
@@ -290,7 +290,7 @@ describe("VisualPipeline", () => {
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
       pipeline.setRuleset(new MusicalVisualVocabulary());
-      pipeline.addGrammar(new RhythmGrammar());
+      pipeline.addLens(new RhythmLens());
 
       pipeline.dispose();
 
@@ -308,7 +308,7 @@ describe("VisualPipeline", () => {
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
       pipeline.setRuleset(new MusicalVisualVocabulary());
-      pipeline.addGrammar(new RhythmGrammar());
+      pipeline.addLens(new RhythmLens());
       // No compositor set
 
       adapter.addNoteOn(60, 100, 1000);
@@ -321,16 +321,16 @@ describe("VisualPipeline", () => {
   });
 
   describe("setMacro routing", () => {
-    it("routes rhythm:* macros to the RhythmGrammar via setMacros", () => {
-      const rhythm = new RhythmGrammar();
-      pipeline.addGrammar(rhythm);
+    it("routes rhythm:* macros to the RhythmLens via setMacros", () => {
+      const rhythm = new RhythmLens();
+      pipeline.addLens(rhythm);
       pipeline.setMacro("rhythm:horizon", 0.4);
       expect(rhythm.getMacros().horizon).toBe(0.4);
     });
 
     it("kebab-case → camelCase param mapping", () => {
-      const rhythm = new RhythmGrammar();
-      pipeline.addGrammar(rhythm);
+      const rhythm = new RhythmLens();
+      pipeline.addLens(rhythm);
       pipeline.setMacro("rhythm:pulse-intensity", 0.8);
       expect(rhythm.getMacros().pulseIntensity).toBe(0.8);
       pipeline.setMacro("rhythm:reference-linger", 2.1);
@@ -340,19 +340,19 @@ describe("VisualPipeline", () => {
     });
 
     it("silently drops unscoped names — no crash", () => {
-      pipeline.addGrammar(new RhythmGrammar());
+      pipeline.addLens(new RhythmLens());
       expect(() => pipeline.setMacro("time-horizon", 0.5)).not.toThrow();
     });
 
-    it("silently drops names whose scope matches no grammar", () => {
-      pipeline.addGrammar(new RhythmGrammar());
+    it("silently drops names whose scope matches no lens", () => {
+      pipeline.addLens(new RhythmLens());
       expect(() => pipeline.setMacro("system:colour-mapping:reference", 90)).not.toThrow();
     });
 
-    it("does not deliver a rhythm:* name to a non-rhythm grammar", () => {
-      const rhythm = new RhythmGrammar();
-      pipeline.addGrammar(rhythm);
-      // Confirms only the scope-matching grammar receives the write.
+    it("does not deliver a rhythm:* name to a non-rhythm lens", () => {
+      const rhythm = new RhythmLens();
+      pipeline.addLens(rhythm);
+      // Confirms only the scope-matching lens receives the write.
       const before = { ...rhythm.getMacros() };
       pipeline.setMacro("harmony:linger", 4);
       expect(rhythm.getMacros()).toEqual(before);

@@ -39,9 +39,9 @@ import {
   ChordDetectionStabilizer,
   HarmonyStabilizer,
   MusicalVisualVocabulary,
-  RhythmGrammar,
-  HarmonyGrammar,
-  DynamicsGrammar,
+  RhythmLens,
+  HarmonyLens,
+  DynamicsLens,
   IdentityCompositor,
 } from "@synesthetica/engine";
 
@@ -71,9 +71,9 @@ class FakeBrowserWithPipeline {
     this.pipeline.addStabilizerFactory(() => new HarmonyStabilizer({ partId }));
     this.vocabulary = new MusicalVisualVocabulary();
     this.pipeline.setVocabulary(this.vocabulary);
-    this.pipeline.addGrammar(new RhythmGrammar());
-    this.pipeline.addGrammar(new HarmonyGrammar());
-    this.pipeline.addGrammar(new DynamicsGrammar());
+    this.pipeline.addLens(new RhythmLens());
+    this.pipeline.addLens(new HarmonyLens());
+    this.pipeline.addLens(new DynamicsLens());
     this.pipeline.setCompositor(new IdentityCompositor());
     // Trigger partState creation so stabilizer macro dispatch reaches
     // instantiated stabilizers.

@@ -4,7 +4,7 @@ import type { PartId } from "../parts/parts";
 /**
  * Diagnostic categories for grouping and visual indication.
  */
-export type DiagnosticCategory = "input" | "stabilizer" | "grammar" | "control";
+export type DiagnosticCategory = "input" | "stabilizer" | "lens" | "control";
 
 /**
  * Diagnostic severity levels.

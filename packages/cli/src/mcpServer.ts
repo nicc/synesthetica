@@ -180,9 +180,9 @@ export async function startMcpServer(
         mimeType: "application/json",
       },
       {
-        uriTemplate: "annotations://grammars/{id}",
-        name: "Grammar annotation",
-        description: "One grammar annotation",
+        uriTemplate: "annotations://lenses/{id}",
+        name: "Lens annotation",
+        description: "One lens annotation",
         mimeType: "application/json",
       },
       {

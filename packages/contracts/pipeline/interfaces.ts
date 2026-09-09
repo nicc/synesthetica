@@ -2,7 +2,7 @@
  * Pipeline Interfaces
  *
  * Defines the contracts for pipeline components: adapters, stabilizers,
- * rulesets, grammars, compositor, and renderer.
+ * rulesets, lenses, compositor, and renderer.
  *
  * See SPEC_008 for pipeline orchestration and SPEC_009 for frame types.
  */
@@ -91,7 +91,7 @@ export interface IMusicalStabilizer {
    *
    * Stabilizers own scope-prefixed macros (harmony:*, rhythm:*)
    * whose parameters live on the stabilizer side of the pipeline
-   * rather than the grammar side — e.g. harmony:arpeggio-tolerance
+   * rather than the lens side — e.g. harmony:arpeggio-tolerance
    * maps to ChordDetectionStabilizer.pitchDecayMs.
    */
   setMacro?(name: string, value: number | string): void;
@@ -127,10 +127,10 @@ export interface IMusicalStabilizer {
  *
  * Key responsibility: Define a consistent visual vocabulary that encodes
  * musical meaning. All minor chords must share visual characteristics that
- * distinguish them from major chords. Users learn this vocabulary; grammars
+ * distinguish them from major chords. Users learn this vocabulary; lenses
  * respect it while making their own rendering choices.
  *
- * The metaphor: vocabulary defines words, grammars write sentences.
+ * The metaphor: vocabulary defines words, lenses write sentences.
  */
 export interface IVisualVocabulary {
   id: string;
@@ -162,40 +162,40 @@ export interface IVisualVocabulary {
 export type IVisualRuleset = IVisualVocabulary;
 
 // ============================================================================
-// Grammars (RFC 006)
+// Lenses (RFC 006)
 // ============================================================================
 
 /**
- * Grammar that renders annotated musical frames to scene entities.
+ * Lens that renders annotated musical frames to scene entities.
  *
- * Grammars receive annotated musical elements and decide HOW to render them
+ * Lenses receive annotated musical elements and decide HOW to render them
  * (or whether to render them at all). They are aware of musical element
  * categories (notes, chords, beats) but not musical analysis details.
  *
- * Grammars:
+ * Lenses:
  * - Decide which musical elements to render
  * - Decide what visual representation to use (particles, shapes, trails, etc.)
  * - Use visual annotations to style their chosen representations
  * - Maintain entity state across frames
- * - May filter elements (e.g., rhythm grammar ignores chords)
+ * - May filter elements (e.g., rhythm lens ignores chords)
  *
- * Grammars do NOT:
+ * Lenses do NOT:
  * - Perform musical analysis
  * - Know pitch class, key, chord quality details
  * - Access raw MIDI or audio data
  *
  * Example interpretive choices:
- * - Rhythm grammar: renders beats as pulses, notes as timing markers, ignores harmony
- * - Chord grammar: renders chords as expanding blooms, notes as particles within
+ * - Rhythm lens: renders beats as pulses, notes as timing markers, ignores harmony
+ * - Chord lens: renders chords as expanding blooms, notes as particles within
  * - Both use the same visual annotations (palette, texture, motion) from the ruleset
  */
-export interface IVisualGrammar {
+export interface IVisualLens {
   id: string;
 
   /**
-   * Initialize the grammar with context for this part.
+   * Initialize the lens with context for this part.
    */
-  init(ctx: GrammarContext): void;
+  init(ctx: LensContext): void;
 
   /**
    * Dispose of any resources.
@@ -205,7 +205,7 @@ export interface IVisualGrammar {
   /**
    * Update the scene based on annotated musical elements and previous state.
    *
-   * The grammar:
+   * The lens:
    * - Iterates through musical elements it cares about
    * - Creates/updates/removes entities based on its rendering strategy
    * - Uses visual annotations for styling (palette, texture, motion)
@@ -217,25 +217,25 @@ export interface IVisualGrammar {
   paramsSchema?: Record<string, unknown>;
 
   /**
-   * Optional: apply a partial macro update. Keys are the grammar's
+   * Optional: apply a partial macro update. Keys are the lens's
    * own camelCased param names (e.g. "linger", "pulseIntensity") —
-   * matching the manifest consumer entry's macroKey for grammar
+   * matching the manifest consumer entry's macroKey for lens
    * consumers. The pipeline translates a scope-prefixed macro id
    * (harmony:linger) to `{ linger: value }` and calls this.
    */
   setMacros?(macros: Record<string, number | string>): void;
 
   /**
-   * Optional: return the current values of every macro this grammar
+   * Optional: return the current values of every macro this lens
    * accepts, keyed by the same camelCase names setMacros uses.
    */
   readMacros?(): Record<string, number | string>;
 }
 
 /**
- * Context provided to grammars during initialization.
+ * Context provided to lenses during initialization.
  */
-export interface GrammarContext {
+export interface LensContext {
   canvasSize: { width: number; height: number };
   rngSeed: number;
   part: PartId;
@@ -269,7 +269,7 @@ export interface IRenderer {
  * The central pipeline orchestrator.
  *
  * Uses a pull-based model where the renderer requests frames at target times.
- * The pipeline coordinates: Adapters → Stabilizers → Vocabulary → Grammars → Compositor
+ * The pipeline coordinates: Adapters → Stabilizers → Vocabulary → Lenses → Compositor
  *
  * See SPEC_005 for frame timing and SPEC_008 for orchestration details.
  */

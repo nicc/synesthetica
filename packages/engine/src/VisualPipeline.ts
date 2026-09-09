@@ -2,11 +2,11 @@
  * Visual Pipeline (RFC 005 / RFC 006)
  *
  * Orchestrates the frame type flow:
- * IRawSourceAdapter → IMusicalStabilizer → IVisualVocabulary → IVisualGrammar → ICompositor
+ * IRawSourceAdapter → IMusicalStabilizer → IVisualVocabulary → IVisualLens → ICompositor
  *
  * RFC 006 changes:
  * - Vocabulary.annotate() returns AnnotatedMusicalFrame instead of VisualIntentFrame
- * - Grammars receive AnnotatedMusicalFrame, decide how/whether to render each element
+ * - Lenses receive AnnotatedMusicalFrame, decide how/whether to render each element
  */
 
 import type {
@@ -14,10 +14,10 @@ import type {
   IRawSourceAdapter,
   IMusicalStabilizer,
   IVisualVocabulary,
-  IVisualGrammar,
+  IVisualLens,
   ICompositor,
   IActivityTracker,
-  GrammarContext,
+  LensContext,
   RawInputFrame,
   MusicalFrame,
   SceneFrame,
@@ -35,7 +35,7 @@ import { createEmptyMusicalFrame as contractsCreateEmptyMusicalFrame } from "@sy
  * Configuration for the visual pipeline.
  */
 export interface VisualPipelineConfig {
-  /** Canvas dimensions for grammar context */
+  /** Canvas dimensions for lens context */
   canvasSize: { width: number; height: number };
 
   /** RNG seed for deterministic behavior (useful for testing/golden tests) */
@@ -55,10 +55,10 @@ interface PartState {
   /** Previous musical frames per stabilizer (keyed by stabilizer id) */
   previousMusicalFrames: Map<string, MusicalFrame | null>;
 
-  /** Grammar contexts per grammar */
-  grammarContexts: Map<string, GrammarContext>;
+  /** Lens contexts per lens */
+  lensContexts: Map<string, LensContext>;
 
-  /** Previous scene frames per grammar */
+  /** Previous scene frames per lens */
   previousScenes: Map<string, SceneFrame | null>;
 }
 
@@ -66,12 +66,12 @@ interface PartState {
  * Visual Pipeline orchestrator.
  *
  * Implements the RFC 005 data flow:
- * Adapters → Router → Stabilizers → Ruleset → Grammars → Compositor
+ * Adapters → Router → Stabilizers → Ruleset → Lenses → Compositor
  *
  * For Phase 0, we simplify:
  * - No router (single adapter, single part)
  * - Single stabilizer per part
- * - All grammars receive same intent frame
+ * - All lenses receive same intent frame
  */
 export class VisualPipeline implements IPipeline, IActivityTracker {
   private config: VisualPipelineConfig;
@@ -80,7 +80,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
   private adapters: IRawSourceAdapter[] = [];
   private stabilizerFactories: Array<() => IMusicalStabilizer> = [];
   private vocabulary: IVisualVocabulary | null = null;
-  private grammars: IVisualGrammar[] = [];
+  private lenses: IVisualLens[] = [];
   private compositor: ICompositor | null = null;
 
   // State
@@ -112,7 +112,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
 
   /**
    * Remove a single adapter without touching the rest of the pipeline
-   * (vocab, grammars, stabilizers, part state, subscribers all
+   * (vocab, lenses, stabilizers, part state, subscribers all
    * survive). Used to swap inputs mid-session without losing macro
    * state, chord-mode, session clock, or the recent-events buffer.
    */
@@ -147,8 +147,8 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     this.setVocabulary(vocabulary);
   }
 
-  addGrammar(grammar: IVisualGrammar): void {
-    this.grammars.push(grammar);
+  addLens(lens: IVisualLens): void {
+    this.lenses.push(lens);
   }
 
   setCompositor(compositor: ICompositor): void {
@@ -157,11 +157,11 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
 
   /**
    * Route a manifest macro (id + value) to every consumer that
-   * declares interest — grammars, stabilizers, and vocab.
+   * declares interest — lenses, stabilizers, and vocab.
    *
-   * Grammar routing: scope-prefixed name (`<scope>:<param>`) picks a
-   * grammar whose id is `${scope}-grammar` or `${scope}`. The param
-   * is kebab→camelCased and passed to grammar.setMacros(). Grammars
+   * Lens routing: scope-prefixed name (`<scope>:<param>`) picks a
+   * lens whose id is `${scope}-lens` or `${scope}`. The param
+   * is kebab→camelCased and passed to lens.setMacros(). Lenses
    * ignore keys they don't own.
    *
    * Stabilizer routing: pipeline invokes setMacro(name, value) on
@@ -177,7 +177,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
    * test keep declaration and implementation in lockstep.
    */
   setMacro(name: string, value: number | string): void {
-    // Grammar dispatch.
+    // Lens dispatch.
     const colon = name.indexOf(":");
     if (colon >= 0) {
       const scope = name.slice(0, colon);
@@ -185,9 +185,9 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       const paramCamel = paramKebab.replace(/-([a-z])/g, (_, c: string) =>
         c.toUpperCase(),
       );
-      for (const grammar of this.grammars) {
-        if (grammar.id === `${scope}-grammar` || grammar.id === scope) {
-          grammar.setMacros?.({ [paramCamel]: value });
+      for (const lens of this.lenses) {
+        if (lens.id === `${scope}-lens` || lens.id === scope) {
+          lens.setMacros?.({ [paramCamel]: value });
         }
       }
     }
@@ -231,7 +231,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
 
   private buildConsumerLookup(): Map<string, { readMacros?(): Record<string, number | string> }> {
     const lookup = new Map<string, { readMacros?(): Record<string, number | string> }>();
-    for (const g of this.grammars) lookup.set(g.id, g);
+    for (const g of this.lenses) lookup.set(g.id, g);
     if (this.vocabulary) lookup.set(this.vocabulary.id, this.vocabulary);
     for (const state of this.partStates.values()) {
       for (const s of state.stabilizers) lookup.set(s.id, s);
@@ -261,7 +261,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
 
   /**
    * Set the prescribed tempo in BPM.
-   * This enables beat-relative visualization in grammars.
+   * This enables beat-relative visualization in lenses.
    */
   setTempo(bpm: number | null): void {
     this.prescribedTempo = bpm;
@@ -269,7 +269,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
 
   /**
    * Set the prescribed time signature.
-   * This enables bar-relative visualization in grammars.
+   * This enables bar-relative visualization in lenses.
    */
   setMeter(beatsPerBar: number | null, beatUnit: number = 4): void {
     if (beatsPerBar === null) {
@@ -292,14 +292,14 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
   /**
    * Set the prescribed key (tonic + mode).
    * This enables functional harmony analysis (Roman numerals) in the
-   * HarmonyStabilizer and progression clock in grammars.
+   * HarmonyStabilizer and progression clock in lenses.
    */
   setKey(key: PrescribedKey | null): void {
     this.prescribedKey = key;
   }
 
   /**
-   * Set the chord interpretation mode (harmonic vs bass-led). Grammars
+   * Set the chord interpretation mode (harmonic vs bass-led). Lenses
    * that render chords pick between chord.harmonic and chord.bassLed
    * based on this.
    */
@@ -376,23 +376,23 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
 
     const annotatedFrame = this.vocabulary.annotate(musicalFrame);
 
-    // Run grammars
-    for (const grammar of this.grammars) {
-      // Initialize grammar for this part if needed
-      if (!partState.grammarContexts.has(grammar.id)) {
-        const ctx: GrammarContext = {
+    // Run lenses
+    for (const lens of this.lenses) {
+      // Initialize lens for this part if needed
+      if (!partState.lensContexts.has(lens.id)) {
+        const ctx: LensContext = {
           canvasSize: this.config.canvasSize,
           rngSeed: this.config.rngSeed ?? Date.now(),
           part: partId,
         };
-        grammar.init(ctx);
-        partState.grammarContexts.set(grammar.id, ctx);
-        partState.previousScenes.set(grammar.id, null);
+        lens.init(ctx);
+        partState.lensContexts.set(lens.id, ctx);
+        partState.previousScenes.set(lens.id, null);
       }
 
-      const previous = partState.previousScenes.get(grammar.id) ?? null;
-      const scene = grammar.update(annotatedFrame, previous);
-      partState.previousScenes.set(grammar.id, scene);
+      const previous = partState.previousScenes.get(lens.id) ?? null;
+      const scene = lens.update(annotatedFrame, previous);
+      partState.previousScenes.set(lens.id, scene);
       partScenes.push(scene);
     }
 
@@ -462,7 +462,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     }
     this.adapters = [];
     this.stabilizerFactories = [];
-    this.grammars = [];
+    this.lenses = [];
     this.vocabulary = null;
     this.compositor = null;
   }
@@ -521,7 +521,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       state = {
         stabilizers: sortedStabilizers,
         previousMusicalFrames: new Map(),
-        grammarContexts: new Map(),
+        lensContexts: new Map(),
         previousScenes: new Map(),
       };
       this.partStates.set(partId, state);

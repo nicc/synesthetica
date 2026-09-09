@@ -1,5 +1,5 @@
 /**
- * Shared layout constants for the three-column grammar layout.
+ * Shared layout constants for the three-column lens layout.
  *
  * ┌────┐  ┌──────────────┐ ┌────────────────┐
  * │    │  │              │ │   chord shape  │
@@ -14,7 +14,7 @@
  */
 
 // ============================================================================
-// Vertical Constants (shared across grammars)
+// Vertical Constants (shared across lenses)
 // ============================================================================
 
 /** Top of the bar area (1/6 from top) */
@@ -114,7 +114,7 @@ export const HARMONY_CHORD_CELL_HEIGHT = 0.21;
  *  width so the cell is square and the clock can fill it as a circle. */
 export const HARMONY_PROGRESSION_CELL_HEIGHT = HARMONY_COLUMN_WIDTH;
 
-/** Backwards-compatible alias used by HarmonyGrammar for clock-radius
+/** Backwards-compatible alias used by HarmonyLens for clock-radius
  *  math. Refers to the progression cell, which is square. */
 export const HARMONY_CELL_SIZE = HARMONY_PROGRESSION_CELL_HEIGHT;
 

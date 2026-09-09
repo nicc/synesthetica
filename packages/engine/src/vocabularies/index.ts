@@ -6,7 +6,7 @@ export {
 // Vocabulary utilities
 export { buildChordShape } from "./utils";
 
-// Rendering utilities for grammars
+// Rendering utilities for lenses
 export {
   renderChordShape,
   colorToCSS,

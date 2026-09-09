@@ -1,7 +1,7 @@
 /**
- * Shared time → screen-Y mapping used by grammars that scroll along
+ * Shared time → screen-Y mapping used by lenses that scroll along
  * the rhythm timeline. Keeping this in one place means the rhythm
- * grammar's note strips and the harmony grammar's scrolling Roman
+ * lens's note strips and the harmony lens's scrolling Roman
  * numerals stay phase-locked to the same now-line and horizon.
  */
 
