@@ -713,6 +713,34 @@ async function refreshInputOptions(): Promise<void> {
   basicsPanel?.updateOptions("input:source", inputsToPanelOptions(inputs));
 }
 
+/**
+ * localStorage key marking that the About panel has already been
+ * shown-and-dismissed at least once. First-ever load opens About
+ * automatically as an orientation gesture; once the user closes it
+ * (by any means — X, ESC, click-outside, or switching to another
+ * tab) the flag is set and future loads leave About untouched.
+ * Wrapped in try/catch — private-mode / storage-disabled browsers
+ * still render the app; they just get the auto-open every time,
+ * which is the safe fallback for a discoverability gesture.
+ */
+const ABOUT_SEEN_KEY = "syn:about-seen";
+
+function hasSeenAbout(): boolean {
+  try {
+    return window.localStorage.getItem(ABOUT_SEEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markAboutSeen(): void {
+  try {
+    window.localStorage.setItem(ABOUT_SEEN_KEY, "1");
+  } catch {
+    /* private mode / storage disabled — silently drop */
+  }
+}
+
 function mountPanels(): void {
   const panel = generatePanel(productionManifest);
   // Single dispatch path: panel → applyEngineOp → (pipeline, state
@@ -723,7 +751,13 @@ function mountPanels(): void {
   });
   const optionsFor = (id: string) => (id === "input:source" ? currentInputOptions() : undefined);
 
-  mountPanelShell({
+  // Track the previous open state so we can detect "was About, now
+  // isn't" — the dismissal moment. onOpenChange fires on every
+  // transition (including the auto-open → about), so we need the
+  // prev-state check to only stamp on genuine departure.
+  let prevOpen: "basics" | "advanced" | "about" | null = null;
+
+  const shell = mountPanelShell({
     host: document.body,
     labels: { basics: "Basics", advanced: "Advanced", about: "About" },
     panelContent: {
@@ -751,7 +785,19 @@ function mountPanels(): void {
       },
       about: () => buildAboutPanel(),
     },
+    onOpenChange: (id) => {
+      if (prevOpen === "about" && id !== "about") markAboutSeen();
+      prevOpen = id;
+    },
   });
+
+  // First-ever load: open About as the orientation gesture. Any
+  // dismissal (X / ESC / click-outside / tab-swap) then flips the
+  // localStorage flag via onOpenChange above, so subsequent loads
+  // leave About untouched.
+  if (!hasSeenAbout()) {
+    shell.open("about");
+  }
 }
 
 /* -----------------------------------------------------------------

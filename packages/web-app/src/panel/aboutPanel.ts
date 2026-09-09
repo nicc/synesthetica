@@ -21,6 +21,7 @@
 
 import aboutMd from "../../ABOUT.md?raw";
 import overviewMd from "@synesthetica/contracts/prompts/system-overview.md?raw";
+import { composeSystemOverview } from "@synesthetica/contracts";
 
 export async function buildAboutPanel(): Promise<HTMLElement> {
   const wrap = document.createElement("div");
@@ -30,8 +31,10 @@ export async function buildAboutPanel(): Promise<HTMLElement> {
   wrap.appendChild(renderMarkdown(aboutMd));
 
   // Collapsed disclosure of the full LLM primer for anyone who
-  // wants to see it. Uses the native <details>/<summary> element —
-  // no JS handler needed, keyboard-accessible by default.
+  // wants to see exactly what the MCP server tells the LLM. Uses
+  // the same composeSystemOverview() the CLI feeds to get_started,
+  // fed the same authored .md; both surfaces render byte-identical
+  // primer text.
   const details = document.createElement("details");
   details.className = "syn-about-primer";
   const summary = document.createElement("summary");
@@ -39,7 +42,7 @@ export async function buildAboutPanel(): Promise<HTMLElement> {
   details.appendChild(summary);
   const primerBody = document.createElement("div");
   primerBody.className = "syn-about-primer-body";
-  primerBody.appendChild(renderMarkdown(overviewMd));
+  primerBody.appendChild(renderMarkdown(composeSystemOverview(overviewMd)));
   details.appendChild(primerBody);
   wrap.appendChild(details);
 

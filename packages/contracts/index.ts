@@ -31,6 +31,7 @@ export * from "./annotations/annotations";
 export * from "./annotations/panel";
 export * from "./annotations/generatePanel";
 export * from "./annotations/manifest";
+export * from "./prompts/composer";
 
 export * from "./routing/router";
 

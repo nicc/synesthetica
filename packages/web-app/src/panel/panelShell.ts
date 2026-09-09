@@ -22,6 +22,13 @@ export interface PanelShellOptions {
   panelContent: Record<PanelId, () => HTMLElement | Promise<HTMLElement>>;
   /** Optional button labels; defaults are the panel ids capitalised. */
   labels?: Partial<Record<PanelId, string>>;
+  /**
+   * Fires every time the open panel changes (including close → null,
+   * and swap panelA → panelB). Lets callers persist first-run
+   * dismissal state or track panel usage without re-plumbing the
+   * shell internals.
+   */
+  onOpenChange?: (id: PanelId | null) => void;
 }
 
 export interface PanelShellHandle {
@@ -54,12 +61,14 @@ export function mountPanelShell(opts: PanelShellOptions): PanelShellHandle {
   const buttons = new Map<PanelId, HTMLButtonElement>();
 
   const setOpen = (id: PanelId | null) => {
+    const changed = openId !== id;
     openId = id;
     for (const [pid, btn] of buttons) {
       btn.classList.toggle("open", pid === id);
       btn.setAttribute("aria-pressed", pid === id ? "true" : "false");
     }
     overlay.hidden = id === null;
+    if (changed) opts.onOpenChange?.(id);
   };
 
   const openPanel = (id: PanelId) => {
