@@ -1,9 +1,3 @@
-# Synesthetica — system overview
-
-*This document is the authored prose portion of the `get_started` MCP tool response. The LLM calls `get_started` once per conversation for pipeline context. Written for an LLM operator; keep specific and load-bearing, not aspirational.*
-
----
-
 ## What Synesthetica is
 
 Synesthetica is a real-time music visualiser. A user plays an instrument (MIDI or acoustic, mic'd); the app renders visual output that represents what's being played — pitch, timing, chord content, dynamics. The user asks you (the LLM) to adjust how the visualisation reads: how much history to see, how strict the timing feedback is, which chord voicings register, how the palette is anchored.
@@ -41,7 +35,7 @@ Input → Adapter → Stabiliser → Vocabulary → Grammar → Renderer → Scr
 
 You interact with this pipeline through **MCP tools** — verbs like `set_macro`, `set_key`, and reader tools like `get_state`, `get_recent_events`, `list_inputs`, `list_presets`, `get_preset`. The server also exposes matching **resources** (`state://<label>/current`, `state://<label>/recent-events`, `annotations://`, `concepts://`, `presets://`) for user-triggered attachment, but Claude Desktop does not proxy resource reads through to the LLM as callable — so the reader tools are your autonomous read surface. Use tools; leave resources for the user to attach when they want to inspect something directly.
 
-**Every tool except `get_started` requires a `primer` argument.** This is a short token — currently `data.token` from your last `get_started` response — that the server checks statelessly. It ensures you've read the current primer before acting. If your token is missing or stale (the primer changed since you last read it), the call is rejected with `code: "PRIMER_INVALID"` and `details.primer` + `details.token` contain the fresh values — re-read the primer and retry with the new token in one round-trip; no need to call `get_started` again manually. Pass the token verbatim on every subsequent tool call in the conversation.
+**Every tool except `get_started` requires a `primer` argument** — the `data.token` from your last `get_started` response. The server checks it statelessly; missing or stale (primer changed since you last read it) returns `code: "PRIMER_INVALID"` with `details.primer` + `details.token` for one-round-trip recovery (no need to re-call `get_started`). Pass the token verbatim on every subsequent tool call.
 
 ---
 
@@ -56,21 +50,21 @@ The visualiser tab renders a control panel (Basics / Advanced / About tabs) that
 
 ## Session lifecycle
 
-The MCP server is always-on and cheap. The visualiser pipeline sits behind explicit tools:
+The visualiser pipeline sits behind explicit tools:
 
-- **`start_session`** — spawns the web-app subprocess + WS bridge + browser tab. Call this when the user signals musical intent (mentions playing, an instrument, tempo, rhythm, harmony, visualisation). Idempotent — a no-op if a session is already running.
-- **`stop_session`** — tears everything down. Call when the user says they're done (thanks / that's it / stop / close). Idempotent.
+- **`start_session`** — spawn the visualiser. Call when the user signals musical intent (mentions playing, an instrument, tempo, rhythm, harmony). Idempotent — a no-op if a session is running.
+- **`stop_session`** — tear it down. Call when the user says they're done (thanks / that's it / stop / close). Idempotent.
 
 Every setter tool (`set_macro`, `set_key`, etc.) and every reader tool (`get_state`, `get_recent_events`) requires a running session. Calling them cold returns `ENGINE_NOT_STARTED` — the LLM's cue to call `start_session` first and re-issue the original request. Standard flow for a musical request is: call `get_started` (once per conversation) → call `start_session` → user picks an input via `set_input` → do the requested work.
 
 `state.session.phase` distinguishes three lifecycle states:
 - **`no-session`** — pipeline hasn't started; call `start_session`.
-- **`spawned`** — pipeline is up and setter tools take effect on consumers, but no input adapter is running yet. `startedAt` is still null, no notes flowing. This is a real intermediate state — the visualiser exists but has nothing to visualise.
-- **`input-active`** — an input is selected; `startedAt` is stamped; events accrue. This is when the temporal-arithmetic guidance below is meaningful.
+- **`spawned`** — pipeline is up and setter tools take effect on consumers, but no input adapter is running yet. `startedAt` is null, no notes flow.
+- **`input-active`** — an input is selected; `startedAt` is stamped; events accrue. The temporal-arithmetic guidance below applies here.
 
 Prefer `state.session.phase` over `startedAt`/`effective` inference when reporting session state to the user — it names the `spawned` intermediate the other signals miss.
 
-`state.permissions` carries the browser's authorisation state for MIDI and microphone (`granted | prompt | denied` each). Values are derived from actual outcome — `granted` when the underlying API accepted, `denied` when it refused. `prompt` means we haven't asked yet: for MIDI, a brief window during page load before `requestMIDIAccess` resolves; for microphone, the normal state before the user picks audio input (getUserMedia hasn't been called). Do NOT tell the user to "click Allow" on a `prompt` value alone — for audio in particular, `prompt` just means "audio hasn't been used yet in this session." When `list_inputs` shows no MIDI entry, check `permissions.midi`: `denied` means the browser refused (re-enable via browser site settings); `granted` with no MIDI entry is when to suspect a cable; `prompt` in the milliseconds after `start_session` may be a race — re-read once.
+`state.permissions` carries the browser's authorisation state for MIDI and microphone (`granted | prompt | denied` each). Values are derived from actual outcome — `granted` when the underlying API accepted, `denied` when it refused. `prompt` means we haven't asked yet: for MIDI, a brief race window during page load before `requestMIDIAccess` resolves (re-read once); for microphone, the normal state before the user picks audio input (getUserMedia hasn't been called). Do NOT tell the user to "click Allow" on a `prompt` value alone. When `list_inputs` shows no MIDI entry: `denied` means the browser refused (re-enable via browser site settings); `granted` with no entry is when to suspect a cable.
 
 ---
 
@@ -117,7 +111,7 @@ When the user says something ambiguous, look at what surface they're asking abou
 
 ## Confidence
 
-Note events carry a `confidence` field (see `get_recent_events` for the exact shape). MIDI notes arrive at 1.0 (deterministic); audio notes arrive with model-reported values < 1.0. **Chord events do not currently carry a confidence field** — if you want to reason about chord ambiguity, aggregate the confidences of the constituent note-on events (matched by `noteId`). No grammar visually modulates on confidence today; the field is available if you want to surface ambiguity to the user rather than acting on it.
+Note events carry a `confidence` field (see `get_recent_events` for the exact shape). MIDI notes arrive at 1.0 (deterministic); audio notes arrive with model-reported values < 1.0. **Chord events do not currently carry a confidence field** — if you want to reason about chord ambiguity, aggregate the confidences of the constituent note-on events (matched by `noteId`). No grammar visually modulates on confidence today.
 
 ---
 

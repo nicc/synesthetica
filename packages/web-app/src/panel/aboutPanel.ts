@@ -173,12 +173,12 @@ function splitPipeRow(line: string): string[] {
 }
 
 /**
- * Handle inline markup: `code`, **bold**, *italic*. Left as-is
- * otherwise. Uses regex-based tokenisation — not robust for nested
- * markup, sufficient for the overview's simple usage.
+ * Handle inline markup: `code`, **bold**, *italic*, [text](url).
+ * Left as-is otherwise. Uses regex-based tokenisation — not robust
+ * for nested markup, sufficient for the overview's simple usage.
  */
 function appendInline(parent: HTMLElement, text: string): void {
-  const re = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
+  const re = /(\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
@@ -186,7 +186,19 @@ function appendInline(parent: HTMLElement, text: string): void {
       parent.appendChild(document.createTextNode(text.slice(last, m.index)));
     }
     const tok = m[0];
-    if (tok.startsWith("`")) {
+    if (tok.startsWith("[")) {
+      const linkMatch = tok.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      if (linkMatch) {
+        const a = document.createElement("a");
+        a.href = linkMatch[2];
+        a.textContent = linkMatch[1];
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        parent.appendChild(a);
+      } else {
+        parent.appendChild(document.createTextNode(tok));
+      }
+    } else if (tok.startsWith("`")) {
       const code = document.createElement("code");
       code.textContent = tok.slice(1, -1);
       parent.appendChild(code);
