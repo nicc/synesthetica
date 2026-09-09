@@ -68,7 +68,7 @@ Every setter tool (`set_macro`, `set_key`, etc.) and every reader tool (`get_sta
 
 Prefer `state.session.phase` over `startedAt`/`effective` inference when reporting session state to the user — it names the `spawned` intermediate the other signals miss.
 
-`state.permissions` carries the browser's authorisation state for MIDI and microphone (`granted | prompt | denied` each). `start_session` returns state directly, so you can read `state.permissions.midi` alongside `list_inputs` without a second call. When `list_inputs` looks shorter than expected — one entry (the microphone) when the user said a keyboard is plugged in — check permissions before assuming a cable problem: `midi: "prompt"` means the fix is "click Allow in the tab", not "check the cable".
+`state.permissions` carries the browser's authorisation state for MIDI and microphone (`granted | prompt | denied` each). Values are derived from actual outcome — `granted` when the underlying API accepted, `denied` when it refused. `prompt` means we haven't asked yet: for MIDI, a brief window during page load before `requestMIDIAccess` resolves; for microphone, the normal state before the user picks audio input (getUserMedia hasn't been called). Do NOT tell the user to "click Allow" on a `prompt` value alone — for audio in particular, `prompt` just means "audio hasn't been used yet in this session." When `list_inputs` shows no MIDI entry, check `permissions.midi`: `denied` means the browser refused (re-enable via browser site settings); `granted` with no MIDI entry is when to suspect a cable; `prompt` in the milliseconds after `start_session` may be a race — re-read once.
 
 ---
 

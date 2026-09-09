@@ -599,12 +599,22 @@ async function startAudioSession(deviceId?: string): Promise<void> {
       deviceId ? `Audio: device ${deviceId}` : "Audio: microphone",
       "success",
     );
+    // getUserMedia resolved — mic permission is granted for this
+    // origin. Ground truth beats the Permissions-API query's guess.
+    setPermission("audio", "granted");
     // Permission was just granted (or previously granted for this
     // origin) — enumerateDevices now returns real labels. Refresh
     // panel options so subsequent user selections see friendly names.
     void refreshInputOptions();
   } catch (err) {
     setStatus(`Audio failed: ${err instanceof Error ? err.message : String(err)}`, "error");
+    // Distinguish permission denial from other failures (device
+    // missing, over-constrained). NotAllowedError = user blocked mic;
+    // everything else is a capability / configuration problem where
+    // permission state is untouched by the failure.
+    if (err instanceof Error && err.name === "NotAllowedError") {
+      setPermission("audio", "denied");
+    }
     if (audioAdapter) {
       await audioAdapter.stop().catch(() => {
         /* best effort */
@@ -741,12 +751,19 @@ async function initMidi(): Promise<void> {
         : "This browser doesn't support Web MIDI. Try Chrome or Firefox for MIDI input; microphone input still works.",
       "warning",
     );
+    // No Web MIDI in this browser — permission can never be granted
+    // here. Mark denied so the LLM stops suggesting "click Allow".
+    setPermission("midi", "denied");
     return;
   }
 
   try {
     midiSource = new WebMidiSource();
     await midiSource.init();
+    // requestMIDIAccess resolved — user allowed (or previously
+    // allowed, or the browser doesn't gate this at all). This is the
+    // ground truth; overrides whatever the Permissions API said.
+    setPermission("midi", "granted");
     const count = midiSource.getInputs().length;
     const sysexNote = midiSource.hasSysExAccess() ? "" : " (SysEx denied — some devices may not appear)";
     setStatus(`MIDI: ${count} device(s) available${sysexNote}`);
@@ -814,6 +831,10 @@ async function initMidi(): Promise<void> {
     } else {
       setStatus(`MIDI unavailable: ${msg}`, "error");
     }
+    // requestMIDIAccess rejected — the user either blocked the prompt,
+    // Firefox needs the add-on, or the browser refused. From the LLM's
+    // POV, MIDI is unavailable and re-prompting won't help.
+    setPermission("midi", "denied");
   }
 }
 
@@ -940,6 +961,26 @@ async function queryPermissionsAndPublish(): Promise<void> {
   } catch {
     // Same.
   }
+}
+
+/**
+ * Overwrite the observed permission state and publish. Used by the
+ * initMidi / startAudioSession outcome paths, which have ground truth
+ * ("we actually got MIDIAccess", "getUserMedia rejected with
+ * NotAllowedError") that beats whatever the Permissions API's
+ * query-and-onchange path returned. See synesthetica-ktm0 — Chrome's
+ * Permissions API for MIDI doesn't reliably fire onchange when the
+ * user grants access via requestMIDIAccess, so state.permissions.midi
+ * would remain "prompt" even while a MIDI device was actively feeding
+ * events. This helper's callers wire the observation back into state.
+ */
+function setPermission(
+  kind: "midi" | "audio",
+  state: "granted" | "prompt" | "denied",
+): void {
+  if (engineState.permissions[kind] === state) return;
+  engineState.permissions[kind] = state;
+  publishState();
 }
 
 function mountWsReceiver(): void {
