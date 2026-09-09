@@ -201,6 +201,30 @@ for (const s of productionManifest.sessionControls) {
     );
   }
 }
+
+/* -----------------------------------------------------------------
+ * 6b. Human-facing prose present on widget-bearing annotations.
+ *     Every macro and every session control renders as a panel
+ *     widget (SPEC 013), so each should carry humanNotes for the
+ *     on-hover tooltip. Warn, don't error — a missing tooltip
+ *     degrades UX but doesn't break the panel.
+ * ----------------------------------------------------------------- */
+for (const m of productionManifest.macros) {
+  if (!m.humanNotes || m.humanNotes.length === 0) {
+    warn(
+      "humanNotes-missing",
+      `macro ${m.id}: no humanNotes[] — panel widget will have no tooltip`,
+    );
+  }
+}
+for (const s of productionManifest.sessionControls) {
+  if (!s.humanNotes || s.humanNotes.length === 0) {
+    warn(
+      "humanNotes-missing",
+      `sessionControl ${s.id}: no humanNotes[] — panel widget will have no tooltip`,
+    );
+  }
+}
 for (const t of productionManifest.tools ?? []) {
   if (!t.description || t.description.trim().length === 0) {
     err("tool-description", `${t.id}: empty description`);

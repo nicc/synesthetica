@@ -104,7 +104,7 @@ function macroWidget(m: MacroAnnotation): WidgetDescriptor {
   const base = {
     id: m.id,
     label: m.name ?? m.id,
-    tooltip: m.notes,
+    tooltip: m.humanNotes,
     aliases: m.aliases ?? [],
   };
   switch (m.type) {
@@ -166,7 +166,7 @@ function sessionWidget(
   const base = {
     id: s.id,
     label: s.name ?? s.id,
-    tooltip: s.notes,
+    tooltip: s.humanNotes,
     aliases: s.aliases ?? [],
   };
   switch (s.type) {
@@ -250,7 +250,7 @@ function pairWidget(
   return {
     id: s.id,
     label: s.name ?? s.id,
-    tooltip: s.notes,
+    tooltip: s.humanNotes,
     aliases: s.aliases ?? [],
     kind: "pair",
     children: [sessionWidget(a, index), sessionWidget(b, index)],

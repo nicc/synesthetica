@@ -50,6 +50,10 @@ const macros: MacroAnnotation[] = [
       "Seconds of chord memory. The value is always seconds regardless of prescribed tempo — do the bars↔seconds arithmetic yourself if the user asks in bars.",
       "Range comfortably under the stabilizer's 60-second progression window, so values here never silently clip.",
     ],
+    humanNotes: [
+      "How long each detected chord lingers in the harmony view before fading.",
+      "Low values keep only the current chord visible; high values let a whole progression accumulate on screen.",
+    ],
     consumers: [{ kind: "lens", id: "harmony-lens", macroKey: "linger" }],
   },
 
@@ -74,6 +78,10 @@ const macros: MacroAnnotation[] = [
     notes: [
       "Unit is chord detection window in ms.",
     ],
+    humanNotes: [
+      "How much time can pass between notes and still count as one chord.",
+      "Low values want block chords struck together; high values let arpeggios and rolled chords register as voicings.",
+    ],
     consumers: [{ kind: "stabilizer", id: "chord-detection", macroKey: "harmony:arpeggio-tolerance" }],
   },
 
@@ -97,6 +105,10 @@ const macros: MacroAnnotation[] = [
     },
     notes: [
       "Denotes the number of notes required to constitute a chord.",
+    ],
+    humanNotes: [
+      "Minimum number of notes sounding together before something is treated as a chord.",
+      "Raise it to keep two-note intervals from registering as chords; lower it to catch sparse voicings.",
     ],
     consumers: [{ kind: "stabilizer", id: "chord-detection", macroKey: "harmony:note-threshold" }],
   },
@@ -123,6 +135,10 @@ const macros: MacroAnnotation[] = [
       "Hysteresis or lag on chord detection.",
       "Unit is ms.",
     ],
+    humanNotes: [
+      "How long chord detection waits before switching to a new reading.",
+      "Higher values steady the chord surface; lower values react instantly and can flicker between ambiguous voicings.",
+    ],
     consumers: [{ kind: "stabilizer", id: "chord-detection", macroKey: "harmony:detection-stability" }],
   },
 
@@ -147,6 +163,10 @@ const macros: MacroAnnotation[] = [
     notes: [
       "Determines how long each note's velocity indicator lingers on the dynamics lens.",
       "Unit is ms.",
+    ],
+    humanNotes: [
+      "How long each velocity mark lingers on the dynamics lens after the note.",
+      "Low values emphasise the strike itself; high values build up a visible dynamics trail.",
     ],
     consumers: [{ kind: "lens", id: "dynamics-lens", macroKey: "linger" }],
   },
@@ -174,6 +194,10 @@ const macros: MacroAnnotation[] = [
       "Can be set independently of the compound time-horizon macro (which fans out to this leaf plus harmony:linger and dynamics:linger). Use rhythm:horizon to isolate rhythm's history without touching the other two lenses.",
       "Unit is decimal fraction of available space.",
     ],
+    humanNotes: [
+      "How much history — and, with a tempo set, how much lookahead — is visible on the rhythm timeline.",
+      "Low values keep the view tight around NOW; high values reveal recurring patterns and make upcoming beats easier to anticipate.",
+    ],
     consumers: [{ kind: "lens", id: "rhythm-lens", macroKey: "horizon" }],
   },
 
@@ -198,6 +222,10 @@ const macros: MacroAnnotation[] = [
     notes: [
       "Drift threshold in milliseconds. Notes whose onset falls within this window of the nearest beat subdivision render as 'tight' and suppress the streak-line motion cue.",
       "Unit is ms.",
+    ],
+    humanNotes: [
+      "How close to the beat a note has to land before the timing streak is suppressed.",
+      "Low values grade timing harshly and expose small drifts; high values forgive looser playing and hide the streaks.",
     ],
     consumers: [{ kind: "lens", id: "rhythm-lens", macroKey: "tightnessTolerance" }],
   },
@@ -224,6 +252,10 @@ const macros: MacroAnnotation[] = [
       "Multiplier applied to the note-history window for reference lines and streak markers.",
       "Unit is dimensionless multiplier (1.0 = fades with the note; 2.0 = twice as long).",
     ],
+    humanNotes: [
+      "How long the drift streaks and reference marks linger after the note itself has faded.",
+      "Low values keep the timeline clean; high values leave a persistent trail that accentuates timing inaccuracy.",
+    ],
     consumers: [{ kind: "lens", id: "rhythm-lens", macroKey: "referenceLinger" }],
   },
 
@@ -249,6 +281,10 @@ const macros: MacroAnnotation[] = [
       "Single dial that scales the beat-pulse decay, opacity boost, and value boost together. At 0.5 the pulse matches the historic baseline.",
       "Skipped in free-time mode (requires a prescribed tempo to have a beat to pulse on).",
     ],
+    humanNotes: [
+      "How prominent the beat pulse is on the NOW line — brighter peak and longer decay at higher values.",
+      "Only visible when a tempo is set; in free-time mode nothing pulses.",
+    ],
     consumers: [{ kind: "lens", id: "rhythm-lens", macroKey: "pulseIntensity" }],
   },
 
@@ -273,6 +309,10 @@ const macros: MacroAnnotation[] = [
       "To anchor a different pitch class instead — e.g. 'make G red' — use set_hue_for_pitch(7, 0); the server computes the equivalent reference value.",
       "Unit is degree on the colour wheel with red at 0.",
     ],
+    humanNotes: [
+      "Anchors the pitch C to a hue on the colour wheel (0° = red). Every other pitch class rotates from there, 30° per semitone.",
+      "Moving this dial rotates the whole palette together.",
+    ],
     consumers: [{ kind: "vocab", id: "musical-visual", macroKey: "system:colour-mapping:reference" }],
   },
 
@@ -296,6 +336,10 @@ const macros: MacroAnnotation[] = [
       "Determines the reference subdivision for timing drift analysis. Drift is measured as the signed distance from the note's onset to the nearest subdivision (not the nearest beat) — `beatMs / 4` for the default `16th`, `beatMs / 2` for `8th`, `beatMs` for `quarter`, `beatMs / 8` for `32nd`.",
       "Coarser resolutions are more likely to show inaccurate timing due to fewer matching grid divisions, which counter-intuitively feels stricter but is actually an easier timing intent; finer resolutions will look more forgiving by matching to more grid divisions but is actually grading to a more difficult intent.",
       "Read `state.macros.effective[\"rhythm:quantise-resolution\"]` before reporting drift verdicts to the user and name the actual subdivision in your answer — its value directly controls what the on-screen streak lines are measuring against.",
+    ],
+    humanNotes: [
+      "The subdivision that drift is measured against — the grid the timeline snaps to.",
+      "Finer resolutions (16ths, 32nds) match more grid points and look forgiving; coarser resolutions (quarters) leave larger gaps and expose more drift.",
     ],
     consumers: [{ kind: "lens", id: "rhythm-lens", macroKey: "quantiseResolution" }],
   },
@@ -324,6 +368,10 @@ const macros: MacroAnnotation[] = [
     },
     notes: [
       "Cross-lens shortcut. When you want to isolate one lens's history, use the per-lens macros (rhythm:horizon, harmony:linger, dynamics:linger) instead.",
+    ],
+    humanNotes: [
+      "One dial that stretches history and context across rhythm, harmony, and dynamics together.",
+      "Use the per-lens dials in Advanced (rhythm horizon, harmony linger, dynamics linger) if you only want to change one of them.",
     ],
   },
 
@@ -356,6 +404,10 @@ const macros: MacroAnnotation[] = [
     cautions: [
       "At maximum, tiny timing deviations become visible; can feel punishing.",
     ],
+    humanNotes: [
+      "One dial that pairs a narrower view with tighter drift grading — a practice knob for how demanding the rhythm view feels.",
+      "At high values even small timing wobbles surface; at low values the view is wide and generous.",
+    ],
   },
 
   {
@@ -380,6 +432,10 @@ const macros: MacroAnnotation[] = [
         tendsTo: ["emphasise pulse", "make timing feedback visible"],
       },
     },
+    humanNotes: [
+      "One dial that turns up beat pulses and lingering drift markers together.",
+      "Low values let harmony and dynamics dominate; high values push rhythm forward and make timing feedback more visible.",
+    ],
   },
 ];
 
@@ -400,6 +456,10 @@ const sessionControls: SessionControlAnnotation[] = [
     notes: [
       "MIDI device or audio input. Enumerate connected devices via the `list_inputs` tool; the currently-selected source is on `state.input` from `get_state`. (The panel widget populates from the same device list.)",
       "Audio device labels only appear after getUserMedia permission is granted for the origin (i.e. after at least one audio session has started). Before that, additional audio entries surface as placeholder names ('Audio input 1', etc.) alongside a 'Default microphone' fallback.",
+    ],
+    humanNotes: [
+      "The MIDI device or audio input Synesthetica is listening to. Switch inputs any time without restarting the session.",
+      "Audio devices show real names only after the browser has been granted microphone permission at least once.",
     ],
   },
 
@@ -429,6 +489,10 @@ const sessionControls: SessionControlAnnotation[] = [
       "Clear to disable functional harmony analysis.",
       "The same pitch-class encoding (0=C, 1=C♯/D♭, …, 11=B) is used by set_hue_for_pitch's pc argument.",
     ],
+    humanNotes: [
+      "The tonal centre. Sets the root of the key alongside Mode.",
+      "Clear it to turn off key-aware analysis; the harmony clock then labels chords by name only, without Roman numerals or borrowed-chord relationships.",
+    ],
   },
   {
     id: "session:mode",
@@ -449,6 +513,9 @@ const sessionControls: SessionControlAnnotation[] = [
       "Paired with session:tonic. Set both together via set_key(root, mode).",
       "Defaults to major (Ionian) when a tonic is set without an explicit mode.",
     ],
+    humanNotes: [
+      "The mode paired with the tonic — major, minor, or a modal flavour. Defaults to major when a tonic is picked without a mode.",
+    ],
   },
   {
     id: "session:key",
@@ -457,6 +524,9 @@ const sessionControls: SessionControlAnnotation[] = [
     pair: ["session:tonic", "session:mode"],
     nullable: true,
     notes: ["Composite of tonic + mode."],
+    humanNotes: [
+      "The prescribed key — tonic plus mode. Set both together, or clear to turn off key-aware harmony analysis.",
+    ],
   },
 
   // ---- Tempo ----
@@ -474,6 +544,10 @@ const sessionControls: SessionControlAnnotation[] = [
       "The system does not infer tempo from onset patterns — it must be set explicitly.",
       "Drives metronome.",
     ],
+    humanNotes: [
+      "Beats per minute. Setting a tempo turns on the beat grid, drift streaks, upcoming-beat lookahead, and the metronome click.",
+      "Clear it for free-time playing; the rhythm view then scrolls without a grid. Tempo is never inferred — you must set it.",
+    ],
   },
 
   // ---- Meter ----
@@ -486,6 +560,9 @@ const sessionControls: SessionControlAnnotation[] = [
     nullable: true,
     notes: [
       "The numerator of the time signature. Paired with session:beat-value; use set_meter(beats_per_bar, beat_value) to set both together.",
+    ],
+    humanNotes: [
+      "The top number of the time signature — how many beats are in each bar.",
     ],
   },
   {
@@ -504,6 +581,9 @@ const sessionControls: SessionControlAnnotation[] = [
     notes: [
       "The denominator of the time signature. Paired with session:beats-per-bar; use set_meter(beats_per_bar, beat_value) to set both together.",
     ],
+    humanNotes: [
+      "The bottom number of the time signature — which note value gets one beat (quarter, eighth, etc.).",
+    ],
   },
   {
     id: "session:meter",
@@ -513,6 +593,9 @@ const sessionControls: SessionControlAnnotation[] = [
     pair: ["session:beats-per-bar", "session:beat-value"],
     nullable: true,
     notes: ["Composite of beats-per-bar + beat-value."],
+    humanNotes: [
+      "The time signature — beats per bar and beat value together (e.g. 4/4, 6/8, 7/8).",
+    ],
   },
 
   // ---- Chord interpretation ----
@@ -529,6 +612,10 @@ const sessionControls: SessionControlAnnotation[] = [
     notes: [
       "How chord detection identifies the root. Harmonic mode identifies chords by pitch-class content, ignoring voicing/inversion. Bass-led mode uses the lowest sounding note as the chord root.",
     ],
+    humanNotes: [
+      "How chord roots are chosen: Harmonic reads the pitch-class content and ignores voicing; Bass-led always treats the lowest sounding note as the root.",
+      "Bass-led is useful when you want inversions labelled as slash chords (e.g. C/E) rather than folded back to root position.",
+    ],
   },
 
   // ---- Metronome ----
@@ -538,6 +625,9 @@ const sessionControls: SessionControlAnnotation[] = [
     type: "boolean",
     nullable: false,
     notes: ["Audible click on each beat when a tempo is prescribed."],
+    humanNotes: [
+      "Turns on an audible click on every beat. Requires a tempo to be set.",
+    ],
   },
 ];
 

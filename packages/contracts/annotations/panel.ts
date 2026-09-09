@@ -26,7 +26,7 @@ interface WidgetDescriptorBase {
   id: string;
   /** Display label from annotation.name (falls back to id). */
   label: string;
-  /** Hover-help paragraphs from annotation.notes (all of them,
+  /** Hover-help paragraphs from annotation.humanNotes (all of them,
    *  concatenated by the renderer as separate <p> blocks). */
   tooltip?: string[];
   /** Non-primary names from annotation.aliases, for the filter input. */

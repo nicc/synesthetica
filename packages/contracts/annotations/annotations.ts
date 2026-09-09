@@ -161,6 +161,16 @@ export interface MacroConsumer {
 
 /**
  * Fields common to every macro annotation regardless of shape.
+ *
+ * Notes are split by audience: `notes` speaks to the LLM operator
+ * (composed into the get_started primer; assumes tool-call context,
+ * mentions macro ids and effective/intents, etc.), while
+ * `humanNotes` speaks to the person using the visualiser panel
+ * (short, tooltip-appropriate — what does this control do to what
+ * I see and hear?). Skip humanNotes on macros that shouldn't ever
+ * show a tooltip; the panel renderer treats absent + empty as 'no
+ * tooltip'. The validator warns on missing humanNotes for any
+ * widget-bearing macro.
  */
 interface MacroAnnotationBase {
   id: string;                        // e.g. "time-horizon", "rhythm:difficulty"
@@ -168,7 +178,13 @@ interface MacroAnnotationBase {
   aliases?: string[];                // user-facing synonyms
   affects?: MusicalConcept[];
   traits?: VisualTrait[];
+  /** LLM-facing notes composed into the get_started primer. */
   notes?: string[];
+  /** Human-facing notes for the panel widget's on-hover tooltip.
+   *  Excludes LLM-specific framing (no tool-call shape, no primer
+   *  references, no `state.macros.effective` etc.). Short — 1–2
+   *  sentences per entry. */
+  humanNotes?: string[];
   cautions?: string[];
 }
 
@@ -303,7 +319,11 @@ interface SessionControlAnnotationBase {
   id: string;                        // e.g. "session:tempo", "input:source"
   name?: string;
   aliases?: string[];
+  /** LLM-facing notes composed into the get_started primer. */
   notes?: string[];
+  /** Human-facing notes for the panel widget's on-hover tooltip.
+   *  See MacroAnnotationBase.humanNotes for the split rationale. */
+  humanNotes?: string[];
   cautions?: string[];
   /**
    * Whether this control accepts null to clear. Session controls are
