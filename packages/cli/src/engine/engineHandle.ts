@@ -127,6 +127,9 @@ export interface EngineHandle {
   // -- State --
   getStateSnapshot(): Promise<StateSnapshot>;
   getRecentEvents(limit?: number, since?: number): Promise<RecentEventsEnvelope>;
+  /** Drop the recent-events buffer contents + diff state. Keeps the
+   *  pipeline subscription alive so subsequent frames repopulate. */
+  clearRecentEvents(): Promise<StateSnapshot>;
 
   // -- Discovery --
   /** Enumerate connected MIDI + audio inputs. Powers inputs://. */

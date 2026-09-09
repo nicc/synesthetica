@@ -190,6 +190,27 @@ export const getRecentEventsTool: ToolSpec = {
   },
 };
 
+export const clearRecentEventsTool: ToolSpec = {
+  name: "clear_recent_events",
+  description:
+    "Drop everything in the recent-events buffer. The visualiser is unaffected — only your `get_recent_events` history view is cleared. Use when the user explicitly asks for a fresh reading horizon; ask before calling if they haven't. Does NOT reset the session clock, adapters, macros, or session controls; those all carry on.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      instance: { type: "string" },
+    },
+    additionalProperties: false,
+  },
+  async handle(_args, engine: EngineHandle) {
+    try {
+      const state = await engine.clearRecentEvents();
+      return { ok: true as const, state };
+    } catch (e) {
+      return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
+    }
+  },
+};
+
 export function buildReadTools(presetStore: PresetStore): ToolSpec[] {
   const listPresetsTool: ToolSpec = {
     name: "list_presets",
@@ -252,6 +273,7 @@ export function buildReadTools(presetStore: PresetStore): ToolSpec[] {
     getStartedTool,
     getStateTool,
     getRecentEventsTool,
+    clearRecentEventsTool,
     listInputsTool,
     listPresetsTool,
     getPresetTool,

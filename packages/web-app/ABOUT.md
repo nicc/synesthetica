@@ -2,6 +2,6 @@ Synesthetica is a real-time music visualiser. It listens to MIDI or audio and dr
 
 Select an input and feed it music to get started. Give it a BPM to see a representation of time. Tell it what key you're in to see functional harmony. These are in the Basics tab.
 
-Try stuff or tell your LLM what you're trying to achieve. If you're using an LLM, don't be afraid to ask it about what or how you're playing. It can access the session's music history.
+Explore the controls or tell your LLM what you're trying to achieve. If you're using an LLM, don't be afraid to ask about what (or how) you're playing. It can access about an hour of sustained piano playing history.
 
 The brave and curious can see the full primer presented by the MCP server to LLMs below.

@@ -27,6 +27,7 @@ export type EngineMethod =
   | "savePreset"
   | "getStateSnapshot"
   | "getRecentEvents"
+  | "clearRecentEvents"
   | "getAvailableInputs";
 
 /**

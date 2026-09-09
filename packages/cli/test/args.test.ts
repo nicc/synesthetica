@@ -26,7 +26,7 @@ describe("parseArgs — start", () => {
     expect(cmd.options.instance).toBeNull();
     expect(cmd.options.transport).toBe("stdio");
     expect(cmd.options.mcpEnabled).toBe(true);
-    expect(cmd.options.recentEventsBufferSize).toBe(1000);
+    expect(cmd.options.recentEventsBufferSize).toBe(10_000);
     expect(cmd.options.logRetentionDays).toBe(7);
     expect(cmd.options.openBrowser).toBe(true);
     expect(cmd.options.webAppPort).toBeNull();

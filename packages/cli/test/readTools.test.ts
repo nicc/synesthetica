@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { StubEngineHandle } from "../src/engine/stubEngineHandle.js";
 import { createPresetStore } from "../src/presets/presetStore.js";
-import { getStartedTool, getStateTool, listInputsTool, getRecentEventsTool, buildReadTools } from "../src/tools/readTools.js";
+import { getStartedTool, getStateTool, listInputsTool, getRecentEventsTool, clearRecentEventsTool, buildReadTools } from "../src/tools/readTools.js";
 
 describe("get_recent_events", () => {
   it("returns the temporal envelope in data + current state in state", async () => {
@@ -31,6 +31,32 @@ describe("get_recent_events", () => {
     if (!withLimit.ok) return;
     const env = withLimit.data as { events: unknown[] };
     expect(env.events).toHaveLength(3);
+  });
+});
+
+describe("clear_recent_events", () => {
+  it("empties the recent-events buffer and returns current state", async () => {
+    const engine = new StubEngineHandle();
+    engine.startSession(Date.now() - 100);
+    engine.injectEvent("note-on", { pitch: 60 });
+    engine.injectEvent("note-on", { pitch: 62 });
+    // Before: buffer has events.
+    const before = await getRecentEventsTool.handle({}, engine);
+    expect(before.ok).toBe(true);
+    if (!before.ok) return;
+    expect((before.data as { events: unknown[] }).events).toHaveLength(2);
+
+    // Clear.
+    const cleared = await clearRecentEventsTool.handle({}, engine);
+    expect(cleared.ok).toBe(true);
+    if (!cleared.ok) return;
+    expect(cleared.state.instance).toBe("default");
+
+    // After: buffer is empty.
+    const after = await getRecentEventsTool.handle({}, engine);
+    expect(after.ok).toBe(true);
+    if (!after.ok) return;
+    expect((after.data as { events: unknown[] }).events).toHaveLength(0);
   });
 });
 

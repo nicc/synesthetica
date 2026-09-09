@@ -145,6 +145,6 @@ Single instance today (`default`). Every tool accepts an optional `instance` par
 ## Non-goals (things you cannot do)
 
 - **Switch or disable lenses.** All three lenses always run. You can only modulate them.
-- **Access history beyond the in-memory recent-events buffer.** `get_recent_events` returns at most the buffer's capacity (~1000 events, roughly 30–60s of active playing). Poll for new events with the `since` arg, but there's no full-session replay or on-disk history.
+- **Recall events from previous sessions.** `get_recent_events` reads a ring buffer sized for ~1 hour of typical sustained play (~10k events). Earlier sessions aren't persisted, and inside the current session the oldest events roll off once the buffer fills. When the session ends, all of its history is gone.
 - **Deselect an input while keeping the visualiser up.** There's no null-input op — the way to release an input is `stop_session`. If the user asks "stop listening but leave the visualiser", name it as a gap. To resume later with a fresh input choice, call `stop_session` and then `start_session` again — the second `start_session` on its own is idempotent while a session is running and does nothing, so the sequence has to be teardown-then-spawn.
 - **Change the pipeline architecture.** Adapter/stabiliser/lens routing is fixed at engine start.

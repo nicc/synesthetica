@@ -89,6 +89,21 @@ let wsReceiver: WsReceiverHandle | null = null;
 let recentEvents: RecentEventsBuffer | null = null;
 
 /**
+ * Recent-events buffer capacity, from the CLI-injected `buffer-size`
+ * query param (see SessionManager.buildOpenUrl). Falls back to a
+ * standalone-mode default sized for ~1hr of typical play at ~2–3
+ * events/sec — a natural token guard-rail: even if the LLM asks for
+ * `limit: 999999`, get_recent_events can only return what fits.
+ */
+const STANDALONE_RECENT_EVENTS_CAPACITY = 10_000;
+function parseRecentEventsBufferSize(): number {
+  const raw = new URLSearchParams(window.location.search).get("buffer-size");
+  if (raw === null) return STANDALONE_RECENT_EVENTS_CAPACITY;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : STANDALONE_RECENT_EVENTS_CAPACITY;
+}
+
+/**
  * Clear the recent-events buffer on session teardown. Called from
  * stopSession(); the buffer's dispose() cuts the subscription so no
  * stale frame captures leak across sessions.
@@ -449,7 +464,9 @@ function attachAdapter(adapter: RawMidiAdapter | AudioInputAdapter): void {
       renderer.attach(canvas);
     }
     if (!recentEvents) {
-      recentEvents = attachRecentEventsBuffer(pipeline!, { capacity: 1000 });
+      recentEvents = attachRecentEventsBuffer(pipeline!, {
+        capacity: parseRecentEventsBufferSize(),
+      });
     }
     // Prime partStates so pipeline.setMacro dispatch reaches
     // stabilizers on the first replay (partStates are created lazily
@@ -1015,6 +1032,14 @@ function mountWsReceiver(): void {
           now: sessionNow(),
           events,
         };
+      }
+      if (method === "clearRecentEvents") {
+        // Drop the buffer contents + diff state, keep the pipeline
+        // subscription alive so subsequent frames repopulate. Does
+        // NOT touch the session clock, adapters, macros, or any
+        // consumer state — only the LLM's history view is cleared.
+        recentEvents?.clear();
+        return snapshotCopy();
       }
       return applyEngineOp(method, args);
     },

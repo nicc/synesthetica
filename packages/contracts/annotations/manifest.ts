@@ -1090,7 +1090,7 @@ const tools: ToolAnnotation[] = [
   {
     id: "get_recent_events",
     description:
-      "Return recent musical events (note-on/off, chord-detected/changed) wrapped in a temporal envelope `{startedAt, now, events}`. Each event's `t` is milliseconds since startedAt. Read this to answer 'what did I just play?', 'summarise the last few chords', 'how long ago was that?'. This is your autonomous read surface for musical history — the matching `state://<label>/recent-events` resource carries the same content but exists for user-triggered attachment. `limit` defaults to 100 and is capped at 1000 (the buffer's in-memory capacity, ~30–60s of active playing).",
+      "Return recent musical events (note-on/off, chord-detected/changed) wrapped in a temporal envelope `{startedAt, now, events}`. Each event's `t` is milliseconds since startedAt. Read this to answer 'what did I just play?', 'summarise the last few chords', 'how long ago was that?'. This is your autonomous read surface for musical history — the matching `state://<label>/recent-events` resource carries the same content but exists for user-triggered attachment. `limit` defaults to 100 and is capped by the buffer (default 10k events, ~1 hour of typical play). Cross-session recall is a non-goal; earlier sessions aren't persisted.",
     aliases: ["recent activity", "what did I play", "recent events"],
     notes: [
       "Pull-only per SPEC 013 §I30 — musical activity at pipeline cadence would pump inference in some clients. Read when the LLM decides it needs context.",
@@ -1099,10 +1099,22 @@ const tools: ToolAnnotation[] = [
       "**Ordering:** `id` is strictly monotonic (safe to poll with `since:`). Within a single frame batch, `t` and `id` agree — the buffer sorts by `t` before assigning ids. Across batches `frameT` is monotonic but `t` is not guaranteed to be for audio-derived events (Basic Pitch onsets are inferred from a rolling model buffer and can lag `frameT` by model latency). MIDI is real-time and doesn't have this. Sort by `t` if strict musical order matters across batches on an audio session.",
       "**Event field shapes:** `note-on` carries `{ noteId, part, pitch (MIDI), pitchClass, octave, velocity, confidence }` — confidence is 1.0 for MIDI, model-reported for audio (< 1.0). `note-off` carries `{ noteId, part, pitch (MIDI), pitchClass, octave, velocity }` — pitch is repeated so the event stands alone; `noteId` matches the corresponding note-on if you need the confidence. `chord-detected` and `chord-changed` carry `{ chordId, part, voicing (MIDI), pitchClasses, bass, harmonic: {root, quality}, bassLed: {root, quality}, isInverted, inversion, previousChordId? }`. Chord events do NOT currently carry a confidence field — reason about note-level confidence from the constituent note-on events if you need it.",
       "`part` is a routing label (see the `part` concept). In v1 it's always `\"main\"` — don't group or filter by it and don't attempt to explain per-part behaviour to the user. Multi-part is planned but not shipped.",
+      "**Token budget.** Rough sizes: a note-on event is ~250 JSON bytes / ~80 tokens; a note-off ~200 bytes / ~65 tokens; a chord event ~600 bytes / ~180 tokens. Piano at 2–3 events/sec sustained means `limit: 100` returns ~30–40 sec of history at ~10–15k tokens. Higher limits scale linearly: `limit: 500` ≈ 60–80k tokens; `limit: 1000` ≈ 120–160k tokens. Prefer `since:` for polling — pull the delta since your last read rather than re-fetching a window. Reach for large `limit` only when you actually need the sweep (e.g. summarising an entire session on request).",
     ],
     examples: [
       "get_recent_events(limit: 20) — the last twenty events.",
       "get_recent_events(since: 143) — poll for events after the last id seen.",
+    ],
+  },
+
+  {
+    id: "clear_recent_events",
+    description:
+      "Drop everything in the recent-events buffer. The visualiser is unaffected — only the LLM's `get_recent_events` history view is cleared. The session clock, adapters, macros, and session controls all carry on. Use when the user explicitly asks for a fresh reading horizon (\"let's start over, ignore what I just played\"); ASK before calling if they didn't. Clearing means you lose access to prior events for reasoning — 'how has my playing changed' style questions won't have data from before the clear.",
+    aliases: ["clear history", "reset history", "fresh start", "forget what I played"],
+    notes: [
+      "This is a user-directed reset, not a token-management primitive. Prefer `since:` polling on `get_recent_events` to bound your own token usage; reach for `clear_recent_events` when the USER wants the buffer emptied.",
+      "Returns the current engine state (unchanged by the clear) for shape consistency with other tools.",
     ],
   },
 ];
