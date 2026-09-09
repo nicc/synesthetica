@@ -1,7 +1,7 @@
 /**
- * Test Chord Progression Grammar (RFC 006)
+ * Test Chord Progression Lens (RFC 006)
  *
- * A harmony-focused grammar that emphasizes chord progressions.
+ * A harmony-focused lens that emphasizes chord progressions.
  * Renders chords as expanding glows with a history trail.
  * Notes within chords are shown as small particles.
  *
@@ -11,7 +11,7 @@
  * - Notes belonging to chords as small particles within the glow
  * - Ignores beat/bar information
  *
- * This grammar demonstrates:
+ * This lens demonstrates:
  * - Filtering: ignores beats entirely
  * - History tracking: maintains chord progression trail
  * - Relationship awareness: renders notes that belong to chords differently
@@ -20,8 +20,8 @@
 
 import type {
   AnnotatedMusicalFrame,
-  IVisualGrammar,
-  GrammarContext,
+  IVisualLens,
+  LensContext,
   SceneFrame,
   Entity,
   EntityId,
@@ -56,8 +56,8 @@ interface ChordProgressionState {
 
 }
 
-export class TestChordProgressionGrammar implements IVisualGrammar {
-  readonly id = "test-chord-progression-grammar";
+export class TestChordProgressionLens implements IVisualLens {
+  readonly id = "test-chord-progression-lens";
 
   private state: ChordProgressionState = {
     chordHistory: [],
@@ -65,7 +65,7 @@ export class TestChordProgressionGrammar implements IVisualGrammar {
     historyWindowMs: 10000, // 10 seconds of history
   };
 
-  init(_ctx: GrammarContext): void {
+  init(_ctx: LensContext): void {
     this.state = {
       chordHistory: [],
       maxHistory: 8,
@@ -114,7 +114,7 @@ export class TestChordProgressionGrammar implements IVisualGrammar {
         const particleEntity = this.createNoteParticle(annotatedNote, t, part);
         entities.push(particleEntity);
       }
-      // Notes not in chords are ignored by this grammar
+      // Notes not in chords are ignored by this lens
     }
 
     // Note: We ignore input.bars (bar detection stabilizer never

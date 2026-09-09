@@ -2,9 +2,9 @@
  * Annotated Musical Frame Types (RFC 006, SPEC 010)
  *
  * Annotated frames combine musical elements with visual properties.
- * Visual vocabularies produce these; grammars consume them and decide how to render.
+ * Visual vocabularies produce these; lenses consume them and decide how to render.
  *
- * Key insight: vocabularies define words, grammars write sentences.
+ * Key insight: vocabularies define words, lenses write sentences.
  *
  * See RFC 006 for design rationale, SPEC 010 for visual vocabulary constraints.
  */
@@ -41,7 +41,7 @@ export type TextureId = string;
 
 /**
  * Reference to a resolved palette with actual colors.
- * Grammars use the resolved colors directly without needing to look up definitions.
+ * Lenses use the resolved colors directly without needing to look up definitions.
  */
 export interface PaletteRef {
   id: PaletteId;
@@ -80,7 +80,7 @@ export interface MotionAnnotation {
  * Visual properties assigned by rulesets to musical elements.
  *
  * These define "what this looks like" without specifying "what shape it is".
- * Grammars interpret these properties through their own rendering logic.
+ * Lenses interpret these properties through their own rendering logic.
  */
 export interface VisualAnnotation {
   /** Color palette for this element */
@@ -181,7 +181,7 @@ export type MarginStyle =
 
 /**
  * Complete chord shape geometry.
- * Invariant I18: This geometry is computed by the vocabulary, not grammars.
+ * Invariant I18: This geometry is computed by the vocabulary, not lenses.
  */
 export interface ChordShapeGeometry {
   /** All elements (wedges and lines) in the shape */
@@ -219,7 +219,7 @@ export interface GlyphArc {
 
 /**
  * Complete Roman numeral glyph geometry.
- * Produced by the vocabulary, consumed by grammars.
+ * Produced by the vocabulary, consumed by lenses.
  * Invariant I19: glyphs are geometric paths, not rendered text.
  */
 export interface RomanNumeralGlyph {
@@ -264,7 +264,7 @@ export interface AnnotatedNote {
  *
  * References are one-directional (chord → notes) to keep stabilizer logic simple.
  * Chords already track their constituent noteIds from detection.
- * Grammars that need to find which chord a note belongs to can iterate
+ * Lenses that need to find which chord a note belongs to can iterate
  * through chords and check noteIds membership - the data volume is small.
  */
 export interface AnnotatedChord {
@@ -282,7 +282,7 @@ export interface AnnotatedChord {
 }
 
 // AnnotatedRhythm removed 2026-08-20 with the removal of tempo/beat
-// inference. Grammars read prescribed tempo/meter directly from the
+// inference. Lenses read prescribed tempo/meter directly from the
 // frame's prescribed* fields for their visualisation logic.
 
 /**
@@ -335,13 +335,13 @@ export interface AnnotatedDynamics {
 
 /**
  * The output of a ruleset: musical elements annotated with visual properties.
- * Grammars receive this and decide how to render each element.
+ * Lenses receive this and decide how to render each element.
  *
- * Grammars are aware of musical element categories (notes, chords, beats, etc.)
+ * Lenses are aware of musical element categories (notes, chords, beats, etc.)
  * but not musical analysis details (pitch class, chord quality, key).
  * They use visual annotations to style their chosen representations.
  *
- * Critical design constraint: Because grammars don't know chord quality,
+ * Critical design constraint: Because lenses don't know chord quality,
  * the ruleset MUST assign visually consistent annotations to similar musical
  * concepts. All minor chords must share visual characteristics that distinguish
  * them from major chords. This is the ruleset's core responsibility.
@@ -350,15 +350,15 @@ export interface AnnotatedMusicalFrame {
   t: Ms;
   part: PartId;
 
-  /** Annotated notes - grammars decide how/whether to render */
+  /** Annotated notes - lenses decide how/whether to render */
   notes: AnnotatedNote[];
 
-  /** Annotated chords - grammars decide how/whether to render */
+  /** Annotated chords - lenses decide how/whether to render */
   chords: AnnotatedChord[];
 
   /**
    * Recent chord progression (IDs only, references chords array).
-   * Ordered oldest to newest. Useful for grammars showing harmonic movement.
+   * Ordered oldest to newest. Useful for lenses showing harmonic movement.
    */
   progression: ChordId[];
 
@@ -379,12 +379,12 @@ export interface AnnotatedMusicalFrame {
   /**
    * Pitch-hue invariant applied by the vocabulary. Anchors the
    * pipeline's colour mapping (which pitch class → which hue,
-   * which direction the wheel rotates). Any grammar that derives
-   * colours from pitch classes (HarmonyGrammar for numerals +
+   * which direction the wheel rotates). Any lens that derives
+   * colours from pitch classes (HarmonyLens for numerals +
    * connector strips + scrolling roman-numeral strip) MUST read
    * this from the frame rather than holding its own copy — one
    * source of truth per session prevents colour drift between
-   * grammars when the mapping is retuned.
+   * lenses when the mapping is retuned.
    */
   hueInvariant: PitchHueInvariant;
 

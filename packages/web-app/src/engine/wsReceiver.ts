@@ -46,7 +46,7 @@ export interface WsReceiverHandle {
   publishStateChanged(snapshot: EngineStateSnapshot): void;
   /**
    * Signal to the CLI that the browser has finished wiring the
-   * VisualPipeline (grammars + vocab + stabilizer factories). The
+   * VisualPipeline (lenses + vocab + stabilizer factories). The
    * SessionManager holds `start_session` open awaiting this before
    * returning ok:true to the LLM. Idempotent from the receiver's
    * side — if already sent this connection, it's a no-op.

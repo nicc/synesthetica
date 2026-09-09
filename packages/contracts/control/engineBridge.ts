@@ -238,7 +238,7 @@ export interface EngineStateChangedMessage {
 
 /**
  * Sent by the browser once it has instantiated the VisualPipeline
- * with all grammars / vocab / stabilizer factories and is ready to
+ * with all lenses / vocab / stabilizer factories and is ready to
  * receive engine calls that mutate consumer state. Distinct from
  * `hello` (which is the pre-init WS handshake) — see SPEC 014
  * §Lifecycle. SessionManager.start() on the CLI awaits this

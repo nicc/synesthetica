@@ -30,9 +30,9 @@ import {
   ChordDetectionStabilizer,
   HarmonyStabilizer,
   MusicalVisualVocabulary,
-  RhythmGrammar,
-  HarmonyGrammar,
-  DynamicsGrammar,
+  RhythmLens,
+  HarmonyLens,
+  DynamicsLens,
   DynamicsStabilizer,
   IdentityCompositor,
   Metronome,
@@ -372,7 +372,7 @@ window.addEventListener("resize", () => {
  * Split into two phases (SPEC 014 §Lifecycle):
  *
  * 1. initializePipeline() — runs on page load. Builds the pipeline
- *    with all consumers (grammars, vocab, stabilizer factories) but
+ *    with all consumers (lenses, vocab, stabilizer factories) but
  *    NO adapter and NO render loop. LLM setter calls arriving after
  *    this reach real consumers immediately.
  *
@@ -409,9 +409,9 @@ function initializePipeline(): void {
   pipeline.addStabilizerFactory(() => new HarmonyStabilizer({ partId: PIPELINE_PART_ID }));
   vocabulary = new MusicalVisualVocabulary();
   pipeline.setVocabulary(vocabulary);
-  pipeline.addGrammar(new RhythmGrammar());
-  pipeline.addGrammar(new HarmonyGrammar());
-  pipeline.addGrammar(new DynamicsGrammar());
+  pipeline.addLens(new RhythmLens());
+  pipeline.addLens(new HarmonyLens());
+  pipeline.addLens(new DynamicsLens());
   pipeline.setCompositor(new IdentityCompositor());
   // Publish the phase transition to "spawned" so the CLI's cached
   // state reflects it. Without this the CLI stays at emptyState()

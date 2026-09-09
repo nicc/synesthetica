@@ -1,5 +1,5 @@
 /**
- * RhythmGrammar - Production rhythm visualization
+ * RhythmLens - Production rhythm visualization
  *
  * Guitar Hero-style vertical scrolling:
  * - Time flows bottom-to-top (future approaches from below, past scrolls up)
@@ -21,8 +21,8 @@
 
 import type {
   AnnotatedMusicalFrame,
-  IVisualGrammar,
-  GrammarContext,
+  IVisualLens,
+  LensContext,
   SceneFrame,
   Entity,
   EntityId,
@@ -36,7 +36,7 @@ import type {
 // ============================================================================
 
 /**
- * Rhythm grammar occupies the central column between dynamics
+ * Rhythm lens occupies the central column between dynamics
  * and harmony columns. See layout.ts for the three-column system.
  */
 import { RHYTHM_LEFT, RHYTHM_RIGHT } from "./layout";
@@ -107,8 +107,8 @@ interface CachedDrift {
   label: string;
 }
 
-interface RhythmGrammarState {
-  ctx: GrammarContext | null;
+interface RhythmLensState {
+  ctx: LensContext | null;
 }
 
 type Tier = 1 | 2 | 3;
@@ -122,8 +122,8 @@ interface PrescribedContext {
 /** Subdivision depth options (notched macro) */
 type SubdivisionDepth = "quarter" | "8th" | "16th" | "32nd";
 
-/** Macro parameters for the grammar */
-interface RhythmGrammarMacros {
+/** Macro parameters for the lens */
+interface RhythmLensMacros {
   /** Field of vision (0 = minimal, 1 = full) */
   horizon: number;
   /** Which subdivision to use for drift calculation */
@@ -166,17 +166,17 @@ function derivePulseParams(intensity: number): {
 }
 
 // ============================================================================
-// Grammar Implementation
+// Lens Implementation
 // ============================================================================
 
-export class RhythmGrammar implements IVisualGrammar {
-  readonly id = "rhythm-grammar";
+export class RhythmLens implements IVisualLens {
+  readonly id = "rhythm-lens";
 
-  private state: RhythmGrammarState = {
+  private state: RhythmLensState = {
     ctx: null,
   };
 
-  private macros: RhythmGrammarMacros = {
+  private macros: RhythmLensMacros = {
     horizon: 1.0, // Default to full view
     quantiseResolution: "16th", // Default to finest subdivision
     referenceLinger: DEFAULT_REFERENCE_LINGER_MULTIPLIER,
@@ -190,7 +190,7 @@ export class RhythmGrammar implements IVisualGrammar {
   private driftCache: Map<string, CachedDrift> = new Map();
 
 
-  init(ctx: GrammarContext): void {
+  init(ctx: LensContext): void {
     this.state = { ctx };
     this.driftCache.clear();
   }
@@ -201,16 +201,16 @@ export class RhythmGrammar implements IVisualGrammar {
   }
 
   /** Set macro values (for exploration/testing) */
-  setMacros(macros: Partial<RhythmGrammarMacros>): void {
+  setMacros(macros: Partial<RhythmLensMacros>): void {
     this.macros = { ...this.macros, ...macros };
   }
 
   /** Get current macro values */
-  getMacros(): RhythmGrammarMacros {
+  getMacros(): RhythmLensMacros {
     return { ...this.macros };
   }
 
-  /** IVisualGrammar.readMacros — same shape as getMacros, widened. */
+  /** IVisualLens.readMacros — same shape as getMacros, widened. */
   readMacros(): Record<string, number | string> {
     return { ...this.macros };
   }
@@ -872,7 +872,7 @@ export class RhythmGrammar implements IVisualGrammar {
     return PITCH_MARGIN_LEFT + (pc / 11) * usableWidth;
   }
 
-  // timeToY moved to ./timeMapping so other grammars can phase-lock to
+  // timeToY moved to ./timeMapping so other lenses can phase-lock to
   // the same horizon. Uses TIME_HORIZON_* constants, not the visible
   // windows (those filter what's shown, not where it's positioned).
 

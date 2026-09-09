@@ -1,15 +1,15 @@
 /**
- * HarmonyGrammar Tests
+ * HarmonyLens Tests
  *
- * Tests the harmony grammar with chord shape visualization.
+ * Tests the harmony lens with chord shape visualization.
  * Run with GENERATE_SNAPSHOTS=1 to generate SVG files for visual review.
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { HarmonyGrammar } from "../../src/grammars/HarmonyGrammar";
+import { HarmonyLens } from "../../src/lenses/HarmonyLens";
 import { buildChordShape } from "../../src/vocabularies/utils";
 import type {
-  GrammarContext,
+  LensContext,
   AnnotatedChord,
   PitchClass,
   MusicalChord,
@@ -24,7 +24,7 @@ import { resolve } from "path";
 // Test Fixtures
 // ============================================================================
 
-const ctx: GrammarContext = {
+const ctx: LensContext = {
   canvasSize: { width: 800, height: 600 },
   rngSeed: 12345,
   part: "main",
@@ -130,21 +130,21 @@ function maybeWriteSnapshot(name: string, svg: string): void {
 // Tests
 // ============================================================================
 
-describe("HarmonyGrammar", () => {
-  let grammar: HarmonyGrammar;
+describe("HarmonyLens", () => {
+  let lens: HarmonyLens;
 
   beforeEach(() => {
-    grammar = new HarmonyGrammar();
-    grammar.init(ctx);
+    lens = new HarmonyLens();
+    lens.init(ctx);
   });
 
   describe("interface compliance", () => {
     it("has correct id", () => {
-      expect(grammar.id).toBe("harmony-grammar");
+      expect(lens.id).toBe("harmony-lens");
     });
 
     it("implements init and dispose", () => {
-      const g = new HarmonyGrammar();
+      const g = new HarmonyLens();
       g.init(ctx);
       g.dispose();
       // Should not throw
@@ -155,7 +155,7 @@ describe("HarmonyGrammar", () => {
     it("returns scene frame with entities", () => {
       const chord = createTestChord(0, "maj", [0, 4, 7]);
       const frame = createTestFrame(1000, chord, 0.2);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       expect(scene.t).toBe(1000);
       expect(scene.entities.length).toBeGreaterThan(0);
@@ -165,7 +165,7 @@ describe("HarmonyGrammar", () => {
     it("creates chord shape entity in harmony column", () => {
       const chord = createTestChord(0, "maj", [0, 4, 7]);
       const frame = createTestFrame(1000, chord, 0.2);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       const chordEntity = scene.entities.find(
         (e) => e.data?.type === "chord-shape"
@@ -179,20 +179,20 @@ describe("HarmonyGrammar", () => {
     it("passes dashed margin through entity data for sus chords", () => {
       const sus2 = createTestChord(0, "sus2", [0, 2, 7]);
       const frame2 = createTestFrame(1000, sus2, 0.2);
-      const scene2 = grammar.update(frame2, null);
+      const scene2 = lens.update(frame2, null);
       const entity2 = scene2.entities.find((e) => e.data?.type === "chord-shape");
       expect(entity2?.data?.margin).toBe("dash-short");
 
       const sus4 = createTestChord(0, "sus4", [0, 5, 7]);
       const frame4 = createTestFrame(1000, sus4, 0.2);
-      const scene4 = grammar.update(frame4, null);
+      const scene4 = lens.update(frame4, null);
       const entity4 = scene4.entities.find((e) => e.data?.type === "chord-shape");
       expect(entity4?.data?.margin).toBe("dash-long");
     });
 
     it("handles no chords gracefully", () => {
       const frame = createTestFrame(1000, null, 0);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       // No chord shape, no tension bar (disabled by default)
       expect(scene.entities.length).toBe(0);
@@ -212,7 +212,7 @@ describe("HarmonyGrammar", () => {
         },
         // no prescribedKey
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const progEntities = scene.entities.filter(
         (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
       );
@@ -233,7 +233,7 @@ describe("HarmonyGrammar", () => {
           ],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const progEntities = scene.entities.filter(
         (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
       );
@@ -261,7 +261,7 @@ describe("HarmonyGrammar", () => {
           ],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const progEntities = scene.entities.filter(
         (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
       );
@@ -297,7 +297,7 @@ describe("HarmonyGrammar", () => {
           ],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const stripEntities = scene.entities.filter(
         (e) => e.data?.type === "connector-strip",
       );
@@ -333,7 +333,7 @@ describe("HarmonyGrammar", () => {
           functionalEdges: [],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const stripEntities = scene.entities.filter(
         (e) => e.data?.type === "connector-strip",
       );
@@ -366,7 +366,7 @@ describe("HarmonyGrammar", () => {
           ],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const arcs = scene.entities.filter(
         (e) => e.data?.type === "connector-arc",
       );
@@ -414,7 +414,7 @@ describe("HarmonyGrammar", () => {
           ],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const arc = scene.entities.find(
         (e) => e.data?.type === "connector-arc",
       )!;
@@ -454,7 +454,7 @@ describe("HarmonyGrammar", () => {
           ],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       expect(scene.entities.filter((e) => e.data?.type === "connector-arc")).toHaveLength(1);
       expect(scene.entities.filter((e) => e.data?.type === "connector-strip")).toHaveLength(1);
     });
@@ -486,7 +486,7 @@ describe("HarmonyGrammar", () => {
           ],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       expect(scene.entities.filter((e) => e.data?.type === "connector-strip")).toHaveLength(1);
     });
 
@@ -527,7 +527,7 @@ describe("HarmonyGrammar", () => {
           ],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const arcs = scene.entities.filter(
         (e) => e.data?.type === "connector-arc",
       );
@@ -581,7 +581,7 @@ describe("HarmonyGrammar", () => {
           ],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const arcs = scene.entities.filter(
         (e) => e.data?.type === "connector-arc",
       );
@@ -636,7 +636,7 @@ describe("HarmonyGrammar", () => {
           ],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const arrows = scene.entities.filter(
         (e) => e.data?.type === "connector-arrow",
       );
@@ -684,7 +684,7 @@ describe("HarmonyGrammar", () => {
           ],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const arrows = scene.entities.filter(
         (e) => e.data?.type === "connector-arrow",
       );
@@ -729,7 +729,7 @@ describe("HarmonyGrammar", () => {
           ],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const arcIds = scene.entities
         .filter((e) => e.data?.type === "connector-arc")
         .map((e) => e.id);
@@ -757,7 +757,7 @@ describe("HarmonyGrammar", () => {
           ],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const progEntities = scene.entities.filter(
         (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
       );
@@ -780,7 +780,7 @@ describe("HarmonyGrammar", () => {
           ],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       const bars = scene.entities.filter((e) => e.id.includes(":strip-bar:"));
       const glyphs = scene.entities.filter((e) => e.id.includes(":strip-glyph:"));
@@ -803,7 +803,7 @@ describe("HarmonyGrammar", () => {
           ],
         },
       });
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const glyphs = scene.entities
         .filter((e) => e.id.includes(":strip-glyph:"))
         .sort((a, b) => (a.position?.y ?? 0) - (b.position?.y ?? 0));
@@ -820,7 +820,7 @@ describe("HarmonyGrammar", () => {
     it("renders major triad", () => {
       const chord = createTestChord(0, "maj", [0, 4, 7]);
       const frame = createTestFrame(1000, chord, 0.1);
-      const svg = grammar.renderToSVG(frame);
+      const svg = lens.renderToSVG(frame);
 
       expect(svg).toContain("<svg");
       expect(svg).toContain("</svg>");
@@ -833,7 +833,7 @@ describe("HarmonyGrammar", () => {
     it("renders minor triad with wavy margin", () => {
       const chord = createTestChord(0, "min", [0, 3, 7]);
       const frame = createTestFrame(1000, chord, 0.15);
-      const svg = grammar.renderToSVG(frame);
+      const svg = lens.renderToSVG(frame);
 
       expect(svg).toContain("<svg");
       maybeWriteSnapshot("minor-triad", svg);
@@ -842,7 +842,7 @@ describe("HarmonyGrammar", () => {
     it("renders dominant 7th with medium tension", () => {
       const chord = createTestChord(7, "dom7", [0, 4, 7, 10]);
       const frame = createTestFrame(1000, chord, 0.45);
-      const svg = grammar.renderToSVG(frame);
+      const svg = lens.renderToSVG(frame);
 
       expect(svg).toContain("<svg");
       maybeWriteSnapshot("dominant-7th", svg);
@@ -851,7 +851,7 @@ describe("HarmonyGrammar", () => {
     it("renders diminished 7th with high tension", () => {
       const chord = createTestChord(0, "dim7", [0, 3, 6, 9]);
       const frame = createTestFrame(1000, chord, 0.75);
-      const svg = grammar.renderToSVG(frame);
+      const svg = lens.renderToSVG(frame);
 
       expect(svg).toContain("<svg");
       maybeWriteSnapshot("diminished-7th", svg);
@@ -860,7 +860,7 @@ describe("HarmonyGrammar", () => {
     it("renders augmented triad", () => {
       const chord = createTestChord(0, "aug", [0, 4, 8]);
       const frame = createTestFrame(1000, chord, 0.35);
-      const svg = grammar.renderToSVG(frame);
+      const svg = lens.renderToSVG(frame);
 
       expect(svg).toContain("<svg");
       maybeWriteSnapshot("augmented-triad", svg);
@@ -869,7 +869,7 @@ describe("HarmonyGrammar", () => {
     it("renders sus4 chord with long dash margin", () => {
       const chord = createTestChord(0, "sus4", [0, 5, 7]);
       const frame = createTestFrame(1000, chord, 0.25);
-      const svg = grammar.renderToSVG(frame);
+      const svg = lens.renderToSVG(frame);
 
       expect(svg).toContain("<svg");
       expect(svg).toContain('stroke-dasharray="6,3"');
@@ -879,7 +879,7 @@ describe("HarmonyGrammar", () => {
     it("renders sus2 chord with short dash margin", () => {
       const chord = createTestChord(0, "sus2", [0, 2, 7]);
       const frame = createTestFrame(1000, chord, 0.2);
-      const svg = grammar.renderToSVG(frame);
+      const svg = lens.renderToSVG(frame);
 
       expect(svg).toContain("<svg");
       expect(svg).toContain('stroke-dasharray="3,3"');
@@ -896,7 +896,7 @@ describe("HarmonyGrammar", () => {
 
       for (const chord of chords) {
         const frame = createTestFrame(1000, chord, 0.3);
-        const svg = grammar.renderToSVG(frame);
+        const svg = lens.renderToSVG(frame);
         expect(svg).not.toContain("stroke-dasharray");
       }
     });
@@ -904,7 +904,7 @@ describe("HarmonyGrammar", () => {
     it("renders major 9th with extensions", () => {
       const chord = createTestChord(0, "maj7", [0, 4, 7, 11, 2]);
       const frame = createTestFrame(1000, chord, 0.3);
-      const svg = grammar.renderToSVG(frame);
+      const svg = lens.renderToSVG(frame);
 
       expect(svg).toContain("<svg");
       maybeWriteSnapshot("major-9th", svg);
@@ -912,7 +912,7 @@ describe("HarmonyGrammar", () => {
 
     it("renders empty frame (no chord)", () => {
       const frame = createTestFrame(1000, null, 0);
-      const svg = grammar.renderToSVG(frame);
+      const svg = lens.renderToSVG(frame);
 
       expect(svg).toContain("<svg");
       expect(svg).not.toContain("linearGradient");
@@ -939,19 +939,19 @@ describe("HarmonyGrammar", () => {
           },
         });
 
-      const grammar2 = new HarmonyGrammar();
-      grammar2.init(ctx);
+      const lens2 = new HarmonyLens();
+      lens2.init(ctx);
 
       // Default: 3 seconds fade, age 4000 ms → past fade → 0 numerals
-      const defaultScene = grammar2.update(buildFrame(5000), null);
+      const defaultScene = lens2.update(buildFrame(5000), null);
       const defaultProg = defaultScene.entities.filter(
         (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
       );
       expect(defaultProg).toHaveLength(0);
 
       // Extended: 6 seconds fade → still visible
-      grammar2.setMacros({ linger: 6 });
-      const longScene = grammar2.update(buildFrame(5000), null);
+      lens2.setMacros({ linger: 6 });
+      const longScene = lens2.update(buildFrame(5000), null);
       const longProg = longScene.entities.filter(
         (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
       );
@@ -959,12 +959,12 @@ describe("HarmonyGrammar", () => {
     });
 
     it("getMacros returns current values; setMacros is partial", () => {
-      const grammar2 = new HarmonyGrammar();
-      const before = grammar2.getMacros();
-      grammar2.setMacros({ linger: 8 });
-      expect(grammar2.getMacros().linger).toBe(8);
-      grammar2.setMacros({});
-      expect(grammar2.getMacros().linger).toBe(8);
+      const lens2 = new HarmonyLens();
+      const before = lens2.getMacros();
+      lens2.setMacros({ linger: 8 });
+      expect(lens2.getMacros().linger).toBe(8);
+      lens2.setMacros({});
+      expect(lens2.getMacros().linger).toBe(8);
       // Verify default matched PROGRESSION_FADE_VALUE (3).
       expect(before.linger).toBe(3);
     });

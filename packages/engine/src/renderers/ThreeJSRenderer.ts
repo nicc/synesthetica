@@ -13,7 +13,7 @@
  *
  * ## Coordinate System
  *
- * - Input: Normalized coordinates (0-1) from grammars
+ * - Input: Normalized coordinates (0-1) from lenses
  * - Output: World space where viewport maps to a configurable size
  * - Z-axis available for depth (0 = camera plane, negative = away)
  */
@@ -469,7 +469,7 @@ export class ThreeJSRenderer implements IRenderer {
    * Render a thin guide ring at the progression wheel using Line2 +
    * LineMaterial so the stroke is anti-aliased (LineBasicMaterial draws
    * raw GL lines that read as jaggy on most GPUs).
-   * data.radius is a normalized [0,1] x-axis length matching grammar
+   * data.radius is a normalized [0,1] x-axis length matching lens
    * coords; it scales to worldWidth so the ring is a true circle in
    * world space. linewidth is in screen pixels, so the line stays
    * crisp regardless of parent scale.
@@ -616,7 +616,7 @@ export class ThreeJSRenderer implements IRenderer {
     // strip prominently gestures toward the chord that originated
     // the relationship.
     // plateauFraction is required on connector-strip entity data —
-    // no fallback. The entity contract requires the grammar to supply
+    // no fallback. The entity contract requires the lens to supply
     // it; treating missing as an error surfaces contract drift
     // immediately rather than silently rendering with a stale default.
     const plateau = data.plateauFraction as number | undefined;
@@ -1458,10 +1458,10 @@ export class ThreeJSRenderer implements IRenderer {
   /**
    * Render a tension bar.
    *
-   * Currently no grammar emits 'tension-bar' entities — the handler
-   * exists ready for the harmony grammar's tension extension to
+   * Currently no lens emits 'tension-bar' entities — the handler
+   * exists ready for the harmony lens's tension extension to
    * light up. Producer + shape decisions live in
-   * synesthetica-xc0 (harmony grammar extension: tension from
+   * synesthetica-xc0 (harmony lens extension: tension from
    * functional harmony); it will draw on the tension value already
    * computed by HarmonyStabilizer.computeTension (also cross-
    * referenced there).

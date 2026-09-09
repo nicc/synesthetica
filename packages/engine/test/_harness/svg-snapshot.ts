@@ -1,7 +1,7 @@
 /**
  * SVG Snapshot Generator
  *
- * Renders SceneFrame entities to SVG for visual review during grammar development.
+ * Renders SceneFrame entities to SVG for visual review during lens development.
  * SVG files can be opened in a browser to see the visual output without running the app.
  *
  * Usage:
@@ -85,7 +85,7 @@ function hsvaToCSS(color: ColorHSVA): string {
  * Render a single entity to SVG elements.
  * Positions are in normalized coordinates (0-1), scaled to canvas size.
  *
- * The grammar's entity `type` (from data.type) is used to determine special rendering:
+ * The lens's entity `type` (from data.type) is used to determine special rendering:
  * - "now-line", "beat-line", "bar-line": Rendered as horizontal lines across canvas
  * - "reference-line": Rendered as short horizontal line through note position
  * - "streak": Rendered as tapered line using velocity for direction
@@ -102,7 +102,7 @@ function renderEntity(entity: Entity, width: number, height: number, showLabels:
 
   const elements: string[] = [];
 
-  // Check for special rhythm grammar types first
+  // Check for special rhythm lens types first
   if (type === "now-line") {
     // NOW line: bright horizontal line across full width
     elements.push(

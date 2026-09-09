@@ -7,8 +7,8 @@ export * from "./stabilizers";
 // Visual Vocabularies (formerly "rulesets")
 export * from "./vocabularies";
 
-// Grammars
-export * from "./grammars";
+// Lenses
+export * from "./lenses";
 
 // Compositor
 export { IdentityCompositor } from "./stubs/IdentityCompositor";

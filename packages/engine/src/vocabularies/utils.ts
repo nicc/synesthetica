@@ -63,7 +63,7 @@ function isAlteration(
 
 /**
  * Builds chord shape geometry from a chord interpretation and its voicing.
- * Invariant I18: This algorithm is fixed; grammars cannot compute shapes.
+ * Invariant I18: This algorithm is fixed; lenses cannot compute shapes.
  *
  * @param interpretation - The chord reading (harmonic or bass-led) to render
  * @param voicing - The actual pitches played (for brightness and interval extraction)

@@ -27,7 +27,7 @@
  * - `hysteresisMs`: How long new chord must be stable before switching (default 50ms)
  *   - Prevents flickering between ambiguous interpretations
  *
- * These can be combined into a "chord stability" macro at the grammar level.
+ * These can be combined into a "chord stability" macro at the lens level.
  *
  * @see IMusicalStabilizer for the stabilizer contract
  */

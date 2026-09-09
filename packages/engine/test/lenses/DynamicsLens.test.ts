@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
-  DynamicsGrammar,
+  DynamicsLens,
   OUTLINE_THICKNESS,
-} from "../../src/grammars/DynamicsGrammar";
+} from "../../src/lenses/DynamicsLens";
 import type {
-  GrammarContext,
+  LensContext,
   DynamicsState,
   Entity,
 } from "@synesthetica/contracts";
 import { createTestAnnotatedFrame } from "../_harness/frames";
 
-const ctx: GrammarContext = {
+const ctx: LensContext = {
   canvasSize: { width: 800, height: 600 },
   rngSeed: 12345,
   part: "main",
@@ -35,7 +35,7 @@ import {
   BAR_TOP,
   BAR_BOTTOM,
   BAR_HEIGHT,
-} from "../../src/grammars/layout";
+} from "../../src/lenses/layout";
 
 /** Filter to just indicator entities (exclude outline + ticks) */
 function indicators(entities: Entity[]): Entity[] {
@@ -49,18 +49,18 @@ function chrome(entities: Entity[]): Entity[] {
   );
 }
 
-describe("DynamicsGrammar", () => {
-  let grammar: DynamicsGrammar;
+describe("DynamicsLens", () => {
+  let lens: DynamicsLens;
 
   beforeEach(() => {
-    grammar = new DynamicsGrammar();
-    grammar.init(ctx);
+    lens = new DynamicsLens();
+    lens.init(ctx);
   });
 
   describe("outline and ticks", () => {
     it("always emits outline and tick entities", () => {
       const frame = createTestFrame(1000, EMPTY_DYNAMICS);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const chromeEnts = chrome(scene.entities);
 
       // 4 outline edges + 6 ticks (left + right at 25%, 50%, 75%)
@@ -69,7 +69,7 @@ describe("DynamicsGrammar", () => {
 
     it("outline is four rect edges using dynamics-indicator type", () => {
       const frame = createTestFrame(1000, EMPTY_DYNAMICS);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const outlines = scene.entities.filter((e) => e.id.includes(":outline-"));
 
       expect(outlines).toHaveLength(4);
@@ -80,7 +80,7 @@ describe("DynamicsGrammar", () => {
 
     it("outline sits within left 1/6 margin", () => {
       const frame = createTestFrame(1000, EMPTY_DYNAMICS);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const outlines = scene.entities.filter((e) => e.id.includes(":outline-"));
 
       for (const o of outlines) {
@@ -93,7 +93,7 @@ describe("DynamicsGrammar", () => {
 
     it("ticks are at 25%, 50%, 75% of bar height", () => {
       const frame = createTestFrame(1000, EMPTY_DYNAMICS);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const ticks = scene.entities.filter((e) => e.id.includes(":tick:"));
 
       expect(ticks).toHaveLength(3);
@@ -113,7 +113,7 @@ describe("DynamicsGrammar", () => {
   describe("indicator production", () => {
     it("produces no indicator entities with empty dynamics", () => {
       const frame = createTestFrame(1000, EMPTY_DYNAMICS);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       expect(indicators(scene.entities)).toHaveLength(0);
     });
@@ -133,7 +133,7 @@ describe("DynamicsGrammar", () => {
       };
 
       const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       expect(indicators(scene.entities)).toHaveLength(2);
     });
@@ -153,7 +153,7 @@ describe("DynamicsGrammar", () => {
       };
 
       const frame = createTestFrame(2500, dynamics);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       expect(indicators(scene.entities)).toHaveLength(1);
     });
@@ -167,7 +167,7 @@ describe("DynamicsGrammar", () => {
       };
 
       const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const ind = indicators(scene.entities)[0];
 
       expect(ind.data?.type).toBe("dynamics-indicator");
@@ -185,7 +185,7 @@ describe("DynamicsGrammar", () => {
 
       // At significant age the width still stays constant
       const frame = createTestFrame(1500, dynamics);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const ind = indicators(scene.entities)[0];
 
       expect(ind.data?.x).toBeCloseTo(BAR_LEFT + OUTLINE_THICKNESS, 4);
@@ -203,7 +203,7 @@ describe("DynamicsGrammar", () => {
 
       // Aged so thickness is near max
       const frame = createTestFrame(1500, dynamics);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const inds = indicators(scene.entities);
 
       for (const ind of inds) {
@@ -220,8 +220,8 @@ describe("DynamicsGrammar", () => {
         events: [{ t: 500, intensity: 0.5 }],
       };
 
-      const fresh = grammar.update(createTestFrame(500, dynamics), null);
-      const aged = grammar.update(createTestFrame(1500, dynamics), null);
+      const fresh = lens.update(createTestFrame(500, dynamics), null);
+      const aged = lens.update(createTestFrame(1500, dynamics), null);
 
       const freshH = indicators(fresh.entities)[0].data?.h as number;
       const agedH = indicators(aged.entities)[0].data?.h as number;
@@ -238,7 +238,7 @@ describe("DynamicsGrammar", () => {
       };
 
       const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const inds = indicators(scene.entities);
 
       expect(inds[0].style.opacity).toBeCloseTo(0.25, 2);
@@ -251,7 +251,7 @@ describe("DynamicsGrammar", () => {
       };
 
       const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       expect(indicators(scene.entities)[0].style.opacity).toBeCloseTo(0.9, 2);
     });
@@ -263,7 +263,7 @@ describe("DynamicsGrammar", () => {
       };
 
       const frame = createTestFrame(1500, dynamics);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const inds = indicators(scene.entities);
 
       expect(inds).toHaveLength(1);
@@ -282,7 +282,7 @@ describe("DynamicsGrammar", () => {
       };
 
       const frame = createTestFrame(1000, dynamics);
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
       const inds = indicators(scene.entities);
 
       const loudY = inds[0].data?.y as number;
@@ -303,22 +303,22 @@ describe("DynamicsGrammar", () => {
       };
       const sample = createTestFrame(2000, dynamics);
 
-      const defaultScene = grammar.update(sample, null);
+      const defaultScene = lens.update(sample, null);
       expect(indicators(defaultScene.entities)).toHaveLength(1);
 
-      grammar.setMacros({ linger: 500 });
-      const shortScene = grammar.update(sample, null);
+      lens.setMacros({ linger: 500 });
+      const shortScene = lens.update(sample, null);
       expect(indicators(shortScene.entities)).toHaveLength(0);
     });
 
     it("setMacros is partial — only supplied fields update", () => {
-      grammar.setMacros({ linger: 1000 });
-      expect(grammar.getMacros().linger).toBe(1000);
+      lens.setMacros({ linger: 1000 });
+      expect(lens.getMacros().linger).toBe(1000);
 
       // A second partial set doesn't reset unrelated fields (there
       // are none right now, but the pattern is what's under test).
-      grammar.setMacros({});
-      expect(grammar.getMacros().linger).toBe(1000);
+      lens.setMacros({});
+      expect(lens.getMacros().linger).toBe(1000);
     });
   });
 
@@ -332,8 +332,8 @@ describe("DynamicsGrammar", () => {
         ],
       };
 
-      const scene1 = grammar.update(createTestFrame(1000, dynamics), null);
-      const scene2 = grammar.update(createTestFrame(1100, dynamics), scene1);
+      const scene1 = lens.update(createTestFrame(1000, dynamics), null);
+      const scene2 = lens.update(createTestFrame(1100, dynamics), scene1);
 
       const ids1 = indicators(scene1.entities)
         .map((e) => e.id)

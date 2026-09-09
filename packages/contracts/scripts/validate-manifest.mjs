@@ -43,7 +43,7 @@ function checkUniqueIds(name, arr, keyFn = (x) => x.id) {
 checkUniqueIds("macro", productionManifest.macros);
 checkUniqueIds("sessionControl", productionManifest.sessionControls);
 checkUniqueIds("concept", productionManifest.concepts, (c) => c.term);
-checkUniqueIds("grammar", productionManifest.grammars);
+checkUniqueIds("lens", productionManifest.lenses);
 checkUniqueIds("tool", productionManifest.tools ?? []);
 checkUniqueIds("preset", productionManifest.presets ?? []);
 checkUniqueIds("resource", productionManifest.resources ?? [], (r) => r.uri);
@@ -125,7 +125,7 @@ for (const m of productionManifest.macros) {
  *     (SPEC 014 §Wiring coverage) asserts each entry's macros[key]
  *     is actually implemented on the named consumer.
  * ----------------------------------------------------------------- */
-const grammarIds = new Set(productionManifest.grammars.map((g) => g.id));
+const lensIds = new Set(productionManifest.lenses.map((g) => g.id));
 // Stabilizer + vocab ids aren't listed in the manifest today; declare
 // the shipping set here. Adding a new one is a two-line change (this
 // list + the runtime coverage test).
@@ -150,7 +150,7 @@ for (const m of productionManifest.macros) {
       err("macro-consumers", `${m.id}: consumer entry is not an object`);
       continue;
     }
-    if (!["grammar", "stabilizer", "vocab"].includes(c.kind)) {
+    if (!["lens", "stabilizer", "vocab"].includes(c.kind)) {
       err("macro-consumers", `${m.id}: unknown consumer kind '${c.kind}'`);
     }
     if (typeof c.id !== "string" || c.id.length === 0) {
@@ -160,8 +160,8 @@ for (const m of productionManifest.macros) {
       err("macro-consumers", `${m.id}: consumer.macroKey missing`);
     }
     const registry =
-      c.kind === "grammar"
-        ? grammarIds
+      c.kind === "lens"
+        ? lensIds
         : c.kind === "stabilizer"
           ? stabilizerIds
           : vocabIds;
@@ -230,5 +230,5 @@ if (errors.length > 0) {
   process.exit(1);
 }
 console.log(
-  `manifest validation OK — ${productionManifest.macros.length} macros, ${productionManifest.sessionControls.length} session controls, ${productionManifest.concepts.length} concepts, ${productionManifest.grammars.length} grammars, ${(productionManifest.tools ?? []).length} tools, ${(productionManifest.resources ?? []).length} resources`,
+  `manifest validation OK — ${productionManifest.macros.length} macros, ${productionManifest.sessionControls.length} session controls, ${productionManifest.concepts.length} concepts, ${productionManifest.lenses.length} lenses, ${(productionManifest.tools ?? []).length} tools, ${(productionManifest.resources ?? []).length} resources`,
 );

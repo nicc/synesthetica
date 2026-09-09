@@ -1,10 +1,10 @@
-# Grammar Glossary
+# Lens Glossary
 
-Terms used in the grammar visualization systems. Organized by grammar.
+Terms used in the lens visualization systems. Organized by lens.
 
 ---
 
-# Harmony Grammar
+# Harmony Lens
 
 ## Harmony Clock
 
@@ -37,7 +37,7 @@ The visual afterimage of a released chord on the harmony clock. On release, brig
 
 ---
 
-# Rhythm Grammar
+# Rhythm Lens
 
 ## Time and Positioning
 

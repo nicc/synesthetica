@@ -6,7 +6,7 @@ Web application shell for the Synesthetica pipeline.
 
 This app provides:
 - A working end-to-end demo: MIDI in → visuals out
-- A test harness for ruleset and grammar iteration
+- A test harness for ruleset and lens iteration
 - Proof that the contract-based architecture works
 
 ## What It Does
@@ -75,7 +75,7 @@ WebMidiSource → RawMidiAdapter → VisualPipeline
                                       ↓
                          MusicalVisualRuleset (MusicalFrame → AnnotatedMusicalFrame)
                                       ↓
-                         TestRhythmGrammar + TestChordProgressionGrammar
+                         TestRhythmLens + TestChordProgressionLens
                          (AnnotatedMusicalFrame → SceneFrame)
                                       ↓
                               IdentityCompositor
@@ -90,8 +90,8 @@ WebMidiSource → RawMidiAdapter → VisualPipeline
 - **NoteTrackingStabilizer**: Tracks note lifecycle (attack → sustain → release)
 - **ChordDetectionStabilizer**: Detects chords from active notes
 - **MusicalVisualRuleset**: Annotates musical elements with visual properties (palette, texture, motion)
-- **TestRhythmGrammar**: Renders beats and notes as timing markers (ignores chords)
-- **TestChordProgressionGrammar**: Renders chords as glows with history trail (ignores beats)
+- **TestRhythmLens**: Renders beats and notes as timing markers (ignores chords)
+- **TestChordProgressionLens**: Renders chords as glows with history trail (ignores beats)
 - **IdentityCompositor**: Simple pass-through (multi-part composition comes later)
 - **Canvas2DRenderer**: Draws entities as shapes on canvas
 
@@ -136,7 +136,7 @@ WebMidiSource → RawMidiAdapter → VisualPipeline
 ## Next Steps
 
 - Better rulesets (harmonic tension, phrase awareness, richer palette system)
-- More expressive grammars (trails, fields, glyphs)
+- More expressive lenses (trails, fields, glyphs)
 - Enhanced stabilizers (phrase detection, progression tracking)
 - Multi-part support
 - Preset system

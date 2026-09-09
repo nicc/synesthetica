@@ -28,7 +28,7 @@ import {
   type MacroAnnotation,
   type SessionControlAnnotation,
   type SystemConceptAnnotation,
-  type GrammarAnnotation,
+  type LensAnnotation,
   type ToolAnnotation,
   type ResourceAnnotation,
   type DerivedStateAnnotation,
@@ -89,7 +89,7 @@ export function computePrimerToken(text: string): string {
 
 /**
  * Composes the full system-overview text: authored narrative +
- * generated reference (macros, session controls, concepts, grammars,
+ * generated reference (macros, session controls, concepts, lenses,
  * tools, resources, session-time, presets). Exported so the
  * `get_started` MCP tool can return the same body without any
  * duplication of content.
@@ -114,7 +114,7 @@ function composeSystemOverviewUncached(): string {
     "",
     "# Full reference (auto-generated from the annotation manifest)",
     "",
-    "Every macro, session control, concept, and grammar the engine exposes appears below. Ranges, directionality, and notes come directly from the manifest — use these values when composing tool calls. Per-URI `annotations://` reads carry the same content and remain available when a client proxies resource reads or the user attaches them explicitly; Claude Desktop currently reaches them only via user-triggered attach.",
+    "Every macro, session control, concept, and lens the engine exposes appears below. Ranges, directionality, and notes come directly from the manifest — use these values when composing tool calls. Per-URI `annotations://` reads carry the same content and remain available when a client proxies resource reads or the user attaches them explicitly; Claude Desktop currently reaches them only via user-triggered attach.",
     "",
     "## Macros",
     "",
@@ -138,9 +138,9 @@ function composeSystemOverviewUncached(): string {
     "",
     productionManifest.concepts.map(renderConcept).join("\n\n"),
     "",
-    "## Grammars",
+    "## Lenses",
     "",
-    productionManifest.grammars.map(renderGrammar).join("\n\n"),
+    productionManifest.lenses.map(renderLens).join("\n\n"),
     "",
     "## Tools",
     "",
@@ -217,7 +217,7 @@ function renderToolResultShape(): string {
     "",
     "StateSnapshot's `macros` field is split into two views:",
     "- `intents`: the last value asked for per macro — populated by `set_macro`, `set_hue_for_pitch`, `switch_preset` (repopulates with the preset's stored values), AND panel widget edits (the user dragging a slider in the visualiser tab dispatches through the same path as the LLM tools). Includes compound macros keyed by their compound id.",
-    "- `effective`: sourced from consumer runtime — the values grammars/stabilizers/vocab are actually running with. Compound macros do NOT appear here (their leaves do).",
+    "- `effective`: sourced from consumer runtime — the values lenses/stabilizers/vocab are actually running with. Compound macros do NOT appear here (their leaves do).",
     "- Read `intents` to answer 'what has been asked for?' (by anyone — you or the user via the panel). Read `effective` to answer 'what is the pipeline actually doing right now?'.",
     "- The two views can legitimately disagree — a compound macro was set (intents holds the compound id) and then one of its leaves was overridden directly (via a tool call, a panel edit, or a preset apply + tweak). Treat divergence as information, not automatically as a bug; only surface it if the user asks or if it clearly contradicts a value they just set.",
     "- **Reporting policy when reading back to the user**: when you just set a value and effective matches intents, state the value plainly ('linger's at 6 now'). When they differ AND the user just asked, name both ('you asked for 8 but the pipeline's showing 6'). When they differ silently (unrelated read), stay quiet unless the delta looks large or contradicts a recent instruction.",
@@ -441,7 +441,7 @@ function renderConcept(c: SystemConceptAnnotation): string {
   return lines.join("\n");
 }
 
-function renderGrammar(g: GrammarAnnotation): string {
+function renderLens(g: LensAnnotation): string {
   const lines: string[] = [`### \`${g.id}\` — ${g.name ?? g.id}`];
   if (g.aliases?.length) lines.push(`Aliases: ${g.aliases.join(", ")}`);
   if (g.illustrates?.length) lines.push(`Illustrates: ${g.illustrates.join(", ")}`);

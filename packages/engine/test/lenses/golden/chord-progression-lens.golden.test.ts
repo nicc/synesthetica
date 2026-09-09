@@ -1,7 +1,7 @@
 /**
- * Golden Tests: TestChordProgressionGrammar
+ * Golden Tests: TestChordProgressionLens
  *
- * Tests the AnnotatedMusicalFrame → SceneFrame boundary for the chord grammar.
+ * Tests the AnnotatedMusicalFrame → SceneFrame boundary for the chord lens.
  * Verifies that annotated musical frames produce correct scene entities.
  */
 
@@ -15,13 +15,13 @@ import type {
   AnnotatedNote,
   AnnotatedChord,
   SceneFrame,
-  GrammarContext,
+  LensContext,
   PitchClass,
 } from "@synesthetica/contracts";
-import { TestChordProgressionGrammar } from "../../../src/grammars/TestChordProgressionGrammar";
+import { TestChordProgressionLens } from "../../../src/lenses/TestChordProgressionLens";
 
 /**
- * Expected output shape for grammar fixtures.
+ * Expected output shape for lens fixtures.
  */
 interface ExpectedOutput {
   entityCount: number;
@@ -31,7 +31,7 @@ interface ExpectedOutput {
   historyCount?: number;
 }
 
-type GrammarSequenceFixture = SequenceFixture<AnnotatedMusicalFrame, ExpectedOutput>;
+type LensSequenceFixture = SequenceFixture<AnnotatedMusicalFrame, ExpectedOutput>;
 
 /**
  * Compare actual SceneFrame against expected output.
@@ -82,32 +82,32 @@ function compareOutput(actual: SceneFrame, expected: ExpectedOutput): void {
   }
 }
 
-describe("TestChordProgressionGrammar golden tests", () => {
-  const ctx: GrammarContext = {
+describe("TestChordProgressionLens golden tests", () => {
+  const ctx: LensContext = {
     canvasSize: { width: 1920, height: 1080 },
     rngSeed: 12345,
     part: "main",
   };
 
   // Load all sequence fixtures
-  const fixtures = loadFixturesFromDir<GrammarSequenceFixture>(
-    "grammar/chord-progression"
+  const fixtures = loadFixturesFromDir<LensSequenceFixture>(
+    "lens/chord-progression"
   ).filter(f => f.steps !== undefined);
 
   for (const fixture of fixtures) {
     describe(fixture.name, () => {
-      let grammar: TestChordProgressionGrammar;
+      let lens: TestChordProgressionLens;
 
       beforeEach(() => {
-        grammar = new TestChordProgressionGrammar();
-        grammar.init(ctx);
+        lens = new TestChordProgressionLens();
+        lens.init(ctx);
       });
 
       it(fixture.description, () => {
         let previous: SceneFrame | null = null;
 
         for (const step of fixture.steps) {
-          const actual = grammar.update(step.input, previous);
+          const actual = lens.update(step.input, previous);
 
           try {
             compareOutput(actual, step.expected);
@@ -125,11 +125,11 @@ describe("TestChordProgressionGrammar golden tests", () => {
 
   // Inline tests for common scenarios
   describe("inline tests", () => {
-    let grammar: TestChordProgressionGrammar;
+    let lens: TestChordProgressionLens;
 
     beforeEach(() => {
-      grammar = new TestChordProgressionGrammar();
-      grammar.init(ctx);
+      lens = new TestChordProgressionLens();
+      lens.init(ctx);
     });
 
     it("produces chord glow for active chords", () => {
@@ -138,7 +138,7 @@ describe("TestChordProgressionGrammar golden tests", () => {
         noteCount: 3,
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       const chordGlow = scene.entities.find(e => e.data?.type === "chord-glow");
       expect(chordGlow).toBeDefined();
@@ -152,7 +152,7 @@ describe("TestChordProgressionGrammar golden tests", () => {
         noteCount: 0,
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       const chordGlow = scene.entities.find(e => e.data?.type === "chord-glow");
       expect(chordGlow).toBeDefined();
@@ -167,7 +167,7 @@ describe("TestChordProgressionGrammar golden tests", () => {
         noteIds: ["n1", "n2", "n3"],
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       const noteParticles = scene.entities.filter(e => e.data?.type === "chord-note");
       expect(noteParticles.length).toBe(3);
@@ -181,7 +181,7 @@ describe("TestChordProgressionGrammar golden tests", () => {
         noteIds: ["n1", "n2", "n3"], // Only n1 is in the chord
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       // Should only render the one note that's in the chord
       const noteParticles = scene.entities.filter(e => e.data?.type === "chord-note");
@@ -195,7 +195,7 @@ describe("TestChordProgressionGrammar golden tests", () => {
         hasPrescribedTempo: true,
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       const rhythmEntities = scene.entities.filter(e => e.data?.type === "rhythm-pulse" || e.data?.type === "division-indicator");
       expect(rhythmEntities.length).toBe(0);
@@ -214,8 +214,8 @@ describe("TestChordProgressionGrammar golden tests", () => {
         noteCount: 0,
       });
 
-      const scene1 = grammar.update(frame1, null);
-      const scene2 = grammar.update(frame2, scene1);
+      const scene1 = lens.update(frame1, null);
+      const scene2 = lens.update(frame2, scene1);
 
       // Scene 2 should have history entry for C major
       const historyEntities = scene2.entities.filter(e => e.data?.type === "chord-history");
@@ -228,7 +228,7 @@ describe("TestChordProgressionGrammar golden tests", () => {
         noteCount: 0,
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       const chordGlow = scene.entities.find(e => e.data?.type === "chord-glow");
       expect(chordGlow).toBeDefined();
@@ -241,7 +241,7 @@ describe("TestChordProgressionGrammar golden tests", () => {
         noteCount: 0,
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       const chordGlow = scene.entities.find(e => e.data?.type === "chord-glow");
       expect(chordGlow).toBeDefined();
@@ -258,7 +258,7 @@ describe("TestChordProgressionGrammar golden tests", () => {
         noteCount: 0,
       });
 
-      const scene = grammar.update(frame, null);
+      const scene = lens.update(frame, null);
 
       const glows = scene.entities.filter(e => e.data?.type === "chord-glow");
       expect(glows.length).toBe(2);

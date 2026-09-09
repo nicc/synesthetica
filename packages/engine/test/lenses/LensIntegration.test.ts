@@ -1,42 +1,42 @@
 /**
- * Grammar Integration Tests
+ * Lens Integration Tests
  *
  * Tests the annotated musical frame architecture by:
- * 1. Running grammars (rhythm, chord) on mock data
- * 2. Verifying each grammar produces coherent output
+ * 1. Running lenses (rhythm, chord) on mock data
+ * 2. Verifying each lens produces coherent output
  * 3. Compositing outputs and evaluating the result
  *
  * Success criteria:
- * - Each grammar produces valid SceneFrame with expected entity types
- * - Grammars correctly filter (rhythm ignores chords, chord ignores beats)
+ * - Each lens produces valid SceneFrame with expected entity types
+ * - Lenses correctly filter (rhythm ignores chords, chord ignores beats)
  * - Both respect visual annotations (palette colors are used)
  * - Composed output doesn't degrade into visual mud
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { RhythmGrammar } from "../../src/grammars/RhythmGrammar";
-import { TestChordProgressionGrammar } from "../../src/grammars/TestChordProgressionGrammar";
+import { RhythmLens } from "../../src/lenses/RhythmLens";
+import { TestChordProgressionLens } from "../../src/lenses/TestChordProgressionLens";
 import { IdentityCompositor } from "../../src/stubs/IdentityCompositor";
 import { mockFrameSequence, frame1, frame3 } from "../_fixtures/frames/annotated-sequences";
-import type { GrammarContext, SceneFrame } from "@synesthetica/contracts";
+import type { LensContext, SceneFrame } from "@synesthetica/contracts";
 
-describe("Grammar Integration", () => {
-  const ctx: GrammarContext = {
+describe("Lens Integration", () => {
+  const ctx: LensContext = {
     canvasSize: { width: 1920, height: 1080 },
     rngSeed: 12345,
     part: "main",
   };
 
-  describe("TestChordProgressionGrammar", () => {
-    let grammar: TestChordProgressionGrammar;
+  describe("TestChordProgressionLens", () => {
+    let lens: TestChordProgressionLens;
 
     beforeEach(() => {
-      grammar = new TestChordProgressionGrammar();
-      grammar.init(ctx);
+      lens = new TestChordProgressionLens();
+      lens.init(ctx);
     });
 
     it("produces entities for chords", () => {
-      const scene = grammar.update(frame1, null);
+      const scene = lens.update(frame1, null);
 
       expect(scene.t).toBe(0);
       expect(scene.entities.length).toBeGreaterThan(0);
@@ -50,10 +50,10 @@ describe("Grammar Integration", () => {
     });
 
     it("ignores rhythm information", () => {
-      const scene = grammar.update(frame1, null);
+      const scene = lens.update(frame1, null);
 
       // Frame 1 has rhythm information
-      // But chord grammar should produce no rhythm-related entities
+      // But chord lens should produce no rhythm-related entities
       const rhythmEntities = scene.entities.filter(
         (e) => e.data?.type === "beat-line" ||
                e.data?.type === "bar-line" ||
@@ -65,7 +65,7 @@ describe("Grammar Integration", () => {
     });
 
     it("renders notes belonging to chords as particles", () => {
-      const scene = grammar.update(frame1, null);
+      const scene = lens.update(frame1, null);
 
       // Frame 1 has 3 notes all belonging to C major chord
       const noteParticles = scene.entities.filter(
@@ -79,7 +79,7 @@ describe("Grammar Integration", () => {
       let previousScene: SceneFrame | null = null;
 
       for (let i = 0; i < 4; i++) {
-        previousScene = grammar.update(mockFrameSequence[i], previousScene);
+        previousScene = lens.update(mockFrameSequence[i], previousScene);
       }
 
       // By frame 4, we should have history entries for C major and A minor
@@ -93,7 +93,7 @@ describe("Grammar Integration", () => {
 
     it("uses palette colors from annotations", () => {
       // Process frame 4 which has A minor (cool palette)
-      const scene = grammar.update(mockFrameSequence[3], null);
+      const scene = lens.update(mockFrameSequence[3], null);
 
       const chordGlow = scene.entities.find(
         (e) => e.data?.type === "chord-glow"
@@ -107,7 +107,7 @@ describe("Grammar Integration", () => {
 
     it("handles chord transitions (frame 3)", () => {
       // Frame 3 has both C major (decaying) and A minor (active)
-      const scene = grammar.update(frame3, null);
+      const scene = lens.update(frame3, null);
 
       const chordGlows = scene.entities.filter(
         (e) => e.data?.type === "chord-glow"
@@ -127,46 +127,46 @@ describe("Grammar Integration", () => {
   });
 
   describe("Composition", () => {
-    let rhythmGrammar: RhythmGrammar;
-    let chordGrammar: TestChordProgressionGrammar;
+    let rhythmLens: RhythmLens;
+    let chordLens: TestChordProgressionLens;
     let compositor: IdentityCompositor;
 
     beforeEach(() => {
-      rhythmGrammar = new RhythmGrammar();
-      chordGrammar = new TestChordProgressionGrammar();
+      rhythmLens = new RhythmLens();
+      chordLens = new TestChordProgressionLens();
       compositor = new IdentityCompositor();
 
-      rhythmGrammar.init(ctx);
-      chordGrammar.init(ctx);
+      rhythmLens.init(ctx);
+      chordLens.init(ctx);
     });
 
-    it("composes both grammar outputs", () => {
-      const rhythmScene = rhythmGrammar.update(frame1, null);
-      const chordScene = chordGrammar.update(frame1, null);
+    it("composes both lens outputs", () => {
+      const rhythmScene = rhythmLens.update(frame1, null);
+      const chordScene = chordLens.update(frame1, null);
 
       const composed = compositor.compose([rhythmScene, chordScene]);
 
-      // Should have entities from both grammars
+      // Should have entities from both lenses
       expect(composed.entities.length).toBe(
         rhythmScene.entities.length + chordScene.entities.length
       );
 
-      // Should have now-line from rhythm grammar
+      // Should have now-line from rhythm lens
       const nowLine = composed.entities.find(
         (e) => e.data?.type === "now-line"
       );
       expect(nowLine).toBeDefined();
 
-      // Should have chord glow from chord grammar
+      // Should have chord glow from chord lens
       const chordGlow = composed.entities.find(
         (e) => e.data?.type === "chord-glow"
       );
       expect(chordGlow).toBeDefined();
     });
 
-    it("maintains entity uniqueness across grammars", () => {
-      const rhythmScene = rhythmGrammar.update(frame1, null);
-      const chordScene = chordGrammar.update(frame1, null);
+    it("maintains entity uniqueness across lenses", () => {
+      const rhythmScene = rhythmLens.update(frame1, null);
+      const chordScene = chordLens.update(frame1, null);
 
       const composed = compositor.compose([rhythmScene, chordScene]);
 
@@ -176,13 +176,13 @@ describe("Grammar Integration", () => {
       expect(uniqueIds.size).toBe(ids.length);
     });
 
-    it("processes full sequence with both grammars", () => {
+    it("processes full sequence with both lenses", () => {
       let prevRhythm: SceneFrame | null = null;
       let prevChord: SceneFrame | null = null;
 
       for (const frame of mockFrameSequence) {
-        const rhythmScene = rhythmGrammar.update(frame, prevRhythm);
-        const chordScene = chordGrammar.update(frame, prevChord);
+        const rhythmScene = rhythmLens.update(frame, prevRhythm);
+        const chordScene = chordLens.update(frame, prevChord);
         const composed = compositor.compose([rhythmScene, chordScene]);
 
         expect(composed.entities.length).toBeGreaterThan(0);

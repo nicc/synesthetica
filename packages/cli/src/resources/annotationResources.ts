@@ -6,7 +6,7 @@
  *   annotations://macros/{id}       — one macro annotation
  *   annotations://session-controls/{id}
  *   annotations://concepts/{term}   — one concept annotation
- *   annotations://grammars/{id}
+ *   annotations://lenses/{id}
  *   concepts://{term}               — shortcut alias for concepts
  *   concepts://                     — list of all concept terms
  *
@@ -18,7 +18,7 @@ import type {
   MacroAnnotation,
   SessionControlAnnotation,
   SystemConceptAnnotation,
-  GrammarAnnotation,
+  LensAnnotation,
   PresetAnnotation,
 } from "@synesthetica/contracts";
 
@@ -26,7 +26,7 @@ export interface AnnotationManifest {
   macros: MacroAnnotation[];
   sessionControls: SessionControlAnnotation[];
   concepts: SystemConceptAnnotation[];
-  grammars: GrammarAnnotation[];
+  lenses: LensAnnotation[];
   presets?: PresetAnnotation[];
 }
 
@@ -119,11 +119,11 @@ export function buildAnnotationResources(m: AnnotationManifest): ResourceEntry[]
   });
 
   // -----------------------------------------------------------------
-  // annotations://grammars/{id}
+  // annotations://lenses/{id}
   // -----------------------------------------------------------------
-  for (const g of m.grammars) {
+  for (const g of m.lenses) {
     entries.push({
-      uri: `annotations://grammars/${encodeURIComponent(g.id)}`,
+      uri: `annotations://lenses/${encodeURIComponent(g.id)}`,
       name: g.name ?? g.id,
       description: (g.notes?.[0] ?? "").slice(0, 120),
       mimeType: "application/json",
