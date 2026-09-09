@@ -1,0 +1,9 @@
+# Cross-origin isolation — required for Basic Pitch's AudioWorklet ->
+# Inference Worker ring buffer, which uses SharedArrayBuffer. Without
+# these headers the page loads but audio input silently fails
+# (crossOriginIsolated === false, SharedArrayBuffer constructor throws).
+# MIDI input still works without cross-origin isolation.
+<IfModule mod_headers.c>
+  Header set Cross-Origin-Opener-Policy "same-origin"
+  Header set Cross-Origin-Embedder-Policy "require-corp"
+</IfModule>
