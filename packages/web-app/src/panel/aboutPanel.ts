@@ -132,7 +132,13 @@ function renderMarkdown(md: string): HTMLElement {
     } else if (line.trim().length === 0) {
       i++;
     } else {
-      // Paragraph — accumulate consecutive non-empty non-special lines.
+      // Paragraph — accumulate consecutive non-empty non-special lines,
+      // preserving hard wraps as <br> rather than joining with spaces.
+      // The composed reference sections (macros, session controls,
+      // lenses, tools, etc.) put each field on its own line and rely
+      // on the break to visually separate them; the authored prose in
+      // system-overview.md writes paragraphs as single long lines so
+      // isn't affected.
       const buf: string[] = [];
       while (
         i < lines.length &&
@@ -143,7 +149,10 @@ function renderMarkdown(md: string): HTMLElement {
         i++;
       }
       const p = document.createElement("p");
-      appendInline(p, buf.join(" "));
+      for (let j = 0; j < buf.length; j++) {
+        if (j > 0) p.appendChild(document.createElement("br"));
+        appendInline(p, buf[j]);
+      }
       root.appendChild(p);
     }
   }
