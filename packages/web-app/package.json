@@ -15,7 +15,8 @@
   "dependencies": {
     "@synesthetica/adapters": "*",
     "@synesthetica/contracts": "*",
-    "@synesthetica/engine": "*"
+    "@synesthetica/engine": "*",
+    "marked": "^18.0.12"
   },
   "devDependencies": {
     "jsdom": "^29.1.1",

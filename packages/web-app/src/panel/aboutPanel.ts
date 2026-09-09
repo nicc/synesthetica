@@ -17,11 +17,25 @@
  *
  * Vite's ?raw suffix inlines both markdown files as strings at build
  * time, so runtime needs no HTTP fetch.
+ *
+ * Rendering uses `marked` — commonmark + GFM, tables, fenced code,
+ * nested lists, all handled properly without the edge-case bugs of a
+ * hand-rolled parser. `breaks: true` turns hard-wrapped lines into
+ * <br> (matching what the composer emits for its per-field lines).
+ * Content is trusted end-to-end (both markdown sources are authored
+ * by us and baked into the build; nothing user-supplied flows here),
+ * so innerHTML is safe.
  */
 
+import { marked } from "marked";
 import aboutMd from "../../ABOUT.md?raw";
 import overviewMd from "@synesthetica/contracts/prompts/system-overview.md?raw";
 import { composeSystemOverview } from "@synesthetica/contracts";
+
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+});
 
 export async function buildAboutPanel(): Promise<HTMLElement> {
   const wrap = document.createElement("div");
@@ -50,182 +64,18 @@ export async function buildAboutPanel(): Promise<HTMLElement> {
 }
 
 /**
- * Minimal Markdown-to-DOM renderer covering the subset used by
- * system-overview.md. Preserves headings, paragraphs, bullet lists,
- * pipe-tables, horizontal rules, and inline code / bold / italic.
- * Not a general Markdown implementation.
+ * Render markdown to a DOM element. Uses `marked` — see file header
+ * for the safety rationale.
  */
 function renderMarkdown(md: string): HTMLElement {
   const root = document.createElement("div");
-  const lines = md.split("\n");
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    if (line.startsWith("# ")) {
-      root.appendChild(headingEl(1, line.slice(2)));
-      i++;
-    } else if (line.startsWith("## ")) {
-      root.appendChild(headingEl(2, line.slice(3)));
-      i++;
-    } else if (line.startsWith("### ")) {
-      root.appendChild(headingEl(3, line.slice(4)));
-      i++;
-    } else if (line.trim() === "---") {
-      root.appendChild(document.createElement("hr"));
-      i++;
-    } else if (line.startsWith("```")) {
-      // Fenced code block — skip through to closing fence.
-      const pre = document.createElement("pre");
-      i++;
-      const buf: string[] = [];
-      while (i < lines.length && !lines[i].startsWith("```")) {
-        buf.push(lines[i]);
-        i++;
-      }
-      pre.textContent = buf.join("\n");
-      root.appendChild(pre);
-      i++;
-    } else if (line.startsWith("- ") || line.startsWith("* ")) {
-      const ul = document.createElement("ul");
-      while (
-        i < lines.length &&
-        (lines[i].startsWith("- ") || lines[i].startsWith("* "))
-      ) {
-        const li = document.createElement("li");
-        appendInline(li, lines[i].slice(2));
-        ul.appendChild(li);
-        i++;
-      }
-      root.appendChild(ul);
-    } else if (line.startsWith("| ")) {
-      // Pipe table — read consecutive pipe lines.
-      const table = document.createElement("table");
-      const rows: string[][] = [];
-      while (i < lines.length && lines[i].startsWith("|")) {
-        rows.push(splitPipeRow(lines[i]));
-        i++;
-      }
-      if (rows.length >= 2) {
-        const thead = document.createElement("thead");
-        const trH = document.createElement("tr");
-        for (const cell of rows[0]) {
-          const th = document.createElement("th");
-          appendInline(th, cell.trim());
-          trH.appendChild(th);
-        }
-        thead.appendChild(trH);
-        table.appendChild(thead);
-        const tbody = document.createElement("tbody");
-        // rows[1] is the separator (---|---); skip.
-        for (let r = 2; r < rows.length; r++) {
-          const tr = document.createElement("tr");
-          for (const cell of rows[r]) {
-            const td = document.createElement("td");
-            appendInline(td, cell.trim());
-            tr.appendChild(td);
-          }
-          tbody.appendChild(tr);
-        }
-        table.appendChild(tbody);
-      }
-      root.appendChild(table);
-    } else if (line.trim().length === 0) {
-      i++;
-    } else {
-      // Paragraph — accumulate consecutive non-empty non-special lines,
-      // preserving hard wraps as <br> rather than joining with spaces.
-      // The composed reference sections (macros, session controls,
-      // lenses, tools, etc.) put each field on its own line and rely
-      // on the break to visually separate them; the authored prose in
-      // system-overview.md writes paragraphs as single long lines so
-      // isn't affected.
-      const buf: string[] = [];
-      while (
-        i < lines.length &&
-        lines[i].trim().length > 0 &&
-        !isBlockStart(lines[i])
-      ) {
-        buf.push(lines[i]);
-        i++;
-      }
-      const p = document.createElement("p");
-      for (let j = 0; j < buf.length; j++) {
-        if (j > 0) p.appendChild(document.createElement("br"));
-        appendInline(p, buf[j]);
-      }
-      root.appendChild(p);
-    }
+  root.innerHTML = marked.parse(md) as string;
+  // Make links open in a new tab. `marked` doesn't do this by
+  // default, and rewriting anchors post-parse is cleaner than a
+  // custom renderer for a one-off requirement.
+  for (const a of root.querySelectorAll("a")) {
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
   }
   return root;
-}
-
-function isBlockStart(line: string): boolean {
-  return (
-    line.startsWith("# ") ||
-    line.startsWith("## ") ||
-    line.startsWith("### ") ||
-    line.trim() === "---" ||
-    line.startsWith("```") ||
-    line.startsWith("- ") ||
-    line.startsWith("* ") ||
-    line.startsWith("|")
-  );
-}
-
-function headingEl(level: 1 | 2 | 3, text: string): HTMLElement {
-  const h = document.createElement(`h${level}`);
-  appendInline(h, text);
-  return h;
-}
-
-function splitPipeRow(line: string): string[] {
-  // Strip the leading/trailing pipes then split.
-  const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "");
-  return trimmed.split("|");
-}
-
-/**
- * Handle inline markup: `code`, **bold**, *italic*, [text](url).
- * Left as-is otherwise. Uses regex-based tokenisation — not robust
- * for nested markup, sufficient for the overview's simple usage.
- */
-function appendInline(parent: HTMLElement, text: string): void {
-  const re = /(\[[^\]]+\]\([^)]+\)|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) {
-      parent.appendChild(document.createTextNode(text.slice(last, m.index)));
-    }
-    const tok = m[0];
-    if (tok.startsWith("[")) {
-      const linkMatch = tok.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-      if (linkMatch) {
-        const a = document.createElement("a");
-        a.href = linkMatch[2];
-        a.textContent = linkMatch[1];
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        parent.appendChild(a);
-      } else {
-        parent.appendChild(document.createTextNode(tok));
-      }
-    } else if (tok.startsWith("`")) {
-      const code = document.createElement("code");
-      code.textContent = tok.slice(1, -1);
-      parent.appendChild(code);
-    } else if (tok.startsWith("**")) {
-      const strong = document.createElement("strong");
-      strong.textContent = tok.slice(2, -2);
-      parent.appendChild(strong);
-    } else {
-      const em = document.createElement("em");
-      em.textContent = tok.slice(1, -1);
-      parent.appendChild(em);
-    }
-    last = m.index + tok.length;
-  }
-  if (last < text.length) {
-    parent.appendChild(document.createTextNode(text.slice(last)));
-  }
 }
