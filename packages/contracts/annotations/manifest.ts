@@ -921,6 +921,9 @@ const tools: ToolAnnotation[] = [
     description:
       "Select the input source (MIDI device or audio input). Use the `list_inputs` tool for the enumerated list of available devices — each entry carries a `sourceString` ready to pass here. Format: `midi:<device-id>`, 'audio' (default microphone), or `audio:<device-id>` (specific audio input). Current selection is on `state.input` from `get_state`.",
     aliases: ["use", "listen to", "switch to", "input"],
+    notes: [
+      "**Input switching is mid-session, not new-session.** Swapping input keeps the same session alive — `startedAt`, `now`, all macros (intents + effective), all session controls (`chordMode`, `tempo`, `key`, `meter`, `metronome`), and the `recent-events` buffer all carry over. Only the adapter changes. `session.phase` stays `input-active` throughout. If you want a fresh session (clock reset, buffer cleared), call `stop_session` first.",
+    ],
     examples: [
       "set_input(source: 'midi:Yamaha P-125') — listen to that MIDI keyboard.",
       "set_input(source: 'audio:default') — listen to the default microphone.",

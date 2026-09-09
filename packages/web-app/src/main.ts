@@ -78,6 +78,7 @@ let vocabulary: MusicalVisualVocabulary | null = null;
 let renderer: ThreeJSRenderer | null = null;
 let metronome: Metronome | null = null;
 let audioAdapter: AudioInputAdapter | null = null;
+let midiAdapter: RawMidiAdapter | null = null;
 let sessionStartTime = 0; // performance.now() reference for session-ms math
 let sessionStartedAtIso: string | null = null; // wall-clock ISO at session start
 let animationFrameId: number | null = null;
@@ -375,11 +376,21 @@ window.addEventListener("resize", () => {
  *    NO adapter and NO render loop. LLM setter calls arriving after
  *    this reach real consumers immediately.
  *
- * 2. attachAdapterAndStartRender(adapter) — runs when the user or
- *    LLM picks an input. Adds the adapter, creates the renderer,
- *    starts the render loop. Replays any macros already set into
- *    engineState.macros.intents so the new adapter session inherits
- *    what was asked for before it existed.
+ * 2. attachAdapter(adapter) — runs when the user or LLM picks an
+ *    input. First attach (spawned → input-active) creates the
+ *    renderer + recent-events buffer, replays accumulated macros to
+ *    the fresh pipeline, marks the session started, starts the
+ *    render loop. Subsequent attaches (mid-session input swap) do
+ *    none of that — the pipeline, vocab, stabilizers, renderer,
+ *    buffer, and session clock all carry over.
+ *
+ * 3. detachCurrentAdapter() — removes whichever adapter is currently
+ *    attached, without disposing the pipeline. Used before each
+ *    attachAdapter to make the swap clean.
+ *
+ * 4. stopSession() — full teardown. Only called from the LLM
+ *    stop_session tool and beforeunload. Input switches never call
+ *    stopSession; they swap via detachCurrentAdapter + attachAdapter.
  */
 
 const PIPELINE_PART_ID = "main";
@@ -415,33 +426,66 @@ function initializePipeline(): void {
   publishState();
 }
 
-function attachAdapterAndStartRender(
-  adapter: RawMidiAdapter | AudioInputAdapter,
-): void {
+/**
+ * Attach `adapter` to the running pipeline. On first attach (session
+ * transitioning from `spawned` → `input-active`), also spins up the
+ * renderer, the recent-events buffer, primes partStates for macro
+ * dispatch, and stamps the session clock. On subsequent attach —
+ * a mid-session input swap — the pipeline, vocab, stabilizers,
+ * renderer, buffer, and session clock all carry over. No consumer
+ * teardown, no state hydration needed.
+ *
+ * Callers should first detach any previously-attached adapter via
+ * detachCurrentAdapter().
+ */
+function attachAdapter(adapter: RawMidiAdapter | AudioInputAdapter): void {
   if (!pipeline) initializePipeline();
   pipeline!.addAdapter(adapter);
 
-  renderer = new ThreeJSRenderer({ backgroundColor: 0x000000 });
-  renderer.attach(canvas);
-
-  recentEvents = attachRecentEventsBuffer(pipeline!, { capacity: 1000 });
-
-  pipeline!.reset();
-  // Prime a partState so stabilizers exist before we replay macros
-  // — pipeline.setMacro dispatches to stabilizers in partStates,
-  // which are lazily created inside requestFrame. Without this,
-  // stabilizer-owned macros (harmony:arpeggio-tolerance etc.) would
-  // not reach their targets on replay.
-  pipeline!.requestFrame(0);
-  // Replay macros captured before the adapter arrived — session
-  // controls (tempo/meter/key/etc) are already applied via the
-  // engineState.session fields on each frame construction, but
-  // macros need to be re-dispatched through pipeline.setMacro to
-  // reach the freshly-reset consumers.
-  for (const [name, value] of Object.entries(engineState.macros.intents)) {
-    pipeline!.setMacro(name, value);
+  const firstAttach = engineState.session.phase !== "input-active";
+  if (firstAttach) {
+    if (!renderer) {
+      renderer = new ThreeJSRenderer({ backgroundColor: 0x000000 });
+      renderer.attach(canvas);
+    }
+    if (!recentEvents) {
+      recentEvents = attachRecentEventsBuffer(pipeline!, { capacity: 1000 });
+    }
+    // Prime partStates so pipeline.setMacro dispatch reaches
+    // stabilizers on the first replay (partStates are created lazily
+    // by requestFrame; without this the initial macro replay
+    // silently skips stabilizer-owned macros).
+    pipeline!.requestFrame(0);
+    // Replay accumulated macro intents into the freshly-initialised
+    // consumers.
+    for (const [name, value] of Object.entries(engineState.macros.intents)) {
+      pipeline!.setMacro(name, value);
+    }
+    markSessionStarted();
+    startRenderLoop();
   }
-  startRenderLoop();
+  // Mid-session swap: nothing else — the caller's next tick of the
+  // existing render loop picks up frames from the new adapter.
+}
+
+/**
+ * Detach whichever adapter is currently attached, if any. Removes it
+ * from the pipeline (without disposing the pipeline itself) and stops
+ * the adapter's own resources (audio worklet + inference worker for
+ * audio; nothing for MIDI, which shares the module-level midiSource).
+ */
+async function detachCurrentAdapter(): Promise<void> {
+  if (midiAdapter) {
+    pipeline?.removeAdapter(midiAdapter);
+    midiAdapter = null;
+  }
+  if (audioAdapter) {
+    pipeline?.removeAdapter(audioAdapter);
+    await audioAdapter.stop().catch(() => {
+      /* best effort */
+    });
+    audioAdapter = null;
+  }
 }
 
 function startRenderLoop(): void {
@@ -456,6 +500,19 @@ function startRenderLoop(): void {
   render();
 }
 
+/**
+ * Full session teardown — disposes the pipeline, detaches the
+ * renderer, stops all adapters, clears the recent-events buffer, and
+ * resets the session clock. Restores the "pipeline exists after page
+ * load" invariant by re-initializing an empty pipeline in spawned
+ * phase.
+ *
+ * Only called from the LLM `stop_session` MCP tool and the browser's
+ * `beforeunload` handler. A mid-session input switch (LLM or panel)
+ * uses swapCurrentAdapter — which keeps the pipeline, vocab,
+ * stabilizers, renderer, buffer, and session clock alive so no state
+ * hydration is needed.
+ */
 function stopSession(): void {
   if (animationFrameId !== null) {
     cancelAnimationFrame(animationFrameId);
@@ -469,6 +526,7 @@ function stopSession(): void {
     renderer.detach();
     renderer = null;
   }
+  if (midiAdapter) midiAdapter = null;
   if (audioAdapter) {
     void audioAdapter.stop().catch(() => {
       /* best effort */
@@ -478,15 +536,13 @@ function stopSession(): void {
   sessionStartedAtIso = null;
   engineState.startedAt = null;
   engineState.now = null;
-  // Adapter is gone; back to spawned phase (pipeline still exists per
-  // the invariant restored below).
+  // Adapter is gone; back to spawned phase (pipeline restored below).
   engineState.session.phase = "spawned";
   clearRecentEvents();
-  // Restore the "pipeline always exists after load" invariant so a
-  // subsequent LLM setter arriving before the user picks a new input
-  // still reaches consumers rather than silent-writing. Fresh grammars
-  // lose their macro state; the next attachAdapterAndStartRender
-  // replays engineState.macros.intents to catch them up.
+  // Restore the invariant so a subsequent LLM setter arriving before
+  // the user picks a new input still reaches consumers rather than
+  // silent-writing. Macros on the fresh pipeline are empty; the next
+  // attachAdapter first-attach replays engineState.macros.intents.
   initializePipeline();
 }
 
@@ -504,30 +560,32 @@ function markSessionStarted(): void {
 }
 
 async function startMidiSession(deviceId: string): Promise<void> {
-  stopSession();
   if (!midiSource) throw new Error("MIDI source not initialised");
   const info = midiSource.getInputs().find((i) => i.id === deviceId);
   if (!info) throw new Error(`no MIDI device with id ${deviceId}`);
-  markSessionStarted();
-  const adapter = new RawMidiAdapter(midiSource, { sessionStart: sessionStartTime });
+  await detachCurrentAdapter();
+  // sessionStartTime is set by markSessionStarted on first attach;
+  // for a swap it already reflects the original session start.
+  const sessionStart = sessionStartTime || performance.now();
+  const adapter = new RawMidiAdapter(midiSource, { sessionStart });
   adapter.start();
-  attachAdapterAndStartRender(adapter);
+  midiAdapter = adapter;
+  attachAdapter(adapter);
   setStatus(`MIDI: ${info.name}`, "success");
 }
 
 async function startAudioSession(deviceId?: string): Promise<void> {
-  stopSession();
+  await detachCurrentAdapter();
   setStatus(
     deviceId
       ? `Loading audio model + requesting device ${deviceId}…`
       : "Loading audio model + requesting mic…",
   );
-  markSessionStarted();
   const audioDebug =
     new URLSearchParams(window.location.search).get("audio-debug") === "1";
-  // markSessionStarted() has already set sessionStartTime.
+  const sessionStart = sessionStartTime || performance.now();
   audioAdapter = new AudioInputAdapter({
-    sessionStart: sessionStartTime,
+    sessionStart,
     modelUrl: BASIC_PITCH_MODEL_URL,
     workerUrl: INFERENCE_WORKER_URL,
     workletUrl: AUDIO_CAPTURE_WORKLET_URL,
@@ -536,7 +594,7 @@ async function startAudioSession(deviceId?: string): Promise<void> {
   });
   try {
     await audioAdapter.start();
-    attachAdapterAndStartRender(audioAdapter);
+    attachAdapter(audioAdapter);
     setStatus(
       deviceId ? `Audio: device ${deviceId}` : "Audio: microphone",
       "success",

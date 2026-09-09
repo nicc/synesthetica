@@ -97,7 +97,7 @@ Three different kinds of thing you can adjust:
 
 - **Aesthetic macros** (`system:*`, bare cross-cutting, `<scope>:*`) — modulate how the grammars *look*. Set via `set_macro(name, value)`. Continuous or discrete or compound. Examples: `harmony:linger`, `rhythm:quantise-resolution`, `time-horizon`.
 - **Session controls** (`session:*`) — set the *musical frame* the analyser reads within. Precise types (numbers, enums, paired values, booleans) matching the underlying musical meaning, and dedicated MCP tools per control. Examples: `set_key` (paired enum), `set_tempo` (nullable number), `set_metronome` (boolean).
-- **Input controls** (`input:*`) — which device the pipeline is listening to. `set_input(source)`; use `list_inputs` for the enumerated list of available MIDI + audio devices (each entry carries a `sourceString` ready to pass), and `get_state` for the current selection (in `state.input`).
+- **Input controls** (`input:*`) — which device the pipeline is listening to. `set_input(source)`; use `list_inputs` for the enumerated list of available MIDI + audio devices (each entry carries a `sourceString` ready to pass), and `get_state` for the current selection (in `state.input`). Switching input is mid-session: session clock, macros, session controls, and recent-events all carry over — only the adapter changes. `stop_session` is the real end-of-session.
 
 When the user says something ambiguous, look at what surface they're asking about:
 

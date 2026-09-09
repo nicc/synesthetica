@@ -111,6 +111,16 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
   }
 
   /**
+   * Remove a single adapter without touching the rest of the pipeline
+   * (vocab, grammars, stabilizers, part state, subscribers all
+   * survive). Used to swap inputs mid-session without losing macro
+   * state, chord-mode, session clock, or the recent-events buffer.
+   */
+  removeAdapter(adapter: IRawSourceAdapter): void {
+    this.adapters = this.adapters.filter((a) => a !== adapter);
+  }
+
+  /**
    * Set the stabilizer factory (legacy single-stabilizer API).
    * @deprecated Use addStabilizerFactory for multiple stabilizers
    */
