@@ -218,11 +218,17 @@ function getExpectedSemitones(quality: ChordQuality): number[] | null {
     aug: [0, 4, 8],
     sus2: [0, 2, 7],
     sus4: [0, 5, 7],
+    maj6: [0, 4, 7, 9],
+    min6: [0, 3, 7, 9],
     maj7: [0, 4, 7, 11],
     min7: [0, 3, 7, 10],
     dom7: [0, 4, 7, 10],
     hdim7: [0, 3, 6, 10],
     dim7: [0, 3, 6, 9],
+    minmaj7: [0, 3, 7, 11],
+    maj9: [0, 4, 7, 11, 2],
+    min9: [0, 3, 7, 10, 2],
+    dom9: [0, 4, 7, 10, 2],
   };
   return map[quality] ?? null;
 }
@@ -231,13 +237,21 @@ function getExpectedSemitones(quality: ChordQuality): number[] | null {
  * Maps chord quality to margin style.
  */
 function getMarginStyle(quality: ChordQuality): MarginStyle {
+  // Extended qualities inherit their base triad's style — the 6/7/9
+  // extension is decoration, not a distinct visual category.
   switch (quality) {
     case "maj":
+    case "maj6":
     case "maj7":
+    case "maj9":
     case "dom7":
+    case "dom9":
       return "straight";
     case "min":
+    case "min6":
     case "min7":
+    case "min9":
+    case "minmaj7":
       return "wavy";
     case "dim":
     case "dim7":
