@@ -144,7 +144,6 @@ Single instance today (`default`). Every tool accepts an optional `instance` par
 
 ## Non-goals (things you cannot do)
 
-- **Infer tempo, key, or meter from the music.** All three are user-prescribed only. Don't offer to "detect" them.
 - **Switch or disable lenses.** All three lenses always run. You can only modulate them.
 - **Access history beyond the in-memory recent-events buffer.** `get_recent_events` returns at most the buffer's capacity (~1000 events, roughly 30–60s of active playing). Poll for new events with the `since` arg, but there's no full-session replay or on-disk history.
 - **Deselect an input while keeping the visualiser up.** There's no null-input op — the way to release an input is `stop_session`. If the user asks "stop listening but leave the visualiser", name it as a gap. To resume later with a fresh input choice, call `stop_session` and then `start_session` again — the second `start_session` on its own is idempotent while a session is running and does nothing, so the sequence has to be teardown-then-spawn.
