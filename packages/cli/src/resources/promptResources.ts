@@ -93,8 +93,20 @@ export function computePrimerToken(text: string): string {
  * tools, resources, session-time, presets). Exported so the
  * `get_started` MCP tool can return the same body without any
  * duplication of content.
+ *
+ * Memoized — the primer is derived from the annotation manifest +
+ * authored markdown, both baked into the build, so the string is
+ * invariant for the process lifetime. Called on every non-get_started
+ * tool call (via the primer gate); memoization keeps that cheap.
  */
+let cachedSystemOverview: string | null = null;
 export function composeSystemOverview(): string {
+  if (cachedSystemOverview !== null) return cachedSystemOverview;
+  cachedSystemOverview = composeSystemOverviewUncached();
+  return cachedSystemOverview;
+}
+
+function composeSystemOverviewUncached(): string {
   const sections: string[] = [
     loadPrompt("system-overview.md").trimEnd(),
     "",

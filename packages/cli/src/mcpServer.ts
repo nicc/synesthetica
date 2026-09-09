@@ -333,6 +333,15 @@ export async function startMcpServer(
     config.session,
   );
 
+  // Primer + token are computed once at server start. The primer text
+  // is a walk over the annotation manifest + authored markdown; both
+  // are baked into the build, so recomputing on every tool call would
+  // be pure waste. If the underlying source ever grows a runtime edit
+  // path, invalidate here — until then, one compute per server
+  // lifetime is correct.
+  const PRIMER_TEXT = composeSystemOverview();
+  const PRIMER_TOKEN = computePrimerToken(PRIMER_TEXT);
+
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: Array.from(toolRegistry.values()).map((t) => ({
       name: t.name,
@@ -369,10 +378,8 @@ export async function startMcpServer(
     // to 16 hex chars — changes whenever the primer content changes,
     // which invalidates outstanding tokens automatically.
     if (!PRIMER_EXEMPT.has(tool.name)) {
-      const currentPrimer = composeSystemOverview();
-      const currentToken = computePrimerToken(currentPrimer);
       const provided = typeof args.primer === "string" ? args.primer : "";
-      if (provided !== currentToken) {
+      if (provided !== PRIMER_TOKEN) {
         return {
           content: [
             {
@@ -386,8 +393,8 @@ export async function startMcpServer(
                       ? "Missing `primer` argument. Every tool except get_started requires a `primer` token (from get_started's response). The current primer + token are attached to this error's details — read the primer and retry with the new token."
                       : "Stale `primer` token — the primer has changed since you last called get_started. Read the primer text attached to this error's details and retry with the new token.",
                     details: {
-                      primer: currentPrimer,
-                      token: currentToken,
+                      primer: PRIMER_TEXT,
+                      token: PRIMER_TOKEN,
                     },
                   },
                 },
