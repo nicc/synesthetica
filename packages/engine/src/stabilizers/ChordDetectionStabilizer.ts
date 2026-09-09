@@ -110,6 +110,94 @@ const DEFAULT_CONFIG: Required<Omit<ChordDetectionConfig, "partId">> = {
  * Used to bias scoring toward musically-canonical interpretations over
  * decorated ones when multiple candidates fit a voicing equally well.
  */
+/**
+ * Derive a ChordQuality from Tonal's interval list, using the interval
+ * pattern directly rather than string-matching Tonal's `type` field.
+ * Handles every Tonal chord uniformly and preserves the correct base
+ * quality even when Tonal's type label is misleading — e.g. "minor
+ * augmented" (Cm#5) has an m3 that dominates the #5, so quality is
+ * "min" not "aug".
+ *
+ * Collapse policy for extensions we don't track distinctly:
+ * - 11ths / 13ths → corresponding 9th (dom13 → dom9, min11 → min9)
+ * - Altered dominants (dom7b5, dom7#5) → dom7
+ * - The higher extension / alteration is decoration; the triad + 7th
+ *   captures the base flavour.
+ *
+ * Empty intervals → "unknown".
+ */
+export function deriveQualityFromIntervals(intervals: readonly string[]): ChordQuality {
+  const semis = intervals
+    .map((ivl) => Tonal.Interval.semitones(ivl))
+    .filter((s): s is number => s !== undefined)
+    .map((s) => ((s % 12) + 12) % 12);
+  if (semis.length === 0) return "unknown";
+  const has = (n: number): boolean => semis.includes(n);
+
+  const hasM3 = has(4);
+  const hasm3 = has(3);
+  const hasP4 = has(5);
+  const hasM2 = has(2);
+  const hasP5 = has(7);
+  const hasDim5 = has(6);
+  const hasAug5 = has(8);
+  const hasm7 = has(10);
+  const hasM7 = has(11);
+  // PC 9 is both M6 (from-root) and dim7 (bb7); disambiguate by context.
+  const hasSemi9 = has(9);
+  const hasM9 = hasM2; // 14 semis mod 12 = 2
+
+  // Base triad detection.
+  let triad: "maj" | "min" | "dim" | "aug" | "sus2" | "sus4" | "5" | null;
+  if (hasM3) triad = "maj";
+  else if (hasm3) {
+    // dim triad only when there's dim5 without perfect or augmented 5.
+    if (hasDim5 && !hasP5 && !hasAug5) triad = "dim";
+    else triad = "min";
+  } else if (hasP4) triad = "sus4";
+  else if (hasM2) triad = "sus2";
+  else if (hasP5) triad = "5";
+  else return "unknown";
+
+  if (triad === "maj") {
+    if (hasM7) return hasM9 ? "maj9" : "maj7";
+    if (hasm7) return hasM9 ? "dom9" : "dom7";
+    if (hasSemi9 && !hasm7 && !hasM7) return "maj6"; // M6, no 7th
+    // Augmented triad only when there's aug5 with no P5 and no 7th.
+    if (hasAug5 && !hasP5) return "aug";
+    return "maj";
+  }
+  if (triad === "min") {
+    if (hasM7) return "minmaj7";
+    if (hasm7) return hasM9 ? "min9" : "min7";
+    if (hasSemi9 && !hasm7 && !hasM7) return "min6";
+    return "min";
+  }
+  if (triad === "dim") {
+    if (hasSemi9) return "dim7"; // bb7 in dim context
+    if (hasm7) return "hdim7";
+    return "dim";
+  }
+  return triad;
+}
+
+/**
+ * Compare candidate notes to input notes by note letter. A candidate
+ * whose Tonal spelling uses a letter not present in the input (e.g.
+ * Cm#5 uses G# when input is Ab) is enharmonically conflicting —
+ * that spelling fights the user's spelling and shouldn't be picked
+ * as the bass-led reading. Returns true iff safe (no conflict).
+ */
+function candidateSpellingMatchesInput(
+  candidateNotes: readonly string[],
+  inputLetters: ReadonlySet<string>,
+): boolean {
+  for (const n of candidateNotes) {
+    if (!inputLetters.has(n[0])) return false;
+  }
+  return true;
+}
+
 const STANDARD_CHORD_TYPES = new Set<string>([
   // Triads
   "major",
@@ -297,8 +385,10 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     // Prune old chords from progression
     this.pruneOldChords(t);
 
-    // Build current chords array
-    const chords = this.buildCurrentChords(t, activePitchClasses, bassPc);
+    // Build current chords array — pass the raw sounding notes so the
+    // reported voicing carries actual MIDI numbers (octaves + doublings),
+    // not a synthetic one-per-PC reconstruction at a reference octave.
+    const chords = this.buildCurrentChords(t, upstream.notes, bassPc);
 
     // Build progression (chord IDs only)
     const progression = this.recentChords.map((c) => c.id);
@@ -415,9 +505,14 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
        * (major, minor, dom7, etc.). True for altered / decorated types
        * like "minor augmented" or unlabelled complex types. */
       isAltered: boolean;
+      /** Note names as Tonal spelled them (e.g. ["C","Eb","G#"]). Used
+       * by bass-led selection to reject enharmonically-conflicting
+       * candidates whose spelling fights the input's spelling. */
+      notes: readonly string[];
     };
     const candidates: Candidate[] = [];
     const diatonicPcs = this.diatonicPcs;
+    const inputLetters = new Set(noteNames.map((n) => n[0]));
 
     const tryDetect = (names: string[]): void => {
       const detected = Tonal.Chord.detect(names);
@@ -432,8 +527,17 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
         const isSlash = name.includes("/");
 
         // Parse Tonal's interval names ("1P", "3M", "5P", "7m", "9M", …)
-        // into pitch-class semitones.
-        const chordTones = chord.intervals
+        // into pitch-class semitones. IMPORTANT: for a slash-chord like
+        // "AbM/C", Tonal returns intervals from the BASS (`[3M, 5P, 8P]`
+        // — no 1P), not from the root. Re-fetching the base chord
+        // without the slash gives us the canonical root-relative interval
+        // set, which is what chordTones is documented as (and what
+        // inversion arithmetic in buildChordOutput depends on).
+        const baseChord = isSlash ? Tonal.Chord.get(name.split("/")[0]) : chord;
+        const intervalsForTones = baseChord.intervals && baseChord.intervals.length > 0
+          ? baseChord.intervals
+          : chord.intervals;
+        const chordTones = intervalsForTones
           .map((ivl) => Tonal.Interval.semitones(ivl))
           .filter((s): s is number => s !== undefined)
           .map((s) => ((s % 12) + 12) % 12);
@@ -441,7 +545,11 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
         if (chordTones.length === 0) continue;
 
         const root = this.noteNameToPitchClass(chord.tonic);
-        const quality = this.mapTonalQuality(chord.quality, chord.type);
+        // Derive quality from the intervals (not Tonal's `type` string).
+        // For slash chords we derive from the base chord's intervals so
+        // the quality matches the root-position reading, consistent with
+        // how chordTones is computed above.
+        const quality = deriveQualityFromIntervals(intervalsForTones);
 
         // Coverage: how many input PCs are accounted for by the chord's
         // actual interval set.
@@ -477,6 +585,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
           keyFit,
           isSlash,
           isAltered,
+          notes: chord.notes ?? [],
         });
       }
     };
@@ -532,12 +641,19 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
 
     const harmonic = toInterpretation(best);
 
-    // Bass-led: pick the best candidate among those rooted at the bass.
-    // If no candidate matches, fall back to harmonic (the two
-    // interpretations converge in this case — no bass-led reading exists).
+    // Bass-led: pick the best candidate among those rooted at the bass
+    // AND whose spelling doesn't conflict with the input. Rejecting
+    // enharmonic-conflicting candidates keeps things like Cm#5 (which
+    // spells the input's Ab as G#) from winning the bass-led slot; when
+    // no clean C-rooted reading exists we fall back to harmonic, whose
+    // slash notation ("Ab/C") already communicates the bass.
     let bassLed: ChordInterpretation = harmonic;
     if (bassPc !== undefined && bassPc !== null) {
-      const bassLedCandidate = candidates.find((c) => c.root === bassPc);
+      const bassLedCandidate = candidates.find(
+        (c) =>
+          c.root === bassPc &&
+          candidateSpellingMatchesInput(c.notes, inputLetters),
+      );
       if (bassLedCandidate) {
         bassLed = toInterpretation(bassLedCandidate);
       }
@@ -689,28 +805,28 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
 
   /**
    * Build current chords array for output.
+   *
+   * Voicing is sourced from the upstream frame's actual sounding notes,
+   * ordered by MIDI pitch ascending (bass first). Released notes are
+   * excluded — voicing represents what's audibly present at time `t`,
+   * not the chord-detection window's lingering pitch-class set.
    */
   private buildCurrentChords(
     t: Ms,
-    activePitchClasses: Set<PitchClass>,
+    notes: Note[],
     bassPc: PitchClass | null,
   ): MusicalChord[] {
     const chords: MusicalChord[] = [];
 
     if (this.displayedChord && this.currentChordOnset !== null) {
-      // Build voicing from active pitch classes
-      const voicing: Pitch[] = [...activePitchClasses].map((pc) => ({
-        pc,
-        octave: 4, // Reference octave
-      }));
-
-      // Sort by pitch class distance from harmonic root for better voicing representation
-      const harmonicRoot = this.displayedChord.harmonic.root;
-      voicing.sort((a, b) => {
-        const distA = (a.pc - harmonicRoot + 12) % 12;
-        const distB = (b.pc - harmonicRoot + 12) % 12;
-        return distA - distB;
-      });
+      const voicing: Pitch[] = notes
+        .filter((n) => n.phase !== "release")
+        .map((n) => ({ pc: n.pitch.pc, octave: n.pitch.octave }))
+        .sort((a, b) => {
+          const midiA = a.pc + a.octave * 12;
+          const midiB = b.pc + b.octave * 12;
+          return midiA - midiB;
+        });
 
       chords.push(
         this.buildChordOutput({
@@ -766,41 +882,4 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
     return note.chroma as PitchClass;
   }
 
-  private mapTonalQuality(tonalQuality: string, tonalType?: string): ChordQuality {
-    // Tonal.js's `type` field is more specific than `quality`. For example,
-    // quality="Major" for both major triads and dominant 7ths, while type
-    // distinguishes "major" from "dominant seventh". Check type first.
-    if (tonalType) {
-      const typeMapping: Record<string, ChordQuality> = {
-        major: "maj",
-        minor: "min",
-        diminished: "dim",
-        augmented: "aug",
-        "suspended second": "sus2",
-        "suspended fourth": "sus4",
-        fifth: "5", // power chord — root + perfect fifth only
-        "major seventh": "maj7",
-        "minor seventh": "min7",
-        "dominant seventh": "dom7",
-        "half-diminished": "hdim7",
-        "diminished seventh": "dim7",
-      };
-      const fromType = typeMapping[tonalType];
-      if (fromType) return fromType;
-    }
-
-    // Fall back to quality field for any types not in the mapping above
-    const qualityMapping: Record<string, ChordQuality> = {
-      Major: "maj",
-      "": "maj",
-      minor: "min",
-      Minor: "min",
-      diminished: "dim",
-      Diminished: "dim",
-      augmented: "aug",
-      Augmented: "aug",
-    };
-
-    return qualityMapping[tonalQuality] ?? "unknown";
-  }
 }

@@ -7,7 +7,10 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { ChordDetectionStabilizer } from "../../src/stabilizers/ChordDetectionStabilizer";
+import {
+  ChordDetectionStabilizer,
+  deriveQualityFromIntervals,
+} from "../../src/stabilizers/ChordDetectionStabilizer";
 import type {
   Note,
   PitchClass,
@@ -70,6 +73,39 @@ function detectQuality(
 // ============================================================================
 // Tests
 // ============================================================================
+
+describe("deriveQualityFromIntervals", () => {
+  // Direct unit tests for the interval-based derivation. Each case
+  // uses Tonal's canonical interval names for the base chord type.
+  const cases: Array<[string, string[], string]> = [
+    ["maj triad", ["1P", "3M", "5P"], "maj"],
+    ["min triad", ["1P", "3m", "5P"], "min"],
+    ["dim triad", ["1P", "3m", "5d"], "dim"],
+    ["aug triad (M3 + aug5, no P5)", ["1P", "3M", "5A"], "aug"],
+    ["Cm#5 (min triad + aug5) → min, not aug", ["1P", "3m", "5A"], "min"],
+    ["sus2", ["1P", "2M", "5P"], "sus2"],
+    ["sus4", ["1P", "4P", "5P"], "sus4"],
+    ["power chord (5)", ["1P", "5P"], "5"],
+    ["maj6", ["1P", "3M", "5P", "6M"], "maj6"],
+    ["min6", ["1P", "3m", "5P", "6M"], "min6"],
+    ["maj7", ["1P", "3M", "5P", "7M"], "maj7"],
+    ["min7", ["1P", "3m", "5P", "7m"], "min7"],
+    ["dom7", ["1P", "3M", "5P", "7m"], "dom7"],
+    ["hdim7", ["1P", "3m", "5d", "7m"], "hdim7"],
+    ["dim7", ["1P", "3m", "5d", "7d"], "dim7"],
+    ["minmaj7", ["1P", "3m", "5P", "7M"], "minmaj7"],
+    ["maj9", ["1P", "3M", "5P", "7M", "9M"], "maj9"],
+    ["min9", ["1P", "3m", "5P", "7m", "9M"], "min9"],
+    ["dom9", ["1P", "3M", "5P", "7m", "9M"], "dom9"],
+    ["dom7#5 (altered dom) collapses to dom7", ["1P", "3M", "5A", "7m"], "dom7"],
+    ["empty → unknown", [], "unknown"],
+  ];
+  for (const [label, intervals, expected] of cases) {
+    it(`${label} → ${expected}`, () => {
+      expect(deriveQualityFromIntervals(intervals)).toBe(expected);
+    });
+  }
+});
 
 describe("ChordDetectionStabilizer", () => {
   let stabilizer: ChordDetectionStabilizer;
@@ -426,11 +462,118 @@ describe("ChordDetectionStabilizer", () => {
       // Harmonic reading: Eb major
       expect(chord?.harmonic.root).toBe(3); // Eb
       expect(chord?.harmonic.quality).toBe("maj");
-      // Bass-led reading: rooted on G (altered chord)
-      expect(chord?.bassLed.root).toBe(7); // G
+      // Bass-led reading: NO clean G-rooted candidate exists for {G, Bb, Eb}
+      // without enharmonic respelling (Gm#5 would need D# where the input has
+      // Eb — rejected by the enharmonic filter). Falls back to harmonic; the
+      // slash notation on the harmonic reading (Eb/G) already carries the
+      // bass information.
+      expect(chord?.bassLed.root).toBe(3); // Eb, converged with harmonic
+      expect(chord?.bassLed.quality).toBe("maj");
       // Bass tracking + inversion metadata
       expect(chord?.bass).toBe(7);
       expect(chord?.isInverted).toBe(true);
+      // Inversion index: first inversion → third-of-chord (interval 4 semitones
+      // from Eb) is in the bass; that's index 1 in chordTones [0, 4, 7].
+      expect(chord?.inversion).toBe(1);
+    });
+
+    it("voicing reports actual sounding MIDI notes (with octaves + doublings)", () => {
+      // Nic played 60, 68, 72, 75 = C4, Ab4, C5, Eb5. Prior behaviour
+      // collapsed to one Pitch per PC at "reference octave 4" —
+      // hiding the C5 doubling and moving Eb5 to Eb4. Voicing should
+      // preserve real octaves + duplicates, bass-first.
+      const notes = [
+        makeNote(0 as PitchClass, 4, 1000), // C4 (60)
+        makeNote(8 as PitchClass, 4, 1000), // Ab4 (68)
+        makeNote(0 as PitchClass, 5, 1000), // C5 (72)
+        makeNote(3 as PitchClass, 5, 1000), // Eb5 (75)
+      ];
+      stabilizer.apply(
+        createTestRawFrame(1000),
+        createTestMusicalFrame(1000, "main", { notes, progression: [] }),
+      );
+      const t2 = 1100;
+      const notes2 = notes.map((n) => ({ ...n, onset: t2 }));
+      const result = stabilizer.apply(
+        createTestRawFrame(t2),
+        createTestMusicalFrame(t2, "main", { notes: notes2, progression: [] }),
+      );
+      const chord = result.chords.find((c) => c.phase === "active");
+      expect(chord).toBeDefined();
+      // Bass-first, four entries preserved including the C4/C5 doubling.
+      expect(chord?.voicing).toEqual([
+        { pc: 0, octave: 4 }, // C4
+        { pc: 8, octave: 4 }, // Ab4
+        { pc: 0, octave: 5 }, // C5
+        { pc: 3, octave: 5 }, // Eb5
+      ]);
+    });
+
+    it("bass-led falls back to harmonic when no clean bass-rooted spelling exists (Ab/C)", () => {
+      // Nic-reported field-bug case: {C, Eb, Ab} — Cm#5 would win the
+      // bass-led slot on the old code (any candidate rooted at bass wins),
+      // even though Tonal spells Cm#5 as [C, Eb, G#], respelling the
+      // input's Ab as G#. The enharmonic filter rejects that; bass-led
+      // falls back to the harmonic reading (Ab), whose slash-notated
+      // form "Ab/C" already communicates the bass.
+      const notes = [
+        makeNote(0 as PitchClass, 3, 1000), // C3 as bass
+        makeNote(3 as PitchClass, 4, 1000), // Eb4
+        makeNote(8 as PitchClass, 4, 1000), // Ab4
+      ];
+      stabilizer.apply(
+        createTestRawFrame(1000),
+        createTestMusicalFrame(1000, "main", { notes, progression: [] }),
+      );
+      const t2 = 1100;
+      const notes2 = notes.map((n) => ({ ...n, onset: t2 }));
+      const result = stabilizer.apply(
+        createTestRawFrame(t2),
+        createTestMusicalFrame(t2, "main", { notes: notes2, progression: [] }),
+      );
+      const chord = result.chords.find((c) => c.phase === "active");
+      expect(chord).toBeDefined();
+      // Harmonic: Ab major
+      expect(chord?.harmonic.root).toBe(8);
+      expect(chord?.harmonic.quality).toBe("maj");
+      // Bass-led: converges with harmonic (not the buggy "aug" Cm#5).
+      expect(chord?.bassLed.root).toBe(8);
+      expect(chord?.bassLed.quality).toBe("maj");
+    });
+
+    it("populates inversion index on Ab/C (first-inversion Ab major, bass C)", () => {
+      // Nic-reported field-bug repro: {C, Eb, Ab} with C as bass — first
+      // inversion of Ab major. inversion should be 1 (third-of-chord in bass).
+      const notes = [
+        makeNote(0 as PitchClass, 3, 1000), // C3 as bass
+        makeNote(3 as PitchClass, 4, 1000), // Eb4
+        makeNote(8 as PitchClass, 4, 1000), // Ab4
+      ];
+      stabilizer.apply(
+        createTestRawFrame(1000),
+        createTestMusicalFrame(1000, "main", {
+          notes,
+          progression: [],
+          prescribedKey: { root: 8 as PitchClass, mode: "ionian" },
+        }),
+      );
+      const t2 = 1100;
+      const notes2 = notes.map((n) => ({ ...n, onset: t2 }));
+      const result = stabilizer.apply(
+        createTestRawFrame(t2),
+        createTestMusicalFrame(t2, "main", {
+          notes: notes2,
+          progression: [],
+          prescribedKey: { root: 8 as PitchClass, mode: "ionian" },
+        }),
+      );
+      const chord = result.chords.find((c) => c.phase === "active");
+      expect(chord).toBeDefined();
+      expect(chord?.harmonic.root).toBe(8); // Ab
+      expect(chord?.harmonic.quality).toBe("maj");
+      expect(chord?.bass).toBe(0); // C in bass
+      expect(chord?.isInverted).toBe(true);
+      expect(chord?.inversion).toBe(1);
     });
 
     it("harmonic and bass-led converge for root-position chords", () => {

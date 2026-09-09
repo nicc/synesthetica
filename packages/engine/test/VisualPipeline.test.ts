@@ -125,6 +125,33 @@ describe("VisualPipeline", () => {
       expect(noteEntities).toHaveLength(0);
     });
 
+    it("removeAdapter drops the specified adapter without touching consumers", () => {
+      const adapter2 = new MockRawAdapter();
+      pipeline.addAdapter(adapter);
+      pipeline.addAdapter(adapter2);
+      pipeline.setStabilizerFactory(
+        () => new NoteTrackingStabilizer({ partId: "test-part" })
+      );
+      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.addGrammar(new RhythmGrammar());
+
+      // Frame drains one raw frame per adapter's nextFrame() call and
+      // creates partStates as a side effect. Establish that partStates
+      // exist by requesting a frame.
+      pipeline.requestFrame(0);
+
+      // Drop the first adapter — grammars, vocab, stabilizer, and
+      // partStates all persist (no dispose was called).
+      pipeline.removeAdapter(adapter);
+
+      // Second adapter still delivers frames through the surviving
+      // pipeline; grammars still emit entities.
+      const frame = pipeline.requestFrame(100);
+      expect(frame.t).toBe(100);
+      // Rhythm grammar always emits its now-line entity when active.
+      expect(frame.entities.length).toBeGreaterThan(0);
+    });
+
     it("emits warning when no vocabulary configured", () => {
       pipeline.addAdapter(adapter);
 

@@ -259,8 +259,14 @@ function formatRoman(
   else if (chordQuality === "hdim7") suffix = "ø7";
   else if (chordQuality === "aug") suffix = "+";
   else if (chordQuality === "dom7") suffix = "7";
+  else if (chordQuality === "dom9") suffix = "9";
   else if (chordQuality === "maj7") suffix = "Δ7";
+  else if (chordQuality === "maj9") suffix = "Δ9";
+  else if (chordQuality === "maj6") suffix = "6";
   else if (chordQuality === "min7") suffix = "7";
+  else if (chordQuality === "min9") suffix = "9";
+  else if (chordQuality === "min6") suffix = "6";
+  else if (chordQuality === "minmaj7") suffix = "mΔ7";
   else if (chordQuality === "sus2") {
     base = numeral; // uppercase
     suffix = "sus2";
@@ -373,8 +379,12 @@ function qualityMatchesDiatonic(
   const triadCore = extractTriadCore(chordQuality);
   if (triadCore !== null && triadCore === diatonicQuality) return true;
 
-  // V7 (dom7 at the V slot) accepted as diatonic in major-quality slots.
-  if (chordQuality === "dom7" && degree === 5 && diatonicQuality === "maj") {
+  // V7 / V9 (dominant at the V slot) accepted as diatonic in major-quality slots.
+  if (
+    (chordQuality === "dom7" || chordQuality === "dom9") &&
+    degree === 5 &&
+    diatonicQuality === "maj"
+  ) {
     return true;
   }
 
@@ -386,10 +396,15 @@ function extractTriadCore(
 ): "maj" | "min" | "dim" | "aug" | null {
   switch (quality) {
     case "maj":
+    case "maj6":
     case "maj7":
+    case "maj9":
       return "maj";
     case "min":
+    case "min6":
     case "min7":
+    case "min9":
+    case "minmaj7":
       return "min";
     case "dim":
     case "dim7":
@@ -398,10 +413,12 @@ function extractTriadCore(
     case "aug":
       return "aug";
     case "dom7":
-      // dom7 is only diatonic at V (handled by the explicit special
-      // case in qualityMatchesDiatonic). Returning null here ensures
-      // dom7 at non-V degrees is correctly flagged borrowed — e.g.
-      // C7 in C major is V/IV (borrowed), not diatonic at I.
+    case "dom9":
+      // dom7/dom9 is only diatonic at V (handled by the explicit
+      // special case in qualityMatchesDiatonic). Returning null here
+      // ensures dominant chords at non-V degrees are correctly flagged
+      // borrowed — e.g. C7 in C major is V/IV (borrowed), not
+      // diatonic at I.
       return null;
     default:
       return null;
@@ -523,10 +540,17 @@ function emitFunctionalEdges(
     }
   }
 
-  // 2. Secondary dominant detection
-  const isMajorOrDom7 =
-    fc.quality === "maj" || fc.quality === "dom7" || fc.quality === "maj7";
-  if (isMajorOrDom7) {
+  // 2. Secondary dominant detection — any major-triad-core quality
+  // (maj / maj6 / maj7 / maj9 / dom7 / dom9) can act as a secondary
+  // dominant when its root sits a fifth above a scale degree.
+  const isMajorTriadCore =
+    fc.quality === "maj" ||
+    fc.quality === "maj6" ||
+    fc.quality === "maj7" ||
+    fc.quality === "maj9" ||
+    fc.quality === "dom7" ||
+    fc.quality === "dom9";
+  if (isMajorTriadCore) {
     const targetPc = ((fc.rootPc - 7 + 12) % 12) as PitchClass;
     const targetSemiFromTonic = (targetPc - key.root + 12) % 12;
     const targetDegreeIdx =
