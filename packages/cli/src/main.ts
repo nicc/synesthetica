@@ -113,6 +113,7 @@ async function runStart(options: StartOptions): Promise<number> {
     webAppPort: options.webAppPort ?? undefined,
     openBrowser: options.openBrowser,
     browser: options.browser,
+    recentEventsBufferSize: options.recentEventsBufferSize,
     log: (line) => writeErr(line),
   });
   shutdownTasks.push({ name: "session (if running)", run: () => session.stop() });
@@ -176,9 +177,14 @@ async function runNoMcpEagerPath(
       port: options.webAppPort ?? undefined,
     });
     shutdownTasks.push({ name: `web app (${webApp.mode})`, run: () => webApp.close() });
-    const openUrl =
-      webApp.url +
-      `?ws-port=${bridge.port}&instance=${encodeURIComponent(instanceLabel)}`;
+    const noMcpParams = new URLSearchParams({
+      "ws-port": String(bridge.port),
+      instance: instanceLabel,
+    });
+    if (options.recentEventsBufferSize !== undefined) {
+      noMcpParams.set("buffer-size", String(options.recentEventsBufferSize));
+    }
+    const openUrl = `${webApp.url}?${noMcpParams.toString()}`;
     writeErr(`web app ready at ${openUrl}`);
     if (options.openBrowser) {
       openBrowser(openUrl, options.browser);

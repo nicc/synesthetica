@@ -41,7 +41,14 @@ const DEFAULT_START_OPTIONS: StartOptions = {
   port: null,
   transport: "stdio",
   mcpEnabled: true,
-  recentEventsBufferSize: 1000,
+  // Sized for ~1 hour of typical play. At ~2–3 events/sec sustained
+  // that's ~10k events (~5 MB memory). Doubles as a natural guard-
+  // rail: even if the LLM asks for `limit: 999999`, it only ever
+  // gets what fits — bounded token cost by construction. Cross-
+  // session recall is a non-goal (see primer). `clear_recent_events`
+  // lets the user zero it mid-session if they want a fresh reading
+  // horizon.
+  recentEventsBufferSize: 10_000,
   logRetentionDays: 7,
   openBrowser: true,
   // Chrome is the default because Firefox needs the per-origin Web MIDI

@@ -547,6 +547,11 @@ function buildSessionEngineProxy(session: SessionManager): EngineHandle {
       if (!engine) return { startedAt: null, now: null, events: [] };
       return engine.getRecentEvents(limit, since);
     },
+    clearRecentEvents: async () => {
+      const engine = session.getEngine();
+      if (!engine) return notStarted();
+      return engine.clearRecentEvents();
+    },
     getAvailableInputs: async () => {
       const engine = session.getEngine();
       if (!engine) return [];

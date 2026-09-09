@@ -169,6 +169,12 @@ export class StubEngineHandle implements EngineHandle {
     };
   }
 
+  async clearRecentEvents(): Promise<StateSnapshot> {
+    this.events = [];
+    this.opLog.push({ method: "clearRecentEvents", args: [] });
+    return this.state;
+  }
+
   /** Test-only: inject a synthetic event into the recent-events buffer. */
   injectEvent(kind: string, payload: Record<string, unknown> = {}): void {
     this.events.push({

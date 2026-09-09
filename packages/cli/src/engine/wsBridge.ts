@@ -369,6 +369,9 @@ class WSBackedEngineHandle implements EngineHandle {
   async getRecentEvents(limit = 100, since?: number): Promise<RecentEventsEnvelope> {
     return this.call("getRecentEvents", [limit, since]) as Promise<RecentEventsEnvelope>;
   }
+  async clearRecentEvents(): Promise<StateSnapshot> {
+    return this.call("clearRecentEvents", []) as Promise<StateSnapshot>;
+  }
   async getAvailableInputs(): Promise<AvailableInput[]> {
     return this.call("getAvailableInputs", []) as Promise<AvailableInput[]>;
   }

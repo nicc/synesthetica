@@ -39,6 +39,12 @@ export interface SessionManagerOptions {
   webAppPort?: number;
   openBrowser: boolean;
   browser: "default" | "chrome";
+  /**
+   * Max events retained in the browser's recent-events buffer.
+   * Passed through to the tab via ?buffer-size=N so the browser
+   * sizes its ring buffer accordingly.
+   */
+  recentEventsBufferSize?: number;
   log?: (line: string) => void;
 }
 
@@ -100,9 +106,7 @@ export class SessionManager {
       this.webApp = await spawnWebApp({
         port: this.options.webAppPort,
       });
-      const openUrl =
-        this.webApp.url +
-        `?ws-port=${this.bridge.port}&instance=${encodeURIComponent(this.options.instanceLabel)}`;
+      const openUrl = this.buildOpenUrl();
       this.log(`web app ready at ${openUrl}`);
 
       let openedInBrowser = false;
@@ -187,10 +191,27 @@ export class SessionManager {
     return {
       instanceLabel: this.options.instanceLabel,
       wsPort: this.bridge.port,
-      webAppUrl:
-        this.webApp.url +
-        `?ws-port=${this.bridge.port}&instance=${encodeURIComponent(this.options.instanceLabel)}`,
+      webAppUrl: this.buildOpenUrl(),
       openedInBrowser: this.options.openBrowser,
     };
+  }
+
+  /**
+   * Assemble the browser-facing URL with all runtime parameters the
+   * tab needs — WS port, instance label, recent-events buffer size.
+   * Kept in one place so future parameters get plumbed uniformly.
+   */
+  private buildOpenUrl(): string {
+    if (!this.bridge || !this.webApp) {
+      throw new Error("buildOpenUrl called on non-running session");
+    }
+    const params = new URLSearchParams({
+      "ws-port": String(this.bridge.port),
+      instance: this.options.instanceLabel,
+    });
+    if (this.options.recentEventsBufferSize !== undefined) {
+      params.set("buffer-size", String(this.options.recentEventsBufferSize));
+    }
+    return `${this.webApp.url}?${params.toString()}`;
   }
 }
