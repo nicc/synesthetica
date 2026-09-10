@@ -465,13 +465,22 @@
     /* -----------------------------------------------------------------
      * On-screen keyboard (mounted only when the input source is
      * the on-screen keyboard). Fixed at the bottom of the viewport,
-     * right-aligned so it sits below the harmony clock's screen
-     * region; the rhythm lens stops well above so no overlap.
+     * horizontally centred under the harmony clock (its centre sits
+     * at ~79% of viewport width — HARMONY_LEFT + HARMONY_COLUMN_WIDTH/2
+     * in the layout module). The rhythm lens stops well above the
+     * bottom, so no overlap.
+     *
+     * Visual language: outline + letter only, no fill. A soft radial
+     * hue glow reads through the transparent centre so the outline
+     * (white for naturals, black for sharps) and its letter sit on
+     * top of the hue rather than inside a solid tile. Pressed state
+     * intensifies the glow AND depresses the key slightly.
      * ----------------------------------------------------------------- */
     .syn-onscreen-keyboard {
       position: absolute;
-      bottom: 24px;
-      right: 24px;
+      bottom: 20px;
+      left: 79%;
+      transform: translateX(-50%);
       z-index: 8;
       pointer-events: none;
       user-select: none;
@@ -480,57 +489,64 @@
       position: relative;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 3px;
     }
     .syn-onscreen-keyboard-row {
       position: relative;
       display: flex;
-      gap: 4px;
+      gap: 2px;
     }
     /* Sharp row is absolutely populated; children position themselves
      * via inline `left`. Reserve the natural-row height so the sharps
      * sit on their own line rather than collapsing. */
-    .syn-onscreen-keyboard-sharps { height: 44px; }
+    .syn-onscreen-keyboard-sharps { height: 22px; }
     .syn-onscreen-keyboard-sharps .syn-onscreen-key { position: absolute; }
 
     .syn-onscreen-key {
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 6px;
+      border-radius: 4px;
       font-family: ui-monospace, SFMono-Regular, monospace;
-      font-size: 14px;
+      font-size: 10px;
       font-weight: 600;
-      background: #000;
-      /* Every key defines its hue via the --syn-key-hue CSS var; the
-       * glow uses that hue at low saturation so the letters stay the
-       * primary read. is-pressed brightens the glow to feedback the
-       * press. */
+      /* Outline + letter only. The radial background paints a soft
+       * hue glow that shows through the transparent centre so the
+       * letter reads against colour rather than solid black — the
+       * key to a legible black-on-black sharp glyph. Complements
+       * the external box-shadow for the overall glow. */
+      background: radial-gradient(
+        circle at center,
+        hsla(var(--syn-key-hue, 0), 70%, 55%, 0.42) 0%,
+        hsla(var(--syn-key-hue, 0), 70%, 55%, 0.18) 55%,
+        transparent 100%
+      );
       box-shadow:
-        0 0 6px 1px hsla(var(--syn-key-hue, 0), 65%, 55%, 0.35),
-        0 0 14px 3px hsla(var(--syn-key-hue, 0), 65%, 55%, 0.18);
-      transition: box-shadow 60ms ease-out, transform 60ms ease-out;
+        0 0 5px 0 hsla(var(--syn-key-hue, 0), 70%, 55%, 0.4),
+        0 0 12px 2px hsla(var(--syn-key-hue, 0), 70%, 55%, 0.18);
+      transition: background 60ms ease-out,
+                  box-shadow 60ms ease-out,
+                  transform 60ms ease-out;
     }
     .syn-onscreen-key.is-white {
-      border: 1.5px solid #fff;
+      border: 1px solid #fff;
       color: #fff;
     }
     .syn-onscreen-key.is-black {
-      border: 1.5px solid #000;
+      border: 1px solid #000;
       color: #000;
-      background: hsla(var(--syn-key-hue, 0), 65%, 55%, 0.85);
     }
     .syn-onscreen-key.is-pressed {
       transform: translateY(1px);
+      background: radial-gradient(
+        circle at center,
+        hsla(var(--syn-key-hue, 0), 90%, 62%, 0.85) 0%,
+        hsla(var(--syn-key-hue, 0), 90%, 62%, 0.42) 55%,
+        hsla(var(--syn-key-hue, 0), 90%, 62%, 0.1) 100%
+      );
       box-shadow:
-        0 0 12px 3px hsla(var(--syn-key-hue, 0), 85%, 60%, 0.9),
-        0 0 24px 6px hsla(var(--syn-key-hue, 0), 85%, 60%, 0.45);
-    }
-    .syn-onscreen-key.is-white.is-pressed {
-      background: hsla(var(--syn-key-hue, 0), 80%, 25%, 0.7);
-    }
-    .syn-onscreen-key.is-black.is-pressed {
-      background: hsla(var(--syn-key-hue, 0), 85%, 62%, 1);
+        0 0 10px 2px hsla(var(--syn-key-hue, 0), 90%, 62%, 0.9),
+        0 0 22px 6px hsla(var(--syn-key-hue, 0), 90%, 62%, 0.45);
     }
   </style>
 </head>

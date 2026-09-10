@@ -31,9 +31,9 @@ import type { ComputerKeyboardSource } from "@synesthetica/adapters";
 import { KEY_MAP, KEY_LABEL, NATURAL_ORDER } from "@synesthetica/adapters";
 import { pcToHue } from "@synesthetica/contracts";
 
-const NATURAL_KEY_PX = 44;
-const NATURAL_KEY_GAP = 4;
-const ROW_GAP = 6;
+const NATURAL_KEY_PX = 22;
+const NATURAL_KEY_GAP = 2;
+const ROW_GAP = 3;
 
 export interface OnScreenKeyboardHandle {
   root: HTMLElement;
