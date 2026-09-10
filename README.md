@@ -73,11 +73,11 @@ There are three lenses.
 
 #### Dynamics lens
 
-<img src="docs/readme/dynamics.png" alt="Dynamics lens — velocity bar along the left edge" align="left" height="200" hspace="16">
+<img src="docs/readme/dynamics.png" alt="Dynamics lens — velocity bar" align="right" height="200" hspace="16">
 
 This is the simplest one. It's just a bar on the left of the screen that renders a little strip indicating how hard you played each note. Notes are undifferentiated in pitch and linger a while (you can change how long). This equips your visual memory to see rising and falling trends, stability and spread. No need for fancy graphs because your brain does this well already. The higher the strip, the harder you played.
 
-<br clear="left">
+<br clear="right">
 
 
 #### Rhythm lens
