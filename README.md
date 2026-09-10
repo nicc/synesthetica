@@ -4,7 +4,7 @@ Synesthetica is a real-time music visualiser that listens to MIDI or audio and d
 
 [This](https://mcnoose.com/synesthetica) is the quickest way to see it running but the [LLM-mediated interaction model](#llm-mediated-interaction) is way more interesting.
 
-<screenshot>
+<!-- TODO: hero screenshot -->
 
 Tested on Chrome and Claude Desktop.
 
@@ -73,7 +73,7 @@ There are three lenses.
 
 #### Dynamics lens
 
-<screenshot along the left edge, text to the right of it>
+<!-- TODO: dynamics-lens screenshot, along the left edge with text to the right of it -->
 
 This is the simplest one. It's just a bar on the left of the screen that renders a little strip indicating how hard you played each note. Notes are undifferentiated in pitch and linger a while (you can change how long). This equips your visual memory to see rising and falling trends, stability and spread. No need for fancy graphs because your brain does this well already. The higher the strip, the harder you played.
 
@@ -120,15 +120,7 @@ Each spoke encodes its specific note using the same colour-mappings applied to t
 
 It's kind of a lot to explain verbally but it makes sense when you see it.
 
-----------
-TODO:
-Screenshots list:
-
-C major — the reference triad. Straight hub, three long spokes, root-third-fifth.
-A minor — same skeleton, squiggly hub. Shows quality-encodes-margin, spokes-encode-intervals.
-Cmaj7 — introduces the mid-length spoke for the 7th. One extra element per photo, still legible.
-Dbmaj13#11 — the complex one. Long/mid/short spokes plus the chromatic-line for the #11. Proves the language holds under complexity without becoming a tangle.
-----------
+<!-- TODO: chord-glyph screenshots (see bd for the chord list) -->
 
 ##### Functional harmony clock
 
@@ -142,7 +134,7 @@ The full chord name appears at the centre of the clock, even if no key is specif
 
 Again, it's a lot to take in verbally. Easier seen in action.
 
-<screenshots for the chord clock - I'll supply these>
+<!-- TODO: chord-clock screenshots -->
 
 ### How it works
 
