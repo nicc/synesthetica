@@ -92,6 +92,7 @@ const macros: MacroAnnotation[] = [
     type: "continuous",
     range: [2, 6],
     default: 2, // matches ChordDetectionStabilizer.minPitchClasses
+    step: 1, // note count — integer domain
     affects: ["harmony"],
     directionality: {
       low: {
@@ -235,12 +236,12 @@ const macros: MacroAnnotation[] = [
     name: "Reference-marker linger",
     aliases: ["drift-marker trail", "reference trail"],
     type: "continuous",
-    range: [1.0, 3.0],
-    default: 1.3, // matches RhythmLens DEFAULT_REFERENCE_LINGER_MULTIPLIER
+    range: [0, 3.0],
+    default: 1.0, // matches RhythmLens DEFAULT_REFERENCE_LINGER_MULTIPLIER
     affects: ["rhythm"],
     directionality: {
       low: {
-        description: "reference lines and streaks fade with the note",
+        description: "reference lines and streaks fade with the note (0 = off entirely)",
         tendsTo: ["cleaner timeline", "not accentuate timing inaccuracy"],
       },
       high: {
@@ -250,11 +251,11 @@ const macros: MacroAnnotation[] = [
     },
     notes: [
       "Multiplier applied to the note-history window for reference lines and streak markers.",
-      "Unit is dimensionless multiplier (1.0 = fades with the note; 2.0 = twice as long).",
+      "Unit is dimensionless multiplier: 0 disables the trail entirely, 1.0 fades with the note, 2.0 lingers twice as long.",
     ],
     humanNotes: [
       "How long the drift streaks and reference marks linger after the note itself has faded.",
-      "Low values keep the timeline clean; high values leave a persistent trail that accentuates timing inaccuracy.",
+      "Set to 0 to turn the trail off; higher values leave a longer persistent trail that accentuates timing inaccuracy.",
     ],
     consumers: [{ kind: "lens", id: "rhythm-lens", macroKey: "referenceLinger" }],
   },
@@ -295,6 +296,7 @@ const macros: MacroAnnotation[] = [
     type: "continuous",
     range: [0, 360],
     default: 0, // red at pitch class 0 (C) — matches MusicalVisualVocabulary.DEFAULT_CONFIG
+    step: 1, // hue degree — integer domain
     affects: ["harmony", "melody"],
     directionality: {
       low: {
@@ -536,6 +538,7 @@ const sessionControls: SessionControlAnnotation[] = [
     aliases: ["bpm", "beats per minute"],
     type: "number",
     range: [30, 240],
+    step: 1, // BPM — integer domain
     unit: "BPM",
     nullable: true,
     notes: [
@@ -557,6 +560,7 @@ const sessionControls: SessionControlAnnotation[] = [
     aliases: ["beats/bar"],
     type: "number",
     range: [1, 16],
+    step: 1, // beat count — integer domain
     nullable: true,
     notes: [
       "The numerator of the time signature. Paired with session:beat-value; use set_meter(beats_per_bar, beat_value) to set both together.",

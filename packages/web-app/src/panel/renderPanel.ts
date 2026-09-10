@@ -314,18 +314,21 @@ function renderSlider(
   input.id = domId(w.id);
   input.min = String(w.range[0]);
   input.max = String(w.range[1]);
-  // Continuous macros often benefit from finer granularity than integers.
-  input.step = "any";
+  // Widget-level step: continuous macros default to "any" for fine
+  // granularity; controls that declare `step: 1` (integers like
+  // note-threshold, colour anchor degree) get discrete increments and
+  // integer-formatted values.
+  input.step = w.step !== undefined ? String(w.step) : "any";
   const initial = Number(initialFor(opts, w.id, w.defaultValue));
   input.value = String(initial);
 
   const valueLabel = document.createElement("span");
   valueLabel.className = "syn-panel-widget-value";
-  valueLabel.textContent = formatSliderValue(initial);
+  valueLabel.textContent = formatSliderValue(initial, w.step);
 
   input.addEventListener("input", () => {
     const v = Number(input.value);
-    valueLabel.textContent = formatSliderValue(v);
+    valueLabel.textContent = formatSliderValue(v, w.step);
     opts.dispatch(w.id, v);
   });
 
@@ -338,15 +341,18 @@ function renderSlider(
   updaters.set(w.id, (v) => {
     if (typeof v !== "number") return;
     input.value = String(v);
-    valueLabel.textContent = formatSliderValue(v);
+    valueLabel.textContent = formatSliderValue(v, w.step);
   });
 
   return el;
 }
 
-function formatSliderValue(v: number): string {
-  // Three-significant-digit format — 3, 3.14, 0.00512, etc.
+function formatSliderValue(v: number, step: number | undefined): string {
   if (v === 0) return "0";
+  // Integer-stepped widgets always render as integers regardless of
+  // magnitude — a note count of "2" must never appear as "2.00".
+  if (step !== undefined && Number.isInteger(step)) return String(Math.round(v));
+  // Otherwise three-significant-digit format — 3, 3.14, 0.00512, etc.
   const abs = Math.abs(v);
   if (abs >= 100) return v.toFixed(0);
   if (abs >= 10) return v.toFixed(1);
@@ -483,6 +489,7 @@ function renderNumber(
   input.id = domId(w.id);
   input.min = String(w.range[0]);
   input.max = String(w.range[1]);
+  if (w.step !== undefined) input.step = String(w.step);
   const initial = initialFor(opts, w.id, null);
   input.value = initial === null || initial === undefined ? "" : String(initial);
 

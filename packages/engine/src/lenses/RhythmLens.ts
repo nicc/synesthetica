@@ -55,7 +55,7 @@ const MAX_NOTE_HISTORY_MS = 8000;
 const MIN_NOTE_HISTORY_BEATS = 1;
 
 /** Reference window (streaks + reference lines) lingers longer than notes (multiplier) */
-const DEFAULT_REFERENCE_LINGER_MULTIPLIER = 1.3;
+const DEFAULT_REFERENCE_LINGER_MULTIPLIER = 1.0;
 
 /** Baseline NOW-line beat pulse constants, scaled at runtime by the
  *  rhythm:pulse-intensity macro (default 0.5 keeps historic feel). */

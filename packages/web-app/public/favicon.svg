@@ -1,19 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!--
-    Synesthetica favicon: chord-shape mark for A♭ add2 (A♭, B♭, C, E♭).
-    Root A♭ (pitch class 8) sets the hub hue at 240° (blue). Spokes
-    radiate to each chord tone in its pitch-class hue: B♭ 300°, C 0°,
-    E♭ 90°. Hue mapping matches the app's default (0° = C, +30° per
-    semitone). Saturation/lightness are an HSL approximation of the
-    HSV(0.7, 0.85) used for chord colours in the vocabulary.
+    Synesthetica favicon: a three-armed chord-shape mark modelled on
+    a screenshot from the harmony lens. Cyan/teal hub with three
+    triangular arms in the app's pitch-class hues — teal at top,
+    magenta bottom-right, gold-orange bottom-left.
   -->
-  <circle cx="16" cy="16" r="6.5" fill="hsl(240, 66%, 55%)"/>
-  <line x1="16" y1="16" x2="16" y2="3"
-        stroke="hsl(240, 66%, 55%)" stroke-width="3" stroke-linecap="round"/>
-  <line x1="16" y1="16" x2="27.5" y2="9.25"
-        stroke="hsl(300, 66%, 60%)" stroke-width="3" stroke-linecap="round"/>
-  <line x1="16" y1="16" x2="22.5" y2="27.5"
-        stroke="hsl(0, 66%, 55%)" stroke-width="3" stroke-linecap="round"/>
-  <line x1="16" y1="16" x2="4.5" y2="22.75"
-        stroke="hsl(90, 66%, 45%)" stroke-width="3" stroke-linecap="round"/>
+  <!-- Arms drawn first so the hub sits cleanly on top of their bases. -->
+  <polygon points="14,9 18,9 16,2" fill="hsl(180, 65%, 55%)"/>
+  <polygon points="22.36,19.54 19.54,22.36 25.9,25.9" fill="hsl(300, 55%, 55%)"/>
+  <polygon points="10.94,21.23 8.94,17.77 3.88,23" fill="hsl(35, 75%, 50%)"/>
+  <circle cx="16" cy="16" r="7" fill="hsl(180, 45%, 32%)"/>
 </svg>

@@ -200,6 +200,10 @@ export interface ContinuousMacroAnnotation extends MacroAnnotationBase {
   /** Default value (also the launch-time value). Anchors relative
    *  requests like "more" or "less" for the LLM. */
   default: number;
+  /** Optional step for the widget's input control. `1` for
+   *  integer-valued macros (e.g. note counts, degrees). Omit to leave
+   *  the widget at "any" — fractional values allowed. */
+  step?: number;
   directionality: MacroDirectionality;
   /** Runtime consumers. Required — an unwired macro is a lie the
    *  manifest can't tell. Validator enforces non-empty. */
@@ -337,6 +341,9 @@ export interface NumberSessionControlAnnotation
   type: "number";
   /** Inclusive range [min, max]. */
   range: [number, number];
+  /** Optional step for the widget's number input. `1` for integer
+   *  counts (e.g. beats-per-bar, BPM). Omit to leave "any". */
+  step?: number;
   /** Human-readable unit ("BPM", "ms"). Optional. */
   unit?: string;
 }

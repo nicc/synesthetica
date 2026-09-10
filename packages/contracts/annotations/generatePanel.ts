@@ -126,6 +126,7 @@ function continuousSlider(
     kind: "slider",
     range: m.range,
     defaultValue: m.default,
+    step: m.step,
     low: m.directionality.low.description,
     high: m.directionality.high.description,
   };
@@ -189,6 +190,7 @@ function numberField(
     ...base,
     kind: "number",
     range: s.range,
+    step: s.step,
     unit: s.unit,
     clearable: s.nullable,
   };

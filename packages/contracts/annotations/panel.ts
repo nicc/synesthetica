@@ -42,6 +42,9 @@ export interface SliderWidgetDescriptor extends WidgetDescriptorBase {
   kind: "slider";
   range: [number, number];
   defaultValue: number;
+  /** Optional step for the widget's <input type="range">. Omit for
+   *  "any" (default). `1` renders as an integer stepper. */
+  step?: number;
   /** Directionality prose for the low/high extremes; render as endpoints. */
   low: string;
   high: string;
@@ -81,6 +84,8 @@ export interface ToggleWidgetDescriptor extends WidgetDescriptorBase {
 export interface NumberWidgetDescriptor extends WidgetDescriptorBase {
   kind: "number";
   range: [number, number];
+  /** Optional step for <input type="number">. Omit for "any". */
+  step?: number;
   unit?: string;
   clearable: boolean;
 }
