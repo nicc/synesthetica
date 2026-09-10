@@ -125,7 +125,7 @@ Each spoke encodes its specific note using the same colour-mappings applied to t
 
 It's kind of a lot to explain verbally but it makes sense when you see it.
 
-| ![C major](docs/readme/chord%20glyph%20C%20maj.png) | ![A minor](docs/readme/chord%20glyph%20A%20min.png) | ![Cmaj7](docs/readme/chord%20glyph%20C%20maj%207.png) | ![D♭maj7♯11](docs/readme/chord%20glyph%20D%20flat%20maj%207%20sharp%2011.png) |
+| <img src="docs/readme/chord%20glyph%20C%20maj.png" alt="C major" width="180"> | <img src="docs/readme/chord%20glyph%20A%20min.png" alt="A minor" width="180"> | <img src="docs/readme/chord%20glyph%20C%20maj%207.png" alt="Cmaj7" width="180"> | <img src="docs/readme/chord%20glyph%20D%20flat%20maj%207%20sharp%2011.png" alt="D♭maj7♯11" width="180"> |
 | :---: | :---: | :---: | :---: |
 | **C major** | **A minor** | **Cmaj7** | **D♭maj7♯11** |
 | straight hub, three long spokes | squiggly hub, same triad skeleton | adds the mid-length 7th spoke | long/mid/short spokes plus the chromatic ♯11 line |
@@ -142,7 +142,7 @@ The full chord name appears at the centre of the clock, even if no key is specif
 
 Again, it's a lot to take in verbally. Easier seen in action.
 
-| ![ii–V–I in A♭](docs/readme/harmony%20clock%202-5-1%20in%20Aflat.png) | ![Modal interchange: B major resolving to E♭ major in A♭](docs/readme/harmony%20clock%20resolved%20modal%20interchange%20from%20B%20maj%20to%20Eflat%20maj%20in%20Aflat.png) |
+| <img src="docs/readme/harmony%20clock%202-5-1%20in%20Aflat.png" alt="ii–V–I in A♭" width="300"> | <img src="docs/readme/harmony%20clock%20resolved%20modal%20interchange%20from%20B%20maj%20to%20Eflat%20maj%20in%20Aflat.png" alt="Modal interchange: B major resolving to E♭ major in A♭" width="300"> |
 | :---: | :---: |
 | **ii–V–I in A♭** | **B major → E♭ major — modal interchange resolving in A♭** |
 | standard functional cadence traced around the diatonic ring | connector arc fanning from a borrowed chord back to its diatonic target |
