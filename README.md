@@ -2,7 +2,7 @@
 
 Synesthetica is a real-time music visualiser that listens to MIDI or audio and draws it from the perspective of Western music theory. It aims to build musical intuition by representing whatever you play in a coherent visual language. It can be viewed directly as a web page or operated through an LLM.
 
-[This](https://mcnoose.com/synesthetica) is the quickest way to see it running but the [LLM-mediated interaction model](#llm-mediated-interaction) is way more interesting.
+<a href="https://mcnoose.com/synesthetica" target="_blank" rel="noopener noreferrer">This</a> is the quickest way to see it running but the [LLM-mediated interaction model](#llm-mediated-interaction) is way more interesting.
 
 <!-- TODO: hero screenshot -->
 
@@ -16,7 +16,7 @@ It'll load in an immediately usable state but it's a lot better if you set up a 
 
 #### Music source
 
-The default input maps an on-screen musical keyboard to your typing keyboard. It requires no setup but has no velocity, limited range and bad ergonomics. A proper MIDI controller is best. Plug one in and reload the page. Audio is also supported but that's just converted to MIDI anyway (by Spotify's [Basic Pitch](https://basicpitch.spotify.com/) running in Web Assembly), so you'll get best results supplying MIDI directly.
+The default input maps an on-screen musical keyboard to your typing keyboard. It requires no setup but has no velocity, limited range and bad ergonomics. A proper MIDI controller is best. Plug one in and reload the page. Audio is also supported but that's just converted to MIDI anyway (by Spotify's <a href="https://basicpitch.spotify.com/" target="_blank" rel="noopener noreferrer">Basic Pitch</a> running in Web Assembly), so you'll get best results supplying MIDI directly.
 
 #### Key
 
@@ -32,7 +32,7 @@ There's a lot you can adjust. Things like pitch → colour mapping, visual empha
 
 ### Web interaction
 
-The important stuff is in the Basics tab. The Advanced tab does what it says too. Every control has a `?` tooltip. Have a look around. [Here's](https://mcnoose.com/synesthetica) a hosted version. The npm package can also serve it locally on a bundled web server:
+The important stuff is in the Basics tab. The Advanced tab does what it says too. Every control has a `?` tooltip. Have a look around. <a href="https://mcnoose.com/synesthetica" target="_blank" rel="noopener noreferrer">Here's</a> a hosted version. The npm package can also serve it locally on a bundled web server:
 
 ```bash
 npx synesthetica start --no-mcp
@@ -59,7 +59,7 @@ Add this block to your Claude Desktop config file (`~/Library/Application Suppor
 
 Restart Claude Desktop after saving. `npx` fetches `synesthetica` from the npm registry the first time it runs and caches it locally, so there's no separate install step. If you'd rather have it installed globally, `npm install -g synesthetica` works too. See [packages/cli/README.md](packages/cli/README.md) for Claude Code and other clients.
 
-Note that the LLM will only spin up context when you start a session or ask about Synesthetica. This keeps the always-on token cost as low as possible — around 50–80 tokens per conversation whether you touch music or not.
+Note that the LLM will only spin up context when you start a session or ask about Synesthetica. This keeps the always-on token cost as low as possible — around 50–80 tokens.
 
 #### Start a session
 
@@ -172,7 +172,7 @@ This project was partly an experiment in operating alongside LLMs, both as user 
 
 See [PRINCIPLES.md](PRINCIPLES.md) for a canonical set of guiding principles. These were important.
 
-The workflow is interesting because this project is as much a design exercise as an engineering one. As such, it didn't work to heavily specify. I couldn't let a swarm of agents loose and grind until they're done because I had no idea what done was. Being inherently exploratory, the problem was not verifiable in significant iteration lengths. This demanded a very conversational workflow. I often found myself giving simple prompts like "write the spec", or "go ahead" after fully developing a shared understanding in dialogue. This demanded very careful management of terminology and explicit promotion through iterative layers of communicative and design certainty. The chord glyph language, for example, was developed initially in unicode, then svg, then html canvas, then webGL canvas. Each stage layered new certainty into emergent specs and glossaries. [Here's](https://mcnoose.com/synesthetica/chord-shapes/) an svg-stage test artefact for the curious.
+The workflow is interesting because this project is as much a design exercise as an engineering one. As such, it didn't work to heavily specify. I couldn't let a swarm of agents loose and grind until they're done because I had no idea what done was. Being inherently exploratory, the problem was not verifiable in significant iteration lengths. This demanded a very conversational workflow. I often found myself giving simple prompts like "write the spec", or "go ahead" after fully developing a shared understanding in dialogue. This demanded very careful management of terminology and explicit promotion through iterative layers of communicative and design certainty. The chord glyph language, for example, was developed initially in unicode, then svg, then html canvas, then webGL canvas. Each stage layered new certainty into emergent specs and glossaries. <a href="https://mcnoose.com/synesthetica/chord-shapes/" target="_blank" rel="noopener noreferrer">Here's</a> an svg-stage test artefact for the curious.
 
 Given the above, I erred towards verbosity and am absolutely not making efficient use of tokens (yet).
 
@@ -182,12 +182,12 @@ Synesthetica ships as an npm package — you don't need the source to use it. If
 
 ## Acknowledgements / built with
 
-- [Claude Code](https://claude.com/claude-code) — wrote the code.
-- [Basic Pitch](https://basicpitch.spotify.com/) (Spotify) — polyphonic pitch detection.
-- [Tonal.js](https://github.com/tonaljs/tonal) — chord + key theory.
-- [Three.js](https://threejs.org) — WebGL rendering.
-- [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) — the Model Context Protocol plumbing that lets Claude Desktop reach the CLI over stdio.
-- [marked](https://github.com/markedjs/marked) — markdown → HTML for the About panel's inline primer view.
+- <a href="https://claude.com/claude-code" target="_blank" rel="noopener noreferrer">Claude Code</a> — wrote the code.
+- <a href="https://basicpitch.spotify.com/" target="_blank" rel="noopener noreferrer">Basic Pitch</a> (Spotify) — polyphonic pitch detection.
+- <a href="https://github.com/tonaljs/tonal" target="_blank" rel="noopener noreferrer">Tonal.js</a> — chord + key theory.
+- <a href="https://threejs.org" target="_blank" rel="noopener noreferrer">Three.js</a> — WebGL rendering.
+- <a href="https://github.com/modelcontextprotocol/typescript-sdk" target="_blank" rel="noopener noreferrer">MCP TypeScript SDK</a> — the Model Context Protocol plumbing that lets Claude Desktop reach the CLI over stdio.
+- <a href="https://github.com/markedjs/marked" target="_blank" rel="noopener noreferrer">marked</a> — markdown → HTML for the About panel's inline primer view.
 
 ## License
 
