@@ -477,10 +477,11 @@
      * intensifies the glow AND depresses the key slightly.
      * ----------------------------------------------------------------- */
     .syn-onscreen-keyboard {
+      /* left / top / transform set inline from OnScreenKeyboard.ts —
+       * see reposition(). The exact viewport position of the harmony
+       * clock depends on the current canvas aspect ratio, so pure
+       * CSS can't align to it. */
       position: absolute;
-      bottom: 20px;
-      left: 79%;
-      transform: translateX(-50%);
       z-index: 8;
       pointer-events: none;
       user-select: none;
@@ -509,18 +510,24 @@
       border-radius: 4px;
       font-family: ui-monospace, SFMono-Regular, monospace;
       font-size: 10px;
-      font-weight: 600;
       /* Outline + letter only. The radial background paints a soft
        * hue glow that shows through the transparent centre so the
        * letter reads against colour rather than solid black — the
        * key to a legible black-on-black sharp glyph. Complements
-       * the external box-shadow for the overall glow. */
+       * the external box-shadow for the overall glow.
+       *
+       * Border is a low-opacity white — bright enough to read as an
+       * outline but muted enough to sit alongside the app's other
+       * outlines (the dynamics bar reads around rgb(41,44,45)). We
+       * tune the border alpha independently of the letter's opacity
+       * so muting the outline doesn't drag the letter down with it. */
       background: radial-gradient(
         circle at center,
         hsla(var(--syn-key-hue, 0), 70%, 55%, 0.42) 0%,
         hsla(var(--syn-key-hue, 0), 70%, 55%, 0.18) 55%,
         transparent 100%
       );
+      border: 1px solid rgba(255, 255, 255, 0.4);
       box-shadow:
         0 0 5px 0 hsla(var(--syn-key-hue, 0), 70%, 55%, 0.4),
         0 0 12px 2px hsla(var(--syn-key-hue, 0), 70%, 55%, 0.18);
@@ -529,24 +536,30 @@
                   transform 60ms ease-out;
     }
     .syn-onscreen-key.is-white {
-      border: 1px solid #fff;
       color: #fff;
+      /* Lighter weight on naturals so the white letters don't
+       * outshout the muted app — about two-thirds of the sharps'
+       * weight. */
+      font-weight: 400;
     }
     .syn-onscreen-key.is-black {
-      border: 1px solid #000;
       color: #000;
+      font-weight: 600;
     }
     .syn-onscreen-key.is-pressed {
       transform: translateY(1px);
+      /* Slightly dimmer pressed glow than the previous pass — dropping
+       * ~0.1 off each opacity stop tones the flash without losing the
+       * "something happened" cue. */
       background: radial-gradient(
         circle at center,
-        hsla(var(--syn-key-hue, 0), 90%, 62%, 0.85) 0%,
-        hsla(var(--syn-key-hue, 0), 90%, 62%, 0.42) 55%,
-        hsla(var(--syn-key-hue, 0), 90%, 62%, 0.1) 100%
+        hsla(var(--syn-key-hue, 0), 90%, 62%, 0.72) 0%,
+        hsla(var(--syn-key-hue, 0), 90%, 62%, 0.32) 55%,
+        hsla(var(--syn-key-hue, 0), 90%, 62%, 0.08) 100%
       );
       box-shadow:
-        0 0 10px 2px hsla(var(--syn-key-hue, 0), 90%, 62%, 0.9),
-        0 0 22px 6px hsla(var(--syn-key-hue, 0), 90%, 62%, 0.45);
+        0 0 10px 2px hsla(var(--syn-key-hue, 0), 90%, 62%, 0.78),
+        0 0 22px 6px hsla(var(--syn-key-hue, 0), 90%, 62%, 0.35);
     }
   </style>
 </head>

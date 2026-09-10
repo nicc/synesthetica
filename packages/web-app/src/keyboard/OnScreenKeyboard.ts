@@ -113,6 +113,9 @@ export function mountOnScreenKeyboard(
   });
 
   host.appendChild(root);
+  reposition();
+  const onResize = () => reposition();
+  window.addEventListener("resize", onResize);
 
   function buildKeyElement(code: string, isBlack: boolean): HTMLElement {
     const el = document.createElement("div");
@@ -136,10 +139,42 @@ export function mountOnScreenKeyboard(
     }
   }
 
+  /**
+   * Position the keyboard so its horizontal centre lands under the
+   * progression clock and its vertical centre sits midway between
+   * the clock's bottom edge and the viewport's bottom edge.
+   *
+   * The clock's on-screen x depends on the current canvas aspect —
+   * the ThreeJS perspective camera keeps worldHeight (75) exactly
+   * filling the viewport vertically, so horizontal world extent is
+   * `75 × aspect`. The clock centre sits at world x = 79 (from
+   * HARMONY_LEFT + HARMONY_COLUMN_WIDTH/2 in the layout module,
+   * times worldWidth = 100). Its viewport-x fraction reduces to
+   * `29 / (75·aspect) + 0.5` — 0.5 when the world fills the viewport
+   * horizontally, drifting further right as the viewport widens.
+   *
+   * Vertical: the clock's bottom edge is at worldY = 12.375
+   * (HARMONY_STACK_TOP + HARMONY_STACK_HEIGHT), which lands at
+   * viewport y-fraction 0.835 across every aspect ratio. Halfway
+   * between there and the bottom is 0.9175.
+   */
+  function reposition(): void {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    if (vw <= 0 || vh <= 0) return;
+    const aspect = vw / vh;
+    const clockXFraction = 29 / (75 * aspect) + 0.5;
+    root.style.left = `${clockXFraction * vw}px`;
+    root.style.top = `${0.9175 * vh}px`;
+    root.style.bottom = "auto";
+    root.style.transform = "translate(-50%, -50%)";
+  }
+
   return {
     root,
     destroy: () => {
       unsubscribe();
+      window.removeEventListener("resize", onResize);
       root.remove();
     },
     setReferenceHue: (hue: number) => {
