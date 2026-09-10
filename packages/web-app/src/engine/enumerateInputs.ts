@@ -34,6 +34,14 @@ export async function enumerateInputs(
   midi: WebMidiSource | null,
 ): Promise<AvailableInput[]> {
   const inputs: AvailableInput[] = [];
+  // On-screen keyboard first — the boot default. Always present, no
+  // permissions, no async handshake, so it's the reliable entry point.
+  inputs.push({
+    kind: "keyboard",
+    name: "On-screen keyboard",
+    id: "keyboard",
+    sourceString: "keyboard",
+  });
   if (midi) {
     for (const info of midi.getInputs()) {
       inputs.push({
@@ -56,6 +64,12 @@ export async function enumerateInputs(
  */
 export function enumerateInputsSync(midi: WebMidiSource | null): AvailableInput[] {
   const inputs: AvailableInput[] = [];
+  inputs.push({
+    kind: "keyboard",
+    name: "On-screen keyboard",
+    id: "keyboard",
+    sourceString: "keyboard",
+  });
   if (midi) {
     for (const info of midi.getInputs()) {
       inputs.push({
@@ -129,6 +143,11 @@ export function inputsToPanelOptions(
 ): Array<{ value: string; label: string }> {
   return inputs.map((i) => ({
     value: i.sourceString,
-    label: i.kind === "midi" ? `MIDI: ${i.name}` : `Audio: ${i.name}`,
+    label:
+      i.kind === "midi"
+        ? `MIDI: ${i.name}`
+        : i.kind === "keyboard"
+          ? i.name
+          : `Audio: ${i.name}`,
   }));
 }

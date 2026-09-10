@@ -22,7 +22,12 @@ import {
   RawMidiAdapter,
   WebMidiSource,
   AudioInputAdapter,
+  ComputerKeyboardSource,
 } from "@synesthetica/adapters";
+import {
+  mountOnScreenKeyboard,
+  type OnScreenKeyboardHandle,
+} from "./keyboard/OnScreenKeyboard.js";
 import {
   VisualPipeline,
   ThreeJSRenderer,
@@ -79,6 +84,13 @@ let renderer: ThreeJSRenderer | null = null;
 let metronome: Metronome | null = null;
 let audioAdapter: AudioInputAdapter | null = null;
 let midiAdapter: RawMidiAdapter | null = null;
+// The keyboard input has three coupled bits of state: the MidiSource
+// wrapping the document event stream, the adapter feeding it into
+// the pipeline, and the on-screen UI overlay. All three come up and
+// down together; module-level so start/stop/swap paths can find them.
+let keyboardSource: ComputerKeyboardSource | null = null;
+let keyboardAdapter: RawMidiAdapter | null = null;
+let onScreenKeyboard: OnScreenKeyboardHandle | null = null;
 let sessionStartTime = 0; // performance.now() reference for session-ms math
 let sessionStartedAtIso: string | null = null; // wall-clock ISO at session start
 let animationFrameId: number | null = null;
@@ -514,6 +526,19 @@ async function detachCurrentAdapter(): Promise<void> {
     });
     audioAdapter = null;
   }
+  if (keyboardAdapter) {
+    pipeline?.removeAdapter(keyboardAdapter);
+    keyboardAdapter.stop();
+    keyboardAdapter = null;
+  }
+  if (keyboardSource) {
+    keyboardSource.dispose();
+    keyboardSource = null;
+  }
+  if (onScreenKeyboard) {
+    onScreenKeyboard.destroy();
+    onScreenKeyboard = null;
+  }
 }
 
 function startRenderLoop(): void {
@@ -561,6 +586,18 @@ function stopSession(): void {
     });
     audioAdapter = null;
   }
+  if (keyboardAdapter) {
+    keyboardAdapter.stop();
+    keyboardAdapter = null;
+  }
+  if (keyboardSource) {
+    keyboardSource.dispose();
+    keyboardSource = null;
+  }
+  if (onScreenKeyboard) {
+    onScreenKeyboard.destroy();
+    onScreenKeyboard = null;
+  }
   sessionStartedAtIso = null;
   engineState.startedAt = null;
   engineState.now = null;
@@ -585,6 +622,36 @@ function markSessionStarted(): void {
   engineState.startedAt = sessionStartedAtIso;
   engineState.now = 0;
   engineState.session.phase = "input-active";
+}
+
+/**
+ * Start (or swap to) the on-screen keyboard session. No permissions
+ * to request and no async device handshake — the source hooks
+ * document key events immediately, the adapter starts, and the
+ * on-screen UI mounts. This is the boot-default input; a fresh user
+ * lands on a working, zero-permission input with no clicks needed.
+ */
+async function startKeyboardSession(): Promise<void> {
+  await detachCurrentAdapter();
+  // Ensure engineState reflects the input even when this path is
+  // reached from the boot auto-start rather than from set_input().
+  engineState.input = "keyboard";
+  keyboardSource = new ComputerKeyboardSource();
+  keyboardSource.attach();
+  const sessionStart = sessionStartTime || performance.now();
+  const adapter = new RawMidiAdapter(keyboardSource, {
+    sessionStart,
+    sourceId: "keyboard",
+    streamId: "onscreen-keyboard",
+  });
+  adapter.start();
+  keyboardAdapter = adapter;
+  attachAdapter(adapter);
+  onScreenKeyboard = mountOnScreenKeyboard(document.body, keyboardSource);
+  setStatus("On-screen keyboard — type on Z / A rows to play", "success");
+  // Reflect the boot-time selection in the panel dropdown when it
+  // eventually mounts.
+  basicsPanel?.update({ "input:source": "keyboard" });
 }
 
 async function startMidiSession(deviceId: string): Promise<void> {
@@ -691,7 +758,9 @@ function toggleMetronome(enabled: boolean): void {
  * Input source dispatch — parses "midi:<id>" or "audio" values
  * ----------------------------------------------------------------- */
 function handleInputSource(source: string): void {
-  if (source === "audio") {
+  if (source === "keyboard") {
+    void startKeyboardSession();
+  } else if (source === "audio") {
     void startAudioSession();
   } else if (source.startsWith("audio:")) {
     const deviceId = source.slice("audio:".length);
@@ -995,6 +1064,12 @@ void initMidi();
 // after that, refreshInputOptions runs again automatically inside
 // startAudioSession's success branch and the real names appear.
 void refreshInputOptions();
+// Boot default: start the on-screen keyboard immediately. Zero
+// permissions, always available, means a fresh user lands on a
+// working input with no clicks — no dropdown to hunt through, no
+// permission prompt. Users who prefer a MIDI controller or the mic
+// switch via the Basics panel's Input dropdown at any time.
+void startKeyboardSession();
 // Hot-plug: devicechange fires when an audio device is added / removed
 // and (in most browsers) when permission state changes such that labels
 // become visible for the first time — re-enumerate and re-push both

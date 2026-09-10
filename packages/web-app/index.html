@@ -461,6 +461,77 @@
       text-decoration: underline;
     }
     .syn-status a:hover { color: #fda; }
+
+    /* -----------------------------------------------------------------
+     * On-screen keyboard (mounted only when the input source is
+     * the on-screen keyboard). Fixed at the bottom of the viewport,
+     * right-aligned so it sits below the harmony clock's screen
+     * region; the rhythm lens stops well above so no overlap.
+     * ----------------------------------------------------------------- */
+    .syn-onscreen-keyboard {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      z-index: 8;
+      pointer-events: none;
+      user-select: none;
+    }
+    .syn-onscreen-keyboard-stack {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .syn-onscreen-keyboard-row {
+      position: relative;
+      display: flex;
+      gap: 4px;
+    }
+    /* Sharp row is absolutely populated; children position themselves
+     * via inline `left`. Reserve the natural-row height so the sharps
+     * sit on their own line rather than collapsing. */
+    .syn-onscreen-keyboard-sharps { height: 44px; }
+    .syn-onscreen-keyboard-sharps .syn-onscreen-key { position: absolute; }
+
+    .syn-onscreen-key {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 14px;
+      font-weight: 600;
+      background: #000;
+      /* Every key defines its hue via the --syn-key-hue CSS var; the
+       * glow uses that hue at low saturation so the letters stay the
+       * primary read. is-pressed brightens the glow to feedback the
+       * press. */
+      box-shadow:
+        0 0 6px 1px hsla(var(--syn-key-hue, 0), 65%, 55%, 0.35),
+        0 0 14px 3px hsla(var(--syn-key-hue, 0), 65%, 55%, 0.18);
+      transition: box-shadow 60ms ease-out, transform 60ms ease-out;
+    }
+    .syn-onscreen-key.is-white {
+      border: 1.5px solid #fff;
+      color: #fff;
+    }
+    .syn-onscreen-key.is-black {
+      border: 1.5px solid #000;
+      color: #000;
+      background: hsla(var(--syn-key-hue, 0), 65%, 55%, 0.85);
+    }
+    .syn-onscreen-key.is-pressed {
+      transform: translateY(1px);
+      box-shadow:
+        0 0 12px 3px hsla(var(--syn-key-hue, 0), 85%, 60%, 0.9),
+        0 0 24px 6px hsla(var(--syn-key-hue, 0), 85%, 60%, 0.45);
+    }
+    .syn-onscreen-key.is-white.is-pressed {
+      background: hsla(var(--syn-key-hue, 0), 80%, 25%, 0.7);
+    }
+    .syn-onscreen-key.is-black.is-pressed {
+      background: hsla(var(--syn-key-hue, 0), 85%, 62%, 1);
+    }
   </style>
 </head>
 <body>

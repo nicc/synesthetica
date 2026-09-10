@@ -241,14 +241,14 @@ export const sessionTools: ToolSpec[] = [
   {
     name: "set_input",
     description:
-      "Select the input source. Read inputs:// for the list of available devices — each entry carries a sourceString ready to pass here. Format: 'midi:<device-id>' or 'audio'. Current selection: state://<label>/current.input.",
+      "Select the input source. Read inputs:// for the list of available devices — each entry carries a sourceString ready to pass here. Format: 'keyboard' (on-screen QWERTY, boot default), 'midi:<device-id>', or 'audio' / 'audio:<deviceId>'. Current selection: state://<label>/current.input.",
     inputSchema: {
       type: "object",
       properties: {
         source: {
           type: "string",
           description:
-            "Input source id (e.g. 'midi:Yamaha P-125', 'audio:built-in-mic').",
+            "Input source id (e.g. 'keyboard', 'midi:Yamaha P-125', 'audio:built-in-mic').",
         },
         instance: { type: "string" },
       },

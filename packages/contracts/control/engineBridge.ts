@@ -39,8 +39,13 @@ export type EngineMethod =
  * "midi:<id>" from the id + kind separately.
  */
 export interface AvailableInput {
-  /** Kind — determines the sourceString scheme. */
-  kind: "midi" | "audio";
+  /** Kind — determines the sourceString scheme.
+   *  - "keyboard" is the on-screen QWERTY piano; sourceString is
+   *    the literal "keyboard".
+   *  - "midi" is a Web MIDI device; sourceString is "midi:<id>".
+   *  - "audio" is a microphone / audio interface; sourceString is
+   *    "audio" (default input) or "audio:<deviceId>". */
+  kind: "keyboard" | "midi" | "audio";
   /** Human-readable name (e.g. "Yamaha P-125", "Built-in Microphone"). */
   name: string;
   /** Underlying device id (MIDI port id, audio deviceId, etc.). Not stable across sessions on some browsers. */
