@@ -163,8 +163,15 @@ export function deriveQualityFromIntervals(intervals: readonly string[]): ChordQ
     if (hasM7) return hasM9 ? "maj9" : "maj7";
     if (hasm7) return hasM9 ? "dom9" : "dom7";
     if (hasSemi9 && !hasm7 && !hasM7) return "maj6"; // M6, no 7th
-    // Augmented triad only when there's aug5 with no P5 and no 7th.
-    if (hasAug5 && !hasP5) return "aug";
+    // Augmented triad only when there's aug5 with no P5, no 7th, AND
+    // no add-extension on top (no add9/add11/add13). Once an extension
+    // tone is present the chord reads as major-with-altered-5th rather
+    // than "augmented + decoration" — matches how Tonal names it
+    // ("F#M#5add9", "M" first) and how a player hears it: the added
+    // colour changes the base identity from "augmented" back to
+    // "major with an alteration". Pure augmented triads still return
+    // "aug"; only extended-with-#5 falls through to "maj".
+    if (hasAug5 && !hasP5 && !hasM9 && !hasP4 && !hasSemi9) return "aug";
     return "maj";
   }
   if (triad === "min") {

@@ -83,6 +83,11 @@ describe("deriveQualityFromIntervals", () => {
     ["dim triad", ["1P", "3m", "5d"], "dim"],
     ["aug triad (M3 + aug5, no P5)", ["1P", "3M", "5A"], "aug"],
     ["Cm#5 (min triad + aug5) → min, not aug", ["1P", "3m", "5A"], "min"],
+    // F#M#5add9 = M3 + aug5 + add9, no P5, no 7th. Once an add-tone
+    // sits on top, the aug5 reads as an alteration rather than the
+    // base identity — hub should show major, not augmented.
+    ["M#5add9 (aug5 + add9) → maj, not aug", ["1P", "3M", "5A", "9M"], "maj"],
+    ["M#5add11 (aug5 + add11) → maj, not aug", ["1P", "3M", "5A", "11P"], "maj"],
     ["sus2", ["1P", "2M", "5P"], "sus2"],
     ["sus4", ["1P", "4P", "5P"], "sus4"],
     ["power chord (5)", ["1P", "5P"], "5"],
