@@ -163,15 +163,19 @@ export function deriveQualityFromIntervals(intervals: readonly string[]): ChordQ
     if (hasM7) return hasM9 ? "maj9" : "maj7";
     if (hasm7) return hasM9 ? "dom9" : "dom7";
     if (hasSemi9 && !hasm7 && !hasM7) return "maj6"; // M6, no 7th
-    // Augmented triad only when there's aug5 with no P5, no 7th, AND
-    // no add-extension on top (no add9/add11/add13). Once an extension
-    // tone is present the chord reads as major-with-altered-5th rather
-    // than "augmented + decoration" — matches how Tonal names it
-    // ("F#M#5add9", "M" first) and how a player hears it: the added
-    // colour changes the base identity from "augmented" back to
-    // "major with an alteration". Pure augmented triads still return
-    // "aug"; only extended-with-#5 falls through to "maj".
-    if (hasAug5 && !hasP5 && !hasM9 && !hasP4 && !hasSemi9) return "aug";
+    // Augmented triad only when the chord is EXACTLY {root, M3, aug5}
+    // — three pitch classes, nothing else. Any additional tone
+    // (add9/add11/add13, ♯11, ♭9, anything) reads as an alteration
+    // decorating a major triad, not "aug + decoration" — matches how
+    // Tonal names such chords ("F#M#5add9", major-first) and how the
+    // maj/min/dim branches already treat extensions.
+    //
+    // The 7ths and 6ths were already consumed by the checks above,
+    // so this branch only sees maj-triad-with-decorations; the
+    // set-size check cleanly separates "pure aug" from "maj with
+    // #5 alteration + something else" without enumerating each
+    // possible decoration type.
+    if (hasAug5 && !hasP5 && new Set(semis).size === 3) return "aug";
     return "maj";
   }
   if (triad === "min") {

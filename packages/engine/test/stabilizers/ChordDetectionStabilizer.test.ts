@@ -83,11 +83,16 @@ describe("deriveQualityFromIntervals", () => {
     ["dim triad", ["1P", "3m", "5d"], "dim"],
     ["aug triad (M3 + aug5, no P5)", ["1P", "3M", "5A"], "aug"],
     ["Cm#5 (min triad + aug5) → min, not aug", ["1P", "3m", "5A"], "min"],
-    // F#M#5add9 = M3 + aug5 + add9, no P5, no 7th. Once an add-tone
-    // sits on top, the aug5 reads as an alteration rather than the
-    // base identity — hub should show major, not augmented.
-    ["M#5add9 (aug5 + add9) → maj, not aug", ["1P", "3M", "5A", "9M"], "maj"],
-    ["M#5add11 (aug5 + add11) → maj, not aug", ["1P", "3M", "5A", "11P"], "maj"],
+    // Pure augmented is exactly {root, M3, aug5}. Any additional
+    // tone reads as an alteration decorating a major triad — the
+    // set-size check catches every decoration type uniformly rather
+    // than enumerating add9 / add11 / add13 case-by-case.
+    ["M#5add9 (aug5 + M9)  → maj, not aug", ["1P", "3M", "5A", "9M"], "maj"],
+    ["M#5add11 (aug5 + P4) → maj, not aug", ["1P", "3M", "5A", "11P"], "maj"],
+    ["M#5add♯11 (aug5 + ♯11)  → maj, not aug", ["1P", "3M", "5A", "11A"], "maj"],
+    ["M#5add♭9 (aug5 + ♭9)  → maj, not aug", ["1P", "3M", "5A", "9m"], "maj"],
+    ["M#5add13 (aug5 + M6) folds into maj6 via the earlier Semi9 branch",
+      ["1P", "3M", "5A", "13M"], "maj6"],
     ["sus2", ["1P", "2M", "5P"], "sus2"],
     ["sus4", ["1P", "4P", "5P"], "sus4"],
     ["power chord (5)", ["1P", "5P"], "5"],

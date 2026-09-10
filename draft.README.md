@@ -1,19 +1,60 @@
-# Synesthetica — README outline (working draft, structure only)
+# Synesthetica
 
-*Not the actual README — a scaffold to collaborate on structure before Nic writes the prose. Every bullet is a candidate section / paragraph, not a heading tree.*
+Synesthetica is a real-time music visualiser that listens to MIDI or audio and draws it from the perspective of Western music theory. It aims to build musical intuition by representing whatever you play in a coherent visual language. It can be viewed directly as a web page or operated through an LLM.
 
----
+[This](https://mcnoose.com/synesthetica) is the quickest way to see it running but the [LLM-mediated interaction model](#llm-mediated-interaction) is way more interesting.
 
-## Opening hook (top of page, first 5 seconds)
+<screenshot>
 
-- One sentence: what Synesthetica is + who it's for.
-- **Hero visual** — SHIP milestone: a strong static screenshot of a live session with the three columns lit up. ITERATION 2: replace with a short GIF or embedded video once we've captured recordings. Design the surrounding layout so the swap is drop-in.
-- Two links right under the hero:
-  - **Try it in your browser** → hosted-web-only URL (after esco deploys). Bring MIDI or mic; no install.
-  - **Install with Claude Desktop / Claude Code** → jumps to Install section.
-- Optional: one-line status ("v1.0 · Claude Desktop supported · Chrome/Firefox").
+Tested on Chrome and Claude Desktop.
 
-## What it is
+## Getting started
+
+It'll load in an immediately usable state but it's a lot better if you set up a bit of context for your session.
+
+### Providing input
+
+#### Music source
+
+The default input maps an on-screen musical keyboard to your typing keyboard. It requires no setup but has no velocity, limited range and bad ergonomics. A proper MIDI controller is best. Plug one in and reload the page. Audio is also supported but that's just converted to MIDI anyway (by Spotify's [Basic Pitch](https://basicpitch.spotify.com/) running in Web Assembly), so you'll get best results supplying MIDI directly.
+
+#### Key
+
+A key is required to represent functional harmony (e.g. ii -> V -> I). It works without a key but you'll see less.
+
+#### Rhythm
+
+It works in a kind of free-time mode by default. But once aghain you'll see more if you inform it about your intended tempo and time signature. If supplied, it will draw bar and beat lines and show you how tight your playing is, relative to a specifiable quantise resolution (16ths by default).
+
+#### Aesthetics
+
+There's a lot you can adjust. Things like pitch->colour mapping, visual emphases, and various tolerances that affect visual stability. These are most useful in the [LLM-mediated interaction model](#llm-mediated-interaction) but work fine in the web view too.
+
+### Web interaction
+
+### LLM-mediated interaction
+
+## Overview
+
+### What you'll see
+
+### How it works
+
+## Design ethos
+
+## Acknowledgements / built with
+
+- Basic Pitch (Spotify) — polyphonic pitch detection.
+- Tonal.js — chord + key theory.
+- Three.js — rendering.
+- MCP — control protocol.
+
+## License
+
+- Whatever C1 decides.
+
+
+
 
 - Three or four sentences on the core loop: user plays → engine visualises → user asks LLM to adjust how it reads.
 - **Deliberately not** an audio effect / not a DAW plugin / not a music-generation tool.
