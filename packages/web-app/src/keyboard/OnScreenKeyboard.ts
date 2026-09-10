@@ -160,6 +160,7 @@ export function mountOnScreenKeyboard(
    * keyboard's total height.
    */
   const NOW_LINE_Y_FRACTION = 0.85;
+  const KEYBOARD_HEIGHT_PX = NATURAL_KEY_PX * 2 + ROW_GAP;
   function reposition(): void {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -167,14 +168,20 @@ export function mountOnScreenKeyboard(
     const aspect = vw / vh;
     const clockXFraction = 29 / (75 * aspect) + 0.5;
     root.style.left = `${clockXFraction * vw}px`;
-    // Anchor the element's TOP edge directly to the NOW line —
-    // simpler and safer than centring via translate(..., -50%),
-    // which depends on the browser having measured the element's
-    // own height by the time the transform applies (which
-    // apparently isn't reliably true on the very first tick,
-    // pushing the keyboard well off the bottom).
-    root.style.top = `${NOW_LINE_Y_FRACTION * vh}px`;
-    root.style.bottom = "auto";
+    // Anchor the bottom edge from the viewport bottom instead of the
+    // top edge from viewport top. Two reasons:
+    //   1. `position: fixed` + `bottom` is the pattern the initial
+    //      working version used, so we're back on a known-good axis.
+    //   2. `top` positioning has kept ending up below the viewport
+    //      on Nic's browser, and the root cause isn't obvious from
+    //      the math — the safer thing is to switch the anchor.
+    // We want the sharp-row top edge (= keyboard top) at 0.85·vh
+    // from the viewport top, i.e. 0.15·vh from the viewport bottom.
+    // Bottom edge = top edge + keyboard height, so:
+    //   bottom-from-viewport = 0.15·vh − keyboard height.
+    const bottomPx = Math.max(0, (1 - NOW_LINE_Y_FRACTION) * vh - KEYBOARD_HEIGHT_PX);
+    root.style.top = "auto";
+    root.style.bottom = `${bottomPx}px`;
     root.style.transform = "translateX(-50%)";
   }
 

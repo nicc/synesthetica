@@ -480,8 +480,12 @@
       /* left / top / transform set inline from OnScreenKeyboard.ts —
        * see reposition(). The exact viewport position of the harmony
        * clock depends on the current canvas aspect ratio, so pure
-       * CSS can't align to it. */
-      position: absolute;
+       * CSS can't align to it.
+       *
+       * position: fixed anchors to the viewport regardless of the
+       * ancestor chain — sidesteps any surprise containing-block
+       * behaviour from siblings that use `inset: 0` etc. */
+      position: fixed;
       z-index: 8;
       pointer-events: none;
       user-select: none;
