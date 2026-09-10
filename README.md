@@ -4,7 +4,7 @@ Synesthetica is a real-time music visualiser that listens to MIDI or audio and d
 
 <a href="https://mcnoose.com/synesthetica" target="_blank" rel="noopener noreferrer">This</a> is the quickest way to see it running but the [LLM-mediated interaction model](#llm-mediated-interaction) is way more interesting.
 
-<!-- TODO: hero screenshot -->
+![Synesthetica — the three lenses in a full-view session](docs/readme/full-view.png)
 
 Tested on Chrome and Claude Desktop.
 
@@ -73,9 +73,12 @@ There are three lenses.
 
 #### Dynamics lens
 
-<!-- TODO: dynamics-lens screenshot, along the left edge with text to the right of it -->
+<img src="docs/readme/dynamics.png" alt="Dynamics lens — velocity bar along the left edge" align="left" width="80" hspace="16">
 
 This is the simplest one. It's just a bar on the left of the screen that renders a little strip indicating how hard you played each note. Notes are undifferentiated in pitch and linger a while (you can change how long). This equips your visual memory to see rising and falling trends, stability and spread. No need for fancy graphs because your brain does this well already. The higher the strip, the harder you played.
+
+<br clear="left">
+
 
 #### Rhythm lens
 
@@ -86,6 +89,8 @@ There's a "now" line near the bottom that will pulse to the beat if a tempo is s
 Notes are arranged horizontally from C to B and are mapped to the colour wheel to give each note a stable colour. You can change this mapping. It is applied throughout the interface. Octaves are ignored.
 
 If you've supplied a tempo, little drift streaks will tell you if you played early or late. Think of them as a nudge; streaks fanning downwards are saying this note would need to be a bit higher / earlier to be on-grid. Ones fanning upwards say the inverse (lower / later). This is analysed relative to the quantise resolution setting. A little horizontal line will show the nearest beat division that each note is assessed against.
+
+![Rhythm lens — note strips rising from the NOW line, drift streaks against beat subdivisions](docs/readme/rhythm.png)
 
 #### Harmony lens
 
@@ -120,7 +125,10 @@ Each spoke encodes its specific note using the same colour-mappings applied to t
 
 It's kind of a lot to explain verbally but it makes sense when you see it.
 
-<!-- TODO: chord-glyph screenshots (see bd for the chord list) -->
+| ![C major](docs/readme/chord%20glyph%20C%20maj.png) | ![A minor](docs/readme/chord%20glyph%20A%20min.png) | ![Cmaj7](docs/readme/chord%20glyph%20C%20maj%207.png) | ![D♭maj7♯11](docs/readme/chord%20glyph%20D%20flat%20maj%207%20sharp%2011.png) |
+| :---: | :---: | :---: | :---: |
+| **C major** | **A minor** | **Cmaj7** | **D♭maj7♯11** |
+| straight hub, three long spokes | squiggly hub, same triad skeleton | adds the mid-length 7th spoke | long/mid/short spokes plus the chromatic ♯11 line |
 
 ##### Functional harmony clock
 
@@ -134,7 +142,10 @@ The full chord name appears at the centre of the clock, even if no key is specif
 
 Again, it's a lot to take in verbally. Easier seen in action.
 
-<!-- TODO: chord-clock screenshots -->
+| ![ii–V–I in A♭](docs/readme/harmony%20clock%202-5-1%20in%20Aflat.png) | ![Modal interchange: B major resolving to E♭ major in A♭](docs/readme/harmony%20clock%20resolved%20modal%20interchange%20from%20B%20maj%20to%20Eflat%20maj%20in%20Aflat.png) |
+| :---: | :---: |
+| **ii–V–I in A♭** | **B major → E♭ major — modal interchange resolving in A♭** |
+| standard functional cadence traced around the diatonic ring | connector arc fanning from a borrowed chord back to its diatonic target |
 
 ### How it works
 
