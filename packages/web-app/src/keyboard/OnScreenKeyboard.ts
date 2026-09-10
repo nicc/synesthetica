@@ -159,7 +159,6 @@ export function mountOnScreenKeyboard(
    * anchors to the keyboard's centre, shift down by half the
    * keyboard's total height.
    */
-  const KEYBOARD_HEIGHT_PX = NATURAL_KEY_PX * 2 + ROW_GAP;
   const NOW_LINE_Y_FRACTION = 0.85;
   function reposition(): void {
     const vw = window.innerWidth;
@@ -168,9 +167,15 @@ export function mountOnScreenKeyboard(
     const aspect = vw / vh;
     const clockXFraction = 29 / (75 * aspect) + 0.5;
     root.style.left = `${clockXFraction * vw}px`;
-    root.style.top = `${NOW_LINE_Y_FRACTION * vh + KEYBOARD_HEIGHT_PX / 2}px`;
+    // Anchor the element's TOP edge directly to the NOW line —
+    // simpler and safer than centring via translate(..., -50%),
+    // which depends on the browser having measured the element's
+    // own height by the time the transform applies (which
+    // apparently isn't reliably true on the very first tick,
+    // pushing the keyboard well off the bottom).
+    root.style.top = `${NOW_LINE_Y_FRACTION * vh}px`;
     root.style.bottom = "auto";
-    root.style.transform = "translate(-50%, -50%)";
+    root.style.transform = "translateX(-50%)";
   }
 
   return {
