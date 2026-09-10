@@ -293,6 +293,12 @@ async function applyEngineOp(
   // Refresh the panel widget for this id so LLM-driven changes appear
   // in the UI. For pair-typed ids we push both children.
   refreshPanelForMethod(method, args);
+  // Any op could indirectly move the vocab's reference hue (set_macro
+  // on the colour anchor, set_hue_for_pitch, and future preset loads
+  // that carry a stored mapping), so re-sync the on-screen keyboard's
+  // palette after every op rather than enumerating the affected
+  // methods. Cheap — one CSS var write per key.
+  syncKeyboardHue();
   publishState();
   return snapshotCopy();
 }
@@ -648,10 +654,32 @@ async function startKeyboardSession(): Promise<void> {
   keyboardAdapter = adapter;
   attachAdapter(adapter);
   onScreenKeyboard = mountOnScreenKeyboard(document.body, keyboardSource);
+  // Prime the keyboard's palette from the current vocab state so a
+  // mid-session switch to the on-screen keyboard picks up whatever
+  // hue-mapping the user or LLM has already set — not the module
+  // default of C-at-0°.
+  syncKeyboardHue();
   setStatus("On-screen keyboard — type on Z / A rows to play", "success");
   // Reflect the boot-time selection in the panel dropdown when it
   // eventually mounts.
   basicsPanel?.update({ "input:source": "keyboard" });
+}
+
+/**
+ * Push the vocab's current reference hue into the on-screen keyboard.
+ * Called both when the keyboard mounts and after any applyEngineOp
+ * that could shift the palette (set_macro on the colour-mapping
+ * reference, set_hue_for_pitch, switch_preset carrying a stored
+ * mapping). The vocab is the runtime source of truth for the
+ * effective invariant — reading via readMacros keeps the keyboard
+ * consistent with whatever the visualiser is actually rendering.
+ */
+function syncKeyboardHue(): void {
+  if (!onScreenKeyboard || !vocabulary) return;
+  const hue = vocabulary.readMacros()["system:colour-mapping:reference"];
+  if (typeof hue === "number") {
+    onScreenKeyboard.setReferenceHue(hue);
+  }
 }
 
 async function startMidiSession(deviceId: string): Promise<void> {
