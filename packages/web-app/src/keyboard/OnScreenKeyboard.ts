@@ -140,9 +140,9 @@ export function mountOnScreenKeyboard(
   }
 
   /**
-   * Position the keyboard so its horizontal centre lands under the
-   * progression clock and the top edge of its sharp row sits on the
-   * rhythm lens's NOW line.
+   * Position the keyboard horizontally so its centre lands under the
+   * progression clock. Vertical positioning is pure CSS (see the
+   * .syn-onscreen-keyboard rule) — no JS math involved on that axis.
    *
    * The clock's on-screen x depends on the current canvas aspect —
    * the ThreeJS perspective camera keeps worldHeight (75) exactly
@@ -152,15 +152,7 @@ export function mountOnScreenKeyboard(
    * times worldWidth = 100). Its viewport-x fraction reduces to
    * `29 / (75·aspect) + 0.5` — 0.5 when the world fills the viewport
    * horizontally, drifting further right as the viewport widens.
-   *
-   * Vertical: NOW_LINE_Y = 0.85 (from timeMapping.ts) lands at
-   * viewport y-fraction 0.85 regardless of aspect. We want the
-   * SHARP row's top edge at that y; since translate(-50%, -50%)
-   * anchors to the keyboard's centre, shift down by half the
-   * keyboard's total height.
    */
-  const NOW_LINE_Y_FRACTION = 0.85;
-  const KEYBOARD_HEIGHT_PX = NATURAL_KEY_PX * 2 + ROW_GAP;
   function reposition(): void {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -168,21 +160,6 @@ export function mountOnScreenKeyboard(
     const aspect = vw / vh;
     const clockXFraction = 29 / (75 * aspect) + 0.5;
     root.style.left = `${clockXFraction * vw}px`;
-    // Anchor the bottom edge from the viewport bottom instead of the
-    // top edge from viewport top. Two reasons:
-    //   1. `position: fixed` + `bottom` is the pattern the initial
-    //      working version used, so we're back on a known-good axis.
-    //   2. `top` positioning has kept ending up below the viewport
-    //      on Nic's browser, and the root cause isn't obvious from
-    //      the math — the safer thing is to switch the anchor.
-    // We want the sharp-row top edge (= keyboard top) at 0.85·vh
-    // from the viewport top, i.e. 0.15·vh from the viewport bottom.
-    // Bottom edge = top edge + keyboard height, so:
-    //   bottom-from-viewport = 0.15·vh − keyboard height.
-    const bottomPx = Math.max(0, (1 - NOW_LINE_Y_FRACTION) * vh - KEYBOARD_HEIGHT_PX);
-    root.style.top = "auto";
-    root.style.bottom = `${bottomPx}px`;
-    root.style.transform = "translateX(-50%)";
   }
 
   return {

@@ -477,15 +477,23 @@
      * intensifies the glow AND depresses the key slightly.
      * ----------------------------------------------------------------- */
     .syn-onscreen-keyboard {
-      /* left / top / transform set inline from OnScreenKeyboard.ts —
-       * see reposition(). The exact viewport position of the harmony
-       * clock depends on the current canvas aspect ratio, so pure
-       * CSS can't align to it.
+      /* Vertical positioning lives ENTIRELY in CSS — pure vh units,
+       * no JS computation. The sharp row's top edge is at NOW_LINE_Y
+       * (0.85·vh from viewport top = 0.15·vh from bottom), and the
+       * keyboard is 56px tall (2 × 26px rows + 4px stack gap), so
+       * the element's bottom sits at (15vh − 56px) from the viewport
+       * bottom. `max(0px, …)` clamps for viewports too short to fit
+       * the natural placement, so the keyboard never disappears
+       * below the fold.
        *
-       * position: fixed anchors to the viewport regardless of the
-       * ancestor chain — sidesteps any surprise containing-block
-       * behaviour from siblings that use `inset: 0` etc. */
+       * Horizontal placement (left) IS JS-driven — it depends on the
+       * canvas aspect ratio, which CSS can't read. See reposition().
+       * The default `left: 50vw` keeps the keyboard vaguely centred
+       * if JS never runs. */
       position: fixed;
+      bottom: max(0px, calc(15vh - 56px));
+      left: 50vw;
+      transform: translateX(-50%);
       z-index: 8;
       pointer-events: none;
       user-select: none;
