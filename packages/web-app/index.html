@@ -490,12 +490,21 @@
       position: relative;
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      /* Must match ROW_GAP in OnScreenKeyboard.ts — the reposition
+       * math uses the same value to place the sharp row's top edge
+       * on the NOW line. */
+      gap: 4px;
     }
     .syn-onscreen-keyboard-row {
       position: relative;
       display: flex;
-      gap: 2px;
+      /* Must match NATURAL_KEY_GAP in OnScreenKeyboard.ts — sharp keys
+       * are absolutely positioned via a JS-computed offset that
+       * assumes the natural row's stride is (NATURAL_KEY_PX +
+       * NATURAL_KEY_GAP). A mismatch here cumulatively drifts each
+       * sharp right of centre and skews the whole row's horizontal
+       * alignment against the harmony clock. */
+      gap: 3px;
     }
     /* Sharp row is absolutely populated; children position themselves
      * via inline `left`. Reserve the natural-row height so the sharps

@@ -141,8 +141,8 @@ export function mountOnScreenKeyboard(
 
   /**
    * Position the keyboard so its horizontal centre lands under the
-   * progression clock and its vertical centre sits midway between
-   * the clock's bottom edge and the viewport's bottom edge.
+   * progression clock and the top edge of its sharp row sits on the
+   * rhythm lens's NOW line.
    *
    * The clock's on-screen x depends on the current canvas aspect —
    * the ThreeJS perspective camera keeps worldHeight (75) exactly
@@ -153,11 +153,14 @@ export function mountOnScreenKeyboard(
    * `29 / (75·aspect) + 0.5` — 0.5 when the world fills the viewport
    * horizontally, drifting further right as the viewport widens.
    *
-   * Vertical: the clock's bottom edge is at worldY = 12.375
-   * (HARMONY_STACK_TOP + HARMONY_STACK_HEIGHT), which lands at
-   * viewport y-fraction 0.835 across every aspect ratio. Halfway
-   * between there and the bottom is 0.9175.
+   * Vertical: NOW_LINE_Y = 0.85 (from timeMapping.ts) lands at
+   * viewport y-fraction 0.85 regardless of aspect. We want the
+   * SHARP row's top edge at that y; since translate(-50%, -50%)
+   * anchors to the keyboard's centre, shift down by half the
+   * keyboard's total height.
    */
+  const KEYBOARD_HEIGHT_PX = NATURAL_KEY_PX * 2 + ROW_GAP;
+  const NOW_LINE_Y_FRACTION = 0.85;
   function reposition(): void {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -165,11 +168,7 @@ export function mountOnScreenKeyboard(
     const aspect = vw / vh;
     const clockXFraction = 29 / (75 * aspect) + 0.5;
     root.style.left = `${clockXFraction * vw}px`;
-    // Vertical centre slightly higher than midway between the clock
-    // bottom (0.835·vh) and the viewport bottom — visually the
-    // midpoint reads a touch low against the clock's outer ring, so
-    // lift by ~1.75% of viewport height.
-    root.style.top = `${0.9 * vh}px`;
+    root.style.top = `${NOW_LINE_Y_FRACTION * vh + KEYBOARD_HEIGHT_PX / 2}px`;
     root.style.bottom = "auto";
     root.style.transform = "translate(-50%, -50%)";
   }
