@@ -128,7 +128,6 @@ It's kind of a lot to explain verbally but it makes sense when you see it.
 | <img src="docs/readme/chord%20glyph%20C%20maj.png" alt="C major" width="150"> | <img src="docs/readme/chord%20glyph%20A%20min.png" alt="A minor" width="150"> | <img src="docs/readme/chord%20glyph%20C%20maj%207.png" alt="Cmaj7" width="150"> | <img src="docs/readme/chord%20glyph%20D%20flat%20maj%207%20sharp%2011.png" alt="D♭maj7♯11" width="150"> |
 | :---: | :---: | :---: | :---: |
 | **C major** | **A minor** | **Cmaj7** | **D♭maj7♯11** |
-| straight hub, three long spokes | squiggly hub, three long spokes | adds a mid-length 7th spoke | short spokes + a chromatic ♯11 line |
 
 ##### Functional harmony clock
 
@@ -145,7 +144,6 @@ Again, it's a lot to take in verbally. Easier seen in action.
 | <img src="docs/readme/harmony%20clock%202-5-1%20in%20Aflat.png" alt="ii–V–I in A♭" width="300"> | <img src="docs/readme/harmony%20clock%20resolved%20modal%20interchange%20from%20B%20maj%20to%20Eflat%20maj%20in%20Aflat.png" alt="Modal interchange: B major resolving to E♭ major in A♭" width="300"> |
 | :---: | :---: |
 | **ii–V–I in A♭** | **B major → E♭ major — modal interchange resolving in A♭** |
-| standard functional cadence traced around the diatonic ring | connector arc fanning from a borrowed chord back to its diatonic target |
 
 ### How it works
 
