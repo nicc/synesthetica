@@ -84,6 +84,13 @@ export class ThreeJSRenderer implements IRenderer {
   // Entity object pools (keyed by entity id)
   private entityObjects: Map<string, THREE.Object3D> = new Map();
 
+  // Entity ids that have already thrown from updateEntity this session.
+  // The render loop swallows per-entity errors so one malformed entity
+  // can't stall the RAF loop (Real-Time Respect: graceful degradation).
+  // We log the first occurrence per id and stay quiet on repeats so a
+  // persistently-broken entity doesn't flood the console.
+  private erroredEntities: Set<string> = new Set();
+
   // Reusable geometries
   private circleGeometry: THREE.CircleGeometry | null = null;
   private planeGeometry: THREE.PlaneGeometry | null = null;
@@ -159,6 +166,7 @@ export class ThreeJSRenderer implements IRenderer {
       this.disposeObject(obj);
     }
     this.entityObjects.clear();
+    this.erroredEntities.clear();
 
     // Dispose geometries
     this.circleGeometry?.dispose();
@@ -182,10 +190,23 @@ export class ThreeJSRenderer implements IRenderer {
     // Track which entities are in this frame
     const currentIds = new Set<string>();
 
-    // Update or create objects for each entity
+    // Update or create objects for each entity. Per-entity try/catch:
+    // a single malformed entity must not tear down the RAF loop — the
+    // rest of the frame still renders. First failure per entity id
+    // logs; repeats stay quiet to avoid console flood.
     for (const entity of frame.entities) {
       currentIds.add(entity.id);
-      this.updateEntity(entity);
+      try {
+        this.updateEntity(entity);
+      } catch (err) {
+        if (!this.erroredEntities.has(entity.id)) {
+          this.erroredEntities.add(entity.id);
+          console.warn(
+            `ThreeJSRenderer: entity '${entity.id}' (kind=${entity.kind}) failed to render; further frames of this entity id will retry silently.`,
+            err,
+          );
+        }
+      }
     }
 
     // Remove objects for entities no longer in scene
@@ -1426,11 +1447,24 @@ export class ThreeJSRenderer implements IRenderer {
 
   /**
    * Fallback placeholder for chord shape when no elements provided.
+   *
+   * The cache may already hold a THREE.Group left over from a previous
+   * full-render frame (elements populated → buildChordShapeGroup) on
+   * the same entity id — Groups have no `.material`, so treating a
+   * Group as a Mesh crashes with `Cannot read properties of undefined
+   * (reading 'color')`. Discard whatever is cached and rebuild if it
+   * isn't a Mesh.
    */
   private updateChordShapePlaceholder(entity: Entity): void {
-    let mesh = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
-
-    if (!mesh) {
+    const cached = this.entityObjects.get(entity.id);
+    let mesh: THREE.Mesh;
+    if (cached instanceof THREE.Mesh) {
+      mesh = cached;
+    } else {
+      if (cached) {
+        this.scene!.remove(cached);
+        this.disposeObject(cached);
+      }
       const geometry = new THREE.CircleGeometry(1, 8);
       const material = new THREE.MeshBasicMaterial({
         transparent: true,
@@ -1445,14 +1479,14 @@ export class ThreeJSRenderer implements IRenderer {
     const y = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
     mesh.position.set(x, y, 0);
 
-    const size = entity.style.size ?? 100;
+    const size = entity.style?.size ?? 100;
     const scale = size / 50;
     mesh.scale.set(scale, scale, 1);
 
     const material = mesh.material as THREE.MeshBasicMaterial;
-    const color = entity.style.color ?? { h: 120, s: 0.7, v: 0.6 };
+    const color = entity.style?.color ?? { h: 120, s: 0.7, v: 0.6 };
     material.color.copy(this.hsvToThreeColor(color));
-    material.opacity = (entity.style.opacity ?? 1) * 0.8;
+    material.opacity = (entity.style?.opacity ?? 1) * 0.8;
   }
 
   /**

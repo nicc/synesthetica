@@ -89,6 +89,17 @@ let wsReceiver: WsReceiverHandle | null = null;
 let recentEvents: RecentEventsBuffer | null = null;
 
 /**
+ * Cache of the most recent async input enumeration (MIDI + audio, with
+ * labels once the browser has surfaced them). Populated by
+ * refreshInputOptions and read by currentInputOptions so the widget's
+ * dropdown reflects the full device list on first render — before
+ * that, currentInputOptions falls back to the sync path (MIDI + a
+ * single default-audio entry), which is the source of the "only
+ * generic audio input visible until I pick something" symptom.
+ */
+let cachedInputOptions: Array<{ value: string; label: string }> | null = null;
+
+/**
  * Recent-events buffer capacity, from the CLI-injected `buffer-size`
  * query param (see SessionManager.buildOpenUrl). Falls back to a
  * standalone-mode default sized for ~1hr of typical play at ~2–3
@@ -696,21 +707,26 @@ function handleInputSource(source: string): void {
  * Panel wiring
  * ----------------------------------------------------------------- */
 function currentInputOptions(): Array<{ value: string; label: string }> {
-  // Sync path — MIDI (which enumerates cheaply) + a default audio
-  // entry. Audio device enumeration is async (getUserMedia gate);
-  // refreshInputOptions() pushes the full list after each session.
+  // Prefer the cached async list (populated on boot + after any input
+  // change) so first-render of the panel already shows every detected
+  // device, not just MIDI + a single default-audio placeholder. Fall
+  // back to the sync path only until the first async enumeration
+  // resolves.
+  if (cachedInputOptions !== null) return cachedInputOptions;
   return inputsToPanelOptions(enumerateInputsSync(midiSource));
 }
 
 /**
  * Async option refresh — enumerates audio devices (with labels once
- * permission is granted) and pushes the merged list into the
- * basics panel widget. Called after MIDI state changes and after
- * each audio session start.
+ * permission is granted) and pushes the merged list into the panel
+ * widget and the module-level cache. Called on boot, after MIDI
+ * state changes, after each audio session start, and on
+ * mediaDevices.devicechange (hot-plug).
  */
 async function refreshInputOptions(): Promise<void> {
   const inputs = await enumerateInputs(midiSource);
-  basicsPanel?.updateOptions("input:source", inputsToPanelOptions(inputs));
+  cachedInputOptions = inputsToPanelOptions(inputs);
+  basicsPanel?.updateOptions("input:source", cachedInputOptions);
 }
 
 /**
@@ -972,6 +988,23 @@ function captureFrame(): void {
 // create a null-pipeline race — pipeline-ready is the gate.
 mountPanels();
 void initMidi();
+// Kick an eager async input enumeration so the widget's dropdown
+// reflects every detected audio device on first open — not just the
+// single default-audio placeholder from the sync path. Labels stay
+// empty (browser privacy gate) until microphone permission is granted;
+// after that, refreshInputOptions runs again automatically inside
+// startAudioSession's success branch and the real names appear.
+void refreshInputOptions();
+// Hot-plug: devicechange fires when an audio device is added / removed
+// and (in most browsers) when permission state changes such that labels
+// become visible for the first time — re-enumerate and re-push both
+// times. Guarded on the API's presence; older browsers just miss the
+// hot-plug refresh.
+if (typeof navigator !== "undefined" && navigator.mediaDevices) {
+  navigator.mediaDevices.addEventListener?.("devicechange", () => {
+    void refreshInputOptions();
+  });
+}
 mountWsReceiver();
 initializePipeline();
 void queryPermissionsAndPublish();
