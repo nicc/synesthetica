@@ -1,259 +1,202 @@
 # Synesthetica
 
-## Overview
-Synesthetica listens to **MIDI note data** and **raw audio input** and generates **real-time visualisations**. The primary use case is as a *synesthetic aid for musical hearing and intuition* (e.g. mapping harmony played on a keyboard to colour/shape patterns that can be matched on guitar, illustrating harmonic tension over time, presenting chord qualities in a coherent visual format irrespective of key). A secondary use case is as a **custom visual component for live performance**.
+Synesthetica is a real-time music visualiser that listens to MIDI or audio and draws it from the perspective of Western music theory. It aims to build musical intuition by representing whatever you play in a coherent visual language. It can be viewed directly as a web page or operated through an LLM.
 
-## Design intent (v1) — TODO folded into rewrite
+[This](https://mcnoose.com/synesthetica) is the quickest way to see it running but the [LLM-mediated interaction model](#llm-mediated-interaction) is way more interesting.
 
-Synesthetica v1 ships as a CLI + MCP server + browser-tab visualiser, controlled via natural language through Claude Desktop (or another MCP client). This shape is deliberate and worth being explicit about.
+<screenshot>
 
-**Why not a native app?** The typical creative tool with LLM assistance is a native app that pulls an LLM in — the LLM lives inside the app. Synesthetica inverts that: the LLM lives outside, in Claude Desktop, and Synesthetica is a tool the LLM can reach for. The differentiator is *LLM-mediated control of a real-time creative tool*, not "a music visualiser that happens to talk to an LLM". A native app would obscure that point.
+Tested on Chrome and Claude Desktop.
 
-**Trade-offs, honestly.**
-- **Slight token cost per Claude Desktop session.** The Synesthetica MCP server registers on connect. We minimise the handshake context — a one-sentence description of what Synesthetica is, plus a `get_started` tool to fetch the full primer on demand. Cost is ~50-80 tokens per conversation whether you touch music or not. Not zero, but honest to the inverted-pattern trade-off.
-- **Alt-tab between Claude Desktop and the browser tab during a session.** For real-time creative use (playing an instrument while a session is active), this is awkward. Acceptable for the v1 audience (technical viewers of a showcase); a v2 Electron shell removes it. See `synesthetica-l0mg`.
-- **The pipeline is lazy.** No web-app, no browser tab, no WS bridge until the LLM calls `start_session`. Every non-music conversation runs zero-cost. See `synesthetica-ure`.
+## Getting started
 
-**Who this v1 is for.** Technical viewers evaluating the LLM-mediated-control idea; portfolio-shaped, not productised. Musicians who just want to play with visuals will be better served by a v2 native app.
+It'll load in an immediately usable state but it's a lot better if you set up a bit of context for your session.
 
-*(This section is a design note for the imminent README rewrite — captures the context of a 2026-09-07 conversation, not necessarily the final voice for public docs.)*
+### Providing input
 
-## The Pipeline
+#### Music source
 
-Synesthetica processes musical input through a series of transformations. Each stage has a specific job and operates on well-defined data types.
+The default input maps an on-screen musical keyboard to your typing keyboard. It requires no setup but has no velocity, limited range and bad ergonomics. A proper MIDI controller is best. Plug one in and reload the page. Audio is also supported but that's just converted to MIDI anyway (by Spotify's [Basic Pitch](https://basicpitch.spotify.com/) running in Web Assembly), so you'll get best results supplying MIDI directly.
 
-### High-Level Flow
+#### Key
 
-```
-MIDI/Audio Input → RawInputFrame → MusicalFrame → AnnotatedMusicalFrame → SceneFrame → Canvas
-```
+A key is required to represent functional harmony (e.g. ii → V → I). It still works without a key but you'll see less.
 
-**What this means:**
-- Adapters emit protocol-level events (RawInputFrame)
-- Stabilizers produce musical abstractions with duration and phase (MusicalFrame)
-- Visual vocabularies annotate musical elements with visual properties (AnnotatedMusicalFrame)
-- Grammars decide what it *looks like* and which elements to render (SceneFrame)
-- A renderer draws it (Canvas)
+#### Rhythm
 
-### The Stages (Per-Part Processing)
+A tempo and time signature are required to analyse rhythm. It will render in free time mode without it. If supplied, you'll get beat and bar lines, an optional metronome, and a view on how tight your playing is. Timing analysis is relative to a configurable quantise resolution (16ths by default). Swing is not yet supported.
 
-Each stage processes one instrument's data independently. Multiple instruments flow through the pipeline in parallel and get composited at the end.
+#### Aesthetics
 
-#### 1. Adapters
-**Technical:** Convert external input (MIDI events, audio analysis) into `RawInputFrame` (protocol-level events).
+There's a lot you can adjust. Things like pitch → colour mapping, visual emphases, and various tolerances that affect visual stability. These are most useful in the [LLM-mediated interaction model](#llm-mediated-interaction) but work fine in the web view too.
 
-**What it does:** Translates MIDI note-on/note-off or audio features into a unified format. Adapters do NOT interpret musical meaning - they just emit what they observe.
+### Web interaction
 
-**Current status:** RawMidiAdapter works. Audio adapter not yet implemented.
-
-#### 2. Stabilizers
-**Technical:** Transform `RawInputFrame` into `MusicalFrame` by accumulating temporal context. Correlate note_on/note_off into Notes with duration and phase. Detect chords, track beats, analyze dynamics.
-
-**What it does:** Produces proper musical abstractions. A Note is not a pair of on/off messages - it's an entity with pitch, velocity, duration, and lifecycle phase (attack → sustain → release). Notes persist in the frame during their release window, allowing visual fade-out.
-
-Stabilizers form a DAG based on dependencies. Independent stabilizers (note tracking, beat detection) process raw input directly; derived stabilizers (chord detection, phrase detection) require upstream output. MusicalFrame is a "snapshot with context" - it contains current state plus recent context (progression, phrases) via references.
-
-**Current status:** NoteTrackingStabilizer, ChordDetectionStabilizer, and BeatDetectionStabilizer implemented. Dynamics, phrase, and progression stabilizers are planned.
-
-#### 3. Ruleset
-**Technical:** A pure function mapping `MusicalFrame` to `AnnotatedMusicalFrame`. This is where musical *meaning* is encoded (e.g., "pitch class → hue", "velocity → brightness", "chord quality → warm/cool palette").
-
-**What it does:** Annotates musical elements with visual properties (palette, texture, motion). Each Note gets a visual annotation; each Chord gets its own annotation. Rulesets define a consistent visual vocabulary that users learn across all grammars.
-
-**Key responsibility:** Rulesets do not render anything directly to output but they do provide shapes, colour values and motion for grammars use when rendering musical elements visually. They define things like the shape, colours, transparency and motion (in)stability of a chord or note. Grammars decide how to actually render these elements.
-
-**Current status:** MusicalVisualRuleset annotates notes and chords with palettes and shapes.
-
-#### 4. Grammar Stack
-**Technical:** Transforms `AnnotatedMusicalFrame` into `SceneFrame` (a collection of visual entities). Grammars see musical elements of various categories (notes, chords, beats) with visual annotation determined by the vocabulary, and decide how to render them.
-
-**What it does:** Determines the visual language. Grammars know *what kind* of musical element something is (note vs chord vs beat) but not musical analysis details (pitch class, chord quality). They use visual annotations to style their chosen representations. Grammars can filter elements (e.g., a rhythm grammar ignores chords).
-
-**Key insight:** Rulesets define vocabulary; grammars write sentences. Different grammars can render the same annotated musical content in completely different ways - one as particles, another as trails, another as background color washes.
-
-**Current status:** RhythmGrammar (renders beats and notes as timing markers) and HarmonyGrammar (renders chords as glows with history trail) are operational with some bugs and outstanding work.
-
-#### 5. Compositor
-**Technical:** Merges multiple `SceneFrame`s (one per part/instrument) into a single composited scene, applying layout, blending, and z-ordering.
-
-**What it does:** Arranges multiple instruments on screen and handles how they overlap visually.
-
-**Current status:** IdentityCompositor (single part, no layout).
-
-#### 6. Renderer
-**Technical:** Draws the composited `SceneFrame` to a canvas using a specific rendering backend (Canvas2D, WebGL, SVG).
-
-**What it does:** Produces the visual output you see on screen.
-
-**Current status:** ThreeJSRenderer is operational and supports both existing grammars. It using the ThreeJS WebGL library.
-
-### Key Architectural Principles
-
-1. **Meaning lives in rulesets, not grammars.** Rulesets define the visual vocabulary (what colors mean). Grammars decide how to render.
-2. **Grammars see categories, not analysis.** Grammars know "this is a note" and "this is a chord" but not pitch class or chord quality rules. Visual annotations convey the semantic meaning of upstream analysis.
-3. **Stabilizers produce real musical abstractions.** A Note has duration and phase - it's not a pair of on/off messages.
-4. **Grammars have creative agency.** They decide which musical elements to render, what shapes to use, and how to animate them. Different grammars can render the same content completely differently.
-5. **Every piece of data belongs to exactly one part (instrument).** Multi-instrument support is built-in from the start.
-6. **Contracts define all boundaries.** Modules communicate through types in [packages/contracts](packages/contracts/), not internal imports.
-7. **The renderer drives timing (pull-based).** The pipeline doesn't push frames; the renderer requests them at render time.
-
-## How We Work
-Our workflow embraces early ambiguity while enforcing discipline as ideas mature.
-
-Results are reproducible from specifications and documented decisions, and do not rely on ephemeral chat context.
-
-Issues are tracked using Beads.
-
-## Document Taxonomy
-The repository is organised around a small, explicit set of document types:
-
-- **VISION** – What we are building and why
-- **SPECS** – Technical specifications by subsystem
-- **RFC** – Proposals and ideas under discussion
-- **PRINCIPLES** – Fundamental values and constraints guiding all decisions
-- **GLOSSARY** – Shared terminology
-
-Each document has a stable ID, clear status, and explicit dependencies where relevant.
-
-## Principles
-High-level principles live in `PRINCIPLES.md` and act as *constraints*, not aspirations. If a design violates a principle, that violation must be explicit and justified.
-
-## Index
-This README acts as the root index. A more detailed `INDEX.md` may be added once the document set grows.
-
-## Status
-
-Actively developed. The core pipeline is implemented with proper frame type
-separation (RawInputFrame → MusicalFrame → AnnotatedMusicalFrame → SceneFrame),
-the CLI + MCP server run end-to-end, and the browser engine speaks to the CLI
-over WebSocket.
-
-**Shippable in shape** — `npm publish --dry-run` produces a self-contained
-tarball (~1.6 MB compressed) with the web-app bundled in and a built-in static
-server. Publishing gated on account permissions; the client-side install flow
-below already works with the monorepo checkout.
-
-## Quickstart (dev / from-source)
+The important stuff is in the Basics tab. The Advanced tab does what it says too. Every control has a `?` tooltip. Have a look around. [Here's](https://mcnoose.com/synesthetica) a hosted version. The npm package can also serve it locally on a bundled web server:
 
 ```bash
-git clone https://github.com/nicc/synesthetica.git
-cd synesthetica
-npm install
-npm run build -ws
-
-# Standalone: browser visualiser + manifest-generated controls, no LLM.
-node packages/cli/dist/bin.js start --no-mcp
-
-# With MCP server on stdio (connect any MCP-capable client via stdio).
-node packages/cli/dist/bin.js start
+npx synesthetica start --no-mcp
 ```
 
-Both paths spawn Vite for the web-app and open a browser tab. Use `--no-open`
-to skip the auto-launch.
+### LLM-mediated interaction
 
-## Adding to an LLM client
+This is where things get interesting. The entire thing is available as an npm package that provides an MCP server on the command line, serves the app on a bundled web server, provides a web socket bridge into the app, exposes a set of tools, and gives a very thorough understanding of the system to your LLM of choice. This lets you interact with the app via an LLM, which can reason about how to achieve your intentions without requiring you to learn the system. The LLM also has access to about an hour of music input history (assuming constant, regular piano playing), which equips it to reason about your playing too. This gives you a voice interface and an intelligent practice assistant in addition to a visual language for music.
 
-MCP servers are packaged as CLIs the client spawns as a subprocess.
-`@synesthetica/cli` fits that shape — the client runs `synesthetica start`,
-connects to its stdin/stdout, and the LLM sees Synesthetica's tools and
-resources. See [packages/cli/README.md](packages/cli/README.md) for
-platform-specific config snippets (Claude Desktop, Claude Code).
+#### Add the tool to Claude Desktop
 
-Once shippable to npm, the client-side config will look like this:
+Add this block to your Claude Desktop config file (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
 
 ```json
 {
   "mcpServers": {
     "synesthetica": {
       "command": "npx",
-      "args": ["-y", "@synesthetica/cli", "start"]
+      "args": ["-y", "synesthetica", "start"]
     }
   }
 }
 ```
 
-Until then, the same shape works with a path to the built CLI:
+Restart Claude Desktop after saving. `npx` fetches `synesthetica` from the npm registry the first time it runs and caches it locally, so there's no separate install step. If you'd rather have it installed globally, `npm install -g synesthetica` works too. See [packages/cli/README.md](packages/cli/README.md) for Claude Code and other clients.
 
-```json
-{
-  "mcpServers": {
-    "synesthetica": {
-      "command": "node",
-      "args": ["/path/to/synesthetica/packages/cli/dist/bin.js", "start"]
-    }
-  }
-}
+Note that the LLM will only spin up context when you start a session or ask about Synesthetica. This keeps the always-on token cost as low as possible — around 50–80 tokens per conversation whether you touch music or not.
+
+#### Start a session
+
+Just open a new chat and ask. This is the fun bit. Try stuff. You could say "I want to visualise some music" or "start a Synesthetica session". Then maybe "I'm using my Arturia keyboard, playing in F# at 90 BPM in 4/4". Maybe "The piece I'm currently practicing looks a bit jittery, can you fix that?". Or even "I just played a piece that I'm struggling with; any tips?". The LLM can see what you've played. It knows how Synesthetica works and can operate it for you. It can also save and load presets, which is currently unavailable in the web UI.
+
+## Overview
+
+### What you'll see
+
+There are three lenses.
+
+#### Dynamics lens
+
+<screenshot along the left edge, text to the right of it>
+
+This is the simplest one. It's just a bar on the left of the screen that renders a little strip indicating how hard you played each note. Notes are undifferentiated in pitch and linger a while (you can change how long). This equips your visual memory to see rising and falling trends, stability and spread. No need for fancy graphs because your brain does this well already. The higher the strip, the harder you played.
+
+#### Rhythm lens
+
+This is a bit like those piano tutorial videos, where the notes fall toward a keyboard. Except they rise from the keyboard in this case because we're showing what happened instead of prescribing what will - you are the input; do what you want.
+
+There's a "now" line near the bottom that will pulse to the beat if a tempo is supplied. The notes you play will emerge from there and scroll upward. You'll see upcoming beats and bars approach from below the now line.
+
+Notes are arranged horizontally from C to B and are mapped to the colour wheel to give each note a stable colour. You can change this mapping. It is applied throughout the interface. Octaves are ignored.
+
+If you've supplied a tempo, little drift streaks will tell you if you played early or late. Think of them as a nudge; streaks fanning downwards are saying this note would need to be a bit higher / earlier to be on-grid. Ones fanning upwards say the inverse (lower / later). This is analysed relative to the quantise resolution setting. A little horizontal line will show the nearest beat division that each note is assessed against.
+
+#### Harmony lens
+
+This is the most complex one. It has two sections: a chord glyph and a functional harmony clock. Both orient notes radially, like a clock (for the geeks: think of the 12-note semitone / 7-note diatonic structure as analogous to base12 / base7 modular arithmetic).
+
+##### Chord glyph
+
+The chord glyph provides a stable visual language for chord quality, irrespective of root note or voicing. Any minor triad, for example, will always have a squiggly hub and three long spokes with the same spacing, regardless of how it's voiced or where it's rooted.
+
+The hub margin encodes chord quality.
+
+| Chord quality | Hub margin type |
+| --- | --- |
+| Power / open 5th | Zig-zagged |
+| Major | Circular |
+| Minor | Squiggly |
+| Suspended 2nd | Short-dashed |
+| Suspended 4th | Long-dashed |
+| Diminished | Concave |
+| Augmented | Convex |
+
+The spokes encode intervals. They are classed by length and appear oriented around the clock relative to their intervallic distance. Any two spokes that are a major 3rd apart will be at the same angle to each other. Two spokes that are a minor 3rd apart will have a slightly more acute angle. The root note is always at 0° / 12 o'clock.
+
+| Interval set | Spoke type |
+| --- | --- |
+| Triads | Long spoke |
+| 7th | Mid-length spoke |
+| 9th, 11th, 13th | Short spoke |
+| Non-diatonic / chromatics | A short line superimposed on the glyph |
+
+Each spoke encodes its specific note using the same colour-mappings applied to the rhythm lens. The hub adopts the colour of the root note. Inversions are subtly indicated by a thicker outline on the bass spoke.
+
+It's kind of a lot to explain verbally but it makes sense when you see it.
+
+----------
+TODO:
+Screenshots list:
+
+C major — the reference triad. Straight hub, three long spokes, root-third-fifth.
+A minor — same skeleton, squiggly hub. Shows quality-encodes-margin, spokes-encode-intervals.
+Cmaj7 — introduces the mid-length spoke for the 7th. One extra element per photo, still legible.
+Dbmaj13#11 — the complex one. Long/mid/short spokes plus the chromatic-line for the #11. Proves the language holds under complexity without becoming a tangle.
+----------
+
+##### Functional harmony clock
+
+Same idea but instead of notes in a chord we have chords in a key. It shows chord symbols instead of note spokes.
+
+There's an inner ring for the diatonic chords: I is at 0° / 12 o'clock and the rest cycles clockwise through to vii.
+
+The outer ring holds non-diatonic chords. These will appear at the midpoint angle between the two neighbouring diatonic chords. If you play a non-diatonic chord that has a modal-interchange relationship that can resolve back to a diatonic chord, an animated arc will fan out along the clock and visually indicate the implied resolution. This applies over two orders of sub-dominant resolution.
+
+The full chord name appears at the centre of the clock, even if no key is specified and the clock is disabled. If a key is supplied, the chord name is inferred relative to it.
+
+Again, it's a lot to take in verbally. Easier seen in action.
+
+<screenshots for the chord clock - I'll supply these>
+
+### How it works
+
+
+#### Core engine
+
+The pipeline is essentially a buffered event stream, pulled on every frame render. From a type perspective, it goes:
+
+```
+(optional Audio to MIDI conversion) → MIDI Input → RawInputFrame → MusicalFrame → AnnotatedMusicalFrame → SceneFrame → Canvas
 ```
 
-## Control and Interaction Model
+**What this means:**
+- Adapters emit protocol-level events (RawInputFrame)
+- Stabilizers produce musical abstractions with duration and phase (MusicalFrame)
+- Visual vocabularies annotate musical elements with consistent visual properties like colour (AnnotatedMusicalFrame)
+- Lenses decide what it *looks like* and which elements to render (SceneFrame)
+- A renderer draws it (WebGL Canvas)
 
-Synesthetica is designed for **LLM-mediated control via natural language**. Users speak or type commands; an LLM translates them into mechanical operations on the pipeline.
+#### LLM interop
 
-### How Control Works
+It's mostly standard MCP (mostly). The interesting part is the multi-modal interface.
 
-**Viewer intent:** "Make the guitar harmony clearer"
+There's a [manifest file](packages/contracts/annotations/manifest.ts) where all operations are defined, regardless of interaction model. These, along with some conceptual prose, are compiled into a primer for the LLM. The primer is available on a standalone tool call. It supplies a token alongside the text that is required for all subsequent tool calls. If a token is missing or invalid we error out and supply both the full primer and a new token. This ensures that the LLM has at least received the primer before doing stuff.
 
-**LLM mediates:**
-1. Resolves "the guitar" to a specific `PartId` (deictic resolution)
-2. Translates "clearer harmony" to a choice of grammar with parameter adjustments
-3. Emits `ControlOp`s (mechanical operations) as necessary
-4. System executes the operation
+The primer is detailed and extensive. It explains system concepts and the musical implications at parameter range extremes. In addition to equipping the LLM to reason about system usage on a person's behalf, it is explicitly given a second role as interpreter and instructed on an appropriate posture.
 
-**Key separation:**
-- The LLM handles semantic understanding ("the guitar", "brighter", "that chord")
-- The engine handles mechanical execution (parameter updates, grammar and preset loading)
-- The engine does *not* interpret natural language or musical semantics
+The whole thing is designed with an LLM as the primary intended user. Retrieving music history reflects this well. The LLM is given an orientation around time, and told how to reason about events relative to the rhythm grid.
 
-### Annotations (Advisory Metadata)
+The web UI controls are generated from this same manifest, along with human-specific tooltips. I quite like that the manifest enforces these per-tool annotations at the type level.
 
-Pipeline components emit **annotations**: advisory metadata that helps the LLM make decisions.
+## Design ethos
 
-Annotations describe:
-- What a **grammar** illustrates (rhythm, harmony, melody)
-- What a **preset** emphasizes or de-emphasizes
-- What a **macro** affects and how (articulation: low = loose, high = tight)
+This project was partly an experiment in operating alongside LLMs, both as user and builder. I tweaked a few things but Claude wrote all the code.
 
-Example grammar annotation:
-```yaml
-id: starfield
-illustrates: [melody, articulation]
-traits: [discrete, transient, high-contrast]
-notes: ["responds strongly to note onsets"]
-```
+See [PRINCIPLES.md](PRINCIPLES.md) for a canonical set of guiding principles. These were important.
 
-Annotations are *not executable*. The engine ignores them. They exist purely to inform LLM decision-making.
+The workflow is interesting because this project is as much a design exercise as an engineering one. As such, it didn't work to heavily specify. I couldn't let a swarm of agents loose and grind until they're done because I had no idea what done was. Being inherently exploratory, the problem was not verifiable in significant iteration lengths. This demanded a very conversational workflow. I often found myself giving simple prompts like "write the spec", or "go ahead" after fully developing a shared understanding in dialogue. This demanded very careful management of terminology and explicit promotion through iterative layers of communicative and design certainty. The chord glyph language, for example, was developed initially in unicode, then svg, then html canvas, then webGL canvas. Each stage layered new certainty into emergent specs and glossaries. [Here's](https://mcnoose.com/synesthetica/chord-shapes/) an svg-stage test artefact for the curious.
 
-### Control Operations (Mechanical)
-
-The LLM constructs control operations; the engine executes them:
-
-```typescript
-{ op: "setMacro", target: { kind: "all" }, patch: { articulation: 0.7 } }
-{ op: "loadPreset", presetId: "builtin:practice-mode" }
-```
-
-Operations are deterministic and schema-validated. The engine provides no semantic interpretation.
-
-### What This Enables
-
-- **Conversational preset design:** "Make it more watercolor-like" → LLM adjusts blend modes and opacity
-- **Live performance control:** "Drop the drums" → LLM mutes the drum part
-- **Context-aware suggestions:** "Which preset works for sparse material?" → LLM searches annotations
-- **Macro creation:** "Save this as 'sunset mode'" → LLM captures current parameter state
-
-### Current Status
-
-The LLM control layer is *not implemented* yet. Current state:
-- Control ops and annotations are specified (see [SPEC_004](specs/SPEC_004_llm_mediation_and_annotations.md))
-- Annotations are designed but not emitted
-- No speech interface or LLM integration
-
-The current focus is on the core pipeline. LLM control comes later.
+Given the above, I erred towards verbosity and am absolutely not making efficient use of tokens (yet).
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow and code organization.
+Synesthetica ships as an npm package — you don't need the source to use it. If you do want to hack on it, [CONTRIBUTING.md](CONTRIBUTING.md) covers the workflow and [CLAUDE.md](CLAUDE.md) captures the AI-collaborator conventions the project runs on.
 
-## Module boundaries
-All module boundaries are defined in [packages/contracts](packages/contracts/). Do not redefine types elsewhere.
+## Acknowledgements / built with
 
+- [Claude Code](https://claude.com/claude-code) — the AI coding agent that wrote every line of code in this repo. I drove the design and the calls; Claude wrote the code.
+- [Basic Pitch](https://basicpitch.spotify.com/) (Spotify) — polyphonic pitch detection.
+- [Tonal.js](https://github.com/tonaljs/tonal) — chord + key theory.
+- [Three.js](https://threejs.org) — WebGL rendering.
+- [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) — the Model Context Protocol plumbing that lets Claude Desktop reach the CLI over stdio.
+- [marked](https://github.com/markedjs/marked) — markdown → HTML for the About panel's inline primer view.
+
+## License
+
+Business Source License 1.1 — see [LICENSE](LICENSE). Free for personal, educational, evaluation, and internal non-production use. Commercial / production use requires a licence from me until the change date (2030-09-10), at which point this version auto-converts to Apache 2.0. Precedent: HashiCorp, CockroachDB, MariaDB use the same shape for the same reason.
