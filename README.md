@@ -8,7 +8,7 @@ Synesthetica is a real-time music visualiser that listens to MIDI or audio and d
 
 Tested on Chrome and Claude Desktop.
 
-## Getting started
+## Getting started
 
 It'll load in an immediately usable state but it's a lot better if you set up a bit of context for your session.
 
@@ -166,7 +166,7 @@ The whole thing is designed with an LLM as the primary intended user. Retrieving
 
 The web UI controls are generated from this same manifest, along with human-specific tooltips. I quite like that the manifest enforces these per-tool annotations at the type level.
 
-## Design ethos
+## Design ethos
 
 This project was partly an experiment in operating alongside LLMs, both as user and builder. I tweaked a few things but Claude wrote all the code.
 
