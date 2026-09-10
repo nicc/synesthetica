@@ -190,7 +190,7 @@ Synesthetica ships as an npm package — you don't need the source to use it. If
 
 ## Acknowledgements / built with
 
-- [Claude Code](https://claude.com/claude-code) — the AI coding agent that wrote every line of code in this repo. I drove the design and the calls; Claude wrote the code.
+- [Claude Code](https://claude.com/claude-code) — wrote the code.
 - [Basic Pitch](https://basicpitch.spotify.com/) (Spotify) — polyphonic pitch detection.
 - [Tonal.js](https://github.com/tonaljs/tonal) — chord + key theory.
 - [Three.js](https://threejs.org) — WebGL rendering.

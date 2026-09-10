@@ -60,14 +60,13 @@ export async function buildAboutPanel(): Promise<HTMLElement> {
   details.appendChild(primerBody);
   wrap.appendChild(details);
 
-  // Copyright / licence line — required by BSL 1.1 to be conspicuously
-  // displayed on each copy of the Licensed Work. Sits below the LLM
-  // primer disclosure so it's the last thing on the panel, muted, one
-  // line, doesn't compete with the intro or primer for attention.
+  // Copyright + repo link at the foot of the panel. Muted, one line —
+  // reads as an unobtrusive attribution, not a legal disclosure. The
+  // licence auto-revert story lives in LICENSE + README, not here.
   const notice = document.createElement("p");
   notice.className = "syn-about-notice";
   notice.innerHTML =
-    '© 2026 Nic Young · Business Source License 1.1 · ' +
+    '© 2026 Nic Young · ' +
     '<a href="https://github.com/nicc/synesthetica" ' +
     'target="_blank" rel="noopener noreferrer">github.com/nicc/synesthetica</a>';
   wrap.appendChild(notice);

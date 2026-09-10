@@ -2,6 +2,7 @@
   "name": "@synesthetica/web-app",
   "version": "0.1.0",
   "private": true,
+  "license": "BUSL-1.1",
   "description": "Web application shell for Synesthetica Phase 0",
   "type": "module",
   "scripts": {

@@ -2,7 +2,7 @@
   "name": "@synesthetica/cli",
   "version": "0.1.0",
   "description": "Synesthetica CLI + MCP server — launches the visualiser and exposes it to any MCP-capable LLM client.",
-  "license": "MIT",
+  "license": "BUSL-1.1",
   "author": "Nic Young",
   "repository": {
     "type": "git",

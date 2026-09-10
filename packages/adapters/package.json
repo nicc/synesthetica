@@ -2,6 +2,7 @@
   "name": "@synesthetica/adapters",
   "version": "0.1.0",
   "private": true,
+  "license": "BUSL-1.1",
   "description": "Input adapters for Synesthetica (MIDI, Audio)",
   "type": "module",
   "main": "dist/index.js",

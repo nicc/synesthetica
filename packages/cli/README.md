@@ -111,4 +111,4 @@ See [../../specs/SPEC_013_llm_control_plane_mcp.md](../../specs/SPEC_013_llm_con
 
 ## License
 
-MIT — see [LICENSE](../../LICENSE).
+Business Source License 1.1 — see [LICENSE](../../LICENSE).
