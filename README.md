@@ -125,10 +125,10 @@ Each spoke encodes its specific note using the same colour-mappings applied to t
 
 It's kind of a lot to explain verbally but it makes sense when you see it.
 
-| <img src="docs/readme/chord%20glyph%20C%20maj.png" alt="C major" width="180"> | <img src="docs/readme/chord%20glyph%20A%20min.png" alt="A minor" width="180"> | <img src="docs/readme/chord%20glyph%20C%20maj%207.png" alt="Cmaj7" width="180"> | <img src="docs/readme/chord%20glyph%20D%20flat%20maj%207%20sharp%2011.png" alt="D♭maj7♯11" width="180"> |
+| <img src="docs/readme/chord%20glyph%20C%20maj.png" alt="C major" width="150"> | <img src="docs/readme/chord%20glyph%20A%20min.png" alt="A minor" width="150"> | <img src="docs/readme/chord%20glyph%20C%20maj%207.png" alt="Cmaj7" width="150"> | <img src="docs/readme/chord%20glyph%20D%20flat%20maj%207%20sharp%2011.png" alt="D♭maj7♯11" width="150"> |
 | :---: | :---: | :---: | :---: |
 | **C major** | **A minor** | **Cmaj7** | **D♭maj7♯11** |
-| straight hub, three long spokes | squiggly hub, same triad skeleton | adds the mid-length 7th spoke | long/mid/short spokes plus the chromatic ♯11 line |
+| straight hub, three long spokes | squiggly hub, three long spokes | adds a mid-length 7th spoke | short spokes + a chromatic ♯11 line |
 
 ##### Functional harmony clock
 
