@@ -24,6 +24,12 @@ const crossOriginIsolationHeaders = {
 const shouldAutoOpen = !process.env.SYN_NO_AUTO_OPEN;
 
 export default defineConfig({
+  // Relative asset paths so the bundle works under any deployment
+  // path — hosted at mcnoose.com/synesthetica/ (subpath), served
+  // from the CLI's built-in static server (root), or opened from
+  // disk. Absolute "/favicon.png" and "/assets/…" resolve to the
+  // domain root and 404 wherever we're not deployed at "/".
+  base: "./",
   server: {
     port: 3000,
     open: shouldAutoOpen ? "/" : false,

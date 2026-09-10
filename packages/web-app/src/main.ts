@@ -62,11 +62,16 @@ import type {
 } from "@synesthetica/contracts";
 
 /* -----------------------------------------------------------------
- * Worker + model URLs (Vite handles these at build time)
+ * Worker + model URLs (Vite handles these at build time). Public
+ * assets under packages/web-app/public are served from the deploy
+ * base URL, not the domain root — respect import.meta.env.BASE_URL
+ * so a subpath deployment (mcnoose.com/synesthetica/) resolves
+ * these correctly. Absolute "/models/…" would go to the domain root
+ * and 404.
  * ----------------------------------------------------------------- */
 import INFERENCE_WORKER_URL from "./audio/inference-worker-entry.ts?worker&url";
-const AUDIO_CAPTURE_WORKLET_URL = "/audio-capture-worklet.js";
-const BASIC_PITCH_MODEL_URL = "/models/basic-pitch/model.json";
+const AUDIO_CAPTURE_WORKLET_URL = `${import.meta.env.BASE_URL}audio-capture-worklet.js`;
+const BASIC_PITCH_MODEL_URL = `${import.meta.env.BASE_URL}models/basic-pitch/model.json`;
 
 /* -----------------------------------------------------------------
  * DOM refs (three: canvas, status line, body host for the shell)
