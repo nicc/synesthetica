@@ -60,17 +60,6 @@ export async function buildAboutPanel(): Promise<HTMLElement> {
   details.appendChild(primerBody);
   wrap.appendChild(details);
 
-  // Copyright + repo link at the foot of the panel. Muted, one line —
-  // reads as an unobtrusive attribution, not a legal disclosure. The
-  // licence auto-revert story lives in LICENSE + README, not here.
-  const notice = document.createElement("p");
-  notice.className = "syn-about-notice";
-  notice.innerHTML =
-    '© 2026 Nic Young · ' +
-    '<a href="https://github.com/nicc/synesthetica" ' +
-    'target="_blank" rel="noopener noreferrer">github.com/nicc/synesthetica</a>';
-  wrap.appendChild(notice);
-
   return wrap;
 }
 
