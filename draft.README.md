@@ -7,7 +7,7 @@
 ## Opening hook (top of page, first 5 seconds)
 
 - One sentence: what Synesthetica is + who it's for.
-- **Hero visual** — animated GIF or short video of a live session. Something that makes the "why" obvious without reading. Nic to record during the demo pass.
+- **Hero visual** — SHIP milestone: a strong static screenshot of a live session with the three columns lit up. ITERATION 2: replace with a short GIF or embedded video once we've captured recordings. Design the surrounding layout so the swap is drop-in.
 - Two links right under the hero:
   - **Try it in your browser** → hosted-web-only URL (after esco deploys). Bring MIDI or mic; no install.
   - **Install with Claude Desktop / Claude Code** → jumps to Install section.
@@ -21,8 +21,8 @@
 
 ## What it looks like
 
-- Screenshots of the three grammar columns (dynamics / rhythm / harmony) with a one-sentence caption each — same content the About panel opens with, just visually.
-- Optional: short second GIF showing a live LLM interaction changing the visualisation.
+- Screenshots of the three columns (dynamics / rhythm / harmony) with a one-sentence caption each — same content the About panel opens with, just visually.
+- ITERATION 2: short GIF alongside the screenshots showing a live LLM interaction changing the visualisation. Screenshots stay as the primary orientation aid; the GIF supplements.
 
 ## Quick start — hosted (fastest evaluation)
 
@@ -83,7 +83,7 @@
 
 - Monorepo layout (contracts / engine / adapters / cli / web-app).
 - One-line each: `npm test -ws` runs all, `npm run build -ws` builds, `npm run lint` lints.
-- Grammar development pointer → `packages/engine/src/grammars/README.md`.
+- Lens development pointer → `packages/engine/src/lenses/README.md`.
 - SPEC docs pointer → `specs/`.
 
 ## Contributing
@@ -108,7 +108,7 @@
 ## Notes for Nic (things worth deciding as we go)
 
 - **How much of the design-intent section to keep in README vs move to a separate DESIGN.md?** The current README already carries a chunk; if the design section grows it may deserve its own file.
-- **Screenshot / GIF sourcing** — you're recording during the demo pass. Decide capture resolution + whether we want a version with the LLM chat pane visible alongside the visualiser (probably yes for the hero, no for the grammar screenshots).
+- **Screenshot / GIF sourcing** — SHIP milestone uses static screenshots only. You'll capture those on the bigger keyboard alongside the op-coverage sweep. Decide capture resolution + whether we want a version with the LLM chat pane visible alongside the visualiser (probably yes for the hero, no for the per-lens screenshots). ITERATION 2 captures GIFs / video after you've had a chance to rehearse the demo path against a shipped README.
 - **npm scoping** — `@synesthetica/cli` vs a bare `synesthetica` package name is a C1 decision that changes the install snippet here.
 - **Hosted URL** — waits on esco deploy. Placeholder text acceptable in draft; verify before merge.
 - **"Try it" ordering** — hosted-first vs Claude-Desktop-first is a UX call. Hosted-first lowers evaluation friction; Claude-Desktop-first anchors on the intended primary use case. Currently drafted hosted-first.
