@@ -409,7 +409,15 @@ export class HarmonyLens implements IVisualLens {
     const activeChord = input.chords.find((c) => c.chord.phase === "active");
     let chord: AnnotatedChord | null = null;
     let chordOpacity = 1;
-    if (activeChord) {
+    // Only treat the frame as "actively rendering" when the chord's
+    // geometry actually has something to draw. Between "all notes
+    // released" and "chord cleared by hysteresis", the stabilizer
+    // still emits an active-phase chord with an EMPTY voicing —
+    // MusicalVisualVocabulary then produces shape.elements: [], and
+    // rendering that would fall to the placeholder path and flash
+    // a grey polygon at the hub position. Fall through to the fade
+    // path instead so the last populated glyph fades cleanly.
+    if (activeChord && activeChord.shape.elements.length > 0) {
       chord = activeChord;
       chordOpacity = 1;
       this.fadingChord = activeChord;

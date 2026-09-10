@@ -1145,9 +1145,19 @@ export class ThreeJSRenderer implements IRenderer {
     const elements = entity.data?.elements as ChordShapeElement[] | undefined;
     const margin = (entity.data?.margin as MarginStyle) ?? "straight";
 
-    // If no elements, fall back to placeholder
+    // If no elements, treat this frame as "nothing to draw" — dispose
+    // any cached geometry from a previous populated frame and skip.
+    // The producer (HarmonyLens) avoids emitting empty-elements entities
+    // during normal playback, so this is a defensive guard; the old
+    // fallback was an 8-segment CircleGeometry that read as a grey
+    // hexagon at the hub position — worse than rendering nothing.
     if (!elements || elements.length === 0) {
-      this.updateChordShapePlaceholder(entity);
+      const cached = this.entityObjects.get(entity.id);
+      if (cached) {
+        this.scene!.remove(cached);
+        this.disposeObject(cached);
+        this.entityObjects.delete(entity.id);
+      }
       return;
     }
 
@@ -1443,50 +1453,6 @@ export class ThreeJSRenderer implements IRenderer {
     }
 
     return group;
-  }
-
-  /**
-   * Fallback placeholder for chord shape when no elements provided.
-   *
-   * The cache may already hold a THREE.Group left over from a previous
-   * full-render frame (elements populated → buildChordShapeGroup) on
-   * the same entity id — Groups have no `.material`, so treating a
-   * Group as a Mesh crashes with `Cannot read properties of undefined
-   * (reading 'color')`. Discard whatever is cached and rebuild if it
-   * isn't a Mesh.
-   */
-  private updateChordShapePlaceholder(entity: Entity): void {
-    const cached = this.entityObjects.get(entity.id);
-    let mesh: THREE.Mesh;
-    if (cached instanceof THREE.Mesh) {
-      mesh = cached;
-    } else {
-      if (cached) {
-        this.scene!.remove(cached);
-        this.disposeObject(cached);
-      }
-      const geometry = new THREE.CircleGeometry(1, 8);
-      const material = new THREE.MeshBasicMaterial({
-        transparent: true,
-        side: THREE.DoubleSide,
-      });
-      mesh = new THREE.Mesh(geometry, material);
-      this.scene!.add(mesh);
-      this.entityObjects.set(entity.id, mesh);
-    }
-
-    const x = (entity.position?.x ?? 0.5) * this.config.worldWidth;
-    const y = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
-    mesh.position.set(x, y, 0);
-
-    const size = entity.style?.size ?? 100;
-    const scale = size / 50;
-    mesh.scale.set(scale, scale, 1);
-
-    const material = mesh.material as THREE.MeshBasicMaterial;
-    const color = entity.style?.color ?? { h: 120, s: 0.7, v: 0.6 };
-    material.color.copy(this.hsvToThreeColor(color));
-    material.opacity = (entity.style?.opacity ?? 1) * 0.8;
   }
 
   /**
