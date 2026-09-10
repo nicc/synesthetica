@@ -500,7 +500,7 @@
     /* Sharp row is absolutely populated; children position themselves
      * via inline `left`. Reserve the natural-row height so the sharps
      * sit on their own line rather than collapsing. */
-    .syn-onscreen-keyboard-sharps { height: 22px; }
+    .syn-onscreen-keyboard-sharps { height: 26px; }
     .syn-onscreen-keyboard-sharps .syn-onscreen-key { position: absolute; }
 
     .syn-onscreen-key {
@@ -509,7 +509,7 @@
       justify-content: center;
       border-radius: 4px;
       font-family: ui-monospace, SFMono-Regular, monospace;
-      font-size: 10px;
+      font-size: 12px;
       /* Outline + letter only. The radial background paints a soft
        * hue glow that shows through the transparent centre so the
        * letter reads against colour rather than solid black — the
@@ -536,7 +536,10 @@
                   transform 60ms ease-out;
     }
     .syn-onscreen-key.is-white {
-      color: #fff;
+      /* Letter colour matches the outline (same rgba white) so the
+       * two read as one muted mark rather than a bright letter over
+       * a dim outline. */
+      color: rgba(255, 255, 255, 0.4);
       /* Lighter weight on naturals so the white letters don't
        * outshout the muted app — about two-thirds of the sharps'
        * weight. */
@@ -548,18 +551,20 @@
     }
     .syn-onscreen-key.is-pressed {
       transform: translateY(1px);
-      /* Slightly dimmer pressed glow than the previous pass — dropping
-       * ~0.1 off each opacity stop tones the flash without losing the
-       * "something happened" cue. */
+      /* Pressed glow footprint tightened to ~0.85 of the previous
+       * pass — inner radial stops pulled inward and the outer box
+       * shadow's blur/spread cut proportionally. Opacity envelope
+       * kept, so the peak brightness holds; only the spatial extent
+       * shrinks. */
       background: radial-gradient(
         circle at center,
         hsla(var(--syn-key-hue, 0), 90%, 62%, 0.72) 0%,
-        hsla(var(--syn-key-hue, 0), 90%, 62%, 0.32) 55%,
-        hsla(var(--syn-key-hue, 0), 90%, 62%, 0.08) 100%
+        hsla(var(--syn-key-hue, 0), 90%, 62%, 0.32) 47%,
+        hsla(var(--syn-key-hue, 0), 90%, 62%, 0.08) 85%
       );
       box-shadow:
-        0 0 10px 2px hsla(var(--syn-key-hue, 0), 90%, 62%, 0.78),
-        0 0 22px 6px hsla(var(--syn-key-hue, 0), 90%, 62%, 0.35);
+        0 0 8px 2px hsla(var(--syn-key-hue, 0), 90%, 62%, 0.78),
+        0 0 19px 5px hsla(var(--syn-key-hue, 0), 90%, 62%, 0.35);
     }
   </style>
 </head>

@@ -31,9 +31,9 @@ import type { ComputerKeyboardSource } from "@synesthetica/adapters";
 import { KEY_MAP, KEY_LABEL, NATURAL_ORDER } from "@synesthetica/adapters";
 import { pcToHue } from "@synesthetica/contracts";
 
-const NATURAL_KEY_PX = 22;
-const NATURAL_KEY_GAP = 2;
-const ROW_GAP = 3;
+const NATURAL_KEY_PX = 26;
+const NATURAL_KEY_GAP = 3;
+const ROW_GAP = 4;
 
 export interface OnScreenKeyboardHandle {
   root: HTMLElement;
@@ -165,7 +165,11 @@ export function mountOnScreenKeyboard(
     const aspect = vw / vh;
     const clockXFraction = 29 / (75 * aspect) + 0.5;
     root.style.left = `${clockXFraction * vw}px`;
-    root.style.top = `${0.9175 * vh}px`;
+    // Vertical centre slightly higher than midway between the clock
+    // bottom (0.835·vh) and the viewport bottom — visually the
+    // midpoint reads a touch low against the clock's outer ring, so
+    // lift by ~1.75% of viewport height.
+    root.style.top = `${0.9 * vh}px`;
     root.style.bottom = "auto";
     root.style.transform = "translate(-50%, -50%)";
   }
