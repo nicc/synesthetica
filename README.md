@@ -160,7 +160,7 @@ The pipeline is essentially a buffered event stream, pulled on every frame rende
 - Adapters emit protocol-level events (RawInputFrame)
 - Stabilizers produce musical abstractions with duration and phase (MusicalFrame)
 - Visual vocabularies annotate musical elements with consistent visual properties like colour (AnnotatedMusicalFrame)
-- Lenses decide what it *looks like* and which elements to render (SceneFrame)
+- Lenses decide what it looks like and which elements to render (SceneFrame)
 - A renderer draws it (WebGLCanvas)
 
 #### LLM interop
