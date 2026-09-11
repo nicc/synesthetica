@@ -63,7 +63,7 @@ Note that the LLM will only spin up context when you start a session or ask abou
 
 #### Start a session
 
-Just open a new chat and ask. This is the fun bit. Try stuff. You could say "I want to visualise some music" or "start a Synesthetica session". Then maybe "I'm using my Arturia keyboard, playing in F# at 90 BPM in 4/4". Maybe "The piece I'm currently practicing looks a bit jittery, can you fix that?". Or even "I just played a piece that I'm struggling with; any tips?". The LLM can see what you've played. It knows how Synesthetica works and can operate it for you. It can also save and load presets, which is currently unavailable in the web UI.
+Just open a new chat and ask. This is the fun bit. Try stuff. You could say "I want to visualise some music" or "start a Synesthetica session". Then maybe "I'm using my Arturia keyboard, playing in F# at 90 BPM in 4/4". Maybe "the piece I'm currently practicing looks a bit jittery, can you fix that?". Or even "I just played a piece that I'm struggling with; any tips?". The LLM can see what you've played. It knows how Synesthetica works and can operate it for you. It can also save and load presets, which is currently unavailable in the web UI.
 
 ## Overview
 
@@ -153,7 +153,7 @@ Again, it's a lot to take in verbally. Easier seen in action.
 The pipeline is essentially a buffered event stream, pulled on every frame render. From a type perspective, it goes:
 
 ```
-(optional Audio to MIDI conversion) → MIDI Input → RawInputFrame → MusicalFrame → AnnotatedMusicalFrame → SceneFrame → WebGLCanvas
+(optional Audio →) MIDI → RawInputFrame → MusicalFrame → AnnotatedMusicalFrame → SceneFrame → WebGLCanvas
 ```
 
 **What this means:**
