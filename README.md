@@ -153,7 +153,7 @@ Again, it's a lot to take in verbally. Easier seen in action.
 The pipeline is essentially a buffered event stream, pulled on every frame render. From a type perspective, it goes:
 
 ```
-(optional Audio to MIDI conversion) → MIDI Input → RawInputFrame → MusicalFrame → AnnotatedMusicalFrame → SceneFrame → Canvas
+(optional Audio to MIDI conversion) → MIDI Input → RawInputFrame → MusicalFrame → AnnotatedMusicalFrame → SceneFrame → WebGLCanvas
 ```
 
 **What this means:**
@@ -161,7 +161,7 @@ The pipeline is essentially a buffered event stream, pulled on every frame rende
 - Stabilizers produce musical abstractions with duration and phase (MusicalFrame)
 - Visual vocabularies annotate musical elements with consistent visual properties like colour (AnnotatedMusicalFrame)
 - Lenses decide what it *looks like* and which elements to render (SceneFrame)
-- A renderer draws it (WebGL Canvas)
+- A renderer draws it (WebGLCanvas)
 
 #### LLM interop
 
