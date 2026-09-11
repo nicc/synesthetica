@@ -16,7 +16,7 @@ It'll load in an immediately usable state but it's a lot better if you set up a 
 
 #### Music source
 
-The default input maps an on-screen musical keyboard to your typing keyboard. It requires no setup but has no velocity, limited range and bad ergonomics. A proper MIDI controller is best. Plug one in and reload the page. Audio is also supported but that's just converted to MIDI anyway (by Spotify's <a href="https://basicpitch.spotify.com/" target="_blank" rel="noopener noreferrer">Basic Pitch</a> running in Web Assembly), so you'll get best results supplying MIDI directly.
+The default input maps an on-screen musical keyboard to your typing keyboard. It requires no setup but has no velocity, limited range and bad ergonomics. A proper MIDI controller is best. Plug one in and reload the page to see it in the inputs list. Audio is also supported but that's converted to MIDI anyway (by Spotify's <a href="https://basicpitch.spotify.com/" target="_blank" rel="noopener noreferrer">Basic Pitch</a> running in Web Assembly), so you'll get best results by supplying MIDI directly.
 
 #### Key
 
@@ -24,7 +24,7 @@ A key is required to represent functional harmony (e.g. ii → V → I). It stil
 
 #### Rhythm
 
-A tempo and time signature are required to analyse rhythm. It will render in free time mode without it. If supplied, you'll get beat and bar lines, an optional metronome, and a view on how tight your playing is. Timing analysis is relative to a configurable quantise resolution (16ths by default). Swing is not yet supported.
+It loads up in free time mode. Supply a tempo and time signature to see rhythm analysis. This will give you beat and bar lines, an optional metronome, and a view on how tight your playing is. Timing analysis is relative to a configurable quantise resolution (16ths by default). Swing is not yet supported.
 
 #### Aesthetics
 
@@ -59,7 +59,7 @@ Add this block to your Claude Desktop config file (`~/Library/Application Suppor
 
 Restart Claude Desktop after saving. `npx` fetches `synesthetica` from the npm registry the first time it runs and caches it locally, so there's no separate install step. If you'd rather have it installed globally, `npm install -g synesthetica` works too. See [packages/cli/README.md](packages/cli/README.md) for Claude Code and other clients.
 
-Note that the LLM will only spin up context when you start a session or ask about Synesthetica. This keeps the always-on token cost as low as possible — around 50–80 tokens.
+Note that the LLM will only spin up context when you start a session or ask about Synesthetica. This keeps the always-on token cost as low as possible, around 50–80 tokens.
 
 #### Start a session
 
@@ -181,13 +181,32 @@ This project was partly an experiment in operating alongside LLMs, both as user 
 
 See [PRINCIPLES.md](PRINCIPLES.md) for a canonical set of guiding principles. These were important.
 
-The workflow is interesting because this project is as much a design exercise as an engineering one. As such, it didn't work to heavily specify. I couldn't let a swarm of agents loose and grind until they're done because I had no idea what done was. Being inherently exploratory, the problem was not verifiable in significant iteration lengths. This demanded a very conversational workflow. I often found myself giving simple prompts like "write the spec", or "go ahead" after fully developing a shared understanding in dialogue. This demanded very careful management of terminology and explicit promotion through iterative layers of communicative and design certainty. The chord glyph language, for example, was developed initially in unicode, then svg, then html canvas, then webGL canvas. Each stage layered new certainty into emergent specs and glossaries. <a href="https://mcnoose.com/synesthetica/chord-shapes/" target="_blank" rel="noopener noreferrer">Here's</a> an svg-stage test artefact for the curious.
+The workflow is interesting because this project is as much a design exercise as an engineering one. As such, it didn't work to heavily specify. I couldn't let a swarm of agents loose and grind until they're done because I had no idea what done was. Being inherently exploratory, the problem was not verifiable in significant iteration lengths. This demanded a very conversational workflow. I often found myself giving simple prompts like "write the spec", or "go ahead" after fully developing a shared understanding in dialogue. This demanded very careful management of terminology, with explicit promotion through iterative layers of communicative and design certainty. The chord glyph language, for example, was developed initially in unicode, then svg, then html canvas, then webGL canvas. Each stage layered new certainties into emergent specs and glossaries. <a href="https://mcnoose.com/synesthetica/chord-shapes/" target="_blank" rel="noopener noreferrer">Here's</a> an svg-stage test artefact for the curious.
 
 Given the above, I erred towards verbosity and am absolutely not making efficient use of tokens (yet).
 
 ## Contributing
 
-Synesthetica ships as an npm package — you don't need the source to use it. If you do want to hack on it, [CONTRIBUTING.md](CONTRIBUTING.md) covers the workflow and [CLAUDE.md](CLAUDE.md) captures the AI-collaborator conventions the project runs on.
+```bash
+# One-time setup
+git clone https://github.com/nicc/synesthetica.git
+cd synesthetica
+npm install
+
+# Build every workspace, in dependency order
+npm run build
+
+# Tests (all workspaces)
+npm test -ws
+
+# Lint
+npm run lint
+
+# Run the app locally
+npm run start              # MCP server on stdio + bundled web-app (what Claude Desktop spawns)
+npm run start:standalone   # web-app only, no MCP server — quickest way to iterate on visuals
+npm run dev                # Vite HMR against the engine sources — best for tight UI/lens loop
+```
 
 ## Acknowledgements / built with
 
@@ -195,9 +214,9 @@ Synesthetica ships as an npm package — you don't need the source to use it. If
 - <a href="https://basicpitch.spotify.com/" target="_blank" rel="noopener noreferrer">Basic Pitch</a> (Spotify) — polyphonic pitch detection.
 - <a href="https://github.com/tonaljs/tonal" target="_blank" rel="noopener noreferrer">Tonal.js</a> — chord + key theory.
 - <a href="https://threejs.org" target="_blank" rel="noopener noreferrer">Three.js</a> — WebGL rendering.
-- <a href="https://github.com/modelcontextprotocol/typescript-sdk" target="_blank" rel="noopener noreferrer">MCP TypeScript SDK</a> — the Model Context Protocol plumbing that lets Claude Desktop reach the CLI over stdio.
+- <a href="https://github.com/modelcontextprotocol/typescript-sdk" target="_blank" rel="noopener noreferrer">MCP TypeScript SDK</a> — the Model Context Protocol plumbing.
 - <a href="https://github.com/markedjs/marked" target="_blank" rel="noopener noreferrer">marked</a> — markdown → HTML for the About panel's inline primer view.
 
 ## License
 
-Business Source License 1.1 — see [LICENSE](LICENSE). Free for personal, educational, evaluation, and internal non-production use. Commercial / production use requires a licence from me until the change date (2030-09-10), at which point this version auto-converts to Apache 2.0. Precedent: HashiCorp, CockroachDB, MariaDB use the same shape for the same reason.
+Business Source License 1.1 — see [LICENSE](LICENSE). Free for personal, educational, evaluation, and internal non-production use.
