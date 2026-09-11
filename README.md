@@ -6,7 +6,7 @@ Synesthetica is a real-time music visualiser that listens to MIDI or audio and d
 
 ![Synesthetica — the three lenses in a full-view session](docs/readme/full-view.png)
 
-Tested on Chrome and Claude Desktop.
+Tested on Chrome and Claude Desktop. Not built for mobile.
 
 ## Getting started
 
