@@ -37,6 +37,7 @@
     "build": "tsc --build tsconfig.json && npm run bundle-cli && npm run bundle-webapp",
     "bundle-cli": "node scripts/bundle-cli.mjs",
     "bundle-webapp": "node scripts/bundle-webapp.mjs",
+    "smoke": "node scripts/smoke-mcp.mjs",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -93,6 +93,16 @@ jobs:
         working-directory: packages/cli
         run: npm publish --dry-run --provenance --access public
 
+      - name: MCP smoke — bundled CLI accepts initialize
+        # 1.0.0 shipped a tarball whose contents inspected clean but
+        # whose bundled bin.js exited immediately at startup because
+        # promptResources reached for a workspace path that only
+        # exists inside the monorepo. Runs the actual binary and
+        # sends a real initialize request — the fastest way to catch
+        # that class of "looks fine in the tarball, dies in the wild"
+        # failure BEFORE it's on the registry.
+        run: npm run smoke -w synesthetica
+
       - name: Publish
         working-directory: packages/cli
         run: npm publish --provenance --access public

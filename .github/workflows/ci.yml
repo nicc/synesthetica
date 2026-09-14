@@ -49,3 +49,11 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: MCP smoke — bundled CLI accepts initialize
+        # Runs the freshly-built dist/bin.js and sends a real MCP
+        # initialize request. Guards against the class of failure
+        # where the tarball inspects cleanly (dry-run) but the
+        # bundled binary blows up at startup (as 1.0.0 did with
+        # a stale prompt-resolver path).
+        run: npm run smoke -w synesthetica
