@@ -1,0 +1,130 @@
+# Publish — triggered by a `v*.*.*` git tag on main. Cuts an npm
+# release of the `synesthetica` package and a matching GitHub
+# release with the tag's CHANGELOG entry attached.
+#
+# Uses npm's trusted-publisher flow (OIDC via GitHub Actions) rather
+# than a stored NPM_TOKEN secret. Setup on the npm side (per package):
+#   1. Publish the package once from a maintainer's machine.
+#   2. https://www.npmjs.com/package/synesthetica/access → "Trusted
+#      Publisher" → GitHub Actions → wire to nicc/synesthetica, this
+#      workflow file, and the "publish" environment.
+# The environment name below (`environment: publish`) is the
+# handshake with what's configured on npmjs.com.
+#
+# Release flow (from a clean main):
+#   cd packages/cli && npm version <patch|minor|major>
+#   git push --follow-tags
+# The tag push fires this workflow, which re-runs the CI gate,
+# does a --dry-run publish, then publishes with provenance.
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    # Attach to the "publish" environment configured on npmjs.com's
+    # trusted-publisher setup. Also gives a chokepoint for optional
+    # protection rules (required reviewers, etc.) if this ever wants
+    # a human "publish yes/no" gate.
+    environment: publish
+    permissions:
+      # id-token: write is what makes OIDC trusted publishing possible.
+      # contents: write lets us create the GitHub Release from the tag.
+      id-token: write
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so extraction from CHANGELOG can look up the
+          # tag's ancestors if needed.
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          # Points npm at the public registry; provenance publishing
+          # requires the registry to be exactly this URL.
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install
+        run: npm ci
+
+      # Same gate as CI. A tag on a green main should just repeat green
+      # here, but the guarantee is worth the two-minute runtime — nothing
+      # ships without passing.
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        # --if-present skips workspaces without a test script.
+        run: npm test -ws --if-present
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Verify tag matches cli/package.json
+        # Prevents publishing v1.2.3 with a package.json still at 1.2.2.
+        # The tag drives the release; the manifest must agree.
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION="$(node -p "require('./packages/cli/package.json').version")"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::tag v$TAG_VERSION does not match packages/cli/package.json ($PKG_VERSION)"
+            exit 1
+          fi
+
+      - name: Publish dry-run
+        # Prints the tarball inventory the real publish will send. If
+        # this ever surfaces something surprising (unexpected files,
+        # sudden size jump), the log tells us BEFORE the real publish
+        # is irrevocably on the registry.
+        working-directory: packages/cli
+        run: npm publish --dry-run --provenance --access public
+
+      - name: Publish
+        working-directory: packages/cli
+        run: npm publish --provenance --access public
+
+      - name: Extract CHANGELOG entry for this tag
+        id: changelog
+        # Pulls the section between "## [X.Y.Z]" and the next "## ["
+        # line so the GitHub Release body is the same prose the
+        # CHANGELOG carries. Falls back to a placeholder if the
+        # section is missing, which nudges us to keep CHANGELOG.md
+        # updated per release.
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          BODY=$(awk -v ver="$TAG_VERSION" '
+            /^## \[/ {
+              if (found) exit;
+              if ($0 ~ ("^## \\[" ver "\\]")) { found=1; next }
+            }
+            found { print }
+          ' CHANGELOG.md)
+          if [ -z "$BODY" ]; then
+            BODY="Release $TAG_VERSION. See CHANGELOG.md."
+          fi
+          {
+            echo "body<<EOF"
+            echo "$BODY"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.body }}

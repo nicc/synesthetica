@@ -1,25 +1,51 @@
+# CI — runs the full quality gate on every pull request and every
+# push to main. Same commands used locally (npm run build / test -ws
+# / lint), so a green CI run means "this is what a fresh clone
+# looks like".
+#
+# Kept lean: one job, one Node version (matching the CLI's engines
+# floor). If we ever need to add a Windows / macOS check or a Node
+# 22 forward-compat lane, matrix it here.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
+
+# Cancel in-progress runs when a new commit lands on the same
+# PR / branch — avoids paying twice for the same tree.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
+  quality:
+    name: Build + test + lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          # Matches the "engines" floor in packages/cli/package.json;
+          # if that ever bumps, bump here too.
+          node-version: "20"
+          cache: "npm"
+
       - name: Install
         run: npm ci
-      # Build in topological order (root's `build` script).
+
       - name: Build
         run: npm run build
+
+      - name: Test
+        # --if-present skips workspaces without a test script
+        # (packages/contracts is types-only, no runtime to test).
+        run: npm test -ws --if-present
+
       - name: Lint
         run: npm run lint
-      - name: Test all workspaces
-        run: npm test -ws --if-present

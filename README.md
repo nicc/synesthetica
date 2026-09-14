@@ -197,7 +197,7 @@ npm install
 npm run build
 
 # Tests (all workspaces)
-npm test -ws
+npm test -ws --if-present
 
 # Lint
 npm run lint
