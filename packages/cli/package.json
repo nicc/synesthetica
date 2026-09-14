@@ -6,7 +6,7 @@
   "author": "Nic Young",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nicc/synesthetica.git",
+    "url": "git+https://github.com/nicc/synesthetica.git",
     "directory": "packages/cli"
   },
   "homepage": "https://github.com/nicc/synesthetica#readme",
