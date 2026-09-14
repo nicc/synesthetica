@@ -4,7 +4,7 @@ Notable changes to Synesthetica. Format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
-## [1.0.0] — TBD
+## [1.0.0] — 2026/09/14
 
 First public release.
 

@@ -1,6 +1,6 @@
 {
   "name": "synesthetica",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Real-time music visualiser + MCP server. Listens to MIDI or audio, draws it in a Western-music-theory visual language, and exposes the whole thing to Claude Desktop for natural-language control.",
   "license": "BUSL-1.1",
   "author": "Nic Young",
