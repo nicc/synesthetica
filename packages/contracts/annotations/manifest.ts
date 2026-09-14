@@ -458,7 +458,7 @@ const sessionControls: SessionControlAnnotation[] = [
     notes: [
       "MIDI device, on-screen QWERTY keyboard, or audio input. Enumerate connected devices via the `list_inputs` tool; the currently-selected source is on `state.input` from `get_state`. (The panel widget populates from the same device list.)",
       "Input quality tiering — MIDI is best: velocity, discrete pitch, no inference noise. On-screen QWERTY keyboard is next: clean discrete events but with a fixed velocity and only ~1.5 octaves of range. Audio (microphone / audio interface) is noisiest: pitch inference occasionally emits transient false chords on ambient sound. Prefer MIDI whenever one is available, and if the user's `list_inputs` result shows a connected MIDI device, suggest switching to it before spending time diagnosing audio-input oddities.",
-      "The on-screen QWERTY keyboard is the boot default (sourceString: 'keyboard') so a fresh user has a working input with no permission prompts.",
+      "The on-screen QWERTY keyboard is the boot default (sourceString: 'keyboard') so a fresh user has a working input with no permission prompts. White kyes run Z to /, mapped C to E an octave up. Black keys are mapped to S,D, G,H,J, L,;.",
       "Audio device labels only appear after getUserMedia permission is granted for the origin (i.e. after at least one audio session has started). Before that, additional audio entries surface as placeholder names ('Audio input 1', etc.) alongside a 'Default microphone' fallback.",
     ],
     humanNotes: [
