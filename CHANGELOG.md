@@ -4,6 +4,8 @@ Notable changes to Synesthetica. Format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+- fixed incorrect ring buffer size default for event history in cli help output.
+
 ## [1.0.0] — 2026/09/14
 
 First public release.
