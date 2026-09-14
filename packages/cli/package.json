@@ -1,7 +1,7 @@
 {
-  "name": "@synesthetica/cli",
+  "name": "synesthetica",
   "version": "0.1.0",
-  "description": "Synesthetica CLI + MCP server — launches the visualiser and exposes it to any MCP-capable LLM client.",
+  "description": "Real-time music visualiser + MCP server. Listens to MIDI or audio, draws it in a Western-music-theory visual language, and exposes the whole thing to Claude Desktop for natural-language control.",
   "license": "BUSL-1.1",
   "author": "Nic Young",
   "repository": {
@@ -34,7 +34,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc --build tsconfig.json && npm run bundle-webapp",
+    "build": "tsc --build tsconfig.json && npm run bundle-cli && npm run bundle-webapp",
+    "bundle-cli": "node scripts/bundle-cli.mjs",
     "bundle-webapp": "node scripts/bundle-webapp.mjs",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "test": "vitest run",
@@ -45,11 +46,12 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
-    "@synesthetica/contracts": "^0.1.0",
     "ws": "^8.21.3"
   },
   "devDependencies": {
+    "@synesthetica/contracts": "^0.1.0",
     "@types/ws": "^8.18.1",
+    "esbuild": "^0.21.5",
     "typescript": "^5.3.0",
     "vitest": "^2.0.0"
   }

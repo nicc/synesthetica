@@ -215,7 +215,7 @@ function locateBundledWebApp(): string {
       "\n  ",
     )}\n\nThis usually means the CLI was built without bundling the web-app assets. ` +
       `In the monorepo, run \`npm run build\` from the root; when installed via npm, ` +
-      `reinstall the @synesthetica/cli package.`,
+      `reinstall the synesthetica package.`,
   );
 }
 
