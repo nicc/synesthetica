@@ -223,7 +223,7 @@ start OPTIONS
   --transport <type>      'stdio' (default) or 'tcp'
   --no-mcp                skip MCP server; engine + UI run standalone
   --recent-events-buffer <N>
-                          in-memory event ring size (default 1000)
+                          in-memory event ring size (default 10000)
   --log-retention-days <N>
                           days to retain rotated event logs (default 7)
   --no-open               do not open the browser automatically
