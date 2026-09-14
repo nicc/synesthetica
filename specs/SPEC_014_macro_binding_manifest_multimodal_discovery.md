@@ -71,7 +71,7 @@ Both steps are unconditional — the manifest state resource is always truthful 
 
 `VisualPipeline.setMacro(name, value)` (packages/engine/src/VisualPipeline.ts) fans the write to two consumer families:
 
-**Grammars.** Parse `<scope>:<param>` from the macro id. Any grammar whose `id` equals `${scope}-grammar` (or `${scope}`) receives `setMacros({[paramCamel]: value})`, where `paramCamel` is `paramKebab` kebab→camelCase. Grammars implement `setMacros` with a `Partial<Config>` shape and ignore keys they don't own.
+**Lenses.** Parse `<scope>:<param>` from the macro id. Any lens whose `id` equals `${scope}-lens` (or `${scope}`) receives `setMacros({[paramCamel]: value})`, where `paramCamel` is `paramKebab` kebab→camelCase. Lenses implement `setMacros` with a `Partial<Config>` shape and ignore keys they don't own.
 
 Example: `set_macro("rhythm:pulse-intensity", 0.8)` reaches `RhythmGrammar.setMacros({pulseIntensity: 0.8})`.
 
@@ -85,21 +85,21 @@ Example: `set_macro("system:colour-mapping:reference", 240)` reaches `MusicalVis
 
 ### 1.7 Bare (unscoped) and `system:*` macros
 
-Bare macros like `time-horizon` and `system:colour-mapping:reference` don't route via grammar-id matching. They flow through both the grammar and stabilizer loops and no-op unless a consumer explicitly recognises them. Compound macros are always bare or otherwise-scoped; their leaves do the actual work, so the compound's own write is state-only.
+Bare macros like `time-horizon` and `system:colour-mapping:reference` don't route via lens-id matching. They flow through both the lens and stabilizer loops and no-op unless a consumer explicitly recognises them. Compound macros are always bare or otherwise-scoped; their leaves do the actual work, so the compound's own write is state-only.
 
 ### 1.8 Declared consumers (SPEC 014 §Wiring coverage)
 
 Every non-compound macro's `MacroAnnotation` carries a required `consumers[]` array:
 
 ```ts
-{ kind: "grammar" | "stabilizer" | "vocab", id: string, macroKey: string }
+{ kind: "lens" | "stabilizer" | "vocab", id: string, macroKey: string }
 ```
 
-`id` is the consumer's runtime `id` field. `macroKey` is how the consumer addresses this macro — for grammars, the camelCase field name on their internal `macros` object (matching what `setMacros` accepts); for stabilizers and vocabs, the full qualified macro id (matching what `setMacro` switches on).
+`id` is the consumer's runtime `id` field. `macroKey` is how the consumer addresses this macro — for lenses, the camelCase field name on their internal `macros` object (matching what `setMacros` accepts); for stabilizers and vocabs, the full qualified macro id (matching what `setMacro` switches on).
 
 This declaration is the manifest's promise about wiring. It's enforced two ways:
 
-1. **Build-time** — `validate-manifest.mjs` fails if any continuous or discrete macro is missing `consumers[]`, or if a consumer's `id` isn't a known grammar/stabilizer/vocab.
+1. **Build-time** — `validate-manifest.mjs` fails if any continuous or discrete macro is missing `consumers[]`, or if a consumer's `id` isn't a known lens/stabilizer/vocab.
 2. **Runtime** — `packages/engine/test/wiringCoverage.test.ts` instantiates a full pipeline and, for every declared consumer, dispatches through `pipeline.setMacro(macroId, testValue)` and asserts `consumer.readMacros()[macroKey] === testValue`. A no-op setter can't accidentally pass because the test picks a value distinct from the current one.
 
 Together these turn "declared but not plumbed" from a class of silent bug into a class of build failure.
@@ -151,7 +151,7 @@ The manifest at `productionManifest` is the sole source. Every derived surface r
 | Composed `guide://system-overview` prompt | Authored `system-overview.md` + generated sections per category | Composed at prompt-fetch time |
 | UI panel widgets | `productionManifest.macros + sessionControls` | `generatePanel(manifest)` at web-app startup |
 | UI panel widget hover-help | Per-widget `notes[]` (all paragraphs) | `generatePanel` copies into descriptor; renderer emits one `<p>` per note |
-| UI About panel appendices | `productionManifest.grammars + concepts` | Rendered at panel-open |
+| UI About panel appendices | `productionManifest.lenses + concepts` | Rendered at panel-open |
 
 A change to a macro's `directionality` or `notes` in the manifest flows to widget hover-help, the LLM primer, every per-URI resource read, and the annotations bundle in one build. No manual sync anywhere.
 
@@ -172,7 +172,7 @@ When the user attaches `guide://system-overview` (or the client auto-attaches �
 - Every macro with type, range, default, directionality, notes.
 - Every session control with type, nullable, notes.
 - Every system concept with definition + examples + related terms.
-- Every grammar with notes + macro-responsiveness table.
+- Every lens with notes + macro-responsiveness table.
 - Every MCP tool with aliases + notes + examples.
 - Every MCP resource (state, presets, annotations bundle) with description + subscribable flag.
 - Session-time guidance (how to reason about `startedAt` + `now` + event `t`).
@@ -184,12 +184,12 @@ Per-item `annotations://` reads remain available for on-demand precision (e.g. w
 
 **Widgets (interactive control surface):**
 - `generatePanel(manifest)` reads `manifest.macros + manifest.sessionControls`.
-- Tools, concepts, grammars, resources, presets are DELIBERATELY excluded. The generator's input type (`ManifestForPanel`) accepts only macros + sessionControls, so misuse is a type error, not a runtime bug.
+- Tools, concepts, lenses, resources, presets are DELIBERATELY excluded. The generator's input type (`ManifestForPanel`) accepts only macros + sessionControls, so misuse is a type error, not a runtime bug.
 - Each widget renders label + control + `?` hover-help. The help popover concatenates every entry in `notes[]` as a separate paragraph (plus low/high endpoint prose for sliders).
 
 **About panel (reference material):**
 - Authored `system-overview.md` prose (the LLM's narrative, useful for humans too).
-- ## Grammars section (from `manifest.grammars`).
+- ## Lenses section (from `manifest.lenses`).
 - ## Glossary section (every `manifest.concepts` entry, alphabetically).
 - Macros, tools, resources are NOT in the About panel — they belong in the interactive widget surface or the LLM primer respectively.
 
@@ -200,7 +200,7 @@ Per-item `annotations://` reads remain available for on-demand precision (e.g. w
 | Macros | — | ✓ per-item | ✓ ## Macros | ✓ | (via widget help) |
 | Session controls | — | ✓ per-item | ✓ ## Session controls | ✓ | (via widget help) |
 | Concepts | — | ✓ per-item + `concepts://` alias | ✓ ## System concepts | — | ✓ ## Glossary |
-| Grammars | — | ✓ per-item | ✓ ## Grammars | — | ✓ ## Grammars |
+| Lenses | — | ✓ per-item | ✓ ## Lenses | — | ✓ ## Lenses |
 | Presets (item + index) | — | ✓ | ✓ ## Presets | — | — |
 | Tools | ✓ | — | ✓ ## Tools | — | — |
 | Resources (state / presets / bundle) | — | ✓ | ✓ ## Resources | — | — |
@@ -226,7 +226,7 @@ A macro is correctly wired iff:
 6. If it's a session control or macro: the UI panel renders a widget for it (with hover-help concatenating every `notes[]` entry).
 
 **Automated coverage:**
-- Build-time validation (`packages/contracts/scripts/validate-manifest.mjs`) asserts (1) — including that every non-compound macro has a non-empty `consumers[]` whose entries reference known grammar/stabilizer/vocab ids.
+- Build-time validation (`packages/contracts/scripts/validate-manifest.mjs`) asserts (1) — including that every non-compound macro has a non-empty `consumers[]` whose entries reference known lens/stabilizer/vocab ids.
 - Engine-level coverage test (`packages/engine/test/wiringCoverage.test.ts`) asserts (4) for every declared consumer via `pipeline.setMacro` directly. A no-op setter fails because the test picks a value distinct from the current one.
 - CLI-level integration test (`packages/cli/test/wsWiringCoverage.test.ts`) asserts (3) + (4) end-to-end: dispatches `setMacroTool.handle(...)` through the real wsBridge / WebSocket / browser-side pipeline stand-in, then reads `state.macros.effective` back and asserts the consumer received it. Catches transport-layer regressions the engine-only test can't see.
 - Existing `renderPanel.test.ts` asserts (6).
@@ -242,7 +242,7 @@ Manual verification for the composed prompt and the UI panel happens via the liv
 - `packages/cli/src/tools/macroTools.ts` — dispatch + fan-out.
 - `packages/cli/src/tools/registry.ts` — tool description override from manifest.
 - `packages/cli/src/resources/promptResources.ts` — composed prompt renderer.
-- `packages/engine/src/VisualPipeline.ts` — grammar + stabilizer + vocab dispatch.
+- `packages/engine/src/VisualPipeline.ts` — lens + stabilizer + vocab dispatch.
 - `packages/engine/src/stabilizers/ChordDetectionStabilizer.ts` — stabilizer-side macro handling reference.
 - `packages/engine/src/vocabularies/MusicalVisualVocabulary.ts` — vocab-side macro handling (colour anchor).
 - `packages/engine/test/wiringCoverage.test.ts` — runtime coverage test for consumer declarations.

@@ -55,24 +55,24 @@ Three annotation types exist:
 
 | Type | Purpose | Key Question Answered |
 |------|---------|----------------------|
-| `GrammarAnnotation` | Describe what a grammar illustrates | "Which grammar shows rhythm well?" |
+| `LensAnnotation` | Describe what a lens illustrates | "Which lens shows rhythm well?" |
 | `PresetAnnotation` | Describe what a preset emphasises | "Which preset suits sparse material?" |
 | `MacroAnnotation` | Describe what a macro affects | "How do I make it crisper?" |
 
-## Grammar Annotations
+## Lens Annotations
 
 ### Purpose
 
 Enable the LLM to:
-1. Map user-facing names ("starfield style") to grammar IDs
-2. Select grammars based on musical intent ("make rhythm more visible")
-3. Understand grammar limitations and combinations
+1. Map user-facing names ("starfield style") to lens IDs
+2. Select lenses based on musical intent ("make rhythm more visible")
+3. Understand lens limitations and combinations
 
 ### Required Fields
 
 ```ts
-interface GrammarAnnotation {
-  id: string;                   // grammar id (e.g. "starfield")
+interface LensAnnotation {
+  id: string;                   // lens id (e.g. "starfield")
   name?: string;                // human-readable name
   aliases?: string[];           // user-facing synonyms
   illustrates?: MusicalConcept[];
@@ -88,19 +88,19 @@ interface GrammarAnnotation {
 - SHOULD include variations with "style", "look", "effect"
 - Example: `["starfield style", "star style", "twinkling effect"]`
 
-**`illustrates`**: Which musical concepts this grammar makes visible
+**`illustrates`**: Which musical concepts this lens makes visible
 - Values from `MusicalConcept`: rhythm, harmony, melody, timbre, density, articulation, phrasing, dynamics
-- Example: A grammar that spawns particles on note onsets illustrates `rhythm` and `articulation`
+- Example: A lens that spawns particles on note onsets illustrates `rhythm` and `articulation`
 
 **`traits`**: Visual characteristics
 - Values from `VisualTrait`: discrete/continuous, transient/persistent, directional/layered, minimal/dense, high-contrast/low-contrast, stable/reactive
-- Example: A particle-burst grammar is `discrete`, `transient`, `high-contrast`
+- Example: A particle-burst lens is `discrete`, `transient`, `high-contrast`
 
 **`notes`**: Free-form guidance for the LLM
 - Example: "responds strongly to note onsets", "works well for sparse material"
 
 **`cautions`**: Known limitations or interactions
-- Example: "becomes noisy under high density", "conflicts with Rain grammar"
+- Example: "becomes noisy under high density", "conflicts with Rain lens"
 
 ### Example
 
@@ -237,7 +237,7 @@ notes:
 
 ### Purpose
 
-Presets bundle grammars and macros into named configurations. Annotations help the LLM:
+Presets bundle lenses and macros into named configurations. Annotations help the LLM:
 1. Match user requests to presets ("something for practising scales")
 2. Understand the overall character of a preset
 3. Suggest alternatives
@@ -273,18 +273,18 @@ notes:
   - clear onset feedback
 ```
 
-## Grammar-Macro Relationships
+## Lens-Macro Relationships
 
 ### The Problem
 
-When the user says "emphasise rhythm", the LLM adjusts macros. But different grammars respond differently to macros — the Starfield grammar might respond strongly to `articulation`, while Rain grammar might be more affected by `persistence`.
+When the user says "emphasise rhythm", the LLM adjusts macros. But different lenses respond differently to macros — the Starfield lens might respond strongly to `articulation`, while Rain lens might be more affected by `persistence`.
 
-### Solution: Grammar Response Hints
+### Solution: Lens Response Hints
 
-Grammar annotations MAY include a `macroResponses` field describing how the grammar responds to macro changes:
+Lens annotations MAY include a `macroResponses` field describing how the lens responds to macro changes:
 
 ```ts
-interface GrammarAnnotation {
+interface LensAnnotation {
   // ... existing fields ...
   macroResponses?: {
     [macroId: string]: {
@@ -321,7 +321,7 @@ This tells the LLM: "If you want to emphasise rhythm using Starfield, increase `
 When the user speaks, the LLM receives:
 1. User utterance(s)
 2. Current system state (active parts, presets, macro values)
-3. Annotation metadata for all grammars, presets, and macros
+3. Annotation metadata for all lenses, presets, and macros
 4. Conversation context (for inferring appropriate posture)
 
 ### LLM Reasoning Process
@@ -332,12 +332,12 @@ Example: User says "Let's emphasise rhythm"
 2. **Check current state**: Using harmony-forward preset
 3. **Search annotations**:
    - Presets with `emphasises: [rhythm]`
-   - Grammars with `illustrates: [rhythm]`
+   - Lenses with `illustrates: [rhythm]`
    - Macros that affect rhythm
 4. **Consider options**:
    - Switch to rhythm-forward preset?
    - Adjust `emphasis.rhythm` macro?
-   - Enable a rhythm-illustrating grammar?
+   - Enable a rhythm-illustrating lens?
 5. **Select actions**: Balance impact vs. disruption
 6. **Emit control ops**: e.g., `setMacro`, `enableGrammar`
 
@@ -357,7 +357,7 @@ The engine executes these deterministically.
 Although interpretation is flexible, execution remains bounded (I12):
 
 - Macro values are clamped to 0–1
-- Grammar parameters are schema-validated
+- Lens parameters are schema-validated
 - Layout/compositing options are enumerated
 - Invalid operations return errors, not exceptions
 
@@ -367,8 +367,8 @@ The LLM may balance competing concerns (I13), but cannot bypass constraints.
 
 ### Build-Time Validation
 
-- Grammar `id` must be unique
-- Grammar `aliases` should not conflict across grammars
+- Lens `id` must be unique
+- Lens `aliases` should not conflict across lenses
 - `illustrates` values must be valid `MusicalConcept` types
 - `traits` values must be valid `VisualTrait` types
 - Macro annotations must exist for all macros defined in `Preset.macros`
@@ -381,7 +381,7 @@ The LLM may balance competing concerns (I13), but cannot bypass constraints.
 ## Contract Location
 
 Types defined in `packages/contracts/annotations/annotations.ts`:
-- `GrammarAnnotation`
+- `LensAnnotation`
 - `PresetAnnotation`
 - `MacroAnnotation` (discriminated union — see §Amendments)
 - `MacroDirectionality`
@@ -414,6 +414,6 @@ The original `MacroAnnotation` shape assumed a numeric 0–1 dial with direction
 
 **`SystemConceptAnnotation` (new)** — terminology dictionary. Kebab-case `term`, short prose `definition`, `related` cross-links, optional `examples`. Rendered as `concepts://<term>` MCP resources per SPEC 013.
 
-**System guide** (documentation artifact, not an annotation type) — a prose narrative of the pipeline flow, grammar semantics, prescribed-context meaning, and confidence handling. Returned as text by the `get_started` MCP tool (see SPEC 014 §Lifecycle — moved from a prompt to a tool since Claude Desktop doesn't proxy prompt attach as autonomous LLM surface). Structured lookup (concepts) and prose narrative (guide) serve different LLM needs.
+**System guide** (documentation artifact, not an annotation type) — a prose narrative of the pipeline flow, lens semantics, prescribed-context meaning, and confidence handling. Returned as text by the `get_started` MCP tool (see SPEC 014 §Lifecycle — moved from a prompt to a tool since Claude Desktop doesn't proxy prompt attach as autonomous LLM surface). Structured lookup (concepts) and prose narrative (guide) serve different LLM needs.
 
 Refer to SPEC 013 for how these annotation types are delivered to the LLM (resource URIs, generator model, refresh semantics).

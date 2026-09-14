@@ -12,7 +12,7 @@ Defines how errors and diagnostics are categorized, propagated, and surfaced in 
 
 ### Graceful Degradation
 
-The system should "keep playing" when possible. A failing grammar shouldn't stop the whole pipeline — it should be skipped with a diagnostic. The user experience matters more than strict error propagation.
+The system should "keep playing" when possible. A failing lens shouldn't stop the whole pipeline — it should be skipped with a diagnostic. The user experience matters more than strict error propagation.
 
 ### Fail Fast for Bugs
 
@@ -30,21 +30,21 @@ All diagnostics are logged. Additionally, renderers should provide visual indica
 |----------|------|---------|----------|
 | **Input** | `input` | MIDI parse error, audio buffer underrun | Continue with partial data |
 | **Stabilizer** | `stabilizer` | State overflow, NaN detected | Reset stabilizer, continue |
-| **Grammar** | `grammar` | Exception in update() | Skip grammar for this frame |
+| **Lens** | `lens` | Exception in update() | Skip lens for this frame |
 | **Control** | `control` | Invalid preset ID, out-of-range macro | Reject op, return error to caller |
 
 ### Configuration Errors (Fail Fast)
 
 | Category | Example | Strategy |
 |----------|---------|----------|
-| **Missing reference** | Preset references non-existent grammar | Fail at load time |
-| **Schema violation** | Grammar params don't match schema | Fail at load time |
-| **Invariant violation** | Ruleset returns null | Fail immediately (indicates bug) |
+| **Missing reference** | Preset references non-existent lens | Fail at load time |
+| **Schema violation** | Lens params don't match schema | Fail at load time |
+| **Invariant violation** | Vocabulary returns null | Fail immediately (indicates bug) |
 
 ## Diagnostic Type
 
 ```ts
-export type DiagnosticCategory = "input" | "stabilizer" | "grammar" | "control";
+export type DiagnosticCategory = "input" | "stabilizer" | "lens" | "control";
 
 export type DiagnosticSeverity = "info" | "warning" | "error";
 
@@ -140,7 +140,7 @@ Display category-specific icons in a consistent location (e.g., top-right corner
 |----------|----------------|---------|
 | `input` | 🔌 | Input/adapter issue |
 | `stabilizer` | ⚙️ | Stabilizer issue |
-| `grammar` | 🎨 | Grammar issue |
+| `lens` | 🎨 | Lens issue |
 | `control` | 🎛️ | Control op rejected |
 
 ### Indicator Behavior
@@ -185,17 +185,17 @@ When a stabilizer encounters an error:
 3. Call `reset()` to clear corrupted state
 4. Return input frame unchanged (pass-through)
 
-### Grammars
+### Lenses
 
-When a grammar throws during `update()`:
+When a lens throws during `update()`:
 1. Log the exception
-2. Emit a diagnostic (category: "grammar")
-3. Skip this grammar for the current frame
-4. Continue with other grammars
+2. Emit a diagnostic (category: "lens")
+3. Skip this lens for the current frame
+4. Continue with other lenses
 
-### Rulesets
+### Vocabularies
 
-Rulesets are pure functions and should not throw. If they do:
+Vocabularies are pure functions and should not throw. If they do:
 1. This indicates a bug
 2. Log the error
 3. Fail the frame (do not attempt graceful degradation)

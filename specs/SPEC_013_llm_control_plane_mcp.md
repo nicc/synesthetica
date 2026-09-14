@@ -74,7 +74,7 @@ SPEC 004 established the principle (annotation-driven, LLM interprets, engine ex
 - **CLI wrapper** — the `synesthetica` binary. Starts and manages engine instances; hosts the MCP server; brokers between MCP and engines.
 - **MCP server** — the protocol boundary. Handles the MCP handshake, tool registration, resource serving, subscription lifecycle.
 - **Engine registry** — the CLI's map of running instances (label → engine handle).
-- **Engine instance** — one running Synesthetica pipeline (adapter → stabilizer → grammar → renderer), one browser tab or embedded surface for the rendered output.
+- **Engine instance** — one running Synesthetica pipeline (adapter → stabilizer → lens → renderer), one browser tab or embedded surface for the rendered output.
 
 **Transport choices** (see §CLI shape for details):
 - MCP server ↔ LLM client: **stdio** (default) or local TCP (opt-in). Stdio is MCP's default for locally-spawned servers.
@@ -94,7 +94,7 @@ Every tool responds with either:
 
 #### `get_started(instance?)` — onboarding primer
 
-Returns the full Synesthetica primer as text (in `data`): pipeline narrative, every macro with range/default/directionality, session controls, system concepts, grammars, tools with aliases/notes/examples, resources, session-time semantics, and preset workflow. The LLM should call this once per conversation before acting on other Synesthetica tools.
+Returns the full Synesthetica primer as text (in `data`): pipeline narrative, every macro with range/default/directionality, session controls, system concepts, lenses, tools with aliases/notes/examples, resources, session-time semantics, and preset workflow. The LLM should call this once per conversation before acting on other Synesthetica tools.
 
 Advertised via a strong `initialize.instructions` hint on the MCP handshake. Does not touch the engine — `state` is a defaulted empty snapshot; call `get_state` separately for real state. `requiresSession: false`.
 
@@ -215,11 +215,11 @@ MCP resources are content-addressable via stable URIs. Three URI schemes.
 
 #### `annotations://` — the annotation manifest
 
-- `annotations://manifest` — the full manifest as a single JSON document, mirroring the shape of `smokeTestManifest` (macros, sessionControls, concepts, grammars). Convenience resource for LLMs that prefer a single fetch.
+- `annotations://manifest` — the full manifest as a single JSON document, mirroring the shape of `smokeTestManifest` (macros, sessionControls, concepts, lenses). Convenience resource for LLMs that prefer a single fetch.
 - `annotations://macros/<id>` — one macro annotation
 - `annotations://session-controls/<id>` — one session-control annotation
 - `annotations://concepts/<term>` — one concept annotation
-- `annotations://grammars/<id>` — one grammar annotation
+- `annotations://lenses/<id>` — one lens annotation
 - `annotations://presets/<id>` — one preset annotation
 
 Shared across all instances (the annotations describe the system, not an instance). Generated at server startup (see §Annotation storage).
@@ -307,7 +307,7 @@ Controls are grouped by annotation namespace into three collapsible sections. Ea
 
 - **Input** — controls in the `input:*` namespace. Currently just `input:source`; renders as a dropdown of available MIDI devices + audio devices (see §Audio input selection).
 - **Basics** — controls in the `session:*` namespace: key (paired `session:tonic` + `session:mode`), tempo, meter (paired `session:beats-per-bar` + `session:beat-value`), chord mode, metronome. Compact widgets — pair-typed controls render as a single grouped widget (e.g. key selector combines root + mode).
-- **Advanced** — everything else: all aesthetic macros (`system:*`, bare cross-cutting, and grammar-scoped). Grouped by scope prefix so the LLM's namespace conventions are visible in the UI.
+- **Advanced** — everything else: all aesthetic macros (`system:*`, bare cross-cutting, and lens-scoped). Grouped by scope prefix so the LLM's namespace conventions are visible in the UI.
 
 ### Widget generation
 
@@ -474,7 +474,7 @@ Kinds emitted (reflects the actual pipeline as of 2026-08-19; add as new stabili
 - `dynamics-event` — `{ intensity }` — from DynamicsStabilizer, per note onset
 
 Notably NOT included (called out because earlier drafts / RFCs referenced them, wrongly):
-- ~~Active grammar~~ — no grammar-switching concept exists; all three grammars always run
+- ~~Active lens~~ — no lens-switching concept exists; all three lenses always run
 - ~~Tempo estimate~~ — the system does not infer tempo from onset patterns under any circumstances (SPEC 013 §Non-Goals; RhythmGrammar's `getEffectiveTempo` returns prescribed tempo only). Prescribed tempo is available in `state://<label>/current` via the `prescribedTempo` field.
 
 ### Disk log (rotating)

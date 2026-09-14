@@ -6,7 +6,7 @@ Web application shell for the Synesthetica pipeline.
 
 This app provides:
 - A working end-to-end demo: MIDI in → visuals out
-- A test harness for ruleset and lens iteration
+- A test harness for vocabulary and lens iteration
 - Proof that the contract-based architecture works
 
 ## What It Does
@@ -135,7 +135,7 @@ WebMidiSource → RawMidiAdapter → VisualPipeline
 
 ## Next Steps
 
-- Better rulesets (harmonic tension, phrase awareness, richer palette system)
+- Better vocabularies (harmonic tension, phrase awareness, richer palette system)
 - More expressive lenses (trails, fields, glyphs)
 - Enhanced stabilizers (phrase detection, progression tracking)
 - Multi-part support

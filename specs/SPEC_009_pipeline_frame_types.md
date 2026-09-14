@@ -14,13 +14,13 @@ The pipeline transforms data through three distinct frame types:
 
 1. **RawInputFrame** — Protocol-level input from adapters (MIDI messages, audio features)
 2. **MusicalFrame** — Musical abstractions from stabilizers (notes with duration, chords, beats)
-3. **AnnotatedMusicalFrame** — Musical elements with visual annotations for grammars
+3. **AnnotatedMusicalFrame** — Musical elements with visual annotations for lenses
 
 This separation ensures:
 - Adapters don't impose musical semantics
 - Stabilizers produce proper musical abstractions
-- Grammars see musical element categories but not musical analysis
-- Rulesets define a consistent visual vocabulary
+- Lenses see musical element categories but not musical analysis
+- Vocabularies define a consistent visual vocabulary
 
 ## Frame Types
 
@@ -142,7 +142,7 @@ export interface DynamicsState {
 
 ### AnnotatedMusicalFrame (RFC 006)
 
-Musical elements with visual annotations. Grammars receive this and decide how to render.
+Musical elements with visual annotations. Lenses receive this and decide how to render.
 
 ```ts
 export interface AnnotatedMusicalFrame {
@@ -159,11 +159,11 @@ export interface AnnotatedMusicalFrame {
 }
 
 // AnnotatedRhythm removed 2026-08-20 along with RhythmicAnalysis.
-// Grammars read prescribedTempo/prescribedMeter directly from the frame.
+// Lenses read prescribedTempo/prescribedMeter directly from the frame.
 
 export interface AnnotatedNote {
   note: Note;                    // The underlying musical note
-  visual: VisualAnnotation;      // Visual properties from ruleset
+  visual: VisualAnnotation;      // Visual properties from vocabulary
 }
 
 export interface AnnotatedChord {
@@ -184,13 +184,13 @@ export interface VisualAnnotation {
 **Key properties:**
 - Musical elements retain their identity (notes, chords, beats)
 - Visual annotations are attached, not separate intents
-- Grammars decide how/whether to render each element
-- Rulesets define visual vocabulary (e.g., major=warm, minor=cool)
+- Lenses decide how/whether to render each element
+- Vocabularies define visual vocabulary (e.g., major=warm, minor=cool)
 
 ## Data Flow
 
 ```
-Adapters              Stabilizers           Rulesets              Grammars
+Adapters              Stabilizers           Vocabularies              Lenses
    │                      │                     │                     │
    │  RawInputFrame       │   MusicalFrame      │ AnnotatedMusicalFr  │
    │ ──────────────────>  │ ─────────────────>  │ ─────────────────>  │
@@ -221,25 +221,25 @@ note_on                                              note_off
 
 The release window (default 500ms) allows visual effects to fade gracefully.
 
-## Grammar Responsibility (RFC 006)
+## Lens Responsibility (RFC 006)
 
-Grammars know:
+Lenses know:
 - Musical element categories (note, chord, beat, bar, phrase)
 - Element lifecycle (phase, onset, duration)
 - Visual annotations (palette, texture, motion)
 
-Grammars decide:
+Lenses decide:
 - Which elements to render (can ignore chords, focus on rhythm, etc.)
 - How to render elements (particles, shapes, trails, etc.)
 - Spatial layout and animation
 - Visual emphasis/de-emphasis
 
-Grammars do NOT know:
+Lenses do NOT know:
 - Pitch class, key, or harmonic analysis
 - Chord quality or voicing details (unless they use `label`)
 - Raw MIDI or audio data
 
-**Key principle**: Grammars know *categories* of musical elements, not musical *analysis*.
+**Key principle**: Lenses know *categories* of musical elements, not musical *analysis*.
 
 ## Division of Responsibility
 
@@ -247,8 +247,8 @@ Grammars do NOT know:
 |---------|----------------------|
 | Protocol translation (MIDI → events) | Adapters |
 | Musical abstraction (events → notes, chords) | Stabilizers |
-| Visual scheme (what colors/textures mean) | Rulesets |
-| Rendering decisions (what shapes, what to show) | Grammars |
+| Visual scheme (what colors/textures mean) | Vocabularies |
+| Rendering decisions (what shapes, what to show) | Lenses |
 | Layer composition | Compositor |
 
 ## Contract Locations
@@ -266,13 +266,13 @@ Grammars do NOT know:
 
 ## Invariants Preserved
 
-- **I3**: Meaning lives in ruleset; grammars see annotated elements (categories, not analysis)
-- **I4**: Grammars may not compute musical semantics
+- **I3**: Meaning lives in vocabulary; lenses see annotated elements (categories, not analysis)
+- **I4**: Lenses may not compute musical semantics
 - **New**: Adapters don't impose musical semantics — only RawInputFrame
 
 ## What This Spec Does NOT Cover
 
 - Specific stabilizer implementations (NoteTrackingStabilizer, etc.)
-- Specific ruleset implementations (MusicalVisualRuleset, etc.)
+- Specific vocabulary implementations (MusicalVisualVocabulary, etc.)
 - Audio adapter input types (AudioFeatures)
 - Multi-part routing

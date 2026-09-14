@@ -102,7 +102,7 @@ This is a default, not an absolute. Computed analysis earns its place when:
 
 **Examples:**
 
-The dynamics grammar shows each note onset as a positioned indicator that fades over time. The viewer perceives range (indicators span the bar), consistency (they cluster), crescendo (they drift upward), and rhythmic character (even spacing vs. bursts) — none of which the system computes or asserts.
+The dynamics lens shows each note onset as a positioned indicator that fades over time. The viewer perceives range (indicators span the bar), consistency (they cluster), crescendo (they drift upward), and rhythmic character (even spacing vs. bursts) — none of which the system computes or asserts.
 
 A side-scrolling contour with EMA smoothing, trend arrows, and range bands was replaced by this approach. The contour computed summaries that lagged behind the input, misrepresented chord dynamics by averaging individual notes, and obscured the temporal texture of the playing.
 

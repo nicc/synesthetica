@@ -179,7 +179,7 @@ type FunctionalRelationType =
   | "other";
 ```
 
-Notable: there is **no `targetChordId`** field. The target is identified by degree + pitch class — it's a slot position on the harmony clock, not a played chord. When/if a chord is played at that slot, the grammar renders its numeral via the normal chord-numeral path; the strip pair already marks the slot.
+Notable: there is **no `targetChordId`** field. The target is identified by degree + pitch class — it's a slot position on the harmony clock, not a played chord. When/if a chord is played at that slot, the lens renders its numeral via the normal chord-numeral path; the strip pair already marks the slot.
 
 ### Edge Emission
 
@@ -206,7 +206,7 @@ Edges remain in the array while their source chord is within its fade window; th
 
 ### Responsibility Boundary
 
-The stabilizer determines functional relationships and emits the graph. The grammar renders connection strips from the graph. The grammar does not infer functional relationships — it only visualises edges the stabilizer provides. This preserves I3 and I4: grammars see categories and relationships, not musical analysis.
+The stabilizer determines functional relationships and emits the graph. The lens renders connection strips from the graph. The lens does not infer functional relationships — it only visualises edges the stabilizer provides. This preserves I3 and I4: lenses see categories and relationships, not musical analysis.
 
 ## RELATIONSHIPS Table (Seed)
 
@@ -253,14 +253,14 @@ Detection notes:
 
 ## Glossary Impact
 
-The following term is in the grammar glossary (already added):
+The following term is in the lens glossary (already added):
 
 **Connection strip** — A short gradient arc sitting on the outward radial edge of a target chord's slot on the harmony clock. The strip carries the full source ↔ target hue gradient (no synthetic midpoint colour): source hue sits at the guide-ring-anchored edge at full opacity, target hue at the chord-side edge fading to zero. Strips indicate a functional relationship between chords without drawing lines across the clock face — only one strip per edge, at the target slot; the source numeral itself signals the originating chord. Strip intensity scales with the connection's conventional weight.
 
 ## Invariants
 
-- **I3**: Meaning lives in the stabilizer (functional edge graph); the grammar renders visual categories (strips) without inferring harmony.
-- **I4**: The grammar does not compute functional relationships.
+- **I3**: Meaning lives in the stabilizer (functional edge graph); the lens renders visual categories (strips) without inferring harmony.
+- **I4**: The lens does not compute functional relationships.
 - **I14**: Connection strip colours derive from the pitch-class hue invariant.
 - **I20** (new): Each functional edge produces exactly one connection strip — at the target slot, carrying the full source ↔ target hue gradient. There is no separate source strip; the source numeral itself signals the originating chord.
 
@@ -269,4 +269,4 @@ The following term is in the grammar glossary (already added):
 - Stabilizer detection algorithms beyond the table lookup (e.g. how V/V is recognised from a played chord — that's HarmonyStabilizer implementation detail; existing chord detection plus the RELATIONSHIPS table is sufficient).
 - Mode-specific RELATIONSHIPS tables for non-Ionian keys (the seed covers major; minor and modal variants follow the same pattern, derived as needed).
 - User control for relationship-type visual encoding.
-- Animation transitions between unresolved and resolved states (none specified — both are static visual states; the grammar renders whichever state holds at frame time).
+- Animation transitions between unresolved and resolved states (none specified — both are static visual states; the lens renders whichever state holds at frame time).

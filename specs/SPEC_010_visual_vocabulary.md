@@ -6,11 +6,11 @@ Source: RFC 009
 
 ## Summary
 
-Defines the mandatory visual vocabulary constraints for Synesthetica—the semantic mappings between musical concepts and visual properties that all grammars must respect.
+Defines the mandatory visual vocabulary constraints for Synesthetica—the semantic mappings between musical concepts and visual properties that all lenses must respect.
 
 ## Overview
 
-The visual vocabulary sits between stabilizers and grammars. It annotates musical elements with visual properties that encode meaning. This specification defines which mappings are mandatory (grammars cannot override) versus advisory (grammars may interpret).
+The visual vocabulary sits between stabilizers and lenses. It annotates musical elements with visual properties that encode meaning. This specification defines which mappings are mandatory (lenses cannot override) versus advisory (lenses may interpret).
 
 Design principle: Model inherent musical structure; let permutations emerge.
 
@@ -27,7 +27,7 @@ The mapping follows SPEC_002:
 - Default: A=0° (red), ascending chromatic = clockwise
 - Configurable reference pitch and direction
 
-**Invariant I14:** Pitch-class to hue mapping is inviolable. Grammars receive hue through `PaletteRef.primary.h` and must not recompute from pitch data.
+**Invariant I14:** Pitch-class to hue mapping is inviolable. Lenses receive hue through `PaletteRef.primary.h` and must not recompute from pitch data.
 
 ### 2. Octave → Brightness
 
@@ -40,7 +40,7 @@ The mapping follows SPEC_002:
 - Maximum brightness: 0.95 (avoids washout)
 - Linear interpolation across playable range (approximately octaves 1-8)
 
-**Invariant I15:** Octave to brightness mapping is mandatory. Grammars receive brightness through `PaletteRef.primary.v`.
+**Invariant I15:** Octave to brightness mapping is mandatory. Lenses receive brightness through `PaletteRef.primary.v`.
 
 ### 3. Velocity → Size and Attack
 
@@ -50,7 +50,7 @@ The mapping follows SPEC_002:
 | Velocity (0-127) | Attack sharpness | Harder strikes have sharper onset |
 
 **Specification:**
-- Size is relative, not absolute. Grammars control base scale.
+- Size is relative, not absolute. Lenses control base scale.
 - Velocity maps to size multiplier: 0.5 (pp) to 2.0 (ff)
 - Attack sharpness: high velocity = instant appearance; low velocity = 50ms fade-in
 
@@ -64,7 +64,7 @@ The mapping follows SPEC_002:
 
 **Specification:**
 - Attack phase (~50ms): Full opacity (1.0)
-- Sustain phase: Maintained opacity (grammar may modulate ±10%)
+- Sustain phase: Maintained opacity (lens may modulate ±10%)
 - Release phase (default 500ms): Linear fade to zero
 
 **Invariant I17:** Note phase must affect visual intensity. Released notes must fade.
@@ -138,7 +138,7 @@ Neither is universally correct; they encode different questions.
 
 The vocabulary exposes both readings on `MusicalChord` (via
 `harmonic` and `bassLed` fields, each a `ChordInterpretation`).
-Grammars pick one based on a runtime interpretation mode:
+Lenses pick one based on a runtime interpretation mode:
 
 - **`harmonic`** (default): identifies the simplest chord whose
   interval set explains the voicing, ignoring which note is lowest
@@ -166,18 +166,18 @@ inverted (`harmonic.root !== bass`), optional bass-spoke decoration
 indicates the voicing arrangement. The decoration is a composition
 of existing primitives, not a new visual element.
 
-## Advisory Properties (Grammar-Level)
+## Advisory Properties (Lens-Level)
 
-These are not constrained by vocabulary. Grammars have full control:
+These are not constrained by vocabulary. Lenses have full control:
 
 | Property | Rationale |
 |----------|-----------|
-| Spatial position | Grammars need layout freedom |
-| Absolute size/scale | Grammars scale for their rendering approach |
+| Spatial position | Lenses need layout freedom |
+| Absolute size/scale | Lenses scale for their rendering approach |
 | Motion | Reserved for pedagogical emphasis |
 | Harmonic tension | Interpretive, requires key context |
 | Chord function (tonic, dominant, etc.) | Requires harmonic analysis beyond vocabulary scope |
-| Voicing/inversion details | Grammar may indicate bass note, interval stacking |
+| Voicing/inversion details | Lens may indicate bass note, interval stacking |
 
 ## Uncertainty Visualization
 
@@ -185,7 +185,7 @@ These are not constrained by vocabulary. Grammars have full control:
 
 **Recommended mechanism:** Subtle position jitter (±2-3px at 60fps). Motion is preattentive and doesn't consume shape or color channels.
 
-**Alternative mechanisms** (grammar choice):
+**Alternative mechanisms** (lens choice):
 - Edge blur
 - Reduced saturation (use sparingly; conflicts with pitch encoding)
 
@@ -312,17 +312,17 @@ element.color.s = 0.8;
 element.color.v = averageOctaveBrightness(chord.voicing);
 ```
 
-This allows grammars to render each arm/wedge in the color of that chord tone while respecting the pitch-class-to-hue invariant. Grammars can use `element.color` directly or compute their own colors from `chord.noteIds` if they need more control.
+This allows lenses to render each arm/wedge in the color of that chord tone while respecting the pitch-class-to-hue invariant. Lenses can use `element.color` directly or compute their own colors from `chord.noteIds` if they need more control.
 
 ## Invariants
 
 | ID | Invariant | Meaning |
 |----|-----------|---------|
-| I14 | Pitch-class to hue is inviolable | Same pitch class always produces same hue; grammars cannot override |
+| I14 | Pitch-class to hue is inviolable | Same pitch class always produces same hue; lenses cannot override |
 | I15 | Octave to brightness is mandatory | Lower octaves darker, higher brighter |
 | I16 | Velocity affects visual prominence | Louder notes must be more visually salient |
 | I17 | Note phase affects intensity | Released notes must fade |
-| I18 | Chord quality determines shape geometry | Radial wedge algorithm is fixed; grammars receive shapes |
+| I18 | Chord quality determines shape geometry | Radial wedge algorithm is fixed; lenses receive shapes |
 
 These extend the invariants defined in SPEC_003.
 
@@ -348,7 +348,7 @@ function buildChordShape(chord: MusicalChord): ChordShapeGeometry;
 
 ## What This Spec Does NOT Cover
 
-- Specific rendering implementations (grammar responsibility)
+- Specific rendering implementations (lens responsibility)
 - Chord detection algorithms (stabilizer responsibility)
 - Spatial layout strategies
 - Animation timing details beyond phase envelope
@@ -373,7 +373,7 @@ function buildChordShape(chord: MusicalChord): ChordShapeGeometry;
 
 - **SPEC_002**: Pitch-class to hue mapping (extended with I14)
 - **SPEC_003**: Instrument identity invariants (extended with I14-I18)
-- **SPEC_006**: Ruleset statefulness (vocabulary remains pure)
+- **SPEC_006**: Vocabulary statefulness (vocabulary remains pure)
 - **SPEC_009**: Frame types (AnnotatedMusicalFrame structure unchanged, AnnotatedNote/AnnotatedChord extended)
 
 ## Roman Numeral Glyphs (Invariant I19)
@@ -382,8 +382,8 @@ function buildChordShape(chord: MusicalChord): ChordShapeGeometry;
 
 Roman numeral glyphs provide a geometric representation of functional harmony
 symbols (I, ii, V7, etc.) for use in the progression glyph and other
-harmony-related grammars. Like chord shapes, they are vocabulary-level data —
-the vocabulary produces the geometry, grammars decide where and how to render it.
+harmony-related lenses. Like chord shapes, they are vocabulary-level data —
+the vocabulary produces the geometry, lenses decide where and how to render it.
 
 ### Design
 
@@ -448,7 +448,7 @@ and lets the viewer perceive harmonic motion as spatial motion around the clock.
 
 Each glyph's opacity reflects recency — the most recently played chord is
 at full brightness, older chords fade linearly toward transparent. This is
-the same observation-over-synthesis pattern used by the dynamics grammar:
+the same observation-over-synthesis pattern used by the dynamics lens:
 the system marks each chord as an event, and the viewer perceives patterns
 (repetition, harmonic range, motion direction) from the spatial + temporal
 distribution of fading markers.
@@ -502,4 +502,4 @@ the appropriate base numeral + suffix geometry.
 
 | ID | Invariant | Meaning |
 |----|-----------|---------|
-| I19 | Roman numeral glyphs are geometric, not text | Vocabulary produces path data; rendering is grammar responsibility |
+| I19 | Roman numeral glyphs are geometric, not text | Vocabulary produces path data; rendering is lens responsibility |

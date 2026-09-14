@@ -61,11 +61,11 @@ It does NOT apply to:
 Bad: "This exciting new feature enables powerful real-time visualizations!"
 Good: "Converts MIDI input to visual output in real-time."
 
-Bad: "The innovative ruleset system provides amazing flexibility!"
-Good: "Rulesets map musical events to visual parameters."
+Bad: "The innovative vocabulary system provides amazing flexibility!"
+Good: "Vocabularies map musical events to visual parameters."
 
-Bad: "Our architecture should make it easy to add new grammars."
-Good: "The grammar interface allows adding new visual styles."
+Bad: "Our architecture should make it easy to add new lenses."
+Good: "The lens interface allows adding new visual styles."
 
 **This applies to:**
 - All documentation, commit messages, code comments, issue descriptions
@@ -252,7 +252,7 @@ npm run lint:fix    # Auto-fix where possible
 - Integration tests across pipeline components
 - Browser-based end-to-end tests
 
-**Grammar development:** See [packages/engine/src/grammars/README.md](packages/engine/src/grammars/README.md) for the incremental development approach using ASCII diagrams, SVG snapshots, and simulation metrics.
+**Lens development:** See [packages/engine/src/lenses/README.md](packages/engine/src/lenses/README.md) for the incremental development approach using ASCII diagrams, SVG snapshots, and simulation metrics.
 
 This section will evolve as we learn what works.
 
@@ -360,7 +360,7 @@ git commit -m "bd sync"
 # GOOD - describes the product work
 git commit -m "Add design gap issues for Phase 1 blockers
 
-- Macro-to-grammar parameter binding (synesthetica-1wq)
+- Macro-to-lens parameter binding (synesthetica-1wq)
 - Coordinate system conventions (synesthetica-khj)
 - 6 more spec gaps identified and tracked"
 ```
@@ -379,7 +379,7 @@ Also created issues for derived signals schema and stabilizer ordering."
 
 Glossaries exist at two levels:
 - **Project-wide**: `GLOSSARY_FULL.md` — architectural, interaction, and domain terms
-- **Grammar-specific**: `packages/engine/src/grammars/GLOSSARY.md` — visual element terms per grammar
+- **Lens-specific**: `packages/engine/src/lenses/GLOSSARY.md` — visual element terms per lens
 
 When the user uses a term that:
 - **Has a glossary definition but is used loosely** — gently restate using the glossary term. E.g. if they say "the ring thing" when they mean "harmony clock", say so.

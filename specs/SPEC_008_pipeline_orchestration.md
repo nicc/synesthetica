@@ -6,7 +6,7 @@ Source: RFC 002, RFC 003, RFC 005, RFC 006, SPEC 005
 
 ## Summary
 
-Defines the `IPipeline` interface and orchestration model that ties together adapters, stabilizers, rulesets, grammars, compositor, and renderer into a unified frame-production system.
+Defines the `IPipeline` interface and orchestration model that ties together adapters, stabilizers, vocabularies, lenses, compositor, and renderer into a unified frame-production system.
 
 ## Overview
 
@@ -54,12 +54,12 @@ export interface IPipeline {
 │         │                                                                │
 │         ▼                                                                │
 │  ┌──────────────┐                                                        │
-│  │   Ruleset    │  ruleset.annotate(musical) → AnnotatedMusicalFrame     │
+│  │   Vocabulary    │  vocabulary.annotate(musical) → AnnotatedMusicalFrame     │
 │  └──────┬───────┘                                                        │
 │         │                                                                │
 │         ▼                                                                │
 │  ┌──────────────┐                                                        │
-│  │   Grammars   │  grammar.update(annotated, prev) → SceneFrame          │
+│  │   Lenses   │  lens.update(annotated, prev) → SceneFrame          │
 │  └──────┬───────┘                                                        │
 │         │                                                                │
 │         └─────────────────────────┐                                      │
@@ -81,8 +81,8 @@ See SPEC_009 for detailed frame type definitions. Summary:
 |-------|-------|--------|-----------|
 | Adapters | External input | RawInputFrame | IRawSourceAdapter |
 | Stabilizers | RawInputFrame | MusicalFrame | IMusicalStabilizer |
-| Rulesets | MusicalFrame | AnnotatedMusicalFrame | IVisualRuleset |
-| Grammars | AnnotatedMusicalFrame | SceneFrame | IVisualGrammar |
+| Vocabularies | MusicalFrame | AnnotatedMusicalFrame | IVisualRuleset |
+| Lenses | AnnotatedMusicalFrame | SceneFrame | IVisualGrammar |
 
 ## Stabilizer DAG
 
@@ -126,7 +126,7 @@ Execution order:
 2. Merge their outputs into an intermediate MusicalFrame
 3. Run stabilizers that depend only on completed ones
 4. Repeat until all stabilizers have run
-5. Final MusicalFrame goes to ruleset
+5. Final MusicalFrame goes to vocabulary
 
 ### Merge Semantics
 
@@ -184,11 +184,11 @@ for (const [partId, rawFrame] of partFrames) {
   // Stabilizers transform raw input to musical abstractions
   const musicalFrame = stabilizer.apply(rawFrame, previousMusical);
 
-  // Ruleset annotates musical elements with visual properties
-  const annotatedFrame = ruleset.annotate(musicalFrame);
+  // Vocabulary annotates musical elements with visual properties
+  const annotatedFrame = vocabulary.annotate(musicalFrame);
 
-  // Grammar produces scene from annotated musical elements
-  const scene = grammar.update(annotatedFrame, previousScene);
+  // Lens produces scene from annotated musical elements
+  const scene = lens.update(annotatedFrame, previousScene);
   partScenes.push(scene);
 }
 ```
@@ -248,8 +248,8 @@ const pipeline = new VisualPipeline({
 pipeline.addAdapter(adapter);
 pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
 pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
-pipeline.setRuleset(new MusicalVisualRuleset());
-// Grammars receive AnnotatedMusicalFrame and decide how to render
+pipeline.setRuleset(new MusicalVisualVocabulary());
+// Lenses receive AnnotatedMusicalFrame and decide how to render
 pipeline.addGrammar(new TestRhythmGrammar());
 pipeline.addGrammar(new TestChordProgressionGrammar());
 pipeline.setCompositor(new IdentityCompositor());
@@ -273,23 +273,23 @@ pipeline.setStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
 
 This orchestration model preserves all system invariants:
 
-- **I1**: Same ruleset processes all parts regardless of source
-- **I3**: Meaning lives in ruleset; grammars see annotated musical elements (categories only, not analysis)
+- **I1**: Same vocabulary processes all parts regardless of source
+- **I3**: Meaning lives in vocabulary; lenses see annotated musical elements (categories only, not analysis)
 - **I6**: Every raw input can be routed to a part
-- **I7**: Grammars don't read other parts (per-part instantiation)
+- **I7**: Lenses don't read other parts (per-part instantiation)
 - **I8**: Layout/blending handled by compositor only
 
 ## Implementation
 
 The canonical implementation is `VisualPipeline` in `packages/engine/src/VisualPipeline.ts`.
 
-## Grammar Composition Model
+## Lens Composition Model
 
-When multiple grammars are active within a part, their outputs combine additively.
+When multiple lenses are active within a part, their outputs combine additively.
 
 ### Current Model: Additive Composition
 
-Each grammar receives the same `AnnotatedMusicalFrame` and produces its own `SceneFrame`. The compositor merges these frames by concatenating entity lists:
+Each lens receives the same `AnnotatedMusicalFrame` and produces its own `SceneFrame`. The compositor merges these frames by concatenating entity lists:
 
 ```ts
 // Simplified composition
@@ -302,43 +302,43 @@ const composed: SceneFrame = {
 
 ### Design Constraints for Additive Composition
 
-For additive composition to produce coherent visuals, grammars must be designed to **not overlap**:
+For additive composition to produce coherent visuals, lenses must be designed to **not overlap**:
 
-1. **Non-overlapping entity types**: Each grammar should produce distinct visual entity types
+1. **Non-overlapping entity types**: Each lens should produce distinct visual entity types
    - Example: TestRhythmGrammar produces `onset-marker`, `drift-ring`, `beat-line`, `bar-line`, `division-tick`, `downbeat-glow`
    - Example: TestChordProgressionGrammar produces `chord-glow`, `chord-history`, `chord-note`
-   - These entity types never overlap, so combining grammars produces complementary visuals
+   - These entity types never overlap, so combining lenses produces complementary visuals
 
-2. **Non-overlapping input consumption**: Grammars should focus on different aspects of the input
+2. **Non-overlapping input consumption**: Lenses should focus on different aspects of the input
    - Example: TestRhythmGrammar ignores chords entirely
    - Example: TestChordProgressionGrammar ignores rhythm information
    - This prevents "doubled" responses to the same musical event
 
-3. **Consistent palette usage**: Both grammars use the same visual annotations (palette colors from ruleset)
-   - Ensures visual coherence even when grammars produce different entity types
-   - Example: Both grammars use warm palette for major chords, cool palette for minor
+3. **Consistent palette usage**: Both lenses use the same visual annotations (palette colors from vocabulary)
+   - Ensures visual coherence even when lenses produce different entity types
+   - Example: Both lenses use warm palette for major chords, cool palette for minor
 
 ### Limitations
 
 This additive model works well when:
-- Grammars are designed as a complementary set
-- Presets curate compatible grammar combinations
-- Each grammar has a clear, non-overlapping visual domain
+- Lenses are designed as a complementary set
+- Presets curate compatible lens combinations
+- Each lens has a clear, non-overlapping visual domain
 
 It breaks down when:
-- Two grammars both respond to the same musical events with conflicting visuals
-- Grammars produce entities that visually compete for attention
-- No coordination exists between independent grammar authors
+- Two lenses both respond to the same musical events with conflicting visuals
+- Lenses produce entities that visually compete for attention
+- No coordination exists between independent lens authors
 
 ### Future Work
 
 See synesthetica-n63 for exploration of more sophisticated composition models:
 - Priority-based layering
-- Domain declarations (grammar declares which channels it consumes)
-- Slot-based composition (grammars fill predefined visual slots)
-- Intent arbitration (intents merged before reaching grammars)
+- Domain declarations (lens declares which channels it consumes)
+- Slot-based composition (lenses fill predefined visual slots)
+- Intent arbitration (intents merged before reaching lenses)
 
-For Phase 1, the additive model with carefully designed non-overlapping grammars is sufficient.
+For Phase 1, the additive model with carefully designed non-overlapping lenses is sufficient.
 
 ## What This Spec Does NOT Cover
 

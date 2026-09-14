@@ -1,4 +1,4 @@
-# @synesthetica/cli
+# synesthetica
 
 CLI wrapper for **Synesthetica** — a real-time music visualiser with LLM-mediated control via MCP (Model Context Protocol).
 
@@ -8,16 +8,13 @@ Starts an engine instance (browser tab hosting the visualiser) and the MCP serve
 
 - **Node.js 20+** (24+ recommended).
 - A modern **Chromium-based browser** for the engine tab (Web MIDI + Basic Pitch audio require it).
-- **Not yet publishable** — see the note at the bottom.
 
 ## Install
 
-Once published:
-
 ```bash
-npm install -g @synesthetica/cli
+npm install -g synesthetica
 # or use npx directly (no install)
-npx @synesthetica/cli start
+npx synesthetica start
 ```
 
 ## Usage
@@ -47,7 +44,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
   "mcpServers": {
     "synesthetica": {
       "command": "npx",
-      "args": ["-y", "@synesthetica/cli", "start"]
+      "args": ["-y", "synesthetica", "start"]
     }
   }
 }
@@ -60,7 +57,7 @@ Restart Claude Desktop. Open a new chat and Synesthetica will be listed under th
 From any project directory:
 
 ```bash
-claude mcp add synesthetica -- npx -y @synesthetica/cli start
+claude mcp add synesthetica -- npx -y synesthetica start
 ```
 
 Or create a `.mcp.json` at the project root:
@@ -70,7 +67,7 @@ Or create a `.mcp.json` at the project root:
   "mcpServers": {
     "synesthetica": {
       "command": "npx",
-      "args": ["-y", "@synesthetica/cli", "start"]
+      "args": ["-y", "synesthetica", "start"]
     }
   }
 }
@@ -94,7 +91,7 @@ start OPTIONS
   --transport <type>       'stdio' (default) or 'tcp'
   --no-mcp                 skip MCP server; engine + UI run standalone
   --recent-events-buffer <N>
-                           in-memory event ring size (default 1000)
+                           in-memory event ring size (default 10000)
   --log-retention-days <N> days to retain rotated event logs (default 7)
   --no-open                do not open the browser automatically
   --web-app-port <port>    fix the web-app dev server port (default: auto)
@@ -103,7 +100,7 @@ start OPTIONS
 
 ## Status
 
-Shippable in shape — publish gated only on account permissions. `npm publish --dry-run` builds the CLI with the web-app bundled in and produces a ~1.6 MB tarball that includes the visualiser dist, the static HTTP server, the MCP server, and every prompt/annotation resource. Running `synesthetica start` from an installed copy hosts the visualiser via the built-in static server (no Vite required); running from a monorepo checkout uses Vite for HMR.
+`npm publish --dry-run` builds the CLI with the web-app bundled in and produces a ~1.8 MB tarball that includes the visualiser dist, the static HTTP server, the MCP server, and every prompt/annotation resource. Running `synesthetica start` from an installed copy hosts the visualiser via the built-in static server (no Vite required); running from a monorepo checkout uses Vite for HMR.
 
 Full pipeline verified end-to-end: MCP tool call → CLI handler → WebSocket bridge → browser engine → state return.
 

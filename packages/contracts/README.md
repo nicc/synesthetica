@@ -10,9 +10,9 @@ to build modules independently.
 3. **Primitives** (`primitives/*`) — fundamental music theory types (MidiNote, PitchClass, Velocity, ChordQuality)
 4. **Raw input** (`raw/*`) — protocol-level input from adapters (MIDI events, audio features)
 5. **Musical abstractions** (`musical/*`) — stabilizer output (notes with duration, chords, beats, progression, phrases)
-6. **Annotated musical frames** (`annotated/*`) — ruleset output: musical elements with visual annotations (RFC 006)
+6. **Annotated musical frames** (`annotated/*`) — vocabulary output: musical elements with visual annotations (RFC 006)
 7. **Scene** (`scene/*`) — entities for rendering
-8. **Pipeline interfaces** (`pipeline/*`) — adapters, stabilizers (DAG-based), rulesets, lenses, compositor, renderer
+8. **Pipeline interfaces** (`pipeline/*`) — adapters, stabilizers (DAG-based), vocabularies, lenses, compositor, renderer
 9. **Configuration** (`config/*`) — presets, layout, compositing
 10. **Control surface** (`control/*`) — ControlOps + Queries (mechanical, non-semantic)
 11. **Annotations** (`annotations/*`) — advisory metadata for LLM mediation (non-executable)
@@ -21,7 +21,7 @@ to build modules independently.
 
 ## Design invariants (high level)
 
-- Meaning is encoded in **rulesets**, not lenses.
+- Meaning is encoded in **vocabularies**, not lenses.
 - Lenses decide **form**, not meaning. They see musical element categories (notes, chords, beats) but not musical analysis.
 - Lenses receive **annotated musical elements** and decide how/whether to render them (RFC 006).
 - Stabilizers form a **DAG** based on dependencies.

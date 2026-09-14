@@ -104,7 +104,7 @@ Parts do not share musical state. Musical interpretation happens independently p
 ### Why Per-Part (Not Consolidated)
 
 Consolidated interpretation would require re-interpreting musical intent from combined evidence (e.g., Part 1's C-E-G + Part 2's E-G-B = Cmaj7). This:
-- Violates I3 (meaning lives in rulesets, not downstream)
+- Violates I3 (meaning lives in vocabularies, not downstream)
 - Loses attribution needed for ear training
 - Requires fusion logic that belongs upstream of musical state
 
@@ -124,8 +124,8 @@ The compositor merges per-part SceneFrames into a unified visual output. This is
 2. For each active part:
    a. Adapter provides RawInputFrame up to targetTime
    b. Stabilizer transforms RawInputFrame → MusicalFrame
-   c. Ruleset transforms MusicalFrame → VisualIntentFrame
-   d. Grammar stack produces SceneFrame(part)
+   c. Vocabulary transforms MusicalFrame → VisualIntentFrame
+   d. Lens stack produces SceneFrame(part)
 3. Compositor merges per-part SceneFrames
 4. Merged SceneFrame returned to renderer
 5. Renderer draws

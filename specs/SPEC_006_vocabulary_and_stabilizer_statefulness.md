@@ -1,4 +1,4 @@
-# SPEC 006: Ruleset and Stabilizer Statefulness
+# SPEC 006: Vocabulary and Stabilizer Statefulness
 
 Status: Approved
 Date: 2026-01-19
@@ -6,7 +6,7 @@ Source: RFC 002, RFC 005
 
 ## Summary
 
-Defines where temporal state lives in the pipeline. Rulesets remain pure (stateless); stabilizers are explicitly stateful and responsible for transforming raw protocol input into musical abstractions.
+Defines where temporal state lives in the pipeline. Vocabularies remain pure (stateless); stabilizers are explicitly stateful and responsible for transforming raw protocol input into musical abstractions.
 
 ## The Problem
 
@@ -18,7 +18,7 @@ Some musical mappings require history:
 
 The question: where should this temporal reasoning live?
 
-## Decision: Stabilizers Handle History, Rulesets Stay Pure
+## Decision: Stabilizers Handle History, Vocabularies Stay Pure
 
 **Stabilizers** are stateful. They:
 - Transform raw protocol input (RawInputFrame) to musical abstractions (MusicalFrame)
@@ -26,7 +26,7 @@ The question: where should this temporal reasoning live?
 - Track note phase (attack → sustain → release)
 - Compute derived signals (tension trajectory, beat phase, phrase position)
 
-**Rulesets** remain pure functions. They:
+**Vocabularies** remain pure functions. They:
 - Map a single MusicalFrame to VisualIntentFrame
 - Do not maintain internal state
 - Are testable with single-frame fixtures
@@ -39,15 +39,15 @@ The question: where should this temporal reasoning live?
 
 2. **Musical knowledge is acceptable** — Stabilizers already handle "chord detection" which requires harmonic understanding. Extending to "harmonic tension over N beats" is natural.
 
-3. **Clean separation** — Stabilizers accumulate and derive; rulesets interpret a snapshot.
+3. **Clean separation** — Stabilizers accumulate and derive; vocabularies interpret a snapshot.
 
-4. **Testability** — Rulesets can be tested with single-frame fixtures. Stabilizers can be tested with sequences.
+4. **Testability** — Vocabularies can be tested with single-frame fixtures. Stabilizers can be tested with sequences.
 
-### Why Rulesets Stay Pure
+### Why Vocabularies Stay Pure
 
-1. **Deterministic mapping** — Given the same MusicalFrame, a ruleset always produces the same VisualIntentFrame. No hidden state.
+1. **Deterministic mapping** — Given the same MusicalFrame, a vocabulary always produces the same VisualIntentFrame. No hidden state.
 
-2. **Easier to reason about** — The ruleset is the "instrument definition" — it shouldn't behave differently based on how long the session has been running.
+2. **Easier to reason about** — The vocabulary is the "instrument definition" — it shouldn't behave differently based on how long the session has been running.
 
 3. **Simpler testing** — Golden tests can use single frames, not sequences.
 
@@ -116,7 +116,7 @@ MusicalFrame is a **snapshot with context**, not a history log. It contains:
 - **Recent context** — What led here, via references (progression, phrases)
 - **No raw events** — Those stay in RawInputFrame
 
-This allows rulesets to remain pure functions while still accessing temporal context like harmonic tension or phrase position.
+This allows vocabularies to remain pure functions while still accessing temporal context like harmonic tension or phrase position.
 
 ### Reference vs Copy
 
@@ -205,7 +205,7 @@ pipeline.setStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
 - Verify note expiration after release window
 - Test reset behavior
 
-### Ruleset Tests
+### Vocabulary Tests
 - Test with single MusicalFrames
 - Golden tests can use snapshot fixtures
 - No sequence dependencies

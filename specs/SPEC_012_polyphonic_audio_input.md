@@ -14,7 +14,7 @@ A second adapter for monophonic continuous-pitch input (voice, single instrument
 
 1. Live microphone → polyphonic note events through the existing pipeline.
 2. End-to-end latency target ≤ 150 ms typical, 250 ms ceiling, measured from note onset at the microphone to the corresponding visual change on screen. (Original spec stated 200 ms ceiling; revised after synesthetica-w1z spike — see Latency Budget.)
-3. Confidence values are first-class — every audio-derived event carries a confidence; downstream grammars and stabilizers may filter, weight, or visually modulate based on it.
+3. Confidence values are first-class — every audio-derived event carries a confidence; downstream lenses and stabilizers may filter, weight, or visually modulate based on it.
 4. MIDI and audio inputs are mutually exclusive. Only one input source is active per session.
 5. The audio path is opt-in — MIDI-only users do not pay the Basic Pitch download cost.
 
@@ -269,14 +269,14 @@ interface PitchSample {
 }
 ```
 
-Grammars that don't care about trajectory ignore the field. The rhythm grammar may later use it to render note strips with sideways deviation; the future mono pitch-accuracy grammar will be its primary consumer.
+Lenses that don't care about trajectory ignore the field. The rhythm lens may later use it to render note strips with sideways deviation; the future mono pitch-accuracy lens will be its primary consumer.
 
 ## Out-of-Order Events
 
 Audio events arrive at the pipeline with timestamps in the past (the inference latency). This is OK: the pipeline tolerates events at past timestamps as long as they fit within the in-flight window. Concretely:
 
 - An `AudioNoteOn` with `t = T_now - 150ms` is enqueued on the next `nextFrame()` call and stabilized into a note that exists in the "current" musical state.
-- The rhythm grammar renders this note at its original `t`, which is ~150 ms past the NOW line. The note appears scrolled-up, exactly where it should be for when it actually happened. The viewer's experience is "the note appeared 150ms after I played it, and it appeared in the right place on the timeline" — i.e. latency without distortion.
+- The rhythm lens renders this note at its original `t`, which is ~150 ms past the NOW line. The note appears scrolled-up, exactly where it should be for when it actually happened. The viewer's experience is "the note appeared 150ms after I played it, and it appeared in the right place on the timeline" — i.e. latency without distortion.
 
 The stabilizer must accept events with `t < current_frame_t` for an audio source. We document this as a stabilizer behavioural requirement.
 
@@ -292,7 +292,7 @@ Not user-facing. Lives in `packages/adapters/test/audio/` and uses local audio f
 
 ## What This Spec Does NOT Cover
 
-- **Monophonic continuous-pitch input** (CREPE-based path). Pitch-bend contract anticipates it but the adapter, grammar, and stabilizer changes are out of scope.
+- **Monophonic continuous-pitch input** (CREPE-based path). Pitch-bend contract anticipates it but the adapter, lens, and stabilizer changes are out of scope.
 - **MIDI pitch bend**. When added, will reuse `AudioPitchBend`'s shape (renamed or aliased).
 - **Adapter selection UI**. The mechanism for the user to choose between MIDI and audio inputs lives in the web app, not in this spec.
 - **Vite cross-origin-isolation configuration** — that's an implementation task, not an architectural decision.
