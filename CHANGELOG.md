@@ -4,7 +4,12 @@ Notable changes to Synesthetica. Format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
-- fixed incorrect ring buffer size default for event history in cli help output.
+## [1.0.1] — 2026/09/14
+
+### Fixed
+
+- **`synesthetica start` failed to launch under Claude Desktop and any other MCP host.** The bundled CLI's prompt-file resolver was reaching for a workspace path that only exists inside the monorepo checkout (`@synesthetica/contracts/package.json`), which the published tarball doesn't ship. `composeSystemOverview` blew up during MCP server initialisation, the process exited, and the host reported "Connection closed". Fixed by checking the bundle-adjacent `dist/prompts/` path first (where the build script actually places the .md files) before falling back to the workspace resolver.
+- Incorrect ring-buffer default (1000) in the CLI's `--help` output for `--recent-events-buffer`; actual default has been 10000 for a while.
 
 ## [1.0.0] — 2026/09/14
 

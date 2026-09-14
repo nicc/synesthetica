@@ -22,36 +22,46 @@ import { fileURLToPath } from "node:url";
 import { composeSystemOverview as composeFromMd } from "@synesthetica/contracts";
 
 /**
- * Prompt-file resolution needs to work in two contexts:
- *   1. Published tarball (`npx synesthetica`): contracts is bundled
- *      inline via esbuild, so `require.resolve("@synesthetica/contracts")`
- *      no longer works. scripts/bundle-cli.mjs copies prompts/ next
- *      to the bundle at dist/prompts/ instead.
- *   2. Monorepo dev (vitest, `npm test`): source is not bundled;
- *      dist/prompts/ may not exist. Contracts is a workspace symlink
- *      and require.resolve finds it fine.
+ * Prompt-file resolution needs to work in three physical layouts:
+ *   A. Bundled tarball (esbuild inlined everything into dist/bin.js
+ *      or dist/index.js). Prompts sit at dist/prompts/, and the
+ *      running file's parent dir IS dist/, so the file we want is
+ *      at `HERE/prompts/<filename>`.
+ *   B. Un-bundled dev build (tsc-only, dist/resources/promptResources.js).
+ *      Prompts still sit at dist/prompts/, so the file we want is
+ *      at `HERE/../prompts/<filename>`.
+ *   C. Test/source (vitest running src/resources/promptResources.ts
+ *      via on-the-fly TS). No prompts directory next to us; reach
+ *      into the workspace-linked contracts package via
+ *      require.resolve.
  *
- * The dual-path resolver below tries the bundle-adjacent copy first
- * (production) and falls back to the contracts-source path
- * (development). Whichever exists wins.
+ * Try A → B → C in order, first hit wins. The 1.0.0 tarball only
+ * checked B and fell straight to C, which then blew up because
+ * @synesthetica/contracts isn't a runtime dep of the published
+ * package — the bundler inlined its exports but left the
+ * dynamic filesystem lookup behind. Fixed by adding path A.
  */
 const HERE = dirname(fileURLToPath(import.meta.url));
 const req = createRequire(import.meta.url);
 
 function loadPrompt(filename: string): string {
-  // Bundled-tarball location: dist/resources/promptResources.js →
-  // ../prompts/<filename>.
-  const bundlePath = resolve(HERE, "..", "prompts", filename);
-  if (existsSync(bundlePath)) return readFileSync(bundlePath, "utf8");
-  // Dev/test fallback — reach into the contracts source directly
-  // via workspace resolution.
-  const pkgPath = req.resolve("@synesthetica/contracts/package.json");
-  const contractsPath = resolve(dirname(pkgPath), "prompts", filename);
+  const candidates = [
+    resolve(HERE, "prompts", filename), // A: bundled dist/bin.js
+    resolve(HERE, "..", "prompts", filename), // B: tsc dist/resources/
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return readFileSync(candidate, "utf8");
+  }
+  // C: dev / test fallback — workspace-linked contracts.
   try {
-    return readFileSync(contractsPath, "utf8");
+    const pkgPath = req.resolve("@synesthetica/contracts/package.json");
+    return readFileSync(
+      resolve(dirname(pkgPath), "prompts", filename),
+      "utf8",
+    );
   } catch (err) {
     throw new Error(
-      `prompt file not found: ${filename} (tried ${bundlePath} and ${contractsPath}) — ${err instanceof Error ? err.message : err}`,
+      `prompt file not found: ${filename} (tried ${candidates.join(", ")}, then workspace contracts) — ${err instanceof Error ? err.message : err}`,
     );
   }
 }
