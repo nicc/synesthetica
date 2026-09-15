@@ -116,7 +116,7 @@ The spokes encode intervals. They are classed by length and appear oriented arou
 
 | Interval set | Spoke type |
 | --- | --- |
-| Triads | Long spoke |
+| Root, 3rd, 5th | Long spoke |
 | 7th | Mid-length spoke |
 | 9th, 11th, 13th | Short spoke |
 | Non-diatonic / chromatics | A short line superimposed on the glyph |
