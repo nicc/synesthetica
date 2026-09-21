@@ -52,7 +52,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # Current active Node LTS. Node 20 was deprecated on GHA
+          # 2025-09-19; kept engines floor at ">=20" so real users on
+          # 20 still work.
+          node-version: "22"
           cache: "npm"
           # Points npm at the public registry; provenance publishing
           # requires the registry to be exactly this URL.

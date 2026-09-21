@@ -31,9 +31,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          # Matches the "engines" floor in packages/cli/package.json;
-          # if that ever bumps, bump here too.
-          node-version: "20"
+          # Current active Node LTS. Engines floor in
+          # packages/cli/package.json is ">=20"; we pick a version >=
+          # that but which is still supported by GitHub Actions
+          # runners (Node 20 was deprecated on GHA 2025-09-19).
+          node-version: "22"
           cache: "npm"
 
       - name: Install
