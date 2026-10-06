@@ -28,10 +28,14 @@ bd dep remove <id> <depends-on-id>    # Remove dependency
 
 ## Sync
 ```bash
-bd sync                     # Sync with git
+bd sync                     # Pull/push the Dolt issue DB to refs/dolt/data on origin
+bd export -o issues.jsonl   # Optional JSONL snapshot (interchange only, not tracked)
 ```
+
+Issues live in `.beads/` as a Dolt database, not in git. The pre-Dolt
+`.beads/issues.jsonl` file is gone; git tracks only bd config and hooks.
 
 ## Common mistakes to avoid
 - `bd close --comment "..."` → use `-r "..."` instead
 - `bd dep <id1> <id2>` → use `bd dep add <id1> <id2>`
-- Never edit `.beads/issues.jsonl` directly — always use the CLI
+- Never touch files under `.beads/` directly — always use the CLI
