@@ -129,6 +129,47 @@ template that covers triads and common 7ths only. Future work: alterations
 (♭9, ♯9, ♯11) should be classified as lines even when present in
 `chordTones` — tracked under the chord-detection umbrella.
 
+### 6. Harmonic Series Overlay (proposed — not yet implemented)
+
+> **Status:** proposed in RFC 012 and tracked as synesthetica-2rlv. The
+> contract below is agreed but no code exists yet. Items marked *snapshot
+> decision* are deliberately unspecified until the SVG promotion round.
+
+An optional overlay of the harmonic series each sounding note *implies*.
+It is a theoretical construct, not a measurement: MIDI carries no timbre,
+so partial levels are modelled with a generic rolloff. It must be named
+and explained as such wherever it is exposed (manifest notes, primer,
+panel tooltip). Off by default.
+
+| Musical Concept | Visual Channel | Constraint |
+|-----------------|----------------|------------|
+| Partial pitch (12·log₂ n above the fundamental, continuous) | Position | Real pitch, not snapped to pitch class |
+| Modelled partial level | Opacity | Onset level at onset, decayed level now |
+| Partial envelope | Opacity gradient along the strip | Bloom at onset, faster fade than the fundamental |
+
+**Specification:**
+- Octave-duplicate partials (2, 4, 8, 16 and the octave copies of 3, 5, 7)
+  fold into the pitch class they land on; one element per distinct pitch class.
+- Default cap: partials up to n = 9 (P5, M3, m7, M2). The 7th partial must
+  survive the default cap.
+- Level: `gain · n^(−rolloff) · decay(n, age)`. `gain` and `rolloff` are the
+  two user-facing continuous controls (`system:harmonic-series:level`,
+  `system:harmonic-series:rolloff`); `gain = 0` emits nothing.
+- Decay time constant shortens with n, so upper partials fade before the
+  fundamental. The fundamental's own phase envelope (I17) is unchanged.
+- Rendering register is "there-but-not-there": thinner, soft-edged,
+  translucent. A ghost must be visibly distinct from a played note.
+- Colour: *snapshot decision* between the partial's pitch-class hue (I14 as
+  written) and the fundamental's hue (provenance; would need an explicit
+  I14 exception recorded here).
+- Velocity brightening of upper partials: *snapshot decision* on whether it
+  earns its place.
+
+**Invariant I31:** Partials are not notes. They exist only as vocabulary
+annotations on `AnnotatedNote`; no stabilizer receives them, chord
+detection is unaffected, and no lens renders a partial with the entity
+treatment of a played note.
+
 ## Chord Interpretation Modes
 
 Every played voicing admits multiple valid readings. A voicing like
@@ -258,6 +299,38 @@ interface AnnotatedChord {
 }
 ```
 
+### Harmonic Partial Annotations (proposed — not yet implemented)
+
+```ts
+// In packages/contracts/annotated/annotated.ts (to be created)
+
+/** One modelled (or, later, measured) partial of a sounding note.
+ *  Invariant I31: not a Note. */
+interface HarmonicPartial {
+  n: number;            // harmonic number ≥ 2, octave duplicates folded in
+  semitones: number;    // 12·log₂(n) mod 12, continuous
+  pc: PitchClass;       // nearest pitch class
+  cents: number;        // deviation from that pitch class
+  onsetLevel: number;   // 0..1 at onset (gain, rolloff applied)
+  level: number;        // 0..1 now (decay applied)
+  color: ColorHSVA;     // per the colour decision above
+}
+
+interface AnnotatedNote {
+  // ...existing fields
+  partials?: HarmonicPartial[];  // present only when gain > 0
+}
+
+// In packages/contracts/pipeline/interfaces.ts (to be created)
+
+/** Provider seam: the modelled provider is the only implementation now.
+ *  An audio-derived provider (SPEC 012 spectral features) replaces it
+ *  without touching lenses. */
+interface PartialLevelProvider {
+  partials(note: Note, t: Ms, params: PartialModelParams): HarmonicPartial[];
+}
+```
+
 ### Constants
 
 ```ts
@@ -323,6 +396,7 @@ This allows lenses to render each arm/wedge in the color of that chord tone whil
 | I16 | Velocity affects visual prominence | Louder notes must be more visually salient |
 | I17 | Note phase affects intensity | Released notes must fade |
 | I18 | Chord quality determines shape geometry | Radial wedge algorithm is fixed; lenses receive shapes |
+| I31 | Partials are not notes (proposed) | Harmonic series overlay data is annotation only; stabilizers and chord detection never see it |
 
 These extend the invariants defined in SPEC_003.
 
@@ -352,7 +426,7 @@ function buildChordShape(chord: MusicalChord): ChordShapeGeometry;
 - Chord detection algorithms (stabilizer responsibility)
 - Spatial layout strategies
 - Animation timing details beyond phase envelope
-- Audio-derived feature mappings (future work)
+- Audio-derived feature mappings (future work; the `PartialLevelProvider` seam above is where measured partials would enter)
 
 ## Contract Location
 

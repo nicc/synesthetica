@@ -65,6 +65,9 @@ Controls visibility of reference lines and drift streaks. Lingers longer than th
 **Note strip**
 Vertical strip representing a played note. Width is constant (velocity is not yet applied; see SPEC 010 I16); height extends from note onset (top) to note end or NOW line (bottom). Color derived from pitch class palette.
 
+**Ghost strip** (proposed, RFC 012)
+The rhythm-lens rendering of a partial: a thinner, soft-edged, translucent strip at the partial's real pitch (not snapped to a pitch-class column), spanning the same time extent as its fundamental's note strip. Opacity follows the modelled partial level: onset level at the top, decayed level at the bottom. Visibly distinct from a note strip; never reads as a played note. Colour is undecided pending SVG snapshots.
+
 **Beat line**
 Horizontal line marking beat positions in the grid. Tier 2+ only (requires tempo).
 
