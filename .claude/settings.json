@@ -1,5 +1,21 @@
 {
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "bd prime --hook-json",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ]
+  },
   "permissions": {
+    "additionalDirectories": [
+      "/Users/nicyoung/.claude"
+    ],
     "allow": [
       "Bash(GENERATE_SNAPSHOTS=1 npx turbo test:*)",
       "Bash(ls /Users/nicyoung/source/play/synesthetica/packages/engine/src/*.ts)",
@@ -16,9 +32,6 @@
       "Bash(node /Users/nicyoung/source/play/synesthetica/tonal_probe.mjs)",
       "Skill(update-config)",
       "Skill(update-config:*)"
-    ],
-    "additionalDirectories": [
-      "/Users/nicyoung/.claude"
     ]
   }
 }

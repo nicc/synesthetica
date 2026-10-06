@@ -77,3 +77,10 @@ __pycache__/
 
 # LICENSE copies made at publish time by `npm pack` (see per-package prepack).
 packages/*/LICENSE
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
+*.gate.lock*

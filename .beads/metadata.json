@@ -1,4 +1,7 @@
 {
-  "database": "beads.db",
-  "jsonl_export": "issues.jsonl"
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "synesthetica",
+  "project_id": "47014ecf-680e-4154-a74d-8625ff35e5f2"
 }
