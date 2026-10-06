@@ -337,9 +337,10 @@ export interface AnnotatedDynamics {
  * The output of a ruleset: musical elements annotated with visual properties.
  * Lenses receive this and decide how to render each element.
  *
- * Lenses are aware of musical element categories (notes, chords, beats, etc.)
- * but not musical analysis details (pitch class, chord quality, key).
- * They use visual annotations to style their chosen representations.
+ * Lenses may read observed musical data (pitch class, octave, timing) for
+ * layout decisions, which are advisory. Styling that carries meaning (hue,
+ * brightness, chord shape) comes from the visual annotations; lenses do not
+ * derive it from analysis details (chord quality, key) themselves.
  *
  * Critical design constraint: Because lenses don't know chord quality,
  * the ruleset MUST assign visually consistent annotations to similar musical

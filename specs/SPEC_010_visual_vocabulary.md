@@ -24,7 +24,7 @@ Design principle: Model inherent musical structure; let permutations emerge.
 
 The mapping follows SPEC_002:
 - 12 pitch classes → 12 hues (30° rotation per semitone)
-- Default: A=0° (red), ascending chromatic = clockwise
+- Default: C=0° (red), ascending chromatic = clockwise
 - Configurable reference pitch and direction
 
 **Invariant I14:** Pitch-class to hue mapping is inviolable. Lenses receive hue through `PaletteRef.primary.h` and must not recompute from pitch data.

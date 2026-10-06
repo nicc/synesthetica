@@ -86,6 +86,10 @@ const DEFAULT_CONFIG: Required<MusicalVisualVocabularyConfig> = {
  * This is a pure function - same input always produces same output.
  * No internal state is maintained across calls.
  */
+/** Duration of the linear release fade (SPEC 010 I17: "Release phase
+ *  (default 500ms): Linear fade to zero"). */
+const RELEASE_FADE_MS = 500;
+
 export class MusicalVisualVocabulary implements IVisualVocabulary {
   readonly id = "musical-visual";
 
@@ -366,7 +370,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     if (note.release === null) return 1;
 
     const timeSinceRelease = t - note.release;
-    const releaseProgress = Math.min(timeSinceRelease / 500, 1);
+    const releaseProgress = Math.min(timeSinceRelease / RELEASE_FADE_MS, 1);
 
     return 1 - releaseProgress;
   }

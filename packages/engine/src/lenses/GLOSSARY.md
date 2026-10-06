@@ -58,12 +58,12 @@ Controls visibility of beat lines and bar lines. Scales linearly with the horizo
 Controls visibility of note strips. At min horizon, shows approximately 1 beat of history; at max horizon, shows full history.
 
 **Reference window**
-Controls visibility of reference lines and drift streaks. Lingers longer than the note window (controlled by `referenceLinger` macro, default 1.3x), allowing these elements to remain visible after note strips have faded. This creates a trailing effect where timing feedback persists after the note itself.
+Controls visibility of reference lines and drift streaks. Lingers longer than the note window (controlled by `referenceLinger` macro, default 1.0x), allowing these elements to remain visible after note strips have faded. This creates a trailing effect where timing feedback persists after the note itself.
 
 ## Visual Elements
 
 **Note strip**
-Vertical strip representing a played note. Width varies with velocity; height extends from note onset (top) to note end or NOW line (bottom). Color derived from pitch class palette.
+Vertical strip representing a played note. Width is constant (velocity is not yet applied; see SPEC 010 I16); height extends from note onset (top) to note end or NOW line (bottom). Color derived from pitch class palette.
 
 **Beat line**
 Horizontal line marking beat positions in the grid. Tier 2+ only (requires tempo).

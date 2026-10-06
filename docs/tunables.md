@@ -4,7 +4,7 @@ Canonical list of every controllable value in the pipeline. Written 2026-08-13 f
 
 ## Reading this doc
 
-- **Location** — where it lives (`grammar/RhythmGrammar.ts:61` etc.)
+- **Location** — where it lives (`lenses/RhythmLens.ts` etc.). Line numbers in this document are as of 2026-08-13 and drift; search for the constant name.
 - **Value** — current default
 - **Controls** — what it changes
 - **Experiential impact** — my best guess at what a user would notice; ⭐ = a change you'd see, ⭐⭐ = a change you'd feel, ⭐⭐⭐ = a change that reframes the reading
@@ -17,17 +17,17 @@ Ranks are opinions — treat as starting points.
 
 ## True macros (already user-tunable in code)
 
-Only RhythmGrammar exposes true macros at the moment. The others are configured entirely through file-level constants.
+Only RhythmLens exposes true macros at the moment. The others are configured entirely through file-level constants.
 
 | Macro | File | Default | Range | Controls | Impact | Pertinence | Class | Decision |
 |---|---|---|---|---|---|---|---|---|
-| `horizon` | RhythmGrammar (state) | 1.0 | 0–1 | Field of vision — how much history/future is visible on the rhythm strip. Lower = tighter, more zoomed-in NOW; higher = more context. | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | time:horizon, rhythm:difficulty |
-| `subdivisionDepth` | RhythmGrammar (state) | "16th" | quarter / 8th / 16th / 32nd | Grid resolution for drift analysis. Affects reference-line placement and "tight vs drifted" labelling. | ⭐⭐ | 🎵🎵🎵 | interpretive | rhythm:quantise-resolution |
-| `referenceLinger` | RhythmGrammar (state) | 1.3 | multiplier | Reference lines + streaks linger this multiple of the note window. Longer = clearer visual memory of recent timing. | ⭐⭐ | 🎵🎵 | dynamics | rhythm:emphasis |
+| `horizon` | RhythmLens (state) | 1.0 | 0–1 | Field of vision — how much history/future is visible on the rhythm strip. Lower = tighter, more zoomed-in NOW; higher = more context. | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | time:horizon, rhythm:difficulty |
+| `subdivisionDepth` | RhythmLens (state) | "16th" | quarter / 8th / 16th / 32nd | Grid resolution for drift analysis. Affects reference-line placement and "tight vs drifted" labelling. | ⭐⭐ | 🎵🎵🎵 | interpretive | rhythm:quantise-resolution |
+| `referenceLinger` | RhythmLens (state) | 1.0 | multiplier | Reference lines + streaks linger this multiple of the note window. Longer = clearer visual memory of recent timing. | ⭐⭐ | 🎵🎵 | dynamics | rhythm:emphasis |
 
 ---
 
-## RhythmGrammar — top-level constants
+## RhythmLens — top-level constants
 
 | Constant | Value | Controls | Impact | Pertinence | Class | Decision |
 |---|---|---|---|---|---|---|
@@ -47,7 +47,7 @@ Only RhythmGrammar exposes true macros at the moment. The others are configured 
 | `GRID_COLORS.nowLine` | `{h:0,s:0,v:0.8,a:0.6}` | NOW line colour | ⭐⭐ | 🎵 | cosmetic | internal |
 | `GRID_COLORS.referenceLine` | `{h:0,s:0,v:0.9,a:0.7}` | Per-note reference line colour | ⭐⭐ | 🎵🎵 | cosmetic | internal |
 
-## HarmonyGrammar — top-level constants
+## HarmonyLens — top-level constants
 
 Progression clock:
 
@@ -90,11 +90,8 @@ Scrolling chord strip (mini roman numerals on rhythm timeline):
 | `STRIP_STROKE_WIDTH` | 1.5 | Mini numeral stroke | ⭐ | — | cosmetic | internal |
 | `STRIP_BAR_OPACITY` | 0.25 | Chord-duration bar opacity behind each numeral | ⭐ | 🎵 | cosmetic | internal |
 | `CHORD_FADE_OUT_MS` | 120 | How long a chord shape fades out after end (smooths hard cut) | ⭐ | 🎵 | dynamics | internal |
-| `DEFAULT_HUE_INVARIANT.referencePc` | 9 (A) | Which pitch class = referenceHue (note duplication in vocabulary, needs refactroring) | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | internal |
-| `DEFAULT_HUE_INVARIANT.referenceHue` | 0 (red) | Which colour anchors the pitch-hue mapping (note duplication in vocabulary, needs refactroring) | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | system:colour-mapping:reference |
-| `DEFAULT_HUE_INVARIANT.direction` | "cw" | Which way the wheel rotates through the chromatic scale (note duplication in vocabulary, needs refactroring) | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | system:colour-mapping:direction |
 
-## DynamicsGrammar — top-level constants
+## DynamicsLens — top-level constants
 
 | Constant | Value | Controls | Impact | Pertinence | Class | Decision |
 |---|---|---|---|---|---|---|
@@ -132,15 +129,14 @@ Structural, define the three-column layout (dynamics / rhythm / harmony). Rarely
 
 ## MusicalVisualVocabulary — default config
 
-The "vocabulary" is the ruleset that maps musical events to visual style. It has three tunables that RhythmGrammar and HarmonyGrammar both consume via `DEFAULT_HUE_INVARIANT`:
+The "vocabulary" is the ruleset that maps musical events to visual style. It has three tunables (`DEFAULT_CONFIG` in MusicalVisualVocabulary.ts) that reach lenses as `AnnotatedMusicalFrame.hueInvariant`:
 
 | Field | Default | Controls | Impact | Pertinence | Class | Decision |
 |---|---|---|---|---|---|---|
-| `referencePc` | 9 (A) | Which pitch class anchors the hue wheel | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | internal |
+| `referencePc` | 0 (C) | Which pitch class anchors the hue wheel | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | internal |
 | `referenceHue` | 0 (red) | Which colour = referencePc | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | system:colour-mapping:reference |
 | `hueDirection` | "cw" | Chromatic step direction on the colour wheel | ⭐⭐⭐ | 🎵🎵🎵 | interpretive |system:colour-mapping:direction |
 
-The `HarmonyGrammar.DEFAULT_HUE_INVARIANT` const above is currently a duplicate — HarmonyGrammar doesn't use the vocabulary's config. Worth reconciling.
 
 ## Vocabulary — chord shape geometry
 
@@ -263,11 +259,11 @@ These are the ones NOT expressed as top-level constants — they live inside ent
 
 | Entity type | Data field | Default | Where read | Notes |
 |---|---|---|---|---|
-| `note-strip` | `topOpacity` | falls back to `style.opacity` | ThreeJSRenderer line 370 | Per-note top-edge fade, computed inline in RhythmGrammar. |
+| `note-strip` | `topOpacity` | falls back to `style.opacity` | ThreeJSRenderer line 370 | Per-note top-edge fade, computed inline in RhythmLens. |
 | `note-strip` | `bottomOpacity` | falls back to `style.opacity` | ThreeJSRenderer line 372 | Per-note bottom-edge fade. |
-| `chord-duration-bar` (in HarmonyGrammar's scrolling strip) | `topOpacity` | inline calc | HarmonyGrammar line 1077 | Same gradient pattern as note strips. |
-| `chord-duration-bar` | `bottomOpacity` | inline calc | HarmonyGrammar line 1078 | Same. |
-| `connector-strip` | `plateauFraction` | 0.1 (grammar), 0.2 (renderer fallback) | HarmonyGrammar line 944 → renderer 628 → uniform 877 | The one Nic flagged. Strip's opacity plateau before the smoothstep fade. |
+| `chord-duration-bar` (in HarmonyLens's scrolling strip) | `topOpacity` | inline calc | HarmonyLens line 1077 | Same gradient pattern as note strips. |
+| `chord-duration-bar` | `bottomOpacity` | inline calc | HarmonyLens line 1078 | Same. |
+| `connector-strip` | `plateauFraction` | 0.1 (grammar), 0.2 (renderer fallback) | HarmonyLens line 944 → renderer 628 → uniform 877 | The one Nic flagged. Strip's opacity plateau before the smoothstep fade. |
 | `connector-arc` | `halfThickness` | 0.002 (renderer fallback), passed by grammar as `CONNECTOR_HALF_THICKNESS_NORMALIZED` | Renderer 648 | Arc stroke thickness. |
 | `connector-arrow` | `arcHalfThicknessNormalized` | 0.001 (renderer fallback) | Renderer 747 | Arrow's reference to arc thickness for overlap calc. |
 | `connector-arrow` | `heightNormalized` | 0.004 (renderer fallback) | Renderer | Arrow height. |
@@ -279,9 +275,9 @@ These are the ones NOT expressed as top-level constants — they live inside ent
 
 | Category | # constants | # macros | # obscured |
 |---|---:|---:|---:|
-| RhythmGrammar | 14 | 3 | 2 |
-| HarmonyGrammar | 25 | 0 | 3 |
-| DynamicsGrammar | 9 | 0 | 0 |
+| RhythmLens | 14 | 3 | 2 |
+| HarmonyLens | 25 | 0 | 3 |
+| DynamicsLens | 9 | 0 | 0 |
 | Layout (shared) | 20 | 0 | 0 |
 | Vocabulary | 3 | 0 | 0 |
 | Chord-shape | 3 | 0 | 0 |
@@ -309,7 +305,7 @@ The subset I'd argue actually matters for a language-mediated interface:
 - Audio: onsetThreshold, frameThreshold, noteOffTimeoutMs, restrikeGapMs
 
 **Dynamics (changes how time feels):**
-- RhythmGrammar: horizon, referenceLinger, MAX_NOTE_HISTORY_MS, PULSE_DECAY_MS
+- RhythmLens: horizon, referenceLinger, MAX_NOTE_HISTORY_MS, PULSE_DECAY_MS
 - Harmony: PROGRESSION_FADE_VALUE, CONNECTOR_ANIMATION_MS
 - NoteTracking: releaseWindowMs
 - Dynamics: FADE_MS, windowMs, trendWindowMs
@@ -327,8 +323,8 @@ Everything in the cosmetic and layout buckets probably belongs OUT of the LLM-me
 
 ## Gaps I noticed while doing this
 
-1. **`DEFAULT_HUE_INVARIANT` is duplicated** — defined in HarmonyGrammar.ts AND in MusicalVisualVocabulary's DEFAULT_CONFIG. They can drift. Should be single-source.
+1. ~~`DEFAULT_HUE_INVARIANT` is duplicated~~ — resolved; HarmonyLens now reads `hueInvariant` from the frame.
 2. **`plateauFraction` has two different defaults** (0.1 in the grammar entity, 0.2 as renderer fallback). One should defer to the other.
-3. **RhythmGrammar is the only grammar with real macros.** HarmonyGrammar and DynamicsGrammar are entirely constant-driven. If macros are the LLM's primary lever (per SPEC 004), that's a coverage gap.
+3. **RhythmLens is the only grammar with real macros.** HarmonyLens and DynamicsLens are entirely constant-driven. If macros are the LLM's primary lever (per SPEC 004), that's a coverage gap.
 4. **Stabilizer configs are constructor-only.** No `setConfig()` methods; can't retune at runtime. If the LLM needs to adjust `pitchDecayMs` mid-session, the plumbing isn't there.
 5. **HarmonyStabilizer tables aren't parameterised.** Modal interchange weights are hardcoded. If we ever want mode-specific tables (e.g. dorian, mixolydian), the shape needs generalising.
