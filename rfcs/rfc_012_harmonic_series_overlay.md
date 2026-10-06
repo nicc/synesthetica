@@ -76,6 +76,7 @@ level(n, velocity, age) = gain · n^(−rolloff) · bright(velocity, n) · decay
 - `gain` — the user-facing level macro, 0..1. 0 disables the overlay and emits no entities.
 - `rolloff` — exponent, user-facing. 1.0 ≈ sawtooth (−6 dB/octave), 2.0 is piano/pluck-like (−12 dB/octave). Flat (0) gives an equal chromatic wash; steep (≥3) leaves only the fifth. Both extremes are legible, which is the Principle 3 test.
 - `bright(velocity, n)` — harder strikes raise upper partials relative to the fundamental. Modelled as a small velocity-dependent reduction of the effective rolloff. This is the one velocity mapping and it satisfies I16 for ghosts without them competing with the fundamental.
+  *Note (2026-10-06):* recommended for omission from the first increment. It is the one term that models the instrument rather than the series, and the hardest to read by eye. Revisit from the snapshot round; the term stays in the model definition so the decision is made on evidence rather than dropped by default.
 - `decay(n, age)` — exponential, with a time constant that shortens as n rises: `τ(n) = τ₁ / n^k`. The fundamental's own strip keeps its existing phase-based opacity; only the ghosts decay faster. Rendered as a linear top→bottom opacity gradient on the strip (onset level at the top, current level at the bottom), which the existing shader already supports.
 
 All of the above are named constants (docs/tunables.md convention): `PARTIAL_CAP`, `PARTIAL_ROLLOFF_DEFAULT`, `PARTIAL_VELOCITY_BRIGHTENING`, `PARTIAL_DECAY_TAU_MS`, `PARTIAL_DECAY_EXPONENT`, `GHOST_CULL_OPACITY`, `GHOST_WIDTH_RATIO`, `GHOST_EDGE_SOFTNESS`.
@@ -134,7 +135,7 @@ export interface PartialLevelProvider {
 
 The provider boundary is the composability seam: the vocabulary calls it, lenses read `partials`, and swapping the model for measurement is invisible downstream.
 
-### Invariant (proposed, to be numbered in SPEC 010)
+### Invariant (proposed; I31 is the next free number across specs)
 
 **Partials are not notes.** No stage upstream of the vocabulary receives partials; no lens renders a partial with the same entity treatment as a played note. The overlay must not read as notes the player did not play.
 
@@ -198,8 +199,34 @@ Per packages/engine/src/lenses/README.md:
 3. Should ghosts of released notes keep decaying after release, or vanish with the note? (Proposed: keep decaying; they are already faint.)
 4. Default rolloff 1.0 vs 2.0 — snapshot decision.
 5. Whether the velocity-brightening term earns its place or is a complication the eye cannot read.
+6. Partials between B and C. The rhythm lens maps pitch class to x as `pc / 11`, so there is no column space between B (11) and C (0 = 12); a partial at continuous semitones 11..12 (e.g. n = 15 at 11.88, or any root whose stencil wraps there) falls outside the usable width. Decide whether to clamp to the B column, wrap to C, or change the x mapping to `pc / 12` with half-column margins. The last is the honest one and affects the existing strips.
 
-## Distance from spec
+## Draft SPEC 010 amendment (held here until code lands)
+
+Per the code–spec matching rule, nothing below enters SPEC 010 until the
+rhythm-lens increment exists. Text is drafted so the amendment is a paste.
+
+**§6 Harmonic Series Overlay**
+
+| Musical Concept | Visual Channel | Constraint |
+|-----------------|----------------|------------|
+| Partial pitch (12·log₂ n above the fundamental, continuous) | Position | Real pitch, not snapped to pitch class |
+| Modelled partial level | Opacity | Onset level at onset, decayed level now |
+| Partial envelope | Opacity gradient along the strip | Bloom at onset, faster fade than the fundamental |
+
+- Octave-duplicate partials fold into the pitch class they land on; one element per distinct pitch class.
+- Default cap n = 9; the 7th partial must survive the default cap.
+- Level: `gain · n^(−rolloff) · decay(n, age)`; `gain = 0` emits nothing.
+- The fundamental's own phase envelope (I17) is unchanged.
+- Register: thinner, soft-edged, translucent; a ghost must be visibly distinct from a played note.
+- Colour and velocity brightening: filled in from the snapshot decision. If fundamental hue wins, record an explicit I14 exception here.
+
+**Invariant I31:** Partials are not notes. They exist only as vocabulary annotations on `AnnotatedNote`; no stabilizer receives them, chord detection is unaffected, and no lens renders a partial with the entity treatment of a played note.
+
+**Contract Implications → Harmonic Partial Annotations:** the `HarmonicPartial`, `AnnotatedNote.partials` and `PartialLevelProvider` definitions from §Pipeline placement above.
+
+**What This Spec Does NOT Cover:** amend "Audio-derived feature mappings (future work)" to point at the `PartialLevelProvider` seam.
+
 
 Spec-ready now: the contract additions, the provider seam, the partials-are-not-notes invariant, the macro ids, and the honesty framing. Not spec-ready: colour, edge treatment, defaults, and anything about the glyph. Expect one snapshot round in the rhythm lens, then a SPEC 010 amendment (new invariant, `HarmonicPartial`, I14 exception if fundamental hue wins) rather than a new spec.
 
