@@ -94,6 +94,7 @@ describe("MusicalVisualVocabulary partial annotation", () => {
   it("annotates partials when the level macro is above 0", () => {
     const vocab = new MusicalVisualVocabulary();
     vocab.setMacro("system:harmonic-series:level", 0.5);
+    vocab.setMacro("system:harmonic-series:rolloff", 1);
     const partials = vocab.annotate(frame).notes[0].partials ?? [];
     expect(partials.map((p) => p.pc)).toEqual([7, 4, 10, 2]);
     expect(partials[0].level).toBeCloseTo(0.25);

@@ -143,7 +143,7 @@ The vocabulary annotates each note with the partials of the harmonic series it i
 
 - Partials with power-of-two n (1, 2, 4, 8) share the fundamental's pitch class in the octave-agnostic lenses and are not drawn. Octave duplicates of odd partials fold into them (6 into 3): one element per odd partial.
 - Default cap n = 9 (P5, M3, m7, M2 above the fundamental). The 7th partial must survive the default cap.
-- Level: `gain · Σ m^(−rolloff)` over the folded partials, clamped to 1; default rolloff 1.0. `gain = 0` annotates nothing.
+- Level: `gain · Σ m^(−rolloff)` over the folded partials, clamped to 1; default rolloff 0.2 (nearly flat, so the 7th partial reads at low levels). `gain = 0` annotates nothing.
 - The fundamental's own phase envelope (I17) is unchanged. Overtone strips occupy exactly their note strip's time extent, scroll with it, and never extend past it.
 - Register: wider than a note strip, soft-edged, translucent, additive; an overtone strip must be visibly distinct from a played note.
 - Colour (`system:harmonic-series:colour`): `pitch` (default) takes the hue of the pitch class the partial lands on, consistent with I14. `fundamental` takes the hue of the originating note, so colour shows origin rather than landing pitch. This is a user-selected exception to I14 for overtone strips only; it trades the colour-means-pitch reading for provenance.

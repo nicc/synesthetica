@@ -355,7 +355,7 @@ const macros: MacroAnnotation[] = [
     aliases: ["overtone falloff", "harmonic rolloff", "partial rolloff"],
     type: "continuous",
     range: [0, 3],
-    default: 1, // ≈ sawtooth — matches PARTIAL_ROLLOFF_DEFAULT
+    default: 0.2, // nearly flat so the 7th partial reads — matches PARTIAL_ROLLOFF_DEFAULT
     affects: ["harmony", "timbre"],
     directionality: {
       low: {

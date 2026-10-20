@@ -52,7 +52,7 @@ Agreed 2026-10-06 unless marked.
 8. *(Revised 2026-10-20.)* **Modelled partials are computed in the vocabulary.** Measured partials, if added, would come from an upstream stabilizer (audio spectral features, SPEC 012) as a separate frame field, and the vocabulary would read those instead of calling the model. No provider interface until a second source exists; the seam is a pure function returning partial levels.
 9. *(2026-10-20.)* Partials whose harmonic number is a power of two (1, 2, 4, 8) share the fundamental's pitch class in these octave-agnostic lenses and are **not drawn**.
 10. *(2026-10-20.)* **Overlapping overtone strips blend additively**, so shared partials visibly pile up.
-11. *(2026-10-20.)* **Default rolloff 1.0.** The default level when the overlay is switched on is well below 1, and a level→opacity curve may be added; both are set from seeing it, not up front.
+11. *(2026-10-20; revised after in-app review.)* **Default rolloff 0.2.** At 1.0 the 7th partial read as too faint in the app; 0.2 keeps it at ≈ 45% of the fifth. The default level when the overlay is switched on is well below 1, and a level→opacity curve may be added; both are set from seeing it, not up front.
 
 ## The model
 
@@ -230,7 +230,7 @@ NOW ━━━━━━━━━━━━━━━━━━━━━━━━━�
 2. Surface treatment for the ethereal register (procedural noise preferred), after the soft-edge version is seen.
 3. Whether the velocity-brightening term earns its place.
 
-Resolved 2026-10-20: colour (user toggle, default pitch), separate decay (dropped; fades with note strip), post-release behaviour (fades with note strip), default rolloff (1.0), partials between B and C (nearest pc + cents offset; mapping unchanged), provider interface (none until a second source).
+Resolved 2026-10-20: colour (user toggle, default pitch), separate decay (dropped; fades with note strip), post-release behaviour (fades with note strip), default rolloff (0.2 after in-app review), partials between B and C (nearest pc + cents offset; mapping unchanged), provider interface (none until a second source).
 
 ## SPEC 010 amendment (entered 2026-10-20)
 

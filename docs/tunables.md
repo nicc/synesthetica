@@ -140,7 +140,7 @@ The "vocabulary" is the ruleset that maps musical events to visual style. It has
 | `referenceHue` | 0 (red) | Which colour = referencePc | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | system:colour-mapping:reference |
 | `hueDirection` | "cw" | Chromatic step direction on the colour wheel | ⭐⭐⭐ | 🎵🎵🎵 | interpretive |system:colour-mapping:direction |
 | `harmonicSeriesLevel` | 0 (off) | Harmonic series overlay level (RFC 012); 0 annotates no partials | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | system:harmonic-series:level |
-| `harmonicSeriesRolloff` | 1.0 | Partial level exponent, n^(−rolloff) | ⭐⭐ | 🎵🎵 | interpretive | system:harmonic-series:rolloff |
+| `harmonicSeriesRolloff` | 0.2 | Partial level exponent, n^(−rolloff) | ⭐⭐ | 🎵🎵 | interpretive | system:harmonic-series:rolloff |
 | `partialColourMode` | "pitch" | Overtone strip hue: landing pitch class or originating note | ⭐⭐ | 🎵🎵 | interpretive | system:harmonic-series:colour |
 
 Harmonic series model constants (`vocabularies/harmonicSeries.ts`):
@@ -148,7 +148,7 @@ Harmonic series model constants (`vocabularies/harmonicSeries.ts`):
 | Constant | Value | Controls | Impact | Pertinence | Class | Decision |
 |---|---|---|---|---|---|---|
 | `PARTIAL_CAP` | 9 | Highest harmonic number modelled; 9 gives P5, M3, m7, M2. The 7th partial must survive | ⭐⭐ | 🎵🎵🎵 | interpretive | internal |
-| `PARTIAL_ROLLOFF_DEFAULT` | 1.0 | Default for `harmonicSeriesRolloff` | ⭐⭐ | 🎵🎵 | interpretive | internal |
+| `PARTIAL_ROLLOFF_DEFAULT` | 0.2 | Default for `harmonicSeriesRolloff` | ⭐⭐ | 🎵🎵 | interpretive | internal |
 
 
 ## Vocabulary — chord shape geometry

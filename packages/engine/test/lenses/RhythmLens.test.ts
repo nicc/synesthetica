@@ -218,6 +218,32 @@ describe("RhythmLens", () => {
       // Now note should be near NOW_LINE_Y (0.85)
       expect(nowNote!.position!.y).toBeCloseTo(0.85, 1);
     });
+
+    it("tracks the onset from the first frames: a new note grows out of the NOW line", () => {
+      const stripAt = (t: number) =>
+        lens
+          .update(createTestFrame(t, { notes: [{ id: "n", pc: 0, onset: 1000 }] }), null)
+          .entities.find((e) => e.data?.type === "note-strip")!;
+
+      const early = stripAt(1020);
+      const later = stripAt(1040);
+      // Top sits on the onset and moves every frame (no still phase)
+      expect(early.position!.y).toBeCloseTo(0.85 - (20 / 8000) * 0.85, 6);
+      expect(later.position!.y).toBeLessThan(early.position!.y);
+      // Never extends below NOW
+      expect(early.position!.y + (early.data!.barHeight as number)).toBeCloseTo(0.85, 6);
+    });
+
+    it("pads a short released note at its bottom, keeping its top on the onset", () => {
+      const frame = createTestFrame(2000, {
+        notes: [{ id: "s", pc: 0, onset: 1000, duration: 10, phase: "release" }],
+      });
+      const strip = lens
+        .update(frame, null)
+        .entities.find((e) => e.data?.type === "note-strip")!;
+      expect(strip.position!.y).toBeCloseTo(0.85 - (1000 / 8000) * 0.85, 6);
+      expect(strip.data!.barHeight).toBeCloseTo(0.008, 6);
+    });
   });
 
   describe("drift visualization", () => {
