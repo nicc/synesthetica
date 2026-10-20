@@ -8,6 +8,8 @@
  * testing.
  */
 
+import type { MacroValue } from "@synesthetica/contracts";
+
 // -----------------------------------------------------------------
 // State snapshot returned after every successful control op.
 // Shape follows SPEC 013 §Resources — the same object served under
@@ -20,8 +22,8 @@
  * for the full contract; kept in sync here.
  */
 export interface MacroState {
-  intents: Record<string, number | string>;
-  effective: Record<string, number | string>;
+  intents: Record<string, MacroValue>;
+  effective: Record<string, MacroValue>;
 }
 
 export interface StateSnapshot {
@@ -105,7 +107,7 @@ export interface EngineHandle {
   readonly status: "starting" | "running" | "stopping" | "error";
 
   // -- Aesthetic macros --
-  setMacro(name: string, value: number | string): Promise<StateSnapshot>;
+  setMacro(name: string, value: MacroValue): Promise<StateSnapshot>;
 
   // -- Session controls --
   setKey(root: number | null, mode: string | null): Promise<StateSnapshot>;

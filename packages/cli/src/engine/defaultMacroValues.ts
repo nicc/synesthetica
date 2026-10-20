@@ -6,17 +6,12 @@
  */
 
 import { productionManifest } from "@synesthetica/contracts";
+import type { MacroValue } from "@synesthetica/contracts";
 
-export const defaultMacroValues: Record<string, number | string> = (() => {
-  const out: Record<string, number | string> = {};
+export const defaultMacroValues: Record<string, MacroValue> = (() => {
+  const out: Record<string, MacroValue> = {};
   for (const macro of productionManifest.macros) {
-    if (macro.type === "compound") {
-      out[macro.id] = macro.default;
-    } else if (macro.type === "continuous") {
-      out[macro.id] = macro.default;
-    } else if (macro.type === "discrete") {
-      out[macro.id] = macro.default;
-    }
+    out[macro.id] = macro.default;
   }
   return out;
 })();

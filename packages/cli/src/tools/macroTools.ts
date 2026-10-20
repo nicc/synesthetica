@@ -7,6 +7,7 @@
  * set_macro validates the value against the macro's annotation:
  *   - continuous: number in [min, max]
  *   - discrete: value must be one of enumValues
+ *   - toggle: boolean
  *   - compound: number in [min, max]; dispatcher fans to targets
  *
  * Compound fan-out uses a linear default curve — placeholder until
@@ -24,7 +25,9 @@ import type {
   MacroAnnotation,
   ContinuousMacroAnnotation,
   DiscreteMacroAnnotation,
+  ToggleMacroAnnotation,
   CompoundMacroAnnotation,
+  MacroValue,
 } from "@synesthetica/contracts";
 import { productionManifest as manifest } from "@synesthetica/contracts";
 import type { ToolSpec } from "./sessionTools.js";
@@ -56,7 +59,7 @@ function linearMapTo(
   compoundValue: number,
   compoundRange: [number, number],
   targetId: string,
-): number | string {
+): MacroValue {
   const target = macroById.get(targetId);
   if (!target) {
     // Target may be an internal param ref not yet exposed as a
@@ -78,6 +81,10 @@ function linearMapTo(
       Math.max(0, Math.round(t * (values.length - 1))),
     );
     return values[idx];
+  }
+  if (target.type === "toggle") {
+    // Toggle target — on in the upper half of the compound's range.
+    return t >= 0.5;
   }
   return compoundValue;
 }
@@ -153,6 +160,16 @@ function validateDiscrete(
   return value as string | number;
 }
 
+function validateToggle(
+  ann: ToggleMacroAnnotation,
+  value: unknown,
+): ToolResult | boolean {
+  if (typeof value !== "boolean") {
+    return err("MACRO_VALUE_WRONG_TYPE", `${ann.id} is a toggle; value must be true or false`);
+  }
+  return value;
+}
+
 function validateCompound(
   ann: CompoundMacroAnnotation,
   value: unknown,
@@ -173,7 +190,7 @@ function validateCompound(
 export const setMacroTool: ToolSpec = {
   name: "set_macro",
   description:
-    "Set an aesthetic macro (any system:*, cross-cutting, or <scope>:* name). Value shape depends on the macro's type: number for continuous / compound, string or number for discrete. See annotations://macros/{id} for each macro's shape and default.",
+    "Set an aesthetic macro (any system:*, cross-cutting, or <scope>:* name). Value shape depends on the macro's type: number for continuous / compound, string or number for discrete, true / false for toggle. See annotations://macros/{id} for each macro's shape and default.",
   inputSchema: {
     type: "object",
     properties: {
@@ -182,7 +199,7 @@ export const setMacroTool: ToolSpec = {
         description: "Macro id from the annotation manifest.",
       },
       value: {
-        description: "Number for continuous/compound, enum value for discrete.",
+        description: "Number for continuous/compound, enum value for discrete, boolean for toggle.",
       },
       instance: { type: "string" },
     },
@@ -209,6 +226,11 @@ export const setMacroTool: ToolSpec = {
     if (ann.type === "discrete") {
       const validated = validateDiscrete(ann, rawValue);
       if (typeof validated === "object") return validated;
+      return safeCall(() => engine.setMacro(ann.id, validated));
+    }
+    if (ann.type === "toggle") {
+      const validated = validateToggle(ann, rawValue);
+      if (typeof validated !== "boolean") return validated;
       return safeCall(() => engine.setMacro(ann.id, validated));
     }
     if (ann.type === "compound") {

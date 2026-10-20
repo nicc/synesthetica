@@ -68,7 +68,7 @@ Stable enumeration. Adding a code = updating this spec + the tool.
 |---|---|---|
 | `SCHEMA_INVALID` | `name` not a string; `pc` outside [0, 11]; `hue` outside [0, 360]. | — |
 | `MACRO_UNKNOWN` | `set_macro` called with an id not in the manifest. | `{ available: string[] }` — currently declared macro ids |
-| `MACRO_VALUE_WRONG_TYPE` | Value shape wrong for the macro's type (e.g. string for continuous, number-only for discrete when enumValues are strings). | — |
+| `MACRO_VALUE_WRONG_TYPE` | Value shape wrong for the macro's type (e.g. string for continuous, number-only for discrete when enumValues are strings, non-boolean for toggle). | — |
 | `MACRO_VALUE_OUT_OF_RANGE` | Continuous / compound value outside declared range. Message includes the range. | — |
 
 ### Preset tools

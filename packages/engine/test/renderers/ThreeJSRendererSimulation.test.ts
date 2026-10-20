@@ -105,6 +105,8 @@ vi.mock("three", () => {
 
   class MockShaderMaterial extends Material {
     uniforms: Record<string, { value: unknown }> = {};
+    blending = 1;
+    depthWrite = true;
     vertexShader = "";
     fragmentShader = "";
     constructor(params?: Record<string, unknown>) {
@@ -115,6 +117,8 @@ vi.mock("three", () => {
         if (params.fragmentShader) this.fragmentShader = params.fragmentShader as string;
         if (params.transparent !== undefined) this.transparent = params.transparent as boolean;
         if (params.side !== undefined) this.side = params.side as number;
+        if (params.blending !== undefined) this.blending = params.blending as number;
+        if (params.depthWrite !== undefined) this.depthWrite = params.depthWrite as boolean;
       }
     }
   }
@@ -253,6 +257,8 @@ vi.mock("three", () => {
     LineBasicMaterial: MockLineBasicMaterial,
     LineDashedMaterial: MockLineDashedMaterial,
     DoubleSide: 2,
+    NormalBlending: 1,
+    AdditiveBlending: 2,
   };
 });
 

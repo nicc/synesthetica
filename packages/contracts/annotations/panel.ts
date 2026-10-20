@@ -70,7 +70,7 @@ export interface SelectWidgetDescriptor extends WidgetDescriptorBase {
 }
 
 /**
- * Toggle — boolean session control. Always non-nullable.
+ * Toggle — boolean session control or toggle macro. Always non-nullable.
  */
 export interface ToggleWidgetDescriptor extends WidgetDescriptorBase {
   kind: "toggle";

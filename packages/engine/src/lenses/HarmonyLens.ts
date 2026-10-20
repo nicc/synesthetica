@@ -21,6 +21,7 @@
  */
 
 import type {
+  MacroValue,
   IVisualLens,
   LensContext,
   AnnotatedMusicalFrame,
@@ -389,7 +390,7 @@ export class HarmonyLens implements IVisualLens {
   /** IVisualLens.readMacros — same shape as getMacros, widened to
    *  the interface-level Record type. Used by state:// and the
    *  wiring-coverage test. */
-  readMacros(): Record<string, number | string> {
+  readMacros(): Record<string, MacroValue> {
     return { ...this.macros };
   }
 

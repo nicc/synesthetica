@@ -24,11 +24,14 @@ If a macro can't be traced end-to-end from manifest declaration through to obser
 
 ### 1.1 Declaration
 
-Macros are declared in `packages/contracts/annotations/manifest.ts` as one of three shapes:
+Macros are declared in `packages/contracts/annotations/manifest.ts` as one of four shapes:
 
 - `ContinuousMacroAnnotation` — numeric range + default + directionality prose.
 - `DiscreteMacroAnnotation` — enum values with labels.
+- `ToggleMacroAnnotation` — boolean on/off with a boolean default. For switching a feature on or off; the panel places toggle macros in Basics (SPEC 013 §Panel).
 - `CompoundMacroAnnotation` — one dial that fans out to leaf targets, optionally with per-target `invert`.
+
+A macro's runtime value is `MacroValue` (`number | string | boolean`): number for continuous and compound, string or number for discrete, boolean for toggle.
 
 Every macro must include `id`, `range` (or `enumValues`), `default`, and enough LLM-facing prose (`directionality`, `notes`) to be usable without further context.
 
@@ -42,6 +45,7 @@ The CLI validates against the annotation before dispatch:
 
 - Continuous: value must be finite, in range.
 - Discrete: value must match one of `enumValues[i].value` (string or number, exact).
+- Toggle: value must be a boolean.
 - Compound: value must be finite, in the compound's range.
 
 Errors return `MACRO_VALUE_OUT_OF_RANGE`, `MACRO_VALUE_WRONG_TYPE`, or `MACRO_UNKNOWN`. See SPEC on control-op validation errors (synesthetica-nrx) for the shape.
@@ -99,7 +103,7 @@ Every non-compound macro's `MacroAnnotation` carries a required `consumers[]` ar
 
 This declaration is the manifest's promise about wiring. It's enforced two ways:
 
-1. **Build-time** — `validate-manifest.mjs` fails if any continuous or discrete macro is missing `consumers[]`, or if a consumer's `id` isn't a known lens/stabilizer/vocab.
+1. **Build-time** — `validate-manifest.mjs` fails if any continuous, discrete or toggle macro is missing `consumers[]`, or if a consumer's `id` isn't a known lens/stabilizer/vocab.
 2. **Runtime** — `packages/engine/test/wiringCoverage.test.ts` instantiates a full pipeline and, for every declared consumer, dispatches through `pipeline.setMacro(macroId, testValue)` and asserts `consumer.readMacros()[macroKey] === testValue`. A no-op setter can't accidentally pass because the test picks a value distinct from the current one.
 
 Together these turn "declared but not plumbed" from a class of silent bug into a class of build failure.
@@ -218,7 +222,7 @@ Called out here rather than glossed over — the spec matches reality including 
 
 A macro is correctly wired iff:
 
-1. It appears in `productionManifest.<category>[]` with all required fields, including `consumers[]` for continuous and discrete macros.
+1. It appears in `productionManifest.<category>[]` with all required fields, including `consumers[]` for continuous, discrete and toggle macros.
 2. `annotations://<category>/<id>` reads back its JSON verbatim.
 3. `set_macro(id, value)` returns `{ok: true, state: {...}}` with `state.macros[id] === value`.
 4. **Every entry in `consumers[]` receives the value.** For each `{kind, id, macroKey}`, `pipeline.setMacro(macroId, testValue)` causes `consumer.readMacros()[macroKey]` to return `testValue`.

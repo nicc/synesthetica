@@ -20,6 +20,7 @@
  */
 
 import type {
+  MacroValue,
   AnnotatedMusicalFrame,
   IVisualLens,
   LensContext,
@@ -88,6 +89,24 @@ const REFERENCE_LINE_HALF_WIDTH = NOTE_STRIP_WIDTH * 1.5 * 0.75;
 
 /** Minimum note strip height in normalized coordinates */
 const MIN_NOTE_STRIP_HEIGHT = 0.008;
+
+/** Overtone strip width as a multiple of note-strip width (RFC 012).
+ *  Must exceed 1: a coincident partial (C's 3rd under a played G, +2¢)
+ *  would otherwise sit entirely behind the note strip it reinforces. */
+const OVERTONE_WIDTH_RATIO = 2;
+
+/** Overtone strips whose brighter end falls below this opacity are
+ *  not emitted. */
+const OVERTONE_CULL_OPACITY = 0.02;
+
+/** Horizontal edge falloff for overtone strips, 0 (hard) .. 1 (fully
+ *  soft from centre to edge). Read by the renderer from entity data. */
+const OVERTONE_EDGE_SOFTNESS = 1.0;
+
+/** Steam dissipation at a screen position: 0 at the NOW line (young),
+ *  rising to 1 at the top of the screen (old). Age and height are the
+ *  same axis in this lens. */
+const dissipationAt = (y: number): number => 1 - Math.min(Math.max(y, 0) / NOW_LINE_Y, 1);
 
 // Grid colors
 const GRID_COLORS = {
@@ -211,7 +230,7 @@ export class RhythmLens implements IVisualLens {
   }
 
   /** IVisualLens.readMacros — same shape as getMacros, widened. */
-  readMacros(): Record<string, number | string> {
+  readMacros(): Record<string, MacroValue> {
     return { ...this.macros };
   }
 
@@ -633,20 +652,19 @@ export class RhythmLens implements IVisualLens {
 
     // Note strip rendering — only gated by screen position, not time windows
 
-    // Clamp onsetY to screen top so the bar rectangle starts at the visible edge
-    const clampedOnsetY = Math.max(onsetY, 0);
-
-    // Bar height: endY (bottom) - clampedOnsetY (top, clamped to screen)
-    // When expanding to minimum height, grow upward (move top up) not downward
-    const rawBarHeight = endY - clampedOnsetY;
-    let barHeight: number;
-    let barTop = clampedOnsetY;
-    if (rawBarHeight >= MIN_NOTE_STRIP_HEIGHT) {
-      barHeight = rawBarHeight;
-    } else {
-      barHeight = MIN_NOTE_STRIP_HEIGHT;
-      barTop = Math.max(endY - MIN_NOTE_STRIP_HEIGHT, 0);
-    }
+    // The top always tracks the onset (clamped to the screen top), so the
+    // strip scrolls from its first frame. The minimum height is applied at
+    // the bottom and never extends below NOW: a new note grows out of the
+    // NOW line and keeps the minimum height once it has scrolled that far.
+    // (Padding the top upward instead held the top still for the first
+    // ~75 ms of every note, which read as a judder.)
+    const barTop = Math.max(onsetY, 0);
+    const barBottom = Math.min(
+      Math.max(endY, onsetY + MIN_NOTE_STRIP_HEIGHT),
+      NOW_LINE_Y,
+    );
+    // Zero on the onset frame itself (the note has existed for 0 ms).
+    const barHeight = barBottom - barTop;
 
     // Phase-based base opacity
     let baseOpacity: number;
@@ -667,7 +685,18 @@ export class RhythmLens implements IVisualLens {
     // This works for both sustain (top fades, bottom bright at NOW)
     // and release (whole bar fades as it scrolls toward the top).
     const topOpacity = baseOpacity * Math.min(barTop / NOW_LINE_Y, 1);
-    const bottomOpacity = baseOpacity * Math.min(endY / NOW_LINE_Y, 1);
+    const bottomOpacity = baseOpacity * Math.min(barBottom / NOW_LINE_Y, 1);
+
+    // Overtone strips first so the note strip draws over them.
+    entities.push(
+      ...this.createOvertoneStrips(an, part, t, {
+        barTop,
+        barHeight,
+        endY: barBottom,
+        topOpacity,
+        bottomOpacity,
+      }),
+    );
 
     // Create main note strip entity
     // Position at barTop (top of visible bar) so it scrolls in sync with
@@ -693,12 +722,79 @@ export class RhythmLens implements IVisualLens {
         driftMs: driftInfo?.driftMs,
         subdivisionLabel: driftInfo?.label,
         barHeight, // Normalized height for renderer
-        endY, // Bottom of bar (clamped to NOW line)
+        endY: barBottom, // Bottom of bar (min-height padded, clamped to NOW line)
         topOpacity, // Opacity at top edge (onset/horizon)
         bottomOpacity, // Opacity at bottom edge (near NOW)
       },
     });
 
+    return entities;
+  }
+
+  // ============================================================================
+  // Overtone Strips (Harmonic Series Overlay, RFC 012)
+  // ============================================================================
+
+  /**
+   * One overtone strip per annotated partial. Shares the note strip's
+   * time extent exactly, and its opacity is the partial level times
+   * the note strip's own opacity, so the ratio between them holds as
+   * both fade. Placed at real pitch (pc + cents), not snapped.
+   */
+  private createOvertoneStrips(
+    an: AnnotatedNote,
+    part: string,
+    t: number,
+    strip: {
+      barTop: number;
+      barHeight: number;
+      endY: number;
+      topOpacity: number;
+      bottomOpacity: number;
+    },
+  ): Entity[] {
+    if (!an.partials) return [];
+    const note = an.note;
+    const entities: Entity[] = [];
+    // How far the timeline has scrolled since t = 0, so the renderer can
+    // anchor the steam field to timeline time rather than to the screen.
+    const fieldOffsetY = NOW_LINE_Y - timeToY(0, t);
+    for (const partial of an.partials) {
+      const topOpacity = partial.level * strip.topOpacity;
+      const bottomOpacity = partial.level * strip.bottomOpacity;
+      if (Math.max(topOpacity, bottomOpacity) < OVERTONE_CULL_OPACITY) continue;
+      entities.push({
+        id: this.entityId(`overtone-${note.id}-${partial.n}`),
+        part,
+        kind: "particle",
+        createdAt: note.onset,
+        updatedAt: t,
+        position: {
+          x: this.pitchClassToX(partial.pc, partial.cents),
+          y: strip.barTop,
+        },
+        style: {
+          color: partial.color,
+          size: NOTE_STRIP_WIDTH * OVERTONE_WIDTH_RATIO * 1000,
+          opacity: bottomOpacity,
+        },
+        data: {
+          type: "overtone-strip",
+          noteId: note.id,
+          n: partial.n,
+          pitchClass: partial.pc,
+          cents: partial.cents,
+          barHeight: strip.barHeight,
+          endY: strip.endY,
+          topOpacity,
+          bottomOpacity,
+          edgeSoftness: OVERTONE_EDGE_SOFTNESS,
+          dissipationTop: dissipationAt(strip.barTop),
+          dissipationBottom: dissipationAt(strip.endY),
+          fieldOffsetY,
+        },
+      });
+    }
     return entities;
   }
 
@@ -866,10 +962,12 @@ export class RhythmLens implements IVisualLens {
   /**
    * Map pitch class (0-11) to x position.
    * C (0) at left margin, B (11) at right margin.
+   * `cents` offsets continuously from the column (overtone strips sit at
+   * real pitch); a flat C lands just left of the C column, not at B.
    */
-  private pitchClassToX(pc: PitchClass): number {
+  private pitchClassToX(pc: PitchClass, cents = 0): number {
     const usableWidth = 1 - PITCH_MARGIN_LEFT - PITCH_MARGIN_RIGHT;
-    return PITCH_MARGIN_LEFT + (pc / 11) * usableWidth;
+    return PITCH_MARGIN_LEFT + ((pc + cents / 100) / 11) * usableWidth;
   }
 
   // timeToY moved to ./timeMapping so other lenses can phase-lock to

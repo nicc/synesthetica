@@ -83,9 +83,15 @@ export function generatePanel(manifest: ManifestForPanel): Panel {
     .filter((s) => s.id.startsWith("session:") && !absorbed.has(s.id))
     .map((s) => sessionWidget(s, sessionById));
 
-  // ----- Advanced section: all macros, subgrouped by scope prefix -----
-  const macroWidgets = manifest.macros.map(macroWidget);
-  const advancedSubgroups = subgroupMacros(macroWidgets, manifest.macros);
+  // Toggle macros are Basics-tier: on/off switches for features
+  // (SPEC 014). They follow the session controls.
+  const toggleMacros = manifest.macros.filter((m) => m.type === "toggle");
+  basicsWidgets.push(...toggleMacros.map(macroWidget));
+
+  // ----- Advanced section: remaining macros, subgrouped by scope prefix -----
+  const advancedMacros = manifest.macros.filter((m) => m.type !== "toggle");
+  const macroWidgets = advancedMacros.map(macroWidget);
+  const advancedSubgroups = subgroupMacros(macroWidgets, advancedMacros);
 
   const sections: PanelSection[] = [
     { id: "input", title: "Input", widgets: inputWidgets, subgroups: [] },
@@ -114,6 +120,8 @@ function macroWidget(m: MacroAnnotation): WidgetDescriptor {
       return compoundSlider(m, base);
     case "discrete":
       return discreteSelect(m, base);
+    case "toggle":
+      return { ...base, kind: "toggle", defaultValue: m.default };
   }
 }
 

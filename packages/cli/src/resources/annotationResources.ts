@@ -153,6 +153,8 @@ function describeMacro(m: MacroAnnotation): string {
       return `${m.name ?? m.id} — continuous, range [${m.range[0]}, ${m.range[1]}], default ${m.default}`;
     case "discrete":
       return `${m.name ?? m.id} — discrete, ${m.enumValues.length} values, default ${JSON.stringify(m.default)}`;
+    case "toggle":
+      return `${m.name ?? m.id} — toggle (true / false), default ${m.default}`;
     case "compound":
       return `${m.name ?? m.id} — compound (fans to ${m.targets.length}), range [${m.range[0]}, ${m.range[1]}], default ${m.default}`;
   }

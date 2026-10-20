@@ -159,16 +159,48 @@ function renderEntity(entity: Entity, width: number, height: number, showLabels:
   }
 
   if (type === "note-strip") {
-    // Note bar: vertical rectangle representing sustained note
-    // Position is center of bar, barHeight is in normalized coordinates
+    // Note bar: vertical rectangle representing sustained note.
+    // Position y is the top of the bar (lenses emit barTop), barHeight
+    // is in normalized coordinates.
     const barHeight = ((entity.data?.barHeight as number) ?? 0.01) * height;
     const barWidth = Math.max(size, 4); // Use size as width, minimum 4px
+    // Mirror ThreeJSRenderer, which drops palette alpha on note strips
+    // (synesthetica-taqk #3); opacity comes from the entity alone.
+    const stripColor = entity.style.color
+      ? hsvaToCSS({ ...entity.style.color, a: 1 })
+      : color;
 
-    // Rectangle: y is center, so offset by half height to get top
-    const rectTop = y - barHeight / 2;
     elements.push(
-      `<rect x="${x - barWidth / 2}" y="${rectTop}" width="${barWidth}" height="${barHeight}" ` +
-      `fill="${color}" opacity="${opacity}" rx="2" />`
+      `<rect x="${x - barWidth / 2}" y="${y}" width="${barWidth}" height="${barHeight}" ` +
+      `fill="${stripColor}" opacity="${opacity}" rx="2" />`
+    );
+    return elements.join("\n    ");
+  }
+
+  if (type === "overtone-strip") {
+    // Overtone strip (RFC 012): same geometry as a note strip, with a
+    // vertical top→bottom opacity gradient, horizontal blur standing in
+    // for the renderer's edge softness, and plus-lighter standing in for
+    // additive blending. A preview of geometry and level, not of the
+    // final register.
+    const barHeight = ((entity.data?.barHeight as number) ?? 0.01) * height;
+    const barWidth = Math.max(size, 6);
+    const topOpacity = (entity.data?.topOpacity as number) ?? opacity;
+    const bottomOpacity = (entity.data?.bottomOpacity as number) ?? opacity;
+    const softness = (entity.data?.edgeSoftness as number) ?? 0;
+    const uid = entity.id.replace(/[^A-Za-z0-9_-]/g, "_");
+    elements.push(
+      `<defs>` +
+      `<linearGradient id="og-${uid}" x1="0" y1="0" x2="0" y2="1">` +
+      `<stop offset="0" stop-color="${color}" stop-opacity="${topOpacity}" />` +
+      `<stop offset="1" stop-color="${color}" stop-opacity="${bottomOpacity}" />` +
+      `</linearGradient>` +
+      `<filter id="of-${uid}" x="-100%" y="0" width="300%" height="100%">` +
+      `<feGaussianBlur stdDeviation="${(barWidth / 4) * softness} 0" />` +
+      `</filter>` +
+      `</defs>`,
+      `<rect x="${x - barWidth / 2}" y="${y}" width="${barWidth}" height="${barHeight}" ` +
+      `fill="url(#og-${uid})" filter="url(#of-${uid})" style="mix-blend-mode: plus-lighter" />`
     );
     return elements.join("\n    ");
   }

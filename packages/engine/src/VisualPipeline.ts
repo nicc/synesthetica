@@ -10,6 +10,7 @@
  */
 
 import type {
+  MacroValue,
   IPipeline,
   IRawSourceAdapter,
   IMusicalStabilizer,
@@ -176,7 +177,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
    * catches each id — a build-time validator + runtime coverage
    * test keep declaration and implementation in lockstep.
    */
-  setMacro(name: string, value: number | string): void {
+  setMacro(name: string, value: MacroValue): void {
     // Lens dispatch.
     const colon = name.indexOf(":");
     if (colon >= 0) {
@@ -210,9 +211,9 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
    * Used by the state:// snapshot builder to source effective values
    * from consumer runtime rather than from a mirror. See SPEC 014 §1.9.
    */
-  readEffectiveMacros(macros: MacroAnnotation[]): Record<string, number | string> {
+  readEffectiveMacros(macros: MacroAnnotation[]): Record<string, MacroValue> {
     const consumers = this.buildConsumerLookup();
-    const out: Record<string, number | string> = {};
+    const out: Record<string, MacroValue> = {};
     for (const macro of macros) {
       if (macro.type === "compound") continue;
       for (const c of macro.consumers) {
@@ -229,8 +230,8 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     return out;
   }
 
-  private buildConsumerLookup(): Map<string, { readMacros?(): Record<string, number | string> }> {
-    const lookup = new Map<string, { readMacros?(): Record<string, number | string> }>();
+  private buildConsumerLookup(): Map<string, { readMacros?(): Record<string, MacroValue> }> {
+    const lookup = new Map<string, { readMacros?(): Record<string, MacroValue> }>();
     for (const g of this.lenses) lookup.set(g.id, g);
     if (this.vocabulary) lookup.set(this.vocabulary.id, this.vocabulary);
     for (const state of this.partStates.values()) {

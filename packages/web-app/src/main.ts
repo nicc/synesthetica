@@ -13,7 +13,7 @@
  * and macros all flow through the same dispatch path.
  */
 
-import type { SceneFrame } from "@synesthetica/contracts";
+import type { SceneFrame, MacroValue } from "@synesthetica/contracts";
 import {
   generatePanel,
   productionManifest,
@@ -257,7 +257,7 @@ async function applyEngineOp(
       break;
     }
     case "setMacro": {
-      const [name, value] = args as [string, number | string];
+      const [name, value] = args as [string, MacroValue];
       engineState.macros.intents[name] = value;
       pipeline?.setMacro(name, value);
       break;
@@ -333,10 +333,10 @@ function collectCurrentPanelValues(): Record<string, number | string | boolean |
   // show the current running value. Fall back to intents when
   // effective is empty (compound macros don't appear in effective).
   for (const [id, v] of Object.entries(engineState.macros.effective)) {
-    values[id] = v as number | string;
+    values[id] = v as MacroValue;
   }
   for (const [id, v] of Object.entries(engineState.macros.intents)) {
-    if (!(id in values)) values[id] = v as number | string;
+    if (!(id in values)) values[id] = v as MacroValue;
   }
   return values;
 }
@@ -365,7 +365,7 @@ function refreshPanelForMethod(method: EngineMethod, args: readonly unknown[]): 
       values["session:metronome"] = args[0] as boolean;
       break;
     case "setMacro":
-      values[args[0] as string] = args[1] as number | string;
+      values[args[0] as string] = args[1] as MacroValue;
       break;
     case "setInput":
       values["input:source"] = args[0] as string;

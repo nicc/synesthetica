@@ -31,6 +31,7 @@ import type {
   AvailableInput,
   Unsubscribe,
 } from "./engineHandle.js";
+import type { MacroValue } from "@synesthetica/contracts";
 
 const CALL_TIMEOUT_MS = 5_000;
 const RECONNECT_GRACE_MS = 2_000;
@@ -323,7 +324,7 @@ class WSBackedEngineHandle implements EngineHandle {
   }
 
   // ---- calls ----
-  async setMacro(name: string, value: number | string): Promise<StateSnapshot> {
+  async setMacro(name: string, value: MacroValue): Promise<StateSnapshot> {
     return this.call("setMacro", [name, value]) as Promise<StateSnapshot>;
   }
   async setKey(root: number | null, mode: string | null): Promise<StateSnapshot> {

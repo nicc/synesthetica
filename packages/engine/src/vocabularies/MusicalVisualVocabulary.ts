@@ -22,6 +22,7 @@
  */
 
 import type {
+  MacroValue,
   IVisualVocabulary,
   MusicalFrame,
   AnnotatedMusicalFrame,
@@ -33,6 +34,7 @@ import type {
   MotionAnnotation,
   VelocityAnnotation,
   PhaseAnnotation,
+  HarmonicPartial,
   PitchClass,
   Note,
   MusicalChord,
@@ -50,6 +52,12 @@ import {
 } from "@synesthetica/contracts";
 
 import { buildChordShape } from "./utils";
+import type { PartialLevel } from "./harmonicSeries";
+import {
+  modelPartialLevels,
+  partialPitch,
+  PARTIAL_ROLLOFF_DEFAULT,
+} from "./harmonicSeries";
 
 /**
  * Configuration for the MusicalVisualVocabulary.
@@ -72,12 +80,43 @@ export interface MusicalVisualVocabularyConfig {
    * @default "cw"
    */
   hueDirection?: "cw" | "ccw";
+
+  /**
+   * Harmonic series overlay on/off (RFC 012). Off annotates no partials.
+   * @default false
+   */
+  harmonicSeriesEnabled?: boolean;
+
+  /**
+   * Harmonic series overlay level, 0..1 (RFC 012); applies while
+   * enabled. 0 annotates no partials.
+   * @default 0.2
+   */
+  harmonicSeriesLevel?: number;
+
+  /**
+   * Harmonic series rolloff exponent, 0..3 (RFC 012).
+   * @default 1.0
+   */
+  harmonicSeriesRolloff?: number;
+
+  /**
+   * Hue source for partials (RFC 012): "pitch" uses the partial's own
+   * pitch-class hue; "fundamental" uses the hue of the note that
+   * produced it.
+   * @default "pitch"
+   */
+  partialColourMode?: "pitch" | "fundamental";
 }
 
 const DEFAULT_CONFIG: Required<MusicalVisualVocabularyConfig> = {
   referencePc: 0, // C — matches session:tonic's PC=0 convention
   referenceHue: 0, // Red
   hueDirection: "cw",
+  harmonicSeriesEnabled: false,
+  harmonicSeriesLevel: 0.2,
+  harmonicSeriesRolloff: PARTIAL_ROLLOFF_DEFAULT,
+  partialColourMode: "pitch",
 };
 
 /**
@@ -99,13 +138,27 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
-  /** Apply a manifest macro. Currently handles
-   *  `system:colour-mapping:reference` — a degree on the colour wheel
-   *  anchored to pitch class 0 (C). Other macros are ignored. */
-  setMacro(name: string, value: number | string): void {
+  /** Apply a manifest macro. Handles `system:colour-mapping:reference`
+   *  (a degree on the colour wheel anchored to pitch class 0, C) and the
+   *  harmonic series overlay's `system:harmonic-series:enabled` / `:level`
+   *  / `:rolloff` / `:colour`.
+   *  Other macros are ignored. */
+  setMacro(name: string, value: MacroValue): void {
     if (name === "system:colour-mapping:reference") {
       const hue = ((Number(value) % 360) + 360) % 360;
       this.config = { ...this.config, referencePc: 0, referenceHue: hue };
+    } else if (name === "system:harmonic-series:enabled") {
+      if (typeof value === "boolean") {
+        this.config = { ...this.config, harmonicSeriesEnabled: value };
+      }
+    } else if (name === "system:harmonic-series:level") {
+      this.config = { ...this.config, harmonicSeriesLevel: Number(value) };
+    } else if (name === "system:harmonic-series:rolloff") {
+      this.config = { ...this.config, harmonicSeriesRolloff: Number(value) };
+    } else if (name === "system:harmonic-series:colour") {
+      if (value === "pitch" || value === "fundamental") {
+        this.config = { ...this.config, partialColourMode: value };
+      }
     }
   }
 
@@ -119,9 +172,13 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
   }
 
   /** Return current values for every macro this vocab accepts. */
-  readMacros(): Record<string, number | string> {
+  readMacros(): Record<string, MacroValue> {
     return {
       "system:colour-mapping:reference": this.config.referenceHue,
+      "system:harmonic-series:enabled": this.config.harmonicSeriesEnabled,
+      "system:harmonic-series:level": this.config.harmonicSeriesLevel,
+      "system:harmonic-series:rolloff": this.config.harmonicSeriesRolloff,
+      "system:harmonic-series:colour": this.config.partialColourMode,
     };
   }
 
@@ -129,10 +186,19 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     // Default harmonic context when stabilizer not in chain
     const defaultHarmonicContext = { ...EMPTY_HARMONIC_CONTEXT };
 
+    // Partial levels depend only on the overlay macros, not the note,
+    // so the stencil is computed once per frame.
+    const partialLevels = modelPartialLevels(
+      this.config.harmonicSeriesEnabled ? this.config.harmonicSeriesLevel : 0,
+      this.config.harmonicSeriesRolloff,
+    );
+
     return {
       t: frame.t,
       part: frame.part,
-      notes: frame.notes.map((note) => this.annotateNote(note, frame.t)),
+      notes: frame.notes.map((note) =>
+        this.annotateNote(note, frame.t, partialLevels),
+      ),
       chords: frame.chords.map((chord) =>
         this.annotateChord(chord, frame.chordInterpretation),
       ),
@@ -157,7 +223,11 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
   // Note Annotation
   // ===========================================================================
 
-  private annotateNote(note: Note, t: Ms): AnnotatedNote {
+  private annotateNote(
+    note: Note,
+    t: Ms,
+    partialLevels: PartialLevel[],
+  ): AnnotatedNote {
     const hue = pcToHue(note.pitch.pc, {
       referencePc: this.config.referencePc,
       referenceHue: this.config.referenceHue,
@@ -192,7 +262,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
       intensity: alpha,
     };
 
-    return {
+    const annotated: AnnotatedNote = {
       note,
       visual: {
         palette,
@@ -204,6 +274,37 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
       velocity,
       phaseState,
     };
+    if (partialLevels.length === 0) return annotated;
+    return {
+      ...annotated,
+      partials: this.annotatePartials(note, partialLevels, brightness),
+    };
+  }
+
+  /** Attach real pitch and colour to modelled partial levels (RFC 012).
+   *  Partials are annotations only — never Notes (proposed I31). */
+  private annotatePartials(
+    note: Note,
+    partialLevels: PartialLevel[],
+    brightness: number,
+  ): HarmonicPartial[] {
+    const hueConfig = {
+      referencePc: this.config.referencePc,
+      referenceHue: this.config.referenceHue,
+      direction: this.config.hueDirection,
+    };
+    return partialLevels.map(({ n, level }) => {
+      const { pc, cents } = partialPitch(note.pitch.pc, n);
+      const huePc =
+        this.config.partialColourMode === "pitch" ? pc : note.pitch.pc;
+      return {
+        n,
+        pc,
+        cents,
+        level,
+        color: { h: pcToHue(huePc, hueConfig), s: 0.8, v: brightness, a: 1 },
+      };
+    });
   }
 
   // ===========================================================================

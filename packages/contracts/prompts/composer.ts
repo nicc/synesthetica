@@ -228,6 +228,9 @@ function renderMacro(m: MacroAnnotation): string {
         lines.push(`  tends to: ${m.directionality.high.tendsTo.join("; ")}`);
       }
       break;
+    case "toggle":
+      lines.push(`Type: toggle (true / false), default ${m.default}`);
+      break;
     case "discrete":
       lines.push(
         `Type: discrete, default ${JSON.stringify(m.default)}`,

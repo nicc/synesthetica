@@ -227,6 +227,19 @@ export interface DiscreteMacroAnnotation extends MacroAnnotationBase {
 }
 
 /**
+ * A macro exposed as an on/off toggle. Value is a boolean. The panel
+ * renders toggle macros as switches in the Basics section (SPEC 014);
+ * the LLM sets them with set_macro(id, true | false).
+ */
+export interface ToggleMacroAnnotation extends MacroAnnotationBase {
+  type: "toggle";
+  /** Default value (also the launch-time value). */
+  default: boolean;
+  /** Runtime consumers. Required — see ContinuousMacroAnnotation. */
+  consumers: MacroConsumer[];
+}
+
+/**
  * A single target of a compound macro. `id` is the leaf macro this
  * compound routes to. `invert: true` flips the direction so the
  * compound's high end corresponds to the leaf's low end (used when a
@@ -260,12 +273,17 @@ export interface CompoundMacroAnnotation extends MacroAnnotationBase {
 }
 
 /**
- * Union of the three macro shapes. Discriminated by `type`.
+ * Union of the macro shapes. Discriminated by `type`.
  */
 export type MacroAnnotation =
   | ContinuousMacroAnnotation
   | DiscreteMacroAnnotation
+  | ToggleMacroAnnotation
   | CompoundMacroAnnotation;
+
+/** A macro's runtime value: number (continuous, compound), string or
+ *  number (discrete), boolean (toggle). */
+export type MacroValue = number | string | boolean;
 
 // ============================================================================
 // DerivedStateAnnotation — read-only fields the server computes from

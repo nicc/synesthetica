@@ -201,10 +201,11 @@ afterEach(async () => {
 
 /** Pick an in-range test value distinct from the macro's default. */
 function pickTestValue(
-  macro: { type: string; default?: number | string },
+  macro: { type: string; default?: number | string | boolean },
   range?: [number, number],
   enumValues?: Array<{ value: number | string }>,
-): number | string {
+): number | string | boolean {
+  if (macro.type === "toggle") return !macro.default;
   if (macro.type === "continuous" && range) {
     const [lo, hi] = range;
     const mid = lo + (hi - lo) * 0.37;

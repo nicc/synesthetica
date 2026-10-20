@@ -21,19 +21,38 @@ describe("renderPanel — structure", () => {
     expect(sections[2].getAttribute("data-section-id")).toBe("advanced");
   });
 
-  it("renders a widget for every macro under Advanced subgroups", () => {
+  it("renders toggle macros in Basics and every other macro under Advanced", () => {
     const panel = generatePanel(productionManifest);
     const rendered = renderPanel({ panel, dispatch: () => {} });
-    const advanced = rendered.root.querySelector(
-      '.syn-panel-section[data-section-id="advanced"]',
-    )!;
-    const widgetIds = Array.from(
-      advanced.querySelectorAll("[data-widget-id]"),
-    ).map((el) => el.getAttribute("data-widget-id"));
-    // Every macro id appears
+    const idsIn = (section: string) =>
+      Array.from(
+        rendered.root
+          .querySelector(`.syn-panel-section[data-section-id="${section}"]`)!
+          .querySelectorAll("[data-widget-id]"),
+      ).map((el) => el.getAttribute("data-widget-id"));
+    const basics = idsIn("basics");
+    const advanced = idsIn("advanced");
     for (const m of productionManifest.macros) {
-      expect(widgetIds).toContain(m.id);
+      if (m.type === "toggle") {
+        expect(basics).toContain(m.id);
+        expect(advanced).not.toContain(m.id);
+      } else {
+        expect(advanced).toContain(m.id);
+      }
     }
+  });
+
+  it("toggle macros dispatch booleans", () => {
+    const dispatch = vi.fn();
+    const panel = generatePanel(productionManifest);
+    const rendered = renderPanel({ panel, dispatch });
+    const input = rendered.root.querySelector(
+      '[data-widget-id="system:harmonic-series:enabled"] input[type="checkbox"]',
+    ) as HTMLInputElement;
+    expect(input.checked).toBe(false);
+    input.checked = true;
+    input.dispatchEvent(new Event("change"));
+    expect(dispatch).toHaveBeenCalledWith("system:harmonic-series:enabled", true);
   });
 });
 

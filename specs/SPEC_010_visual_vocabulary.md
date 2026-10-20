@@ -129,6 +129,26 @@ template that covers triads and common 7ths only. Future work: alterations
 (♭9, ♯9, ♯11) should be classified as lines even when present in
 `chordTones` — tracked under the chord-detection umbrella.
 
+### 6. Harmonic Series Overlay
+
+Source: RFC 012. Optional; off by default (`system:harmonic-series:enabled` = false). Brightness is `system:harmonic-series:level` (default 0.2), applied while enabled.
+
+The vocabulary annotates each note with the partials of the harmonic series it implies. Levels are modelled from a generic rolloff, not measured: MIDI carries no timbre, so this is a theoretical overlay and must be described as such in the manifest and primer. The rhythm lens renders each partial as an overtone strip.
+
+| Musical Concept | Visual Channel | Constraint |
+|-----------------|----------------|------------|
+| Partial pitch (12·log₂ n above the fundamental, continuous) | Position | Real pitch (nearest pitch class + cents), not snapped to the column |
+| Modelled partial level | Opacity | Multiplies the note strip's own opacity; the ratio holds as both fade |
+| Partials shared across notes | Additive blending | Coincident partials visibly sum |
+
+- Partials with power-of-two n (1, 2, 4, 8) share the fundamental's pitch class in the octave-agnostic lenses and are not drawn. Octave duplicates of odd partials fold into them (6 into 3): one element per odd partial.
+- Default cap n = 9 (P5, M3, m7, M2 above the fundamental). The 7th partial must survive the default cap.
+- Level: `gain · Σ m^(−rolloff)` over the folded partials, clamped to 1; default rolloff 0.15 (nearly flat, so the 7th partial reads at low levels). `gain` is the level macro while enabled and 0 otherwise; `gain = 0` annotates nothing.
+- The fundamental's own phase envelope (I17) is unchanged. Overtone strips occupy exactly their note strip's time extent, scroll with it, and never extend past it.
+- Register: wider than a note strip, soft-edged, translucent, additive; an overtone strip must be visibly distinct from a played note. Surface is slow procedural steam (renderer shader): breakup stays inside the strip's footprint, the noise field is shared across strips (indexed by pitch position and timeline time) so coincident partials add as denser steam of the same kind, and haze breaks into sparse wisps with age. Motion is uniform across strips and carries no meaning; it follows the session clock and is frozen under reduced motion.
+- Colour (`system:harmonic-series:colour`): `pitch` (default) takes the hue of the pitch class the partial lands on, consistent with I14. `fundamental` takes the hue of the originating note, so colour shows origin rather than landing pitch. This is a user-selected exception to I14 for overtone strips only; it trades the colour-means-pitch reading for provenance.
+- Velocity brightening is not applied.
+
 ## Chord Interpretation Modes
 
 Every played voicing admits multiple valid readings. A voicing like
@@ -314,6 +334,28 @@ element.color.v = averageOctaveBrightness(chord.voicing);
 
 This allows lenses to render each arm/wedge in the color of that chord tone while respecting the pitch-class-to-hue invariant. Lenses can use `element.color` directly or compute their own colors from `chord.noteIds` if they need more control.
 
+### Harmonic Partial Annotations
+
+```ts
+// In packages/contracts/annotated/annotated.ts
+
+/** One partial of a sounding note's harmonic series (§6). Not a Note. */
+interface HarmonicPartial {
+  n: number;          // harmonic number, octave duplicates folded in
+  pc: PitchClass;     // nearest pitch class to the real pitch
+  cents: number;      // deviation from pc, -50..50
+  level: number;      // 0..1, gain and rolloff applied
+  color: ColorHSVA;   // per system:harmonic-series:colour
+}
+
+interface AnnotatedNote {
+  // ...
+  partials?: HarmonicPartial[]; // present only when the overlay level > 0
+}
+```
+
+The model (`vocabularies/harmonicSeries.ts`) is a pure function returning `{ n, level }` per partial; the vocabulary derives `pc`, `cents` and `color`. Measured partials, if added, would arrive from an upstream stabilizer in the same `{ n, level }` shape as a separate frame field.
+
 ## Invariants
 
 | ID | Invariant | Meaning |
@@ -323,6 +365,7 @@ This allows lenses to render each arm/wedge in the color of that chord tone whil
 | I16 | Velocity affects visual prominence | Louder notes must be more visually salient |
 | I17 | Note phase affects intensity | Released notes must fade |
 | I18 | Chord quality determines shape geometry | Radial wedge algorithm is fixed; lenses receive shapes |
+| I31 | Partials are not notes | Modelled partials exist only as vocabulary annotations on `AnnotatedNote`; measured partials, if added, enter from an upstream stabilizer as a separate frame field, never as notes. Chord detection, dynamics and harmony analysis are unaffected, and no lens renders a partial with the entity treatment of a played note |
 
 These extend the invariants defined in SPEC_003.
 
@@ -352,7 +395,7 @@ function buildChordShape(chord: MusicalChord): ChordShapeGeometry;
 - Chord detection algorithms (stabilizer responsibility)
 - Spatial layout strategies
 - Animation timing details beyond phase envelope
-- Audio-derived feature mappings (future work)
+- Audio-derived feature mappings (future work). Measured partials would arrive from an upstream stabilizer in the `{ n, level }` shape the §6 model produces.
 
 ## Contract Location
 

@@ -90,6 +90,9 @@ for (const m of productionManifest.macros) {
       );
     }
   }
+  if (m.type === "toggle" && typeof m.default !== "boolean") {
+    err("macro-default", `${m.id}: toggle default must be a boolean`);
+  }
   if (m.type === "discrete") {
     const values = m.enumValues.map((v) => v.value);
     if (!values.includes(m.default)) {
