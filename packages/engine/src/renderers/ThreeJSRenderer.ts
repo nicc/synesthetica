@@ -61,6 +61,171 @@ const DEFAULT_CONFIG: Required<ThreeJSRendererConfig> = {
 };
 
 // ============================================================================
+// Overtone steam (RFC 012)
+// ============================================================================
+//
+// Overtone strips render as slow steam: procedural noise in the strip's
+// fragment shader, no particles or extra entities. The noise lives in a
+// shared field indexed by pitch position (x) and timeline time (y), so
+// coincident strips sample the same steam and add up as denser haze of
+// the same kind, and the field scrolls with the timeline. All strips
+// follow the same rules; motion carries no meaning. Breakup is inward
+// only: the strip's quad bounds the footprint.
+//
+// Spatial units are fractions of world width, so values read against
+// the overtone strip width (~0.04 at 2.5 × note-strip width). Starting
+// values were chosen from CPU-rendered previews; tune by eye in the app.
+
+/** Noise frequency per unit of world width, horizontally and
+ *  vertically. Lower vertical frequency stretches features upward into
+ *  wisps (steam over a cup), rather than isotropic grain. */
+const STEAM_SCALE_X = 18;
+const STEAM_SCALE_Y = 6;
+
+/** Noise octaves and per-octave amplitude. Few, soft octaves keep the
+ *  haze smooth; more octaves read as grain or crumpled paper. */
+const STEAM_OCTAVES = 3;
+const STEAM_OCTAVE_GAIN = 0.55;
+
+/** Upward drift of the steam within its strip, world-width units per
+ *  second. Kept under one strip width per second and under the
+ *  timeline's own scroll. */
+const STEAM_RISE_PER_S = 0.012;
+
+/** Rate at which the warp field evolves (noise units per second).
+ *  0.25 gives wisps that change shape over a few seconds. */
+const STEAM_SWIRL_PER_S = 0.25;
+
+/** Domain-warp strength: how far wisps curl. 0 = plain fog. */
+const STEAM_WARP = 2.4;
+
+/** Density threshold for young steam (near NOW) and old steam (near the
+ *  horizon). Raising the threshold with age breaks the haze into sparse
+ *  wisps before it disappears. */
+const STEAM_THRESHOLD_YOUNG = 0.32;
+const STEAM_THRESHOLD_OLD = 0.6;
+
+/** Half-width of the soft step around the threshold. */
+const STEAM_THRESHOLD_SOFTNESS = 0.25;
+
+/** How much the noise erodes the strip's side and end edges (inward). */
+const STEAM_EDGE_BREAKUP = 0.6;
+
+/** Soft fade at the strip's top and bottom ends, world-width units, so
+ *  the haze has no hard horizontal cut. */
+const STEAM_END_SOFTNESS = 0.006;
+
+const glslFloat = (n: number): string =>
+  Number.isInteger(n) ? n.toFixed(1) : String(n);
+
+const OVERTONE_STEAM_VERTEX = `
+  varying vec2 vUv;
+  varying vec2 vWorld;
+  void main() {
+    vUv = uv;
+    vWorld = (modelMatrix * vec4(position, 1.0)).xy;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+/** Noise lattice period (noise units, power of two). The field repeats
+ *  every PERIOD units in x and y — about two screen heights of scroll —
+ *  which lets the CPU wrap the growing timeline and time offsets so
+ *  shader coordinates stay small and precise in long sessions. */
+const STEAM_PERIOD = 64;
+
+const OVERTONE_STEAM_FRAGMENT = `
+  uniform vec3 color;
+  uniform float topOpacity;
+  uniform float bottomOpacity;
+  uniform float edgeSoftness;
+  uniform float dissipationTop;
+  uniform float dissipationBottom;
+  uniform float fieldShift;   // timeline scroll + rise, noise units, wrapped to PERIOD
+  uniform float swirlPhase;   // warp evolution, noise units, wrapped to PERIOD
+  uniform float worldWidth;
+  uniform float stripHeight;  // world units
+  varying vec2 vUv;
+  varying vec2 vWorld;
+
+  const vec2 SCALE = vec2(${glslFloat(STEAM_SCALE_X)}, ${glslFloat(STEAM_SCALE_Y)});
+  const int OCTAVES = ${STEAM_OCTAVES};
+  const float OCTAVE_GAIN = ${glslFloat(STEAM_OCTAVE_GAIN)};
+  const float PERIOD = ${glslFloat(STEAM_PERIOD)};
+  const float WARP = ${glslFloat(STEAM_WARP)};
+  const float THRESH_YOUNG = ${glslFloat(STEAM_THRESHOLD_YOUNG)};
+  const float THRESH_OLD = ${glslFloat(STEAM_THRESHOLD_OLD)};
+  const float THRESH_SOFT = ${glslFloat(STEAM_THRESHOLD_SOFTNESS)};
+  const float EDGE_BREAKUP = ${glslFloat(STEAM_EDGE_BREAKUP)};
+  const float END_SOFT = ${glslFloat(STEAM_END_SOFTNESS)};
+
+  // Hash without sine (Dave Hoskins); precise for small inputs.
+  float hash(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+  }
+
+  // Value noise, periodic with the given lattice period.
+  float noise(vec2 p, float period) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    vec2 i0 = mod(i, period);
+    vec2 i1 = mod(i + 1.0, period);
+    return mix(
+      mix(hash(i0), hash(vec2(i1.x, i0.y)), u.x),
+      mix(hash(vec2(i0.x, i1.y)), hash(i1), u.x),
+      u.y
+    );
+  }
+
+  // Octave sum; doubling frequency and period keeps it periodic.
+  float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    float norm = 0.0;
+    float period = PERIOD;
+    for (int k = 0; k < OCTAVES; k++) {
+      v += a * noise(p, period);
+      norm += a;
+      p = p * 2.0 + vec2(17.0, 9.0);
+      period *= 2.0;
+      a *= OCTAVE_GAIN;
+    }
+    return v / norm;
+  }
+
+  void main() {
+    // Shared field: x = pitch position, y = timeline time (the scroll and
+    // a slow upward rise are removed via fieldShift).
+    vec2 p = vWorld / worldWidth * SCALE - vec2(0.0, fieldShift);
+    vec2 q = vec2(
+      fbm(p + vec2(0.0, swirlPhase)),
+      fbm(p + vec2(5.2, 1.3) - vec2(swirlPhase, 0.0))
+    );
+    float n = fbm(p + WARP * (q - 0.5));
+
+    // Age → sparser wisps (dissipation runs 0 near NOW to 1 at the horizon).
+    float dissipation = mix(dissipationBottom, dissipationTop, vUv.y);
+    float threshold = mix(THRESH_YOUNG, THRESH_OLD, dissipation);
+    float density = smoothstep(threshold - THRESH_SOFT, threshold + THRESH_SOFT, n);
+
+    // Footprint: peak at the real pitch, symmetric falloff, eroded inward.
+    float d = clamp(abs(vUv.x - 0.5) * 2.0 + EDGE_BREAKUP * (n - 0.5), 0.0, 1.0);
+    float footprint = 1.0 - smoothstep(min(1.0 - edgeSoftness, 0.999), 1.0, d);
+
+    // Soft ends, eroded inward.
+    float endSoft = END_SOFT * worldWidth;
+    float endDist = min(vUv.y, 1.0 - vUv.y) * stripHeight;
+    float ends = smoothstep(0.0, endSoft, endDist + endSoft * EDGE_BREAKUP * (n - 0.5));
+
+    float opacity = mix(bottomOpacity, topOpacity, vUv.y) * density * footprint * ends;
+    gl_FragColor = vec4(color, opacity);
+  }
+`;
+
+// ============================================================================
 // Renderer Implementation
 // ============================================================================
 
@@ -98,6 +263,11 @@ export class ThreeJSRenderer implements IRenderer {
   // Viewport resolution for LineMaterial (thick lines)
   private resolution = new THREE.Vector2(800, 600);
 
+  /** Session time of the frame being rendered, seconds; drives overtone
+   *  steam. Stays 0 when the viewer prefers reduced motion. */
+  private frameTimeSec = 0;
+  private reducedMotion = false;
+
   constructor(config: ThreeJSRendererConfig = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
@@ -106,6 +276,11 @@ export class ThreeJSRenderer implements IRenderer {
    * Attach to a canvas element and initialize Three.js.
    */
   attach(canvas: HTMLCanvasElement): void {
+    this.reducedMotion =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     // Create WebGL renderer
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -186,6 +361,8 @@ export class ThreeJSRenderer implements IRenderer {
    */
   render(frame: SceneFrame): void {
     if (!this.renderer || !this.scene || !this.camera) return;
+
+    this.frameTimeSec = this.reducedMotion ? 0 : frame.t / 1000;
 
     // Track which entities are in this frame
     const currentIds = new Set<string>();
@@ -338,54 +515,66 @@ export class ThreeJSRenderer implements IRenderer {
    * Position is at onsetY (top of bar); rectangle extends downward by barHeight.
    * Uses a gradient shader: top edge (onset/horizon) fades, bottom edge (NOW) stays bright.
    *
-   * Overtone strips (RFC 012) share this path with two differences: a
-   * horizontal edge falloff (`edgeSoftness` from entity data) and
-   * additive blending, so coincident partials visibly sum. They draw
-   * before note strips so a played note sits on top of its glow.
+   * Overtone strips (RFC 012) share the geometry path but use the
+   * steam shader (see OVERTONE_STEAM_FRAGMENT) with additive blending,
+   * so coincident partials visibly sum. They draw before note strips so
+   * a played note sits on top of its haze.
    */
   private updateNoteStrip(entity: Entity): void {
     if (!this.scene || !this.planeGeometry) return;
 
     let mesh = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
 
+    const isOvertone = entity.data?.type === "overtone-strip";
+
     if (!mesh) {
-      const isOvertone = entity.data?.type === "overtone-strip";
-      const material = new THREE.ShaderMaterial({
-        transparent: true,
-        side: THREE.DoubleSide,
-        blending: isOvertone ? THREE.AdditiveBlending : THREE.NormalBlending,
-        depthWrite: !isOvertone,
-        uniforms: {
-          color: { value: new THREE.Color() },
-          topOpacity: { value: 1.0 },
-          bottomOpacity: { value: 1.0 },
-          edgeSoftness: { value: 0.0 },
-        },
-        vertexShader: `
-          varying vec2 vUv;
-          void main() {
-            vUv = uv;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }
-        `,
-        fragmentShader: `
-          uniform vec3 color;
-          uniform float topOpacity;
-          uniform float bottomOpacity;
-          uniform float edgeSoftness;
-          varying vec2 vUv;
-          void main() {
-            float opacity = mix(bottomOpacity, topOpacity, vUv.y);
-            // Horizontal falloff: 0 at centre, 1 at either edge.
-            // edgeSoftness 0 keeps hard edges (note strips).
-            if (edgeSoftness > 0.0) {
-              float d = abs(vUv.x - 0.5) * 2.0;
-              opacity *= 1.0 - smoothstep(1.0 - edgeSoftness, 1.0, d);
-            }
-            gl_FragColor = vec4(color, opacity);
-          }
-        `,
-      });
+      const material = isOvertone
+        ? new THREE.ShaderMaterial({
+            transparent: true,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            uniforms: {
+              color: { value: new THREE.Color() },
+              topOpacity: { value: 1.0 },
+              bottomOpacity: { value: 1.0 },
+              edgeSoftness: { value: 1.0 },
+              dissipationTop: { value: 0.0 },
+              dissipationBottom: { value: 0.0 },
+              fieldShift: { value: 0.0 },
+              swirlPhase: { value: 0.0 },
+              worldWidth: { value: this.config.worldWidth },
+              stripHeight: { value: 0.0 },
+            },
+            vertexShader: OVERTONE_STEAM_VERTEX,
+            fragmentShader: OVERTONE_STEAM_FRAGMENT,
+          })
+        : new THREE.ShaderMaterial({
+            transparent: true,
+            side: THREE.DoubleSide,
+            uniforms: {
+              color: { value: new THREE.Color() },
+              topOpacity: { value: 1.0 },
+              bottomOpacity: { value: 1.0 },
+            },
+            vertexShader: `
+              varying vec2 vUv;
+              void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `,
+            fragmentShader: `
+              uniform vec3 color;
+              uniform float topOpacity;
+              uniform float bottomOpacity;
+              varying vec2 vUv;
+              void main() {
+                float opacity = mix(bottomOpacity, topOpacity, vUv.y);
+                gl_FragColor = vec4(color, opacity);
+              }
+            `,
+          });
       mesh = new THREE.Mesh(this.planeGeometry, material);
       if (isOvertone) mesh.renderOrder = -1;
       this.scene.add(mesh);
@@ -412,8 +601,24 @@ export class ThreeJSRenderer implements IRenderer {
       (entity.data?.topOpacity as number) ?? (entity.style.opacity ?? 1);
     material.uniforms.bottomOpacity.value =
       (entity.data?.bottomOpacity as number) ?? (entity.style.opacity ?? 1);
-    material.uniforms.edgeSoftness.value =
-      (entity.data?.edgeSoftness as number) ?? 0;
+    if (isOvertone) {
+      const u = material.uniforms;
+      u.edgeSoftness.value = (entity.data?.edgeSoftness as number) ?? 1;
+      u.dissipationTop.value = (entity.data?.dissipationTop as number) ?? 0;
+      u.dissipationBottom.value = (entity.data?.dissipationBottom as number) ?? 0;
+      // Offsets grow with session time; wrap them here (double precision)
+      // so the shader's coordinates stay small. The field is periodic in
+      // STEAM_PERIOD, so wrapping is seamless.
+      const wrap = (v: number) => ((v % STEAM_PERIOD) + STEAM_PERIOD) % STEAM_PERIOD;
+      const offsetWorld =
+        ((entity.data?.fieldOffsetY as number) ?? 0) * this.config.worldHeight;
+      u.fieldShift.value = wrap(
+        (offsetWorld / this.config.worldWidth) * STEAM_SCALE_Y +
+          this.frameTimeSec * STEAM_RISE_PER_S * STEAM_SCALE_Y,
+      );
+      u.swirlPhase.value = wrap(this.frameTimeSec * STEAM_SWIRL_PER_S);
+      u.stripHeight.value = barHeight;
+    }
   }
 
   /**

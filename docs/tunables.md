@@ -46,7 +46,7 @@ Only RhythmLens exposes true macros at the moment. The others are configured ent
 | `GRID_COLORS.barLine` | `{h:200,s:0.3,v:0.6,a:0.5}` | Bar grid line colour | ⭐ | 🎵 | cosmetic | internal |
 | `GRID_COLORS.nowLine` | `{h:0,s:0,v:0.8,a:0.6}` | NOW line colour | ⭐⭐ | 🎵 | cosmetic | internal |
 | `GRID_COLORS.referenceLine` | `{h:0,s:0,v:0.9,a:0.7}` | Per-note reference line colour | ⭐⭐ | 🎵🎵 | cosmetic | internal |
-| `OVERTONE_WIDTH_RATIO` | 2.0 | Overtone strip width as a multiple of note-strip width (RFC 012). Must exceed 1 so a coincident partial is not hidden behind the note strip it reinforces | ⭐⭐ | 🎵🎵 | cosmetic | internal |
+| `OVERTONE_WIDTH_RATIO` | 2.5 | Overtone strip width as a multiple of note-strip width (RFC 012). Must exceed 1 so a coincident partial is not hidden behind the note strip it reinforces | ⭐⭐ | 🎵🎵 | cosmetic | internal |
 | `OVERTONE_CULL_OPACITY` | 0.02 | Overtone strips whose brighter end is below this are not emitted | ⭐ | 🎵 | cosmetic | internal |
 | `OVERTONE_EDGE_SOFTNESS` | 1.0 | Horizontal edge falloff of overtone strips, 0 hard .. 1 soft from centre; passed to the renderer as `data.edgeSoftness` | ⭐⭐ | 🎵 | cosmetic | internal |
 
@@ -265,6 +265,23 @@ These live in `ThreeJSRenderer.ts` and don't surface as top-level constants. The
 | `worldHeight` config default | 75 | Renderer world height | — | — | layout | internal |
 | Various `??` colour fallbacks | `{h:0,s:0,v:0.5}` etc. | Default colours for entities missing explicit style.color. Ideally never hit. | — | — | cosmetic | internal |
 
+Overtone steam (top-level constants in `ThreeJSRenderer.ts`, RFC 012). Spatial units are fractions of world width; starting values from CPU-rendered previews, tune by eye.
+
+| Constant | Value | Controls | Impact | Pertinence | Class | Decision |
+|---|---|---|---|---|---|---|
+| `STEAM_SCALE_X` / `STEAM_SCALE_Y` | 18 / 6 | Noise frequency per world width; lower Y stretches features upward into wisps | ⭐⭐ | — | cosmetic | internal |
+| `STEAM_OCTAVES` / `STEAM_OCTAVE_GAIN` | 3 / 0.55 | Detail of the haze; more or stronger octaves read as grain | ⭐⭐ | — | cosmetic | internal |
+| `STEAM_WARP` | 2.4 | How far wisps curl (domain-warp strength) | ⭐⭐ | — | cosmetic | internal |
+| `STEAM_RISE_PER_S` | 0.012 | Upward drift of the steam within its strip | ⭐⭐ | — | dynamics | internal |
+| `STEAM_SWIRL_PER_S` | 0.25 | How fast wisps change shape (~4 s cycle) | ⭐⭐ | — | dynamics | internal |
+| `STEAM_THRESHOLD_YOUNG` / `_OLD` | 0.32 / 0.6 | Density threshold near NOW vs near the horizon; the rise breaks old haze into sparse wisps | ⭐⭐ | 🎵 | cosmetic | internal |
+| `STEAM_THRESHOLD_SOFTNESS` | 0.25 | Softness of the density threshold | ⭐ | — | cosmetic | internal |
+| `STEAM_EDGE_BREAKUP` | 0.6 | Inward erosion of side and end edges by the noise | ⭐ | — | cosmetic | internal |
+| `STEAM_END_SOFTNESS` | 0.006 | Soft fade at strip ends (no hard horizontal cut) | ⭐ | — | cosmetic | internal |
+| `STEAM_PERIOD` | 64 | Noise lattice period; lets offsets wrap so long sessions keep shader precision | — | — | internal | internal |
+
+Motion follows the session clock (`SceneFrame.t`) and is frozen when the viewer prefers reduced motion.
+
 ---
 
 ## Obscured / inline params on the entity contract (Nic's specific ask)
@@ -276,7 +293,9 @@ These are the ones NOT expressed as top-level constants — they live inside ent
 | `note-strip` | `topOpacity` | falls back to `style.opacity` | ThreeJSRenderer line 370 | Per-note top-edge fade, computed inline in RhythmLens. |
 | `note-strip` | `bottomOpacity` | falls back to `style.opacity` | ThreeJSRenderer line 372 | Per-note bottom-edge fade. |
 | `overtone-strip` | `topOpacity` / `bottomOpacity` | falls back to `style.opacity` | ThreeJSRenderer `updateNoteStrip` | Partial level × the note strip's own top/bottom opacity (RFC 012). |
-| `overtone-strip` | `edgeSoftness` | 0 (renderer fallback), `OVERTONE_EDGE_SOFTNESS` from the lens | ThreeJSRenderer `edgeSoftness` uniform | Horizontal smoothstep falloff; overtone strips also use additive blending and draw beneath note strips. |
+| `overtone-strip` | `edgeSoftness` | 1 (renderer fallback), `OVERTONE_EDGE_SOFTNESS` from the lens | Steam shader `edgeSoftness` uniform | Horizontal falloff; overtone strips also use additive blending and draw beneath note strips. |
+| `overtone-strip` | `dissipationTop` / `dissipationBottom` | 0 | Steam shader uniforms | Age at each end, 0 at NOW to 1 at the screen top (`dissipationAt` in RhythmLens); drives the breakup into wisps. |
+| `overtone-strip` | `fieldOffsetY` | 0 | Steam shader `fieldShift` (wrapped) | How far the timeline has scrolled, so the steam field is anchored to timeline time. |
 | `chord-duration-bar` (in HarmonyLens's scrolling strip) | `topOpacity` | inline calc | HarmonyLens line 1077 | Same gradient pattern as note strips. |
 | `chord-duration-bar` | `bottomOpacity` | inline calc | HarmonyLens line 1078 | Same. |
 | `connector-strip` | `plateauFraction` | 0.1 (grammar), 0.2 (renderer fallback) | HarmonyLens line 944 → renderer 628 → uniform 877 | The one Nic flagged. Strip's opacity plateau before the smoothstep fade. |

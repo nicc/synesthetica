@@ -93,7 +93,7 @@ const MIN_NOTE_STRIP_HEIGHT = 0.008;
 /** Overtone strip width as a multiple of note-strip width (RFC 012).
  *  Must exceed 1: a coincident partial (C's 3rd under a played G, +2¢)
  *  would otherwise sit entirely behind the note strip it reinforces. */
-const OVERTONE_WIDTH_RATIO = 2.0;
+const OVERTONE_WIDTH_RATIO = 2.5;
 
 /** Overtone strips whose brighter end falls below this opacity are
  *  not emitted. */
@@ -102,6 +102,11 @@ const OVERTONE_CULL_OPACITY = 0.02;
 /** Horizontal edge falloff for overtone strips, 0 (hard) .. 1 (fully
  *  soft from centre to edge). Read by the renderer from entity data. */
 const OVERTONE_EDGE_SOFTNESS = 1.0;
+
+/** Steam dissipation at a screen position: 0 at the NOW line (young),
+ *  rising to 1 at the top of the screen (old). Age and height are the
+ *  same axis in this lens. */
+const dissipationAt = (y: number): number => 1 - Math.min(Math.max(y, 0) / NOW_LINE_Y, 1);
 
 // Grid colors
 const GRID_COLORS = {
@@ -751,6 +756,9 @@ export class RhythmLens implements IVisualLens {
     if (!an.partials) return [];
     const note = an.note;
     const entities: Entity[] = [];
+    // How far the timeline has scrolled since t = 0, so the renderer can
+    // anchor the steam field to timeline time rather than to the screen.
+    const fieldOffsetY = NOW_LINE_Y - timeToY(0, t);
     for (const partial of an.partials) {
       const topOpacity = partial.level * strip.topOpacity;
       const bottomOpacity = partial.level * strip.bottomOpacity;
@@ -781,6 +789,9 @@ export class RhythmLens implements IVisualLens {
           topOpacity,
           bottomOpacity,
           edgeSoftness: OVERTONE_EDGE_SOFTNESS,
+          dissipationTop: dissipationAt(strip.barTop),
+          dissipationBottom: dissipationAt(strip.endY),
+          fieldOffsetY,
         },
       });
     }

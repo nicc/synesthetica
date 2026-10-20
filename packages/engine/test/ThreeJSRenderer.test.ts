@@ -418,20 +418,33 @@ describe("ThreeJSRenderer", () => {
       expect(true).toBe(true);
     });
 
-    it("renders overtone strips soft-edged and additive, beneath note strips", () => {
-      const strip = (id: string, type: string, edgeSoftness?: number) =>
+    it("renders overtone strips as additive steam beneath clean note strips", () => {
+      const strip = (id: string, type: string, extra: Record<string, unknown> = {}) =>
         createEntity({
           id,
           kind: "particle",
-          data: { type, barHeight: 0.2, topOpacity: 0.3, bottomOpacity: 0.5, edgeSoftness },
+          data: { type, barHeight: 0.2, topOpacity: 0.3, bottomOpacity: 0.5, ...extra },
         });
       renderer.render(
-        createSceneFrame([strip("ot", "overtone-strip", 1), strip("ns", "note-strip")]),
+        createSceneFrame([
+          strip("ot", "overtone-strip", {
+            edgeSoftness: 1,
+            dissipationTop: 0.6,
+            dissipationBottom: 0.1,
+            fieldOffsetY: 0.2,
+          }),
+          strip("ns", "note-strip"),
+        ]),
       );
 
       type StripMesh = {
         renderOrder?: number;
-        material: { blending: number; depthWrite: boolean; uniforms: Record<string, { value: unknown }> };
+        material: {
+          blending: number;
+          depthWrite: boolean;
+          fragmentShader: string;
+          uniforms: Record<string, { value: unknown }>;
+        };
       };
       const objects = (renderer as unknown as { entityObjects: Map<string, StripMesh> })
         .entityObjects;
@@ -440,11 +453,19 @@ describe("ThreeJSRenderer", () => {
 
       expect(overtone.material.blending).toBe(2); // AdditiveBlending
       expect(overtone.material.depthWrite).toBe(false);
-      expect(overtone.material.uniforms.edgeSoftness.value).toBe(1);
       expect(overtone.renderOrder).toBe(-1);
+      expect(overtone.material.fragmentShader).toContain("fbm");
+      const u = overtone.material.uniforms;
+      expect(u.edgeSoftness.value).toBe(1);
+      expect(u.dissipationTop.value).toBe(0.6);
+      expect(u.dissipationBottom.value).toBe(0.1);
+      // fieldOffsetY 0.2 × worldHeight 75 / worldWidth 100 × scale-y 6 = 0.9,
+      // plus rise 0.012/s × 6 × 1 s (frame.t = 1000 ms) = 0.072
+      expect(u.fieldShift.value).toBeCloseTo(0.972);
+      expect(u.swirlPhase.value).toBeCloseTo(0.25);
 
       expect(note.material.blending).toBe(1); // NormalBlending
-      expect(note.material.uniforms.edgeSoftness.value).toBe(0);
+      expect(note.material.fragmentShader).not.toContain("fbm");
       expect(note.renderOrder ?? 0).toBe(0);
     });
   });

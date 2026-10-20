@@ -146,7 +146,7 @@ For each annotated note with `partials`, emit one overtone strip per partial:
 
 **Renderer changes:** the note-strip ShaderMaterial gains an `edgeSoftness` uniform; the fragment shader multiplies opacity by a horizontal falloff (`smoothstep` from the strip's centre to its edge). Overtone strips use additive blending; note strips keep `edgeSoftness = 0` and normal blending. Opacity alone is already used for release phase and screen position and cannot carry the register.
 
-A later surface treatment (steam, dust, swirl) is preferably procedural noise in the same fragment shader, with density tracking level, rather than a CPU particle system: it adds no entities, and additive overlap then reads as denser.
+*(Decided 2026-10-20.)* Surface treatment is **steam**: procedural, domain-warped value noise in the overtone strip's own fragment shader, no particle system. The field is shared (indexed by pitch position and timeline time) so coincident strips add as denser steam of the same kind; breakup is inward only; haze breaks into sparse wisps with age (dissipation rises from 0 at NOW to 1 at the horizon); motion is uniform, meaningless for now, follows the session clock and freezes under reduced motion. Beating as a motion encoding is tracked in synesthetica-xt7e.
 
 **Colour** — a user toggle (`system:harmonic-series:colour`), decided 2026-10-20 after the snapshot round:
 - *`pitch`* (default): the overtone strip at the G column is G-coloured. Honours "colour encodes pitch class" (I14), and coincident partials from different notes share one colour, so pile-up reads as one reinforced pitch. Risk: reads as a quietly played G; the register (width, softness, additive glow) carries the distinction.
@@ -228,8 +228,7 @@ NOW ━━━━━━━━━━━━━━━━━━━━━━━━━�
 ## Open questions
 
 1. Default level when enabled, and whether level→opacity needs a curve. Constraint: the 7th partial survives culling.
-2. Surface treatment for the ethereal register (procedural noise preferred), after the soft-edge version is seen.
-3. Whether the velocity-brightening term earns its place.
+2. Whether the velocity-brightening term earns its place.
 
 Resolved 2026-10-20: colour (user toggle, default pitch), separate decay (dropped; fades with note strip), post-release behaviour (fades with note strip), default rolloff (0.2 after in-app review), partials between B and C (nearest pc + cents offset; mapping unchanged), provider interface (none until a second source).
 
@@ -261,7 +260,7 @@ is kept for history and is not updated.
 **What This Spec Does NOT Cover:** amend "Audio-derived feature mappings (future work)" to note that measured partials would arrive from an upstream stabilizer in the `{ n, level }` shape the model produces.
 
 
-Still open after the amendment: default level and any level→opacity curve, edge treatment tuning, surface treatment, and anything about the glyph.
+Still open after the amendment: default level and any level→opacity curve, edge and steam tuning by eye, and anything about the glyph.
 
 ## Non-goals
 

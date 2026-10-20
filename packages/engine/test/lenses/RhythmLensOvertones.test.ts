@@ -142,6 +142,30 @@ describe("RhythmLens overtone strips", () => {
     expect(flatC.position!.x).toBeLessThan(c.position!.x);
   });
 
+  it("dissipates with age: older (higher) ends get sparser steam", () => {
+    const fifth = overtones(render([{ id: "c", pc: 0, onset: 1000 }])).find(
+      (e) => e.data!.n === 3,
+    )!;
+    // Held note: bottom at NOW (young), top three seconds up (older)
+    expect(fifth.data!.dissipationBottom).toBeCloseTo(0, 6);
+    expect(fifth.data!.dissipationTop as number).toBeGreaterThan(0.3);
+  });
+
+  it("anchors the steam field to timeline time, so it scrolls with the strip", () => {
+    const at = (t: number) =>
+      overtones(render([{ id: "c", pc: 0, onset: 2000, release: 2500 }], { t })).find(
+        (e) => e.data!.n === 3,
+      )!;
+    const a = at(3000);
+    const b = at(3600);
+    // Screen position moves; position + offset (timeline coordinate) does not
+    expect(b.position!.y).toBeLessThan(a.position!.y);
+    expect(b.position!.y + (b.data!.fieldOffsetY as number)).toBeCloseTo(
+      a.position!.y + (a.data!.fieldOffsetY as number),
+      9,
+    );
+  });
+
   it("culls overtone strips below the opacity floor", () => {
     // Level 0.1: the 9th partial is 0.011, below OVERTONE_CULL_OPACITY
     const ns = overtones(render(held([0]), { level: 0.1 })).map((e) => e.data!.n);
