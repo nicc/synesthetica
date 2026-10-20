@@ -93,7 +93,7 @@ const MIN_NOTE_STRIP_HEIGHT = 0.008;
 /** Overtone strip width as a multiple of note-strip width (RFC 012).
  *  Must exceed 1: a coincident partial (C's 3rd under a played G, +2¢)
  *  would otherwise sit entirely behind the note strip it reinforces. */
-const OVERTONE_WIDTH_RATIO = 2.5;
+const OVERTONE_WIDTH_RATIO = 2;
 
 /** Overtone strips whose brighter end falls below this opacity are
  *  not emitted. */
