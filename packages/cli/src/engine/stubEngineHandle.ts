@@ -17,10 +17,11 @@ import type {
   Unsubscribe,
 } from "./engineHandle.js";
 import { defaultMacroValues } from "./defaultMacroValues.js";
+import type { MacroValue } from "@synesthetica/contracts";
 
 export interface StubOptions {
   label?: string;
-  initialMacros?: Record<string, number | string>;
+  initialMacros?: Record<string, MacroValue>;
 }
 
 export class StubEngineHandle implements EngineHandle {
@@ -77,7 +78,7 @@ export class StubEngineHandle implements EngineHandle {
   }
 
   // ---- macros ----
-  async setMacro(name: string, value: number | string): Promise<StateSnapshot> {
+  async setMacro(name: string, value: MacroValue): Promise<StateSnapshot> {
     this.opLog.push({ method: "setMacro", args: [name, value] });
     this.state.macros = {
       intents: { ...this.state.macros.intents, [name]: value },

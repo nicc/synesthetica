@@ -56,6 +56,31 @@ describe("set_macro — discrete", () => {
   });
 });
 
+describe("set_macro — toggle", () => {
+  const engine = new StubEngineHandle();
+
+  it("defaults to the manifest value and accepts a boolean", async () => {
+    expect((await engine.getStateSnapshot()).macros.intents["system:harmonic-series:enabled"]).toBe(false);
+    const r = await setMacroTool.handle(
+      { name: "system:harmonic-series:enabled", value: true },
+      engine,
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.state.macros.intents["system:harmonic-series:enabled"]).toBe(true);
+  });
+
+  it("rejects non-boolean values", async () => {
+    for (const value of ["on", 1]) {
+      const r = await setMacroTool.handle(
+        { name: "system:harmonic-series:enabled", value },
+        engine,
+      );
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error.code).toBe("MACRO_VALUE_WRONG_TYPE");
+    }
+  });
+});
+
 describe("set_macro — compound (linear fan-out)", () => {
   it("time-horizon fans to leaf macros with linear map", async () => {
     const engine = new StubEngineHandle();

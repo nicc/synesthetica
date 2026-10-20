@@ -30,12 +30,13 @@ import {
 import { join } from "node:path";
 import { homedir, platform } from "node:os";
 import type { StateSnapshot } from "../engine/engineHandle.js";
+import type { MacroValue } from "@synesthetica/contracts";
 
 const NAME_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 
 export interface PresetContent {
   version: 1;
-  macros: Record<string, number | string>;
+  macros: Record<string, MacroValue>;
   session: StateSnapshot["session"];
   savedAt: string; // ISO
 }

@@ -104,11 +104,12 @@ function buildPipeline() {
  *  or the current baseline — so a no-op setter can't accidentally pass
  *  by returning the pre-existing value. */
 function pickTestValue(
-  macro: { type: string; default?: number | string },
-  baseline: number | string,
+  macro: { type: string; default?: number | string | boolean },
+  baseline: number | string | boolean,
   range?: [number, number],
   enumValues?: Array<{ value: number | string }>,
-): number | string {
+): number | string | boolean {
+  if (macro.type === "toggle") return !baseline;
   if (macro.type === "continuous" && range) {
     const [lo, hi] = range;
     // Try halfway between default and hi; if that equals baseline,

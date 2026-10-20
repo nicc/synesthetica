@@ -158,11 +158,12 @@ Not in the first increment. Direction agreed: a colourful smudge outside the gly
 
 ## Parameters and control surface
 
-Two continuous macros and one discrete toggle, vocabulary-scoped (precedent: `system:colour-mapping:reference`, consumed by `musical-visual`):
+An on/off toggle, two continuous macros and one discrete choice, vocabulary-scoped (precedent: `system:colour-mapping:reference`, consumed by `musical-visual`):
 
 | Macro | Range | Default | Extremes |
 |---|---|---|---|
-| `system:harmonic-series:level` | 0..1 | 0 (off) | 0: no overlay, no entities. 1: overtone strips at full modelled level. |
+| `system:harmonic-series:enabled` | true / false | false | Toggle, in the panel's Basics (added 2026-10-20). Off: no overlay, no entities. |
+| `system:harmonic-series:level` | 0..1 | 0.25 | Applies while enabled. 0: no entities. 1: overtone strips at full modelled level. |
 | `system:harmonic-series:rolloff` | 0..3 | 1.0 | 0: equal wash across the stencil. 3: only the fifth survives. |
 | `system:harmonic-series:colour` | `pitch` / `fundamental` | `pitch` | Discrete. Landing pitch-class hue, or originating note's hue. |
 

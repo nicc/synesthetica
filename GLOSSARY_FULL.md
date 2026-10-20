@@ -381,7 +381,7 @@ Contains:
 ---
 
 ### Harmonic Series Overlay
-An optional display of the harmonic series each sounding note implies. Modelled, not measured: MIDI carries no timbre, so partial levels come from a generic rolloff. Framed as a theoretical overlay, in the same class as implied-resolution arcs. Off by default. Rendered in the rhythm lens as overtone strips. See SPEC 010 §6 and RFC 012.
+An optional display of the harmonic series each sounding note implies. Modelled, not measured: MIDI carries no timbre, so partial levels come from a generic rolloff. Framed as a theoretical overlay, in the same class as implied-resolution arcs. Off by default (`system:harmonic-series:enabled`). Rendered in the rhythm lens as overtone strips. See SPEC 010 §6 and RFC 012.
 
 ---
 

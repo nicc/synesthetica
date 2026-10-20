@@ -13,6 +13,8 @@
  * short deadline.
  */
 
+import type { MacroValue } from "../annotations/annotations";
+
 // Methods the CLI can call on the engine. Names match EngineHandle.
 export type EngineMethod =
   | "setMacro"
@@ -75,8 +77,8 @@ export interface AvailableInput {
  *   consumer — their leaves do).
  */
 export interface MacroState {
-  intents: Record<string, number | string>;
-  effective: Record<string, number | string>;
+  intents: Record<string, MacroValue>;
+  effective: Record<string, MacroValue>;
 }
 
 /**

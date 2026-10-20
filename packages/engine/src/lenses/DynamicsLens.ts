@@ -16,6 +16,7 @@
  */
 
 import type {
+  MacroValue,
   AnnotatedMusicalFrame,
   IVisualLens,
   LensContext,
@@ -112,7 +113,7 @@ export class DynamicsLens implements IVisualLens {
   }
 
   /** IVisualLens.readMacros — same shape as getMacros, widened. */
-  readMacros(): Record<string, number | string> {
+  readMacros(): Record<string, MacroValue> {
     return { ...this.macros };
   }
 

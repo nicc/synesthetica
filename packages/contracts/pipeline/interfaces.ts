@@ -14,6 +14,7 @@ import type { PartId } from "../parts/parts";
 import type { RawInputFrame } from "../raw/raw";
 import type { MusicalFrame } from "../musical/musical";
 import type { AnnotatedMusicalFrame } from "../annotated/annotated";
+import type { MacroValue } from "../annotations/annotations";
 
 // ============================================================================
 // Source Adapters
@@ -94,7 +95,7 @@ export interface IMusicalStabilizer {
    * rather than the lens side — e.g. harmony:arpeggio-tolerance
    * maps to ChordDetectionStabilizer.pitchDecayMs.
    */
-  setMacro?(name: string, value: number | string): void;
+  setMacro?(name: string, value: MacroValue): void;
 
   /**
    * Optional: return the current values of every macro this
@@ -104,7 +105,7 @@ export interface IMusicalStabilizer {
    * consumers rather than a mirror; used by the wiring-coverage
    * test to assert setMacro actually mutated something.
    */
-  readMacros?(): Record<string, number | string>;
+  readMacros?(): Record<string, MacroValue>;
 }
 
 // ============================================================================
@@ -147,13 +148,13 @@ export interface IVisualVocabulary {
    * The pipeline calls this on every set_macro; vocabs that don't
    * own the given macro ignore it silently. See IMusicalStabilizer.setMacro.
    */
-  setMacro?(name: string, value: number | string): void;
+  setMacro?(name: string, value: MacroValue): void;
 
   /**
    * Optional: return the current values of every macro this vocab
    * accepts, keyed as setMacro takes them. See IMusicalStabilizer.readMacros.
    */
-  readMacros?(): Record<string, number | string>;
+  readMacros?(): Record<string, MacroValue>;
 }
 
 /**
@@ -223,13 +224,13 @@ export interface IVisualLens {
    * consumers. The pipeline translates a scope-prefixed macro id
    * (harmony:linger) to `{ linger: value }` and calls this.
    */
-  setMacros?(macros: Record<string, number | string>): void;
+  setMacros?(macros: Record<string, MacroValue>): void;
 
   /**
    * Optional: return the current values of every macro this lens
    * accepts, keyed by the same camelCase names setMacros uses.
    */
-  readMacros?(): Record<string, number | string>;
+  readMacros?(): Record<string, MacroValue>;
 }
 
 /**

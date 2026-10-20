@@ -56,6 +56,7 @@ function render(
 ): SceneFrame {
   const t = opts.t ?? T;
   const vocab = new MusicalVisualVocabulary({
+    harmonicSeriesEnabled: true,
     harmonicSeriesLevel: opts.level ?? 1,
     // RFC 012 metrics are stated at rolloff 1.0; pinned so a default
     // change does not move them.

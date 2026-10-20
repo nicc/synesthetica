@@ -130,7 +130,7 @@ Returns one preset's full stored content (macro values, session controls, input)
 
 #### `set_macro(name, value, instance?)`
 
-Set an aesthetic macro (any `<scope>:*` or bare cross-cutting name). `value` type varies per the macro's annotation — number for continuous / compound, string or number for discrete.
+Set an aesthetic macro (any `<scope>:*` or bare cross-cutting name). `value` type varies per the macro's annotation — number for continuous / compound, string or number for discrete, boolean for toggle.
 
 Params (JSON Schema):
 ```json
@@ -142,7 +142,7 @@ Params (JSON Schema):
       "description": "Macro id (drawn from macro annotations)."
     },
     "value": {
-      "description": "Value; shape per the macro's type. Continuous/compound: number in [min,max]; discrete: enum value from the macro's enumValues."
+      "description": "Value; shape per the macro's type. Continuous/compound: number in [min,max]; discrete: enum value from the macro's enumValues; toggle: boolean."
     },
     "instance": { "type": "string" }
   },
@@ -306,8 +306,8 @@ The web app renders a control panel derived from the same annotation manifest th
 Controls are grouped by annotation namespace into three collapsible sections. Each section is collapsed by default to keep the panel small.
 
 - **Input** — controls in the `input:*` namespace. Currently just `input:source`; renders as a dropdown of available MIDI devices + audio devices (see §Audio input selection).
-- **Basics** — controls in the `session:*` namespace: key (paired `session:tonic` + `session:mode`), tempo, meter (paired `session:beats-per-bar` + `session:beat-value`), chord mode, metronome. Compact widgets — pair-typed controls render as a single grouped widget (e.g. key selector combines root + mode).
-- **Advanced** — everything else: all aesthetic macros (`system:*`, bare cross-cutting, and lens-scoped). Grouped by scope prefix so the LLM's namespace conventions are visible in the UI.
+- **Basics** — controls in the `session:*` namespace: key (paired `session:tonic` + `session:mode`), tempo, meter (paired `session:beats-per-bar` + `session:beat-value`), chord mode, metronome, followed by every toggle macro (`ToggleMacroAnnotation`, e.g. `system:harmonic-series:enabled`) — feature on/off switches sit with the basics while their fine controls stay in Advanced. Compact widgets — pair-typed controls render as a single grouped widget (e.g. key selector combines root + mode).
+- **Advanced** — everything else: all non-toggle aesthetic macros (`system:*`, bare cross-cutting, and lens-scoped). Grouped by scope prefix so the LLM's namespace conventions are visible in the UI.
 
 ### Widget generation
 
@@ -317,6 +317,7 @@ Each control gets a widget appropriate to its annotation type:
 |---|---|
 | `ContinuousMacroAnnotation` | Slider (range from annotation, current value from state) |
 | `DiscreteMacroAnnotation` | Segmented control or dropdown (enum values) |
+| `ToggleMacroAnnotation` | Toggle (in Basics) |
 | `CompoundMacroAnnotation` | Slider (dispatches to the underlying targets per the compound's fan-out) |
 | `NumberSessionControlAnnotation` (nullable) | Number input + clear button |
 | `EnumSessionControlAnnotation` | Dropdown |

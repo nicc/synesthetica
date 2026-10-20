@@ -34,6 +34,7 @@
 
 import * as Tonal from "tonal";
 import type {
+  MacroValue,
   IMusicalStabilizer,
   RawInputFrame,
   MusicalFrame,
@@ -319,7 +320,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
    *   harmony:note-threshold      → minPitchClasses
    *   harmony:detection-stability → hysteresisMs
    */
-  setMacro(name: string, value: number | string): void {
+  setMacro(name: string, value: MacroValue): void {
     switch (name) {
       case "harmony:arpeggio-tolerance":
         this.setConfig({ pitchDecayMs: Number(value) });
@@ -335,7 +336,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
 
   /** IMusicalStabilizer.readMacros — every macro this stabilizer owns,
    *  keyed by the qualified macro id that setMacro takes. */
-  readMacros(): Record<string, number | string> {
+  readMacros(): Record<string, MacroValue> {
     return {
       "harmony:arpeggio-tolerance": this.config.pitchDecayMs,
       "harmony:note-threshold": this.config.minPitchClasses,

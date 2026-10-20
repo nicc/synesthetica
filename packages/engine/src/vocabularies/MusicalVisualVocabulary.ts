@@ -22,6 +22,7 @@
  */
 
 import type {
+  MacroValue,
   IVisualVocabulary,
   MusicalFrame,
   AnnotatedMusicalFrame,
@@ -81,9 +82,15 @@ export interface MusicalVisualVocabularyConfig {
   hueDirection?: "cw" | "ccw";
 
   /**
-   * Harmonic series overlay level, 0..1 (RFC 012). 0 disables the
-   * overlay: no partials are annotated.
-   * @default 0
+   * Harmonic series overlay on/off (RFC 012). Off annotates no partials.
+   * @default false
+   */
+  harmonicSeriesEnabled?: boolean;
+
+  /**
+   * Harmonic series overlay level, 0..1 (RFC 012); applies while
+   * enabled. 0 annotates no partials.
+   * @default 0.25
    */
   harmonicSeriesLevel?: number;
 
@@ -106,7 +113,8 @@ const DEFAULT_CONFIG: Required<MusicalVisualVocabularyConfig> = {
   referencePc: 0, // C — matches session:tonic's PC=0 convention
   referenceHue: 0, // Red
   hueDirection: "cw",
-  harmonicSeriesLevel: 0,
+  harmonicSeriesEnabled: false,
+  harmonicSeriesLevel: 0.25,
   harmonicSeriesRolloff: PARTIAL_ROLLOFF_DEFAULT,
   partialColourMode: "pitch",
 };
@@ -132,13 +140,17 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
 
   /** Apply a manifest macro. Handles `system:colour-mapping:reference`
    *  (a degree on the colour wheel anchored to pitch class 0, C) and the
-   *  harmonic series overlay's `system:harmonic-series:level` / `:rolloff`
-   *  / `:colour`.
+   *  harmonic series overlay's `system:harmonic-series:enabled` / `:level`
+   *  / `:rolloff` / `:colour`.
    *  Other macros are ignored. */
-  setMacro(name: string, value: number | string): void {
+  setMacro(name: string, value: MacroValue): void {
     if (name === "system:colour-mapping:reference") {
       const hue = ((Number(value) % 360) + 360) % 360;
       this.config = { ...this.config, referencePc: 0, referenceHue: hue };
+    } else if (name === "system:harmonic-series:enabled") {
+      if (typeof value === "boolean") {
+        this.config = { ...this.config, harmonicSeriesEnabled: value };
+      }
     } else if (name === "system:harmonic-series:level") {
       this.config = { ...this.config, harmonicSeriesLevel: Number(value) };
     } else if (name === "system:harmonic-series:rolloff") {
@@ -160,9 +172,10 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
   }
 
   /** Return current values for every macro this vocab accepts. */
-  readMacros(): Record<string, number | string> {
+  readMacros(): Record<string, MacroValue> {
     return {
       "system:colour-mapping:reference": this.config.referenceHue,
+      "system:harmonic-series:enabled": this.config.harmonicSeriesEnabled,
       "system:harmonic-series:level": this.config.harmonicSeriesLevel,
       "system:harmonic-series:rolloff": this.config.harmonicSeriesRolloff,
       "system:harmonic-series:colour": this.config.partialColourMode,
@@ -176,7 +189,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     // Partial levels depend only on the overlay macros, not the note,
     // so the stencil is computed once per frame.
     const partialLevels = modelPartialLevels(
-      this.config.harmonicSeriesLevel,
+      this.config.harmonicSeriesEnabled ? this.config.harmonicSeriesLevel : 0,
       this.config.harmonicSeriesRolloff,
     );
 

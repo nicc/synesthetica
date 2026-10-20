@@ -319,16 +319,35 @@ const macros: MacroAnnotation[] = [
   },
 
   {
-    id: "system:harmonic-series:level",
+    id: "system:harmonic-series:enabled",
     name: "Harmonic series overlay",
-    aliases: ["overtones", "overtone overlay", "harmonic series", "partials"],
+    aliases: ["overtones", "overtone overlay", "harmonic series", "partials", "show overtones"],
+    type: "toggle",
+    default: false, // off — matches MusicalVisualVocabulary.DEFAULT_CONFIG
+    affects: ["harmony", "melody"],
+    notes: [
+      "Theoretical overlay: the harmonic series each sounding note implies, modelled with a generic rolloff. MIDI carries no timbre, so this is not a measurement of the instrument. Never describe it as the player's overtones.",
+      "When true, the rhythm lens draws an overtone strip for partials 3, 5, 7 and 9 of every note (P5, M3, m7, M2 above it) at their real pitch, not snapped to the pitch-class columns: the 7th partial sits visibly flat of the ♭7 column. Partials 2, 4 and 8 share the note's own pitch class and are not drawn. Brightness is set by system:harmonic-series:level.",
+      "What to look for: shared partials pile up. Under C major, D and B glow although neither was played. G alone puts a faint, flat F (its 7th partial) — the dominant seventh's ♭7 is already in the root's series. In C–E, C's 5th partial sits just flat beside the played E; in C–E♭ no partial of C lands on E♭.",
+    ],
+    humanNotes: [
+      "Shows the overtones each note implies as faint, soft strips in the rhythm view.",
+      "This is the theoretical harmonic series, not a measurement of your instrument. Where overtones from different notes line up, they add together. Fine-tune brightness and colour under Advanced.",
+    ],
+    consumers: [{ kind: "vocab", id: "musical-visual", macroKey: "system:harmonic-series:enabled" }],
+  },
+
+  {
+    id: "system:harmonic-series:level",
+    name: "Overtone level",
+    aliases: ["overtone brightness", "overtone amount", "overtone strength"],
     type: "continuous",
     range: [0, 1],
-    default: 0, // off — matches MusicalVisualVocabulary.DEFAULT_CONFIG
+    default: 0.25, // matches MusicalVisualVocabulary.DEFAULT_CONFIG
     affects: ["harmony", "melody"],
     directionality: {
       low: {
-        description: "overlay off at 0; only played notes are drawn",
+        description: "faint overtone strips; 0 draws none",
         tendsTo: ["keep the view to what was played"],
       },
       high: {
@@ -337,14 +356,12 @@ const macros: MacroAnnotation[] = [
       },
     },
     notes: [
-      "Theoretical overlay: the harmonic series each sounding note implies, modelled with a generic rolloff. MIDI carries no timbre, so this is not a measurement of the instrument. Never describe it as the player's overtones.",
-      "0 is off. Above 0, the rhythm lens draws an overtone strip for partials 3, 5, 7 and 9 of every note (P5, M3, m7, M2 above it) at their real pitch, not snapped to the pitch-class columns: the 7th partial sits visibly flat of the ♭7 column. Partials 2, 4 and 8 share the note's own pitch class and are not drawn.",
-      "What to look for: shared partials pile up. Under C major, D and B glow although neither was played. G alone puts a faint, flat F (its 7th partial) — the dominant seventh's ♭7 is already in the root's series. In C–E, C's 5th partial sits just flat beside the played E; in C–E♭ no partial of C lands on E♭.",
+      "Brightness of the harmonic series overlay. Only has an effect while system:harmonic-series:enabled is true.",
       "Values well below 1 read best. Near 1 the strongest overtone columns approach the opacity of played notes.",
     ],
     humanNotes: [
-      "Shows the overtones each note implies as faint, soft strips in the rhythm view. 0 turns it off.",
-      "This is the theoretical harmonic series, not a measurement of your instrument. Where overtones from different notes line up, they add together.",
+      "How bright the overtone strips are. Only applies while the harmonic series overlay is on.",
+      "Low values keep overtones in the background; high values make shared overtones rival the notes you played.",
     ],
     consumers: [{ kind: "vocab", id: "musical-visual", macroKey: "system:harmonic-series:level" }],
   },
@@ -369,12 +386,12 @@ const macros: MacroAnnotation[] = [
     },
     notes: [
       "Exponent of the modelled partial level, n^(−rolloff). 1.0 ≈ sawtooth (−6 dB/octave); 2.0 ≈ plucked or struck strings (−12 dB/octave). A generic curve, not an instrument model.",
-      "No visible effect while system:harmonic-series:level is 0.",
+      "No visible effect while system:harmonic-series:enabled is false.",
       "Above about 2 the 7th partial (the dominant seventh's ♭7) is too faint to see.",
     ],
     humanNotes: [
       "How quickly the higher overtones fade relative to the fifth. Low shows more overtones; high leaves only the fifth.",
-      "Has no effect while the harmonic series overlay is at 0.",
+      "Has no effect while the harmonic series overlay is off.",
     ],
     consumers: [{ kind: "vocab", id: "musical-visual", macroKey: "system:harmonic-series:rolloff" }],
   },
@@ -421,7 +438,7 @@ const macros: MacroAnnotation[] = [
     notes: [
       "How overtone strips are coloured. `pitch`: each overtone strip takes the hue of the pitch class it lands on, like a played note in that column, so coincident partials from different notes share a colour and pile up as one. `fundamental`: each overtone strip takes the hue of the note that produced it, so you can see which note an overtone comes from.",
       "`fundamental` shows origin at the expense of harmonic intuition: the column's colour no longer names its pitch, and coincident partials from different notes appear as mixed colours rather than one reinforced pitch. Suggest it when the user asks where an overtone comes from; otherwise keep `pitch`.",
-      "No visible effect while system:harmonic-series:level is 0.",
+      "No visible effect while system:harmonic-series:enabled is false.",
     ],
     humanNotes: [
       "Pitch colours each overtone by the note it sounds as, matching the rest of the view. Fundamental colours it by the note that produced it.",
@@ -777,7 +794,7 @@ const concepts: SystemConceptAnnotation[] = [
   {
     term: "harmonic-series-overlay",
     definition:
-      "An optional theoretical overlay of the harmonic series each sounding note implies, drawn in the rhythm lens as overtone strips. Partial levels are modelled from a generic rolloff, not measured — MIDI carries no timbre. Off by default (system:harmonic-series:level = 0). Partials are never notes: chord detection, dynamics and harmony analysis do not see them.",
+      "An optional theoretical overlay of the harmonic series each sounding note implies, drawn in the rhythm lens as overtone strips. Partial levels are modelled from a generic rolloff, not measured — MIDI carries no timbre. Off by default (system:harmonic-series:enabled = false). Partials are never notes: chord detection, dynamics and harmony analysis do not see them.",
     related: ["overtone-strip", "note-strip"],
     examples: [
       "Under a held C major triad, D and B light up although neither was played: C's 9th and G's 3rd partials coincide at D; E's 3rd and G's 5th at B.",
@@ -969,6 +986,10 @@ const lenses: LensAnnotation[] = [
       "rhythm:emphasis": {
         responsiveness: "strong",
         notes: "compound; fans to rhythm:pulse-intensity + rhythm:reference-linger",
+      },
+      "system:harmonic-series:enabled": {
+        responsiveness: "strong",
+        notes: "draws overtone strips (harmonic series overlay) when true",
       },
       "system:harmonic-series:level": {
         responsiveness: "strong",

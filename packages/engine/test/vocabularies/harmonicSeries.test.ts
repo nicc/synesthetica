@@ -91,8 +91,9 @@ describe("MusicalVisualVocabulary partial annotation", () => {
     expect(annotated.notes[0].partials).toBeUndefined();
   });
 
-  it("annotates partials when the level macro is above 0", () => {
+  it("annotates partials when enabled, at the level macro's gain", () => {
     const vocab = new MusicalVisualVocabulary();
+    vocab.setMacro("system:harmonic-series:enabled", true);
     vocab.setMacro("system:harmonic-series:level", 0.5);
     vocab.setMacro("system:harmonic-series:rolloff", 1);
     const partials = vocab.annotate(frame).notes[0].partials ?? [];
@@ -101,13 +102,16 @@ describe("MusicalVisualVocabulary partial annotation", () => {
   });
 
   it("does not add partials to the note list (partials are not notes)", () => {
-    const vocab = new MusicalVisualVocabulary();
+    const vocab = new MusicalVisualVocabulary({ harmonicSeriesEnabled: true });
     vocab.setMacro("system:harmonic-series:level", 1);
     expect(vocab.annotate(frame).notes).toHaveLength(1);
   });
 
-  it("reads back both overlay macros", () => {
+  it("reads back the overlay macros", () => {
     const vocab = new MusicalVisualVocabulary();
+    expect(vocab.readMacros()["system:harmonic-series:enabled"]).toBe(false);
+    vocab.setMacro("system:harmonic-series:enabled", true);
+    expect(vocab.readMacros()["system:harmonic-series:enabled"]).toBe(true);
     vocab.setMacro("system:harmonic-series:level", 0.3);
     vocab.setMacro("system:harmonic-series:rolloff", 2);
     const macros = vocab.readMacros();
@@ -117,7 +121,7 @@ describe("MusicalVisualVocabulary partial annotation", () => {
 
   it("colours partials by pitch or by fundamental", () => {
     const hueConfig = { referencePc: 0 as PitchClass, referenceHue: 0, direction: "cw" as const };
-    const vocab = new MusicalVisualVocabulary({ harmonicSeriesLevel: 1 });
+    const vocab = new MusicalVisualVocabulary({ harmonicSeriesEnabled: true, harmonicSeriesLevel: 1 });
     expect(vocab.readMacros()["system:harmonic-series:colour"]).toBe("pitch");
     const fifthPitch = vocab.annotate(frame).notes[0].partials![0];
     expect(fifthPitch.color.h).toBe(pcToHue(7, hueConfig));
