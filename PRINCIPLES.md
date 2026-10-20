@@ -4,7 +4,7 @@
 id: PRINCIPLES.core-v1
 status: draft
 owner: user
-last_updated: 2026-01-21
+last_updated: 2026-10-20
 ---
 
 ## How to Use This Document
@@ -88,6 +88,12 @@ This approach:
 Example: Testing beat detection with simulated MIDI sequences (subdivisions, rubato, tempo changes) rather than trying to describe "what feels wrong" about the output.
 
 Apply this principle whenever the system's behavior is experiential—where seeing it operate reveals more than describing it.
+
+**At design time, too.** When a design makes a checkable claim — a level survives a threshold, an element fits a gap, a test case shows or doesn't show an effect — compute it before agreeing to the design. A throwaway script against the real constants is usually enough. Prose claims feel verified because they are specific; they are not.
+
+Prioritise the claims that justify the design: success criteria, the reason a default was chosen, the case a feature exists to show. An error there doesn't stay in the document. It becomes a test assertion, a spec sentence and a tuning target.
+
+Example: RFC 012 claimed that a minor-third dyad would show no overtone reinforcement, that a rolloff of 2.0 would keep the 7th partial visible, and that a thinner overtone strip would read as distinct from a played note. A short script using the real cents offsets and layout widths found the opposite in each case: the minor third reinforces more than the major third, rolloff 2.0 leaves the 7th partial at 2%, and a thinner strip sits entirely behind the note it reinforces. All three were caught before code was written.
 
 ### 9. Observation Over Synthesis
 

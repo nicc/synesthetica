@@ -24,6 +24,8 @@ Before any implementation, use conversation to develop the visual concept. The u
 
 Once the concept is clear, describe visual intent using ASCII/text diagrams. This establishes shared understanding of what the lens should produce.
 
+Where the design is quantitative (positions, levels, thresholds), generate the ASCII from a script using the real constants, rather than drawing it by hand, and list the design's checkable claims with their computed values alongside it. See PRINCIPLES.md §8.
+
 ### 2. SVG Snapshots for Visual Feedback
 
 Tests generate SVG snapshots of SceneFrame output. These provide visual feedback without running the full application:
