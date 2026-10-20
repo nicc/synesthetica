@@ -327,7 +327,7 @@ const macros: MacroAnnotation[] = [
     affects: ["harmony", "melody"],
     notes: [
       "Theoretical overlay: the harmonic series each sounding note implies, modelled with a generic rolloff. MIDI carries no timbre, so this is not a measurement of the instrument. Never describe it as the player's overtones.",
-      "When true, the rhythm lens draws an overtone strip for partials 3, 5, 7 and 9 of every note (P5, M3, m7, M2 above it) at their real pitch, not snapped to the pitch-class columns: the 7th partial sits visibly flat of the ♭7 column. Partials 2, 4 and 8 share the note's own pitch class and are not drawn. Brightness is set by system:harmonic-series:level.",
+      "When true, the rhythm lens draws an overtone strip for partials 3, 5, 7 and 9 of every note (P5, M3, m7, M2 above it) at their real pitch, not snapped to the pitch-class columns: the 7th partial sits visibly flat of the ♭7 column. Partials 2, 4 and 8 share the note's own pitch class and are not drawn. The chord glyph also shows its tones' partials as steam rising from the glyph's edge at each partial's angle (30° per semitone from the root), one set per distinct pitch class. Brightness is set by system:harmonic-series:level.",
       "What to look for: shared partials pile up. Under C major, D and B glow although neither was played. G alone puts a faint, flat F (its 7th partial) — the dominant seventh's ♭7 is already in the root's series. In C–E, C's 5th partial sits just flat beside the played E; in C–E♭ no partial of C lands on E♭.",
     ],
     humanNotes: [
@@ -803,6 +803,13 @@ const concepts: SystemConceptAnnotation[] = [
   },
 
   {
+    term: "overtone-halo",
+    definition:
+      "Steam rising from the chord glyph's edge (hub, spoke tip, or the side of a spoke) when the harmonic series overlay is on. Each partial of each chord tone sits at its pitch's angle around the glyph — the same 30°-per-semitone frame as the spokes, so a partial landing on a chord tone's angle emits from that spoke. Its length is fixed and shorter than any spoke: steam is never a chord tone. Overlapping partials add up. One set per distinct pitch class; octave doubling is ignored.",
+    related: ["harmonic-series-overlay", "chord-quality-glyph", "overtone-strip"],
+  },
+
+  {
     term: "overtone-strip",
     definition:
       "A wide, soft, translucent strip in the rhythm lens for one partial of a sounding note, present when the harmonic series overlay is on. Sits at the partial's real pitch, so it can fall between columns (the 7th partial is visibly flat of ♭7). Spans exactly its note strip's time extent, scrolls with it, and fades with it. Overlapping overtone strips add together. Never a played note.",
@@ -1037,6 +1044,22 @@ const lenses: LensAnnotation[] = [
       "system:colour-mapping:reference": {
         responsiveness: "strong",
         notes: "shifts the palette of all chord numerals, connector strips, and glyph shapes",
+      },
+      "system:harmonic-series:enabled": {
+        responsiveness: "strong",
+        notes: "draws the overtone halo (steam from the chord glyph's edge) when true",
+      },
+      "system:harmonic-series:level": {
+        responsiveness: "strong",
+        notes: "density of the overtone halo",
+      },
+      "system:harmonic-series:rolloff": {
+        responsiveness: "moderate",
+        notes: "relative strength of the halo's upper partials against the fifth",
+      },
+      "system:harmonic-series:colour": {
+        responsiveness: "moderate",
+        notes: "halo hue: landing pitch (default) or originating chord tone",
       },
       "time-horizon": {
         responsiveness: "strong",

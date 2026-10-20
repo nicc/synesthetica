@@ -971,3 +971,27 @@ describe("HarmonyLens", () => {
   });
 
 });
+
+describe("HarmonyLens glyph overtones (RFC 012)", () => {
+  it("passes chord partials and fade-driven dissipation to the chord-shape entity", () => {
+    const lens = new HarmonyLens();
+    const c = createTestChord(0 as PitchClass, "maj", [0, 4, 7]);
+    const partials = [
+      { n: 3, pc: 7 as PitchClass, cents: 2, level: 0.3, color: { h: 210, s: 0.8, v: 0.8, a: 1 }, sourcePc: 0 as PitchClass, angle: 210.6 },
+    ];
+    const withPartials = { ...c, partials };
+
+    const held = lens.update(createTestFrame(1000, withPartials, 0), null)
+      .entities.find((e) => e.data?.type === "chord-shape")!;
+    expect(held.data!.partials).toEqual(partials);
+    expect(held.data!.overtoneDissipation).toBe(0);
+
+    // Chord ends: the glyph fades and its steam dissipates with it
+    lens.update(createTestFrame(1016, null, 0), null);
+    const fading = lens.update(createTestFrame(1076, null, 0), null)
+      .entities.find((e) => e.data?.type === "chord-shape")!;
+    expect(fading.data!.overtoneDissipation as number).toBeGreaterThan(0);
+    expect(fading.data!.overtoneDissipation as number).toBeCloseTo(1 - (fading.style.opacity ?? 1), 9);
+  });
+});
+

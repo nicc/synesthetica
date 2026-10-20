@@ -148,6 +148,7 @@ The vocabulary annotates each note with the partials of the harmonic series it i
 - Register: wider than a note strip, soft-edged, translucent, additive; an overtone strip must be visibly distinct from a played note. Surface is slow procedural steam (renderer shader): breakup stays inside the strip's footprint, the noise field is shared across strips (indexed by pitch position and timeline time) so coincident partials add as denser steam of the same kind, and haze breaks into sparse wisps with age. Motion is uniform across strips and carries no meaning; it follows the session clock and is frozen under reduced motion.
 - Colour (`system:harmonic-series:colour`): `pitch` (default) takes the hue of the pitch class the partial lands on, consistent with I14. `fundamental` takes the hue of the originating note, so colour shows origin rather than landing pitch. This is a user-selected exception to I14 for overtone strips only; it trades the colour-means-pitch reading for provenance.
 - Velocity brightening is not applied.
+- **Chord glyph:** the chord's own tones (once per distinct pitch class; octave doubling ignored) emit steam from the glyph's edge at each partial's angle — 30° per semitone from the root, cents included — whether that edge is the hub, a spoke tip or a spoke's side. Angle carries pitch; spoke length does not apply (partials are not chord tones): the steam has a fixed radial length equal to an extension spoke and fades outward, so it reads shorter than any spoke. Density is the partial level; overlapping partials add. Steam fades with the glyph and breaks into wisps as it fades. The shape geometry (I18) is unchanged; partials sit beside it on `AnnotatedChord.partials`.
 
 ## Chord Interpretation Modes
 
@@ -350,7 +351,19 @@ interface HarmonicPartial {
 
 interface AnnotatedNote {
   // ...
-  partials?: HarmonicPartial[]; // present only when the overlay level > 0
+  partials?: HarmonicPartial[]; // present only when the overlay is enabled
+}
+
+/** A chord tone's partial, in the glyph's angular frame (§6). */
+interface ChordPartial extends HarmonicPartial {
+  sourcePc: PitchClass; // the chord tone that produced it
+  angle: number;        // clock degrees from the root, cents included
+}
+
+interface AnnotatedChord {
+  // ...
+  shape: ChordShapeGeometry;   // chord quality (I18), unchanged
+  partials?: ChordPartial[];   // alongside the shape; one set per distinct pitch class
 }
 ```
 

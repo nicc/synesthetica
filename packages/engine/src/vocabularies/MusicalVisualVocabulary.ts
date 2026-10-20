@@ -35,6 +35,7 @@ import type {
   VelocityAnnotation,
   PhaseAnnotation,
   HarmonicPartial,
+  ChordPartial,
   PitchClass,
   Note,
   MusicalChord,
@@ -200,7 +201,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
         this.annotateNote(note, frame.t, partialLevels),
       ),
       chords: frame.chords.map((chord) =>
-        this.annotateChord(chord, frame.chordInterpretation),
+        this.annotateChord(chord, frame.chordInterpretation, partialLevels),
       ),
       progression: frame.progression ?? [],
       prescribedTempo: frame.prescribedTempo,
@@ -314,6 +315,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
   private annotateChord(
     chord: MusicalChord,
     mode: ChordInterpretationMode,
+    partialLevels: PartialLevel[],
   ): AnnotatedChord {
     const interpretation =
       mode === "bass-led" ? chord.bassLed : chord.harmonic;
@@ -362,7 +364,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
       mode === "harmonic" ? chord.bass : null,
     );
 
-    return {
+    const annotated: AnnotatedChord = {
       chord,
       visual: {
         palette,
@@ -374,6 +376,52 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
       noteIds: chord.noteIds,
       shape,
     };
+    if (partialLevels.length === 0) return annotated;
+    return {
+      ...annotated,
+      partials: this.annotateChordPartials(
+        chord,
+        interpretation.root,
+        partialLevels,
+      ),
+    };
+  }
+
+  /** Partials of each distinct pitch class in the voicing, placed in the
+   *  glyph's angular frame (RFC 012). Octave doubling is ignored, as in
+   *  the glyph itself. */
+  private annotateChordPartials(
+    chord: MusicalChord,
+    root: PitchClass,
+    partialLevels: PartialLevel[],
+  ): ChordPartial[] {
+    const hueConfig = {
+      referencePc: this.config.referencePc,
+      referenceHue: this.config.referenceHue,
+      direction: this.config.hueDirection,
+    };
+    const brightness = octaveToBrightness(
+      chord.voicing.length > 0
+        ? chord.voicing.reduce((sum, p) => sum + p.octave, 0) / chord.voicing.length
+        : 4,
+    );
+    const tones = [...new Set(chord.voicing.map((p) => p.pc))];
+    return tones.flatMap((sourcePc) =>
+      partialLevels.map(({ n, level }) => {
+        const { pc, cents } = partialPitch(sourcePc, n);
+        const huePc =
+          this.config.partialColourMode === "pitch" ? pc : sourcePc;
+        return {
+          n,
+          pc,
+          cents,
+          level,
+          color: { h: pcToHue(huePc, hueConfig), s: 0.8, v: brightness, a: 1 },
+          sourcePc,
+          angle: (((pc - root + 12) % 12) + cents / 100) * 30,
+        };
+      }),
+    );
   }
 
   // Rhythm annotation removed 2026-08-20 with the removal of BPM

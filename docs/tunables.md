@@ -282,6 +282,17 @@ Overtone steam (top-level constants in `ThreeJSRenderer.ts`, RFC 012). Spatial u
 
 Motion follows the session clock (`SceneFrame.t`) and is frozen when the viewer prefers reduced motion.
 
+Glyph overtone steam / overtone halo (top-level constants in `ThreeJSRenderer.ts`). Shares the noise, warp, threshold and swirl constants above.
+
+| Constant | Value | Controls | Impact | Pertinence | Class | Decision |
+|---|---|---|---|---|---|---|
+| `GLYPH_STEAM_PLACEMENT` | "edge" | "edge": emitted from the glyph outline at each angle. "band": a fixed ring outside the longest spoke (RFC 012 option A) | ⭐⭐⭐ | 🎵 | layout | internal |
+| `GLYPH_STEAM_LENGTH` | `ARM_LENGTH.extension` (0.25) | Radial length of the steam, fraction of base radius; with the outward fade it reads shorter than an extension spoke | ⭐⭐ | 🎵 | layout | internal |
+| `GLYPH_STEAM_BAND_GAP` | 0.08 | Ring gap beyond the triadic tip (band placement only) | ⭐ | — | layout | internal |
+| `GLYPH_STEAM_HALF_WIDTH_DEG` | 11 | Angular half-width of one partial's steam (30° per semitone) | ⭐⭐ | 🎵 | cosmetic | internal |
+| `GLYPH_STEAM_SCALE_R` | 6 | Radial noise frequency per base radius | ⭐ | — | cosmetic | internal |
+| `GLYPH_STEAM_RISE_PER_S` | 0.05 | Outward rise, base radii per second | ⭐⭐ | — | dynamics | internal |
+
 ---
 
 ## Obscured / inline params on the entity contract (Nic's specific ask)
