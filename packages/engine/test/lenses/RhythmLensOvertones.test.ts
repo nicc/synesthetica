@@ -52,12 +52,12 @@ function toNote(spec: NoteSpec, t: number): Note {
 
 function render(
   specs: NoteSpec[],
-  opts: { level?: number; colour?: "column" | "fundamental"; t?: number } = {},
+  opts: { level?: number; colour?: "pitch" | "fundamental"; t?: number } = {},
 ): SceneFrame {
   const t = opts.t ?? T;
   const vocab = new MusicalVisualVocabulary({
     harmonicSeriesLevel: opts.level ?? 1,
-    partialColourMode: opts.colour ?? "column",
+    partialColourMode: opts.colour ?? "pitch",
   });
   const lens = new RhythmLens();
   lens.init(ctx);
@@ -213,7 +213,7 @@ describe("RhythmLens overtone snapshots", () => {
   ];
 
   for (const [name, specs] of scenarios) {
-    for (const colour of ["column", "fundamental"] as const) {
+    for (const colour of ["pitch", "fundamental"] as const) {
       it(`${name} (${colour} hue)`, () => {
         const scene = render(specs, { level, colour });
         maybeWriteSnapshot(`${name}-${colour}`, scene, {}, "overtones");

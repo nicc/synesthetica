@@ -66,6 +66,8 @@ vi.mock("three", () => {
 
   class MockShaderMaterial extends Material {
     uniforms: Record<string, { value: unknown }> = {};
+    blending = 1;
+    depthWrite = true;
     vertexShader = "";
     fragmentShader = "";
     constructor(params?: Record<string, unknown>) {
@@ -76,6 +78,8 @@ vi.mock("three", () => {
         if (params.fragmentShader) this.fragmentShader = params.fragmentShader as string;
         if (params.transparent !== undefined) this.transparent = params.transparent as boolean;
         if (params.side !== undefined) this.side = params.side as number;
+        if (params.blending !== undefined) this.blending = params.blending as number;
+        if (params.depthWrite !== undefined) this.depthWrite = params.depthWrite as boolean;
       }
     }
   }
@@ -211,6 +215,8 @@ vi.mock("three", () => {
     ShaderMaterial: MockShaderMaterial,
     LineBasicMaterial: MockLineBasicMaterial,
     DoubleSide: 2,
+    NormalBlending: 1,
+    AdditiveBlending: 2,
   };
 });
 
@@ -410,6 +416,36 @@ describe("ThreeJSRenderer", () => {
       const frame = createSceneFrame([chordShape, tensionBar]);
       renderer.render(frame);
       expect(true).toBe(true);
+    });
+
+    it("renders overtone strips soft-edged and additive, beneath note strips", () => {
+      const strip = (id: string, type: string, edgeSoftness?: number) =>
+        createEntity({
+          id,
+          kind: "particle",
+          data: { type, barHeight: 0.2, topOpacity: 0.3, bottomOpacity: 0.5, edgeSoftness },
+        });
+      renderer.render(
+        createSceneFrame([strip("ot", "overtone-strip", 1), strip("ns", "note-strip")]),
+      );
+
+      type StripMesh = {
+        renderOrder?: number;
+        material: { blending: number; depthWrite: boolean; uniforms: Record<string, { value: unknown }> };
+      };
+      const objects = (renderer as unknown as { entityObjects: Map<string, StripMesh> })
+        .entityObjects;
+      const overtone = objects.get("ot")!;
+      const note = objects.get("ns")!;
+
+      expect(overtone.material.blending).toBe(2); // AdditiveBlending
+      expect(overtone.material.depthWrite).toBe(false);
+      expect(overtone.material.uniforms.edgeSoftness.value).toBe(1);
+      expect(overtone.renderOrder).toBe(-1);
+
+      expect(note.material.blending).toBe(1); // NormalBlending
+      expect(note.material.uniforms.edgeSoftness.value).toBe(0);
+      expect(note.renderOrder ?? 0).toBe(0);
     });
   });
 

@@ -407,6 +407,29 @@ const macros: MacroAnnotation[] = [
     consumers: [{ kind: "lens", id: "rhythm-lens", macroKey: "quantiseResolution" }],
   },
 
+  {
+    id: "system:harmonic-series:colour",
+    name: "Overtone colour",
+    aliases: ["overtone hue", "partial colour", "overtone origin colour"],
+    type: "discrete",
+    enumValues: [
+      { value: "pitch", label: "pitch (default)" },
+      { value: "fundamental", label: "fundamental" },
+    ],
+    default: "pitch", // matches MusicalVisualVocabulary.DEFAULT_CONFIG
+    affects: ["harmony"],
+    notes: [
+      "How overtone strips are coloured. `pitch`: each overtone strip takes the hue of the pitch class it lands on, like a played note in that column, so coincident partials from different notes share a colour and pile up as one. `fundamental`: each overtone strip takes the hue of the note that produced it, so you can see which note an overtone comes from.",
+      "`fundamental` shows origin at the expense of harmonic intuition: the column's colour no longer names its pitch, and coincident partials from different notes appear as mixed colours rather than one reinforced pitch. Suggest it when the user asks where an overtone comes from; otherwise keep `pitch`.",
+      "No visible effect while system:harmonic-series:level is 0.",
+    ],
+    humanNotes: [
+      "Pitch colours each overtone by the note it sounds as, matching the rest of the view. Fundamental colours it by the note that produced it.",
+      "Fundamental shows where each overtone comes from, at the cost of the colour-means-pitch reading that makes shared overtones easy to see.",
+    ],
+    consumers: [{ kind: "vocab", id: "musical-visual", macroKey: "system:harmonic-series:colour" }],
+  },
+
   // -----------------------------------------------------------------
   // Compound — one dial fanning to multiple underlying params
   // -----------------------------------------------------------------
@@ -954,6 +977,10 @@ const lenses: LensAnnotation[] = [
       "system:harmonic-series:rolloff": {
         responsiveness: "moderate",
         notes: "relative strength of the 5th, 7th and 9th partials against the 3rd",
+      },
+      "system:harmonic-series:colour": {
+        responsiveness: "moderate",
+        notes: "overtone strip hue: landing pitch (default) or originating note",
       },
     },
   },

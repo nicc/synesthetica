@@ -94,12 +94,12 @@ export interface MusicalVisualVocabularyConfig {
   harmonicSeriesRolloff?: number;
 
   /**
-   * Hue source for partials (RFC 012 open question 1, decided from
-   * snapshots): "column" uses the partial's own pitch-class hue;
-   * "fundamental" uses the hue of the note that produced it.
-   * @default "column"
+   * Hue source for partials (RFC 012): "pitch" uses the partial's own
+   * pitch-class hue; "fundamental" uses the hue of the note that
+   * produced it.
+   * @default "pitch"
    */
-  partialColourMode?: "column" | "fundamental";
+  partialColourMode?: "pitch" | "fundamental";
 }
 
 const DEFAULT_CONFIG: Required<MusicalVisualVocabularyConfig> = {
@@ -108,7 +108,7 @@ const DEFAULT_CONFIG: Required<MusicalVisualVocabularyConfig> = {
   hueDirection: "cw",
   harmonicSeriesLevel: 0,
   harmonicSeriesRolloff: PARTIAL_ROLLOFF_DEFAULT,
-  partialColourMode: "column",
+  partialColourMode: "pitch",
 };
 
 /**
@@ -132,7 +132,8 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
 
   /** Apply a manifest macro. Handles `system:colour-mapping:reference`
    *  (a degree on the colour wheel anchored to pitch class 0, C) and the
-   *  harmonic series overlay's `system:harmonic-series:level` / `:rolloff`.
+   *  harmonic series overlay's `system:harmonic-series:level` / `:rolloff`
+   *  / `:colour`.
    *  Other macros are ignored. */
   setMacro(name: string, value: number | string): void {
     if (name === "system:colour-mapping:reference") {
@@ -142,6 +143,10 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
       this.config = { ...this.config, harmonicSeriesLevel: Number(value) };
     } else if (name === "system:harmonic-series:rolloff") {
       this.config = { ...this.config, harmonicSeriesRolloff: Number(value) };
+    } else if (name === "system:harmonic-series:colour") {
+      if (value === "pitch" || value === "fundamental") {
+        this.config = { ...this.config, partialColourMode: value };
+      }
     }
   }
 
@@ -160,6 +165,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
       "system:colour-mapping:reference": this.config.referenceHue,
       "system:harmonic-series:level": this.config.harmonicSeriesLevel,
       "system:harmonic-series:rolloff": this.config.harmonicSeriesRolloff,
+      "system:harmonic-series:colour": this.config.partialColourMode,
     };
   }
 
@@ -277,7 +283,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     return partialLevels.map(({ n, level }) => {
       const { pc, cents } = partialPitch(note.pitch.pc, n);
       const huePc =
-        this.config.partialColourMode === "column" ? pc : note.pitch.pc;
+        this.config.partialColourMode === "pitch" ? pc : note.pitch.pc;
       return {
         n,
         pc,

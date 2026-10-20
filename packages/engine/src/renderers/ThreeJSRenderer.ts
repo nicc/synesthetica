@@ -286,8 +286,11 @@ export class ThreeJSRenderer implements IRenderer {
   private updateParticle(entity: Entity): void {
     if (!this.scene || !this.circleGeometry) return;
 
-    // Note strips render as rectangles, not circles
-    if (entity.data?.type === "note-strip") {
+    // Note strips and overtone strips render as rectangles, not circles
+    if (
+      entity.data?.type === "note-strip" ||
+      entity.data?.type === "overtone-strip"
+    ) {
       this.updateNoteStrip(entity);
       return;
     }
@@ -334,6 +337,11 @@ export class ThreeJSRenderer implements IRenderer {
    * Render a note strip as a rectangle spanning from onset to end time.
    * Position is at onsetY (top of bar); rectangle extends downward by barHeight.
    * Uses a gradient shader: top edge (onset/horizon) fades, bottom edge (NOW) stays bright.
+   *
+   * Overtone strips (RFC 012) share this path with two differences: a
+   * horizontal edge falloff (`edgeSoftness` from entity data) and
+   * additive blending, so coincident partials visibly sum. They draw
+   * before note strips so a played note sits on top of its glow.
    */
   private updateNoteStrip(entity: Entity): void {
     if (!this.scene || !this.planeGeometry) return;
@@ -341,13 +349,17 @@ export class ThreeJSRenderer implements IRenderer {
     let mesh = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
 
     if (!mesh) {
+      const isOvertone = entity.data?.type === "overtone-strip";
       const material = new THREE.ShaderMaterial({
         transparent: true,
         side: THREE.DoubleSide,
+        blending: isOvertone ? THREE.AdditiveBlending : THREE.NormalBlending,
+        depthWrite: !isOvertone,
         uniforms: {
           color: { value: new THREE.Color() },
           topOpacity: { value: 1.0 },
           bottomOpacity: { value: 1.0 },
+          edgeSoftness: { value: 0.0 },
         },
         vertexShader: `
           varying vec2 vUv;
@@ -360,14 +372,22 @@ export class ThreeJSRenderer implements IRenderer {
           uniform vec3 color;
           uniform float topOpacity;
           uniform float bottomOpacity;
+          uniform float edgeSoftness;
           varying vec2 vUv;
           void main() {
             float opacity = mix(bottomOpacity, topOpacity, vUv.y);
+            // Horizontal falloff: 0 at centre, 1 at either edge.
+            // edgeSoftness 0 keeps hard edges (note strips).
+            if (edgeSoftness > 0.0) {
+              float d = abs(vUv.x - 0.5) * 2.0;
+              opacity *= 1.0 - smoothstep(1.0 - edgeSoftness, 1.0, d);
+            }
             gl_FragColor = vec4(color, opacity);
           }
         `,
       });
       mesh = new THREE.Mesh(this.planeGeometry, material);
+      if (isOvertone) mesh.renderOrder = -1;
       this.scene.add(mesh);
       this.entityObjects.set(entity.id, mesh);
     }
@@ -392,6 +412,8 @@ export class ThreeJSRenderer implements IRenderer {
       (entity.data?.topOpacity as number) ?? (entity.style.opacity ?? 1);
     material.uniforms.bottomOpacity.value =
       (entity.data?.bottomOpacity as number) ?? (entity.style.opacity ?? 1);
+    material.uniforms.edgeSoftness.value =
+      (entity.data?.edgeSoftness as number) ?? 0;
   }
 
   /**

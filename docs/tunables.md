@@ -46,6 +46,9 @@ Only RhythmLens exposes true macros at the moment. The others are configured ent
 | `GRID_COLORS.barLine` | `{h:200,s:0.3,v:0.6,a:0.5}` | Bar grid line colour | ⭐ | 🎵 | cosmetic | internal |
 | `GRID_COLORS.nowLine` | `{h:0,s:0,v:0.8,a:0.6}` | NOW line colour | ⭐⭐ | 🎵 | cosmetic | internal |
 | `GRID_COLORS.referenceLine` | `{h:0,s:0,v:0.9,a:0.7}` | Per-note reference line colour | ⭐⭐ | 🎵🎵 | cosmetic | internal |
+| `OVERTONE_WIDTH_RATIO` | 2.0 | Overtone strip width as a multiple of note-strip width (RFC 012). Must exceed 1 so a coincident partial is not hidden behind the note strip it reinforces | ⭐⭐ | 🎵🎵 | cosmetic | internal |
+| `OVERTONE_CULL_OPACITY` | 0.02 | Overtone strips whose brighter end is below this are not emitted | ⭐ | 🎵 | cosmetic | internal |
+| `OVERTONE_EDGE_SOFTNESS` | 1.0 | Horizontal edge falloff of overtone strips, 0 hard .. 1 soft from centre; passed to the renderer as `data.edgeSoftness` | ⭐⭐ | 🎵 | cosmetic | internal |
 
 ## HarmonyLens — top-level constants
 
@@ -136,6 +139,16 @@ The "vocabulary" is the ruleset that maps musical events to visual style. It has
 | `referencePc` | 0 (C) | Which pitch class anchors the hue wheel | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | internal |
 | `referenceHue` | 0 (red) | Which colour = referencePc | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | system:colour-mapping:reference |
 | `hueDirection` | "cw" | Chromatic step direction on the colour wheel | ⭐⭐⭐ | 🎵🎵🎵 | interpretive |system:colour-mapping:direction |
+| `harmonicSeriesLevel` | 0 (off) | Harmonic series overlay level (RFC 012); 0 annotates no partials | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | system:harmonic-series:level |
+| `harmonicSeriesRolloff` | 1.0 | Partial level exponent, n^(−rolloff) | ⭐⭐ | 🎵🎵 | interpretive | system:harmonic-series:rolloff |
+| `partialColourMode` | "pitch" | Overtone strip hue: landing pitch class or originating note | ⭐⭐ | 🎵🎵 | interpretive | system:harmonic-series:colour |
+
+Harmonic series model constants (`vocabularies/harmonicSeries.ts`):
+
+| Constant | Value | Controls | Impact | Pertinence | Class | Decision |
+|---|---|---|---|---|---|---|
+| `PARTIAL_CAP` | 9 | Highest harmonic number modelled; 9 gives P5, M3, m7, M2. The 7th partial must survive | ⭐⭐ | 🎵🎵🎵 | interpretive | internal |
+| `PARTIAL_ROLLOFF_DEFAULT` | 1.0 | Default for `harmonicSeriesRolloff` | ⭐⭐ | 🎵🎵 | interpretive | internal |
 
 
 ## Vocabulary — chord shape geometry
@@ -261,6 +274,8 @@ These are the ones NOT expressed as top-level constants — they live inside ent
 |---|---|---|---|---|
 | `note-strip` | `topOpacity` | falls back to `style.opacity` | ThreeJSRenderer line 370 | Per-note top-edge fade, computed inline in RhythmLens. |
 | `note-strip` | `bottomOpacity` | falls back to `style.opacity` | ThreeJSRenderer line 372 | Per-note bottom-edge fade. |
+| `overtone-strip` | `topOpacity` / `bottomOpacity` | falls back to `style.opacity` | ThreeJSRenderer `updateNoteStrip` | Partial level × the note strip's own top/bottom opacity (RFC 012). |
+| `overtone-strip` | `edgeSoftness` | 0 (renderer fallback), `OVERTONE_EDGE_SOFTNESS` from the lens | ThreeJSRenderer `edgeSoftness` uniform | Horizontal smoothstep falloff; overtone strips also use additive blending and draw beneath note strips. |
 | `chord-duration-bar` (in HarmonyLens's scrolling strip) | `topOpacity` | inline calc | HarmonyLens line 1077 | Same gradient pattern as note strips. |
 | `chord-duration-bar` | `bottomOpacity` | inline calc | HarmonyLens line 1078 | Same. |
 | `connector-strip` | `plateauFraction` | 0.1 (grammar), 0.2 (renderer fallback) | HarmonyLens line 944 → renderer 628 → uniform 877 | The one Nic flagged. Strip's opacity plateau before the smoothstep fade. |

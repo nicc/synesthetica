@@ -65,8 +65,8 @@ Controls visibility of reference lines and drift streaks. Lingers longer than th
 **Note strip**
 Vertical strip representing a played note. Width is constant (velocity is not yet applied; see SPEC 010 I16); height extends from note onset (top) to note end or NOW line (bottom). Color derived from pitch class palette.
 
-**Overtone strip** (proposed, RFC 012)
-The rhythm-lens rendering of one partial with n ≥ 3. Partials 1, 2, 4 and 8 share the fundamental's pitch class in this octave-agnostic lens and are not drawn; other octave duplicates fold into the pitch class they land on (6 into 3). Placed at the partial's real pitch, not snapped to a pitch-class column. Wider and less opaque than a note strip, soft-edged; it must read as ethereal, never as a played note. Spans the same time extent as its fundamental's note strip and scrolls with it. Opacity is the partial level multiplied by the note strip's own opacity, so the ratio between the two holds as both fade. Overlapping overtone strips blend additively. Colour and surface treatment (e.g. particles) are undecided.
+**Overtone strip** (SPEC 010 §6)
+The rhythm-lens rendering of one partial with n ≥ 3. Partials 1, 2, 4 and 8 share the fundamental's pitch class in this octave-agnostic lens and are not drawn; other octave duplicates fold into the pitch class they land on (6 into 3). Placed at the partial's real pitch, not snapped to a pitch-class column. Wider and less opaque than a note strip, soft-edged; it must read as ethereal, never as a played note. Spans the same time extent as its fundamental's note strip and scrolls with it. Opacity is the partial level multiplied by the note strip's own opacity, so the ratio between the two holds as both fade. Overlapping overtone strips blend additively. Colour follows `system:harmonic-series:colour`: the landing pitch class by default, or the originating note. Surface treatment (e.g. particles) is undecided.
 
 **Beat line**
 Horizontal line marking beat positions in the grid. Tier 2+ only (requires tempo).

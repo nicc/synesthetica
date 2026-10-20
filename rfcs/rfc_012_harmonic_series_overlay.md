@@ -1,6 +1,6 @@
 # RFC 0012: Harmonic Series Overlay
 
-Status: Draft (design agreed 2026-10-06, revised 2026-10-20; ASCII agreed, awaiting SVG promotion)
+Status: Implemented in the rhythm lens (2026-10-20); canonical text now in SPEC 010 §6 and I31. Open items below remain exploratory.
 Author(s): Synesthetica
 Date: 2026-10-06
 
@@ -48,7 +48,7 @@ Agreed 2026-10-06 unless marked.
 4. Controls are **continuous**, not boolean. Level 0 is off.
 5. *(Revised 2026-10-20.)* Register is **ethereal**: overtone strips are wider and less opaque than note strips, soft-edged, and visually distinct from the clean strips of what was played. A wider strip is required, not just preferred: a coincident partial (C's 3rd under a played G, +2 ¢) would otherwise sit entirely behind the note strip it reinforces. Surface treatment (steam, dust, swirl) is a later rendering decision; it must not be busy.
 6. **Chord glyph deferred.** When it comes, it is a colourful smudge *outside* the glyph outline, not more lines inside it.
-7. Overtone strip **colour is undecided** (column hue vs fundamental hue) and will be chosen from snapshots.
+7. *(Revised 2026-10-20.)* Overtone strip **colour is a user toggle**, `system:harmonic-series:colour`: `pitch` (default, the landing pitch class's hue) or `fundamental` (the originating note's hue). Fundamental shows origin at the expense of harmonic intuition, and is recorded as an I14 exception for overtone strips only.
 8. *(Revised 2026-10-20.)* **Modelled partials are computed in the vocabulary.** Measured partials, if added, would come from an upstream stabilizer (audio spectral features, SPEC 012) as a separate frame field, and the vocabulary would read those instead of calling the model. No provider interface until a second source exists; the seam is a pure function returning partial levels.
 9. *(2026-10-20.)* Partials whose harmonic number is a power of two (1, 2, 4, 8) share the fundamental's pitch class in these octave-agnostic lenses and are **not drawn**.
 10. *(2026-10-20.)* **Overlapping overtone strips blend additively**, so shared partials visibly pile up.
@@ -148,9 +148,9 @@ For each annotated note with `partials`, emit one overtone strip per partial:
 
 A later surface treatment (steam, dust, swirl) is preferably procedural noise in the same fragment shader, with density tracking level, rather than a CPU particle system: it adds no entities, and additive overlap then reads as denser.
 
-**Colour** — decided from snapshots:
-- *Column hue*: the overtone strip at the G column is G-coloured. Honours "colour encodes pitch class" (I14 as stated in the `note-strip` concept). Risk: reads as a quietly played G.
-- *Fundamental hue*: C's red in the G column. Carries provenance and shows coincidence as colour mixing; unmistakably not a played note. Breaks the column-colour expectation and needs an explicit I14 exception in SPEC 010.
+**Colour** — a user toggle (`system:harmonic-series:colour`), decided 2026-10-20 after the snapshot round:
+- *`pitch`* (default): the overtone strip at the G column is G-coloured. Honours "colour encodes pitch class" (I14), and coincident partials from different notes share one colour, so pile-up reads as one reinforced pitch. Risk: reads as a quietly played G; the register (width, softness, additive glow) carries the distinction.
+- *`fundamental`*: C's red in the G column. Carries provenance and shows coincidence as colour mixing; unmistakably not a played note. Costs the colour-means-pitch reading. Recorded in SPEC 010 §6 as an I14 exception for overtone strips only.
 
 ## Chord glyph treatment (deferred)
 
@@ -158,12 +158,13 @@ Not in the first increment. Direction agreed: a colourful smudge outside the gly
 
 ## Parameters and control surface
 
-Two continuous macros, vocabulary-scoped (precedent: `system:colour-mapping:reference`, consumed by `musical-visual`):
+Two continuous macros and one discrete toggle, vocabulary-scoped (precedent: `system:colour-mapping:reference`, consumed by `musical-visual`):
 
 | Macro | Range | Default | Extremes |
 |---|---|---|---|
 | `system:harmonic-series:level` | 0..1 | 0 (off) | 0: no overlay, no entities. 1: overtone strips at full modelled level. |
 | `system:harmonic-series:rolloff` | 0..3 | 1.0 | 0: equal wash across the stencil. 3: only the fifth survives. |
+| `system:harmonic-series:colour` | `pitch` / `fundamental` | `pitch` | Discrete. Landing pitch-class hue, or originating note's hue. |
 
 At level 1 the brightest overtone columns rival note strips (0.75 at D under C major, 0.95 at A under G7, against 1.0), so the overlay reads as notes not played. The useful range is well below 1; the panel's suggested starting value and any level→opacity curve are set from seeing it.
 
@@ -225,17 +226,17 @@ NOW ━━━━━━━━━━━━━━━━━━━━━━━━━�
 
 ## Open questions
 
-1. Overtone strip colour: column hue or fundamental hue (snapshot decision).
-2. Default level when enabled, and whether level→opacity needs a curve. Constraint: the 7th partial survives culling.
-3. Surface treatment for the ethereal register (procedural noise preferred), after the soft-edge version is seen.
-4. Whether the velocity-brightening term earns its place.
+1. Default level when enabled, and whether level→opacity needs a curve. Constraint: the 7th partial survives culling.
+2. Surface treatment for the ethereal register (procedural noise preferred), after the soft-edge version is seen.
+3. Whether the velocity-brightening term earns its place.
 
-Resolved 2026-10-20: separate decay (dropped; fades with note strip), post-release behaviour (fades with note strip), default rolloff (1.0), partials between B and C (nearest pc + cents offset; mapping unchanged), provider interface (none until a second source).
+Resolved 2026-10-20: colour (user toggle, default pitch), separate decay (dropped; fades with note strip), post-release behaviour (fades with note strip), default rolloff (1.0), partials between B and C (nearest pc + cents offset; mapping unchanged), provider interface (none until a second source).
 
-## Draft SPEC 010 amendment (held here until code lands)
+## SPEC 010 amendment (entered 2026-10-20)
 
-Per the code–spec matching rule, nothing below enters SPEC 010 until the
-rhythm-lens increment exists. Text is drafted so the amendment is a paste.
+The text below was entered into SPEC 010 (§6, Harmonic Partial Annotations,
+I31) when the rhythm-lens increment landed. SPEC 010 is canonical; this copy
+is kept for history and is not updated.
 
 **§6 Harmonic Series Overlay**
 
@@ -259,7 +260,7 @@ rhythm-lens increment exists. Text is drafted so the amendment is a paste.
 **What This Spec Does NOT Cover:** amend "Audio-derived feature mappings (future work)" to note that measured partials would arrive from an upstream stabilizer in the `{ n, level }` shape the model produces.
 
 
-Spec-ready now: the contract additions, the partials-are-not-notes invariant, the macro ids, and the honesty framing. Not spec-ready: colour, edge treatment, default level, and anything about the glyph.
+Still open after the amendment: default level and any level→opacity curve, edge treatment tuning, surface treatment, and anything about the glyph.
 
 ## Non-goals
 

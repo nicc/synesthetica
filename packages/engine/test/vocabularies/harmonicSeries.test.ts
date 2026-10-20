@@ -114,17 +114,18 @@ describe("MusicalVisualVocabulary partial annotation", () => {
     expect(macros["system:harmonic-series:rolloff"]).toBe(2);
   });
 
-  it("colours partials by column or by fundamental", () => {
+  it("colours partials by pitch or by fundamental", () => {
     const hueConfig = { referencePc: 0 as PitchClass, referenceHue: 0, direction: "cw" as const };
-    const column = new MusicalVisualVocabulary({ harmonicSeriesLevel: 1 });
-    const fifthCol = column.annotate(frame).notes[0].partials![0];
-    expect(fifthCol.color.h).toBe(pcToHue(7, hueConfig));
+    const vocab = new MusicalVisualVocabulary({ harmonicSeriesLevel: 1 });
+    expect(vocab.readMacros()["system:harmonic-series:colour"]).toBe("pitch");
+    const fifthPitch = vocab.annotate(frame).notes[0].partials![0];
+    expect(fifthPitch.color.h).toBe(pcToHue(7, hueConfig));
 
-    const fundamental = new MusicalVisualVocabulary({
-      harmonicSeriesLevel: 1,
-      partialColourMode: "fundamental",
-    });
-    const fifthFund = fundamental.annotate(frame).notes[0].partials![0];
+    vocab.setMacro("system:harmonic-series:colour", "fundamental");
+    const fifthFund = vocab.annotate(frame).notes[0].partials![0];
     expect(fifthFund.color.h).toBe(pcToHue(0, hueConfig));
+
+    vocab.setMacro("system:harmonic-series:colour", "nonsense");
+    expect(vocab.readMacros()["system:harmonic-series:colour"]).toBe("fundamental");
   });
 });
