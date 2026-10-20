@@ -318,6 +318,67 @@ const macros: MacroAnnotation[] = [
     consumers: [{ kind: "vocab", id: "musical-visual", macroKey: "system:colour-mapping:reference" }],
   },
 
+  {
+    id: "system:harmonic-series:level",
+    name: "Harmonic series overlay",
+    aliases: ["overtones", "overtone overlay", "harmonic series", "partials"],
+    type: "continuous",
+    range: [0, 1],
+    default: 0, // off — matches MusicalVisualVocabulary.DEFAULT_CONFIG
+    affects: ["harmony", "melody"],
+    directionality: {
+      low: {
+        description: "overlay off at 0; only played notes are drawn",
+        tendsTo: ["keep the view to what was played"],
+      },
+      high: {
+        description: "overtone strips at full modelled level; the brightest rival played notes",
+        tendsTo: ["reveal partials shared between notes", "risk reading as notes that were not played"],
+      },
+    },
+    notes: [
+      "Theoretical overlay: the harmonic series each sounding note implies, modelled with a generic rolloff. MIDI carries no timbre, so this is not a measurement of the instrument. Never describe it as the player's overtones.",
+      "0 is off. Above 0, the rhythm lens draws an overtone strip for partials 3, 5, 7 and 9 of every note (P5, M3, m7, M2 above it) at their real pitch, not snapped to the pitch-class columns: the 7th partial sits visibly flat of the ♭7 column. Partials 2, 4 and 8 share the note's own pitch class and are not drawn.",
+      "What to look for: shared partials pile up. Under C major, D and B glow although neither was played. G alone puts a faint, flat F (its 7th partial) — the dominant seventh's ♭7 is already in the root's series. In C–E, C's 5th partial sits just flat beside the played E; in C–E♭ no partial of C lands on E♭.",
+      "Values well below 1 read best. Near 1 the strongest overtone columns approach the opacity of played notes.",
+    ],
+    humanNotes: [
+      "Shows the overtones each note implies as faint, soft strips in the rhythm view. 0 turns it off.",
+      "This is the theoretical harmonic series, not a measurement of your instrument. Where overtones from different notes line up, they add together.",
+    ],
+    consumers: [{ kind: "vocab", id: "musical-visual", macroKey: "system:harmonic-series:level" }],
+  },
+
+  {
+    id: "system:harmonic-series:rolloff",
+    name: "Overtone rolloff",
+    aliases: ["overtone falloff", "harmonic rolloff", "partial rolloff"],
+    type: "continuous",
+    range: [0, 3],
+    default: 1, // ≈ sawtooth — matches PARTIAL_ROLLOFF_DEFAULT
+    affects: ["harmony", "timbre"],
+    directionality: {
+      low: {
+        description: "upper partials as strong as the fifth; an even wash of overtones",
+        tendsTo: ["show every modelled partial", "add clutter"],
+      },
+      high: {
+        description: "upper partials fall away; at 3 only the fifth remains",
+        tendsTo: ["isolate the fifth", "hide the 7th partial"],
+      },
+    },
+    notes: [
+      "Exponent of the modelled partial level, n^(−rolloff). 1.0 ≈ sawtooth (−6 dB/octave); 2.0 ≈ plucked or struck strings (−12 dB/octave). A generic curve, not an instrument model.",
+      "No visible effect while system:harmonic-series:level is 0.",
+      "Above about 2 the 7th partial (the dominant seventh's ♭7) is too faint to see.",
+    ],
+    humanNotes: [
+      "How quickly the higher overtones fade relative to the fifth. Low shows more overtones; high leaves only the fifth.",
+      "Has no effect while the harmonic series overlay is at 0.",
+    ],
+    consumers: [{ kind: "vocab", id: "musical-visual", macroKey: "system:harmonic-series:rolloff" }],
+  },
+
   // -----------------------------------------------------------------
   // Discrete — enum with labels
   // -----------------------------------------------------------------
@@ -690,6 +751,24 @@ const concepts: SystemConceptAnnotation[] = [
     related: ["now-line", "rhythm-emphasis"],
   },
 
+  {
+    term: "harmonic-series-overlay",
+    definition:
+      "An optional theoretical overlay of the harmonic series each sounding note implies, drawn in the rhythm lens as overtone strips. Partial levels are modelled from a generic rolloff, not measured — MIDI carries no timbre. Off by default (system:harmonic-series:level = 0). Partials are never notes: chord detection, dynamics and harmony analysis do not see them.",
+    related: ["overtone-strip", "note-strip"],
+    examples: [
+      "Under a held C major triad, D and B light up although neither was played: C's 9th and G's 3rd partials coincide at D; E's 3rd and G's 5th at B.",
+      "C then G: C's strongest overtone strip (its 3rd partial) sits in the G column. Played detached, the G lands below it in the same column; with C held, the G lands inside it.",
+    ],
+  },
+
+  {
+    term: "overtone-strip",
+    definition:
+      "A wide, soft, translucent strip in the rhythm lens for one partial of a sounding note, present when the harmonic series overlay is on. Sits at the partial's real pitch, so it can fall between columns (the 7th partial is visibly flat of ♭7). Spans exactly its note strip's time extent, scrolls with it, and fades with it. Overlapping overtone strips add together. Never a played note.",
+    related: ["harmonic-series-overlay", "note-strip"],
+  },
+
   // ------- Harmony lens concepts -------
   {
     term: "progression-clock",
@@ -833,6 +912,7 @@ const lenses: LensAnnotation[] = [
       "Central column. Note strips scroll upward through the NOW line.",
       "Reference lines and streaks visualise drift against the current subdivision (when a tempo is prescribed).",
       "Shows how individual notes appear in time, with visual feedback on timing accuracy and pitch.",
+      "When the harmonic series overlay is on, overtone strips show each note's implied partials (theoretical, not measured).",
     ],
     macroResponses: {
       "time-horizon": {
@@ -866,6 +946,14 @@ const lenses: LensAnnotation[] = [
       "rhythm:emphasis": {
         responsiveness: "strong",
         notes: "compound; fans to rhythm:pulse-intensity + rhythm:reference-linger",
+      },
+      "system:harmonic-series:level": {
+        responsiveness: "strong",
+        notes: "opacity of overtone strips; 0 draws none",
+      },
+      "system:harmonic-series:rolloff": {
+        responsiveness: "moderate",
+        notes: "relative strength of the 5th, 7th and 9th partials against the 3rd",
       },
     },
   },

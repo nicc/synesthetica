@@ -12,6 +12,7 @@
 import type { Ms, Confidence } from "../core/time";
 import type { PartId } from "../parts/parts";
 import type { ColorHSVA, PitchHueInvariant } from "../intents/colors";
+import type { PitchClass } from "../primitives/primitives";
 import type {
   Note,
   NoteId,
@@ -233,6 +234,31 @@ export interface RomanNumeralGlyph {
   height: number;
 }
 
+/**
+ * One partial of a sounding note's harmonic series, as annotated by the
+ * vocabulary for the harmonic series overlay (RFC 012).
+ *
+ * Not a Note: chord detection, dynamics and harmony analysis never see
+ * partials, and lenses must not render them as if they were played.
+ * Levels are modelled from a generic rolloff, not measured.
+ */
+export interface HarmonicPartial {
+  /** Harmonic number (octave duplicates already folded in) */
+  n: number;
+
+  /** Nearest pitch class to the partial's real pitch */
+  pc: PitchClass;
+
+  /** Deviation of the real pitch from that pitch class, in cents (-50..50) */
+  cents: number;
+
+  /** Level, 0..1 (gain and rolloff applied) */
+  level: number;
+
+  /** Colour for rendering */
+  color: ColorHSVA;
+}
+
 // ============================================================================
 // Annotated Musical Elements
 // ============================================================================
@@ -257,6 +283,12 @@ export interface AnnotatedNote {
 
   /** Phase-derived properties (Invariant I17) */
   phaseState: PhaseAnnotation;
+
+  /**
+   * Modelled partials for the harmonic series overlay (RFC 012).
+   * Present only when the overlay is enabled (level > 0).
+   */
+  partials?: HarmonicPartial[];
 }
 
 /**

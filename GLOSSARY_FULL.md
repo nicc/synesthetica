@@ -381,12 +381,12 @@ Contains:
 ---
 
 ### Harmonic Series Overlay (proposed)
-An optional display of the harmonic series each sounding note implies. Modelled, not measured: MIDI carries no timbre, so partial levels come from a generic rolloff. Framed as a theoretical overlay, in the same class as implied-resolution arcs. Off by default. See RFC 012 and SPEC 010 §6.
+An optional display of the harmonic series each sounding note implies. Modelled, not measured: MIDI carries no timbre, so partial levels come from a generic rolloff. Framed as a theoretical overlay, in the same class as implied-resolution arcs. Off by default. Rendered in the rhythm lens as overtone strips. See RFC 012.
 
 ---
 
 ### Partial (proposed)
-One component of a note's modelled harmonic series: harmonic number, real pitch (continuous semitones above the fundamental, not snapped to pitch class), and a level that blooms at onset and decays faster than the fundamental. A vocabulary annotation on `AnnotatedNote`, never a `Note` (Invariant I31): stabilizers and chord detection do not see partials.
+One component of a note's harmonic series, identified by harmonic number n (n = 1 is the fundamental), with a real pitch (12·log₂ n semitones above the fundamental, continuous, not snapped to pitch class) and a level. Levels are modelled from a generic rolloff today; the contract carries partial levels so a measured source can replace the model later. Never a `Note`: chord detection, dynamics and harmony analysis do not treat partials as notes (proposed invariant, RFC 012). Numbering: partial n is overtone n − 1; this project counts partials.
 
 ---
 

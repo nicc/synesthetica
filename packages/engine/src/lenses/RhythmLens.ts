@@ -89,6 +89,19 @@ const REFERENCE_LINE_HALF_WIDTH = NOTE_STRIP_WIDTH * 1.5 * 0.75;
 /** Minimum note strip height in normalized coordinates */
 const MIN_NOTE_STRIP_HEIGHT = 0.008;
 
+/** Overtone strip width as a multiple of note-strip width (RFC 012).
+ *  Must exceed 1: a coincident partial (C's 3rd under a played G, +2¢)
+ *  would otherwise sit entirely behind the note strip it reinforces. */
+const OVERTONE_WIDTH_RATIO = 2.0;
+
+/** Overtone strips whose brighter end falls below this opacity are
+ *  not emitted. */
+const OVERTONE_CULL_OPACITY = 0.02;
+
+/** Horizontal edge falloff for overtone strips, 0 (hard) .. 1 (fully
+ *  soft from centre to edge). Read by the renderer from entity data. */
+const OVERTONE_EDGE_SOFTNESS = 1.0;
+
 // Grid colors
 const GRID_COLORS = {
   beatLine: { h: 200, s: 0.2, v: 0.5, a: 0.4 } as ColorHSVA,
@@ -669,6 +682,17 @@ export class RhythmLens implements IVisualLens {
     const topOpacity = baseOpacity * Math.min(barTop / NOW_LINE_Y, 1);
     const bottomOpacity = baseOpacity * Math.min(endY / NOW_LINE_Y, 1);
 
+    // Overtone strips first so the note strip draws over them.
+    entities.push(
+      ...this.createOvertoneStrips(an, part, t, {
+        barTop,
+        barHeight,
+        endY,
+        topOpacity,
+        bottomOpacity,
+      }),
+    );
+
     // Create main note strip entity
     // Position at barTop (top of visible bar) so it scrolls in sync with
     // streaks and grid lines. When onset scrolls off-screen, the bar is clipped
@@ -699,6 +723,67 @@ export class RhythmLens implements IVisualLens {
       },
     });
 
+    return entities;
+  }
+
+  // ============================================================================
+  // Overtone Strips (Harmonic Series Overlay, RFC 012)
+  // ============================================================================
+
+  /**
+   * One overtone strip per annotated partial. Shares the note strip's
+   * time extent exactly, and its opacity is the partial level times
+   * the note strip's own opacity, so the ratio between them holds as
+   * both fade. Placed at real pitch (pc + cents), not snapped.
+   */
+  private createOvertoneStrips(
+    an: AnnotatedNote,
+    part: string,
+    t: number,
+    strip: {
+      barTop: number;
+      barHeight: number;
+      endY: number;
+      topOpacity: number;
+      bottomOpacity: number;
+    },
+  ): Entity[] {
+    if (!an.partials) return [];
+    const note = an.note;
+    const entities: Entity[] = [];
+    for (const partial of an.partials) {
+      const topOpacity = partial.level * strip.topOpacity;
+      const bottomOpacity = partial.level * strip.bottomOpacity;
+      if (Math.max(topOpacity, bottomOpacity) < OVERTONE_CULL_OPACITY) continue;
+      entities.push({
+        id: this.entityId(`overtone-${note.id}-${partial.n}`),
+        part,
+        kind: "particle",
+        createdAt: note.onset,
+        updatedAt: t,
+        position: {
+          x: this.pitchClassToX(partial.pc, partial.cents),
+          y: strip.barTop,
+        },
+        style: {
+          color: partial.color,
+          size: NOTE_STRIP_WIDTH * OVERTONE_WIDTH_RATIO * 1000,
+          opacity: bottomOpacity,
+        },
+        data: {
+          type: "overtone-strip",
+          noteId: note.id,
+          n: partial.n,
+          pitchClass: partial.pc,
+          cents: partial.cents,
+          barHeight: strip.barHeight,
+          endY: strip.endY,
+          topOpacity,
+          bottomOpacity,
+          edgeSoftness: OVERTONE_EDGE_SOFTNESS,
+        },
+      });
+    }
     return entities;
   }
 
@@ -866,10 +951,12 @@ export class RhythmLens implements IVisualLens {
   /**
    * Map pitch class (0-11) to x position.
    * C (0) at left margin, B (11) at right margin.
+   * `cents` offsets continuously from the column (overtone strips sit at
+   * real pitch); a flat C lands just left of the C column, not at B.
    */
-  private pitchClassToX(pc: PitchClass): number {
+  private pitchClassToX(pc: PitchClass, cents = 0): number {
     const usableWidth = 1 - PITCH_MARGIN_LEFT - PITCH_MARGIN_RIGHT;
-    return PITCH_MARGIN_LEFT + (pc / 11) * usableWidth;
+    return PITCH_MARGIN_LEFT + ((pc + cents / 100) / 11) * usableWidth;
   }
 
   // timeToY moved to ./timeMapping so other lenses can phase-lock to
