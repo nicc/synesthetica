@@ -90,7 +90,7 @@ export interface MusicalVisualVocabularyConfig {
   /**
    * Harmonic series overlay level, 0..1 (RFC 012); applies while
    * enabled. 0 annotates no partials.
-   * @default 0.25
+   * @default 0.2
    */
   harmonicSeriesLevel?: number;
 
@@ -114,7 +114,7 @@ const DEFAULT_CONFIG: Required<MusicalVisualVocabularyConfig> = {
   referenceHue: 0, // Red
   hueDirection: "cw",
   harmonicSeriesEnabled: false,
-  harmonicSeriesLevel: 0.25,
+  harmonicSeriesLevel: 0.2,
   harmonicSeriesRolloff: PARTIAL_ROLLOFF_DEFAULT,
   partialColourMode: "pitch",
 };

@@ -17,9 +17,9 @@ export const PARTIAL_CAP = 9;
 
 /** Default rolloff exponent. 1.0 ≈ sawtooth (−6 dB/octave); at 2.0 the
  *  7th partial falls to ≈ 0.02 and the dominant-seventh reading is lost.
- *  0.2 (set 2026-10-20 after in-app review) keeps the 7th at ≈ 45% of the
- *  fifth so it reads at low overlay levels. */
-export const PARTIAL_ROLLOFF_DEFAULT = 0.2;
+ *  0.15 (set 2026-10-20 after in-app review) keeps the 7th at ≈ 46% of
+ *  the fifth so it reads at low overlay levels. */
+export const PARTIAL_ROLLOFF_DEFAULT = 0.15;
 
 /** One modelled partial before pitch and colour are attached. */
 export interface PartialLevel {

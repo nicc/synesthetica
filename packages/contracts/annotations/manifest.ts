@@ -343,7 +343,7 @@ const macros: MacroAnnotation[] = [
     aliases: ["overtone brightness", "overtone amount", "overtone strength"],
     type: "continuous",
     range: [0, 1],
-    default: 0.25, // matches MusicalVisualVocabulary.DEFAULT_CONFIG
+    default: 0.2, // matches MusicalVisualVocabulary.DEFAULT_CONFIG
     affects: ["harmony", "melody"],
     directionality: {
       low: {
@@ -372,7 +372,7 @@ const macros: MacroAnnotation[] = [
     aliases: ["overtone falloff", "harmonic rolloff", "partial rolloff"],
     type: "continuous",
     range: [0, 3],
-    default: 0.2, // nearly flat so the 7th partial reads — matches PARTIAL_ROLLOFF_DEFAULT
+    default: 0.15, // nearly flat so the 7th partial reads — matches PARTIAL_ROLLOFF_DEFAULT
     affects: ["harmony", "timbre"],
     directionality: {
       low: {
