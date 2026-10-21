@@ -40,7 +40,14 @@ import type {
  * Rhythm lens occupies the central column between dynamics
  * and harmony columns. See layout.ts for the three-column system.
  */
-import { RHYTHM_LEFT, RHYTHM_RIGHT } from "./layout";
+import {
+  RHYTHM_LEFT,
+  RHYTHM_RIGHT,
+  NOW_LINE_COLOR,
+  STRUCTURAL_TEXT_COLOR,
+  ASSUMED_WORLD_HEIGHT,
+  keyboardRelativeTextSize,
+} from "./layout";
 import { NOW_LINE_Y, timeToY, timeToYUniform } from "./timeMapping";
 const PITCH_MARGIN_LEFT = RHYTHM_LEFT;
 const PITCH_MARGIN_RIGHT = 1 - RHYTHM_RIGHT;
@@ -108,11 +115,21 @@ const OVERTONE_EDGE_SOFTNESS = 1.0;
  *  same axis in this lens. */
 const dissipationAt = (y: number): number => 1 - Math.min(Math.max(y, 0) / NOW_LINE_Y, 1);
 
+/** Note-name legend under the NOW line (rhythm:note-names). Size is a
+ *  multiple of the on-screen keyboard's 12px labels, matched at a
+ *  900px-tall window; like the rest of the view it scales with the
+ *  window rather than staying a fixed pixel size. */
+const NOTE_NAME_FONT_SCALE = 0.8;
+/** Note-name line height in world units. */
+const NOTE_NAME_SIZE = keyboardRelativeTextSize(NOTE_NAME_FONT_SCALE);
+/** Gap between the NOW line and the top of the note names, world units. */
+const NOTE_NAME_GAP = 0.6;
+
 // Grid colors
 const GRID_COLORS = {
   beatLine: { h: 200, s: 0.2, v: 0.5, a: 0.4 } as ColorHSVA,
   barLine: { h: 200, s: 0.3, v: 0.6, a: 0.5 } as ColorHSVA,
-  nowLine: { h: 0, s: 0, v: 0.8, a: 0.6 } as ColorHSVA,
+  nowLine: NOW_LINE_COLOR as ColorHSVA,
   referenceLine: { h: 0, s: 0, v: 0.9, a: 0.7 } as ColorHSVA,
 };
 
@@ -159,6 +176,12 @@ interface RhythmLensMacros {
    *  duration + amplitude of the pulse on the NOW line; 0.5 preserves
    *  the historic baseline exactly. */
   pulseIntensity: number;
+  /** Draw overtone strips for annotated partials (harmonic series
+   *  overlay, RFC 012). Lens-level so the rhythm lens and the chord glyph
+   *  can be toggled independently. */
+  overtones: boolean;
+  /** Show the note-name legend under the NOW line. */
+  noteNames: boolean;
 }
 
 /**
@@ -201,6 +224,8 @@ export class RhythmLens implements IVisualLens {
     referenceLinger: DEFAULT_REFERENCE_LINGER_MULTIPLIER,
     tightnessTolerance: TIGHT_TOLERANCE_DEFAULT_MS,
     pulseIntensity: PULSE_INTENSITY_DEFAULT,
+    overtones: false,
+    noteNames: true,
   };
 
   /** Drift frozen at first computation per note. Ensures referential transparency:
@@ -251,6 +276,11 @@ export class RhythmLens implements IVisualLens {
 
     // Always render NOW line
     entities.push(this.createNowLine(t, part, prescribed));
+
+    // Note-name legend: one name per pitch-class column, under the NOW line
+    if (this.macros.noteNames) {
+      entities.push(...this.createNoteNames(input.pitchClassNames, t, part));
+    }
 
     // Render grid lines (visibility controlled by horizon)
     if (tier >= 2) {
@@ -732,6 +762,27 @@ export class RhythmLens implements IVisualLens {
   }
 
   // ============================================================================
+  // Note-Name Legend
+  // ============================================================================
+
+  /** A fixed row of pitch names centred under each column, in the NOW
+   *  line's colour. Spelling comes from the vocabulary (key-aware). */
+  private createNoteNames(names: string[], t: number, part: string): Entity[] {
+    const y =
+      NOW_LINE_Y + (NOTE_NAME_GAP + NOTE_NAME_SIZE / 2) / ASSUMED_WORLD_HEIGHT;
+    return names.map((name, pc) => ({
+      id: this.entityId(`note-name-${pc}`),
+      part,
+      kind: "glyph" as const,
+      createdAt: t,
+      updatedAt: t,
+      position: { x: this.pitchClassToX(pc as PitchClass), y },
+      style: { color: STRUCTURAL_TEXT_COLOR, size: NOTE_NAME_SIZE, opacity: 1 },
+      data: { type: "text-label", text: name, font: "mono", anchor: "center" },
+    }));
+  }
+
+  // ============================================================================
   // Overtone Strips (Harmonic Series Overlay, RFC 012)
   // ============================================================================
 
@@ -753,7 +804,7 @@ export class RhythmLens implements IVisualLens {
       bottomOpacity: number;
     },
   ): Entity[] {
-    if (!an.partials) return [];
+    if (!this.macros.overtones || !an.partials) return [];
     const note = an.note;
     const entities: Entity[] = [];
     // How far the timeline has scrolled since t = 0, so the renderer can

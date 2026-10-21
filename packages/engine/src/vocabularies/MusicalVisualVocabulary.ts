@@ -35,7 +35,9 @@ import type {
   VelocityAnnotation,
   PhaseAnnotation,
   HarmonicPartial,
+  ChordPartial,
   PitchClass,
+  PrescribedKey,
   Note,
   MusicalChord,
   ChordInterpretationMode,
@@ -52,6 +54,7 @@ import {
 } from "@synesthetica/contracts";
 
 import { buildChordShape } from "./utils";
+import { buildSpellingTable } from "../utils/pitchSpelling";
 import type { PartialLevel } from "./harmonicSeries";
 import {
   modelPartialLevels,
@@ -82,14 +85,9 @@ export interface MusicalVisualVocabularyConfig {
   hueDirection?: "cw" | "ccw";
 
   /**
-   * Harmonic series overlay on/off (RFC 012). Off annotates no partials.
-   * @default false
-   */
-  harmonicSeriesEnabled?: boolean;
-
-  /**
-   * Harmonic series overlay level, 0..1 (RFC 012); applies while
-   * enabled. 0 annotates no partials.
+   * Harmonic series overlay level, 0..1 (RFC 012). 0 annotates no
+   * partials. Whether a lens draws them is the lens's own toggle
+   * (rhythm:overtones, harmony:overtones).
    * @default 0.2
    */
   harmonicSeriesLevel?: number;
@@ -107,16 +105,30 @@ export interface MusicalVisualVocabularyConfig {
    * @default "pitch"
    */
   partialColourMode?: "pitch" | "fundamental";
+
+  /**
+   * Note-name spelling when no key is prescribed. With a key, names follow
+   * the key's spelling regardless.
+   * @default "sharps"
+   */
+  noteSpelling?: "sharps" | "flats";
 }
+
+const SHARP_NAMES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
+const FLAT_NAMES = ["C", "D♭", "D", "E♭", "E", "F", "G♭", "G", "A♭", "A", "B♭", "B"];
+
+/** ASCII spelling (Tonal: "C#", "Bb") → music symbols ("C♯", "B♭"). */
+const toMusicSymbols = (name: string): string =>
+  name[0] + name.slice(1).replace(/#/g, "♯").replace(/b/g, "♭");
 
 const DEFAULT_CONFIG: Required<MusicalVisualVocabularyConfig> = {
   referencePc: 0, // C — matches session:tonic's PC=0 convention
   referenceHue: 0, // Red
   hueDirection: "cw",
-  harmonicSeriesEnabled: false,
   harmonicSeriesLevel: 0.2,
   harmonicSeriesRolloff: PARTIAL_ROLLOFF_DEFAULT,
   partialColourMode: "pitch",
+  noteSpelling: "sharps",
 };
 
 /**
@@ -140,21 +152,21 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
 
   /** Apply a manifest macro. Handles `system:colour-mapping:reference`
    *  (a degree on the colour wheel anchored to pitch class 0, C) and the
-   *  harmonic series overlay's `system:harmonic-series:enabled` / `:level`
-   *  / `:rolloff` / `:colour`.
+   *  harmonic series overlay's `system:harmonic-series:level` / `:rolloff`
+   *  / `:colour`, and `system:note-names:spelling`.
    *  Other macros are ignored. */
   setMacro(name: string, value: MacroValue): void {
     if (name === "system:colour-mapping:reference") {
       const hue = ((Number(value) % 360) + 360) % 360;
       this.config = { ...this.config, referencePc: 0, referenceHue: hue };
-    } else if (name === "system:harmonic-series:enabled") {
-      if (typeof value === "boolean") {
-        this.config = { ...this.config, harmonicSeriesEnabled: value };
-      }
     } else if (name === "system:harmonic-series:level") {
       this.config = { ...this.config, harmonicSeriesLevel: Number(value) };
     } else if (name === "system:harmonic-series:rolloff") {
       this.config = { ...this.config, harmonicSeriesRolloff: Number(value) };
+    } else if (name === "system:note-names:spelling") {
+      if (value === "sharps" || value === "flats") {
+        this.config = { ...this.config, noteSpelling: value };
+      }
     } else if (name === "system:harmonic-series:colour") {
       if (value === "pitch" || value === "fundamental") {
         this.config = { ...this.config, partialColourMode: value };
@@ -175,10 +187,10 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
   readMacros(): Record<string, MacroValue> {
     return {
       "system:colour-mapping:reference": this.config.referenceHue,
-      "system:harmonic-series:enabled": this.config.harmonicSeriesEnabled,
       "system:harmonic-series:level": this.config.harmonicSeriesLevel,
       "system:harmonic-series:rolloff": this.config.harmonicSeriesRolloff,
       "system:harmonic-series:colour": this.config.partialColourMode,
+      "system:note-names:spelling": this.config.noteSpelling,
     };
   }
 
@@ -189,7 +201,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
     // Partial levels depend only on the overlay macros, not the note,
     // so the stencil is computed once per frame.
     const partialLevels = modelPartialLevels(
-      this.config.harmonicSeriesEnabled ? this.config.harmonicSeriesLevel : 0,
+      this.config.harmonicSeriesLevel,
       this.config.harmonicSeriesRolloff,
     );
 
@@ -200,12 +212,13 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
         this.annotateNote(note, frame.t, partialLevels),
       ),
       chords: frame.chords.map((chord) =>
-        this.annotateChord(chord, frame.chordInterpretation),
+        this.annotateChord(chord, frame.chordInterpretation, partialLevels),
       ),
       progression: frame.progression ?? [],
       prescribedTempo: frame.prescribedTempo,
       prescribedMeter: frame.prescribedMeter,
       prescribedKey: frame.prescribedKey,
+      pitchClassNames: this.pitchClassNames(frame.prescribedKey ?? null),
       chordInterpretation: frame.chordInterpretation,
       hueInvariant: {
         referencePc: this.config.referencePc,
@@ -217,6 +230,27 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
       phrases: [], // No phrase detection yet
       dynamics: this.annotateDynamics(frame.dynamics),
     };
+  }
+
+  /** Key spellings are memoised; the result depends only on the key. */
+  private keySpellings = new Map<string, string[]>();
+
+  /** Display name per pitch class: the key's spelling when a key is
+   *  prescribed, otherwise the default spelling (sharps or flats). */
+  private pitchClassNames(key: PrescribedKey | null): string[] {
+    if (!key) {
+      return this.config.noteSpelling === "flats" ? FLAT_NAMES : SHARP_NAMES;
+    }
+    const id = `${key.root}:${key.mode}`;
+    let names = this.keySpellings.get(id);
+    if (!names) {
+      const table = buildSpellingTable(key);
+      names = Array.from({ length: 12 }, (_, pc) =>
+        toMusicSymbols(table[pc as PitchClass]),
+      );
+      this.keySpellings.set(id, names);
+    }
+    return names;
   }
 
   // ===========================================================================
@@ -314,6 +348,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
   private annotateChord(
     chord: MusicalChord,
     mode: ChordInterpretationMode,
+    partialLevels: PartialLevel[],
   ): AnnotatedChord {
     const interpretation =
       mode === "bass-led" ? chord.bassLed : chord.harmonic;
@@ -362,7 +397,7 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
       mode === "harmonic" ? chord.bass : null,
     );
 
-    return {
+    const annotated: AnnotatedChord = {
       chord,
       visual: {
         palette,
@@ -374,6 +409,52 @@ export class MusicalVisualVocabulary implements IVisualVocabulary {
       noteIds: chord.noteIds,
       shape,
     };
+    if (partialLevels.length === 0) return annotated;
+    return {
+      ...annotated,
+      partials: this.annotateChordPartials(
+        chord,
+        interpretation.root,
+        partialLevels,
+      ),
+    };
+  }
+
+  /** Partials of each distinct pitch class in the voicing, placed in the
+   *  glyph's angular frame (RFC 012). Octave doubling is ignored, as in
+   *  the glyph itself. */
+  private annotateChordPartials(
+    chord: MusicalChord,
+    root: PitchClass,
+    partialLevels: PartialLevel[],
+  ): ChordPartial[] {
+    const hueConfig = {
+      referencePc: this.config.referencePc,
+      referenceHue: this.config.referenceHue,
+      direction: this.config.hueDirection,
+    };
+    const brightness = octaveToBrightness(
+      chord.voicing.length > 0
+        ? chord.voicing.reduce((sum, p) => sum + p.octave, 0) / chord.voicing.length
+        : 4,
+    );
+    const tones = [...new Set(chord.voicing.map((p) => p.pc))];
+    return tones.flatMap((sourcePc) =>
+      partialLevels.map(({ n, level }) => {
+        const { pc, cents } = partialPitch(sourcePc, n);
+        const huePc =
+          this.config.partialColourMode === "pitch" ? pc : sourcePc;
+        return {
+          n,
+          pc,
+          cents,
+          level,
+          color: { h: pcToHue(huePc, hueConfig), s: 0.8, v: brightness, a: 1 },
+          sourcePc,
+          angle: (((pc - root + 12) % 12) + cents / 100) * 30,
+        };
+      }),
+    );
   }
 
   // Rhythm annotation removed 2026-08-20 with the removal of BPM

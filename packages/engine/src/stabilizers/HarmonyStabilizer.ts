@@ -37,6 +37,7 @@ import type {
   ModeId,
   ChordQuality,
   ChordInterpretationMode,
+  KeyChord,
 } from "@synesthetica/contracts";
 import {
   createEmptyMusicalFrame,
@@ -283,6 +284,15 @@ function formatRoman(
   return prefix + base + suffix;
 }
 
+/** The key's diatonic triads as clock guides (degree order). */
+function diatonicKeyChords(table: DiatonicEntry[]): KeyChord[] {
+  return table.map((entry, i) => ({
+    rootPc: entry.rootPc as PitchClass,
+    roman: formatRoman(i + 1, entry.quality, false, 0),
+    borrowed: false,
+  }));
+}
+
 /**
  * Analyze a detected chord in functional terms relative to a key.
  */
@@ -483,6 +493,26 @@ const MODAL_INTERCHANGE_MAJOR: Record<string, RelationshipEntry[]> = {
   "iv": [{ targetDegree: 1, weight: 0.75, type: "modal-interchange" }],
   "♭II": [{ targetDegree: 5, weight: 0.80, type: "modal-interchange" }],
 };
+
+/** Semitones above the tonic for each MODAL_INTERCHANGE_MAJOR chord,
+ *  for placing them on the clock as hints. */
+const MODAL_INTERCHANGE_MAJOR_ROOTS: Record<string, number> = {
+  "♭II": 1,
+  "♭III": 3,
+  "iv": 5,
+  "♭VI": 8,
+  "♭VII": 10,
+};
+
+/** Modal-interchange chords for a major key as clock hints. */
+function modalInterchangeKeyChords(key: PrescribedKey): KeyChord[] {
+  if (key.mode !== "ionian") return [];
+  return Object.keys(MODAL_INTERCHANGE_MAJOR).map((roman) => ({
+    rootPc: ((key.root + MODAL_INTERCHANGE_MAJOR_ROOTS[roman]) % 12) as PitchClass,
+    roman,
+    borrowed: true,
+  }));
+}
 
 /** Conventional weights for V/X → X resolutions, keyed by target degree. */
 const SECONDARY_DOMINANT_WEIGHTS: Record<number, number> = {
@@ -736,6 +766,8 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
       currentFunction,
       functionalProgression: key ? [...this.progression] : [],
       functionalEdges,
+      diatonicChords: diatonicTable ? diatonicKeyChords(diatonicTable) : [],
+      modalInterchangeChords: key ? modalInterchangeKeyChords(key) : [],
     };
 
     return {

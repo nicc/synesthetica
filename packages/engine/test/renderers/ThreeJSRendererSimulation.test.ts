@@ -484,6 +484,61 @@ describe("ThreeJSRenderer Simulations", () => {
     });
   });
 
+  describe("Glyph overtone steam (RFC 012)", () => {
+    type SteamMesh = {
+      visible: boolean;
+      material: { blending: number; uniforms: Record<string, { value: unknown }> };
+    };
+    const steamOf = () => {
+      const group = (renderer as unknown as {
+        entityObjects: Map<string, { getObjectByName(n: string): unknown }>;
+      }).entityObjects.get("chord")!;
+      return group.getObjectByName("overtone-steam") as SteamMesh | undefined;
+    };
+    const withPartials = (opacity: number, dissipation: number) => {
+      const entity = makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", 0);
+      entity.style.opacity = opacity;
+      entity.data = {
+        ...entity.data,
+        partials: [
+          { n: 3, pc: 7, cents: 2, level: 0.3, color: makeColor(210), sourcePc: 0, angle: 210.6 },
+          { n: 7, pc: 10, cents: -31, level: 0.15, color: makeColor(300), sourcePc: 0, angle: 290.7 },
+        ],
+        overtoneDissipation: dissipation,
+      };
+      return entity;
+    };
+
+    it("adds no steam when the overlay is off", () => {
+      renderer.render(makeFrame(0, [
+        makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", 0),
+      ]));
+      expect(steamOf()).toBeUndefined();
+    });
+
+    it("adds additive steam inside the glyph group, faded and dissipated with the glyph", () => {
+      renderer.render(makeFrame(1000, [withPartials(0.5, 0.5)]));
+      const steam = steamOf()!;
+      expect(steam.visible).toBe(true);
+      expect(steam.material.blending).toBe(2); // AdditiveBlending
+      const u = steam.material.uniforms;
+      expect(u.partialCount.value).toBe(2);
+      expect(u.armCount.value).toBe(MAJOR_TRIAD_ELEMENTS.length);
+      expect(u.fade.value).toBe(0.5);
+      expect(u.dissipation.value).toBe(0.5);
+      // Clock angle 210.6° → math radians (90 − 210.6)°
+      expect((u.partialAngles.value as Float32Array)[0]).toBeCloseTo(((90 - 210.6) * Math.PI) / 180, 5);
+    });
+
+    it("hides the steam when partials disappear", () => {
+      renderer.render(makeFrame(0, [withPartials(1, 0)]));
+      renderer.render(makeFrame(16, [
+        makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", 16),
+      ]));
+      expect(steamOf()!.visible).toBe(false);
+    });
+  });
+
   describe("Beat Grid Dynamics", () => {
     it("handles beat lines appearing and disappearing", () => {
       // Frame 1: 4 beat lines

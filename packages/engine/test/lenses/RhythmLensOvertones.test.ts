@@ -52,11 +52,10 @@ function toNote(spec: NoteSpec, t: number): Note {
 
 function render(
   specs: NoteSpec[],
-  opts: { level?: number; colour?: "pitch" | "fundamental"; t?: number } = {},
+  opts: { level?: number; colour?: "pitch" | "fundamental"; t?: number; lensToggle?: boolean } = {},
 ): SceneFrame {
   const t = opts.t ?? T;
   const vocab = new MusicalVisualVocabulary({
-    harmonicSeriesEnabled: true,
     harmonicSeriesLevel: opts.level ?? 1,
     // RFC 012 metrics are stated at rolloff 1.0; pinned so a default
     // change does not move them.
@@ -65,6 +64,7 @@ function render(
   });
   const lens = new RhythmLens();
   lens.init(ctx);
+  lens.setMacros({ overtones: opts.lensToggle ?? true });
   const frame = createTestMusicalFrame(t, "main", {
     notes: specs.map((s) => toNote(s, t)),
   });
@@ -91,8 +91,13 @@ const held = (pcs: PitchClass[], onset = 2500): NoteSpec[] =>
   pcs.map((pc, i) => ({ id: `n${i}-${pc}`, pc, onset }));
 
 describe("RhythmLens overtone strips", () => {
-  it("emits none when the overlay is off", () => {
+  it("emits none at level 0", () => {
     expect(overtones(render(held([0, 4, 7]), { level: 0 }))).toHaveLength(0);
+  });
+
+  it("emits none when the rhythm lens toggle is off (its default)", () => {
+    expect(overtones(render(held([0, 4, 7]), { lensToggle: false }))).toHaveLength(0);
+    expect(new RhythmLens().readMacros().overtones).toBe(false);
   });
 
   it("emits one overtone strip per modelled partial, before its note strip", () => {

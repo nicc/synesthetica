@@ -47,12 +47,12 @@ describe("renderPanel — structure", () => {
     const panel = generatePanel(productionManifest);
     const rendered = renderPanel({ panel, dispatch });
     const input = rendered.root.querySelector(
-      '[data-widget-id="system:harmonic-series:enabled"] input[type="checkbox"]',
+      '[data-widget-id="rhythm:overtones"] input[type="checkbox"]',
     ) as HTMLInputElement;
     expect(input.checked).toBe(false);
     input.checked = true;
     input.dispatchEvent(new Event("change"));
-    expect(dispatch).toHaveBeenCalledWith("system:harmonic-series:enabled", true);
+    expect(dispatch).toHaveBeenCalledWith("rhythm:overtones", true);
   });
 });
 

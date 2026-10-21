@@ -17,6 +17,12 @@ An annular region within the harmony clock, bounded by guide rings. The harmony 
 **Diatonic ring**
 The inner guide band where chords whose roots are diatonic to the prescribed key sit. Contains seven equally-spaced angular slots, one per scale degree.
 
+**Guide numeral**
+A greyed diatonic numeral (structure colour and opacity) always shown on the diatonic ring when a key is prescribed, as part of the clock's guides. Played numerals draw in colour over it; a guide is hidden while a played numeral is held in its slot and fades back in as that numeral fades out.
+
+**Modal-interchange hint**
+A greyed borrowed-ring numeral (♭II, ♭III, iv, ♭VI, ♭VII) shown in major keys when `harmony:modal-interchange-hints` is on: a suggestion of a commonly borrowed chord, not a played one. Same occupancy rule as guide numerals.
+
 **Slot**
 One of seven angular positions on the diatonic ring, spaced at 360/7 (approximately 51.4 degrees). Degree I sits at 12 o'clock, proceeding clockwise through VII.
 
@@ -67,6 +73,15 @@ Vertical strip representing a played note. Width is constant (velocity is not ye
 
 **Overtone strip** (SPEC 010 §6)
 The rhythm-lens rendering of one partial with n ≥ 3. Partials 1, 2, 4 and 8 share the fundamental's pitch class in this octave-agnostic lens and are not drawn; other octave duplicates fold into the pitch class they land on (6 into 3). Placed at the partial's real pitch, not snapped to a pitch-class column. Wider and less opaque than a note strip, soft-edged; it must read as ethereal, never as a played note. Spans the same time extent as its fundamental's note strip and scrolls with it. Opacity is the partial level multiplied by the note strip's own opacity, so the ratio between the two holds as both fade. Overlapping overtone strips blend additively. Colour follows `system:harmonic-series:colour`: the landing pitch class by default, or the originating note. Surface: slow steam, like the surface of a cup of tea on a cold day. The haze curls and rises within the strip's footprint (inward breakup only), shares one field with coincident strips so they add as denser steam of the same kind, and breaks into sparse wisps as it ages. All overtone strips follow the same motion rules; motion carries no meaning.
+
+**Note-name legend**
+A fixed row of pitch names under the NOW line, one centred under each pitch-class column, in the NOW line's grey and the on-screen keyboard's monospace font. Spelling comes from the frame (key-aware; default sharps). Toggled by `rhythm:note-names` (on by default).
+
+**Interval-name dial**
+Simple-interval names (R m2 M2 m3 M3 P4 d5 P5 m6 M6 m7 M7) around the chord glyph at the spoke angles, baselines on the steam ring's inner edge, rotated to their angle. NOW-line grey; toggled by `harmony:interval-names` (off by default).
+
+**Overtone halo** (proposed name, RFC 012)
+The chord glyph's rendering of its tones' partials: a ring of steam just outside the longest spoke, beyond a gap of negative space, at each partial's angle; one set per distinct pitch class of the chord. Fixed shape, with density as the partial level. Same steam rules as overtone strips; fades with the glyph.
 
 **Beat line**
 Horizontal line marking beat positions in the grid. Tier 2+ only (requires tempo).

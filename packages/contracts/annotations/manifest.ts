@@ -319,22 +319,92 @@ const macros: MacroAnnotation[] = [
   },
 
   {
-    id: "system:harmonic-series:enabled",
-    name: "Harmonic series overlay",
-    aliases: ["overtones", "overtone overlay", "harmonic series", "partials", "show overtones"],
+    id: "rhythm:note-names",
+    name: "Note names",
+    aliases: ["note labels", "pitch names", "column labels", "show note names"],
     type: "toggle",
-    default: false, // off — matches MusicalVisualVocabulary.DEFAULT_CONFIG
+    default: true, // matches RhythmLens macros.noteNames
+    affects: ["melody"],
+    notes: [
+      "Shows a fixed row of pitch names under the rhythm lens's NOW line, one centred under each pitch-class column, in the NOW line's grey. Spelling follows the prescribed key when one is set; otherwise system:note-names:spelling (sharps by default).",
+    ],
+    humanNotes: [
+      "Labels each column of the rhythm view with its note name, just under the NOW line.",
+      "With a key set, names follow the key's spelling; otherwise the default spelling under Advanced.",
+    ],
+    consumers: [{ kind: "lens", id: "rhythm-lens", macroKey: "noteNames" }],
+  },
+
+  {
+    id: "rhythm:overtones",
+    name: "Overtone strips",
+    aliases: ["rhythm overtones", "overtones on the timeline", "overtone strips", "harmonic series on rhythm"],
+    type: "toggle",
+    default: false, // matches RhythmLens macros.overtones
     affects: ["harmony", "melody"],
     notes: [
-      "Theoretical overlay: the harmonic series each sounding note implies, modelled with a generic rolloff. MIDI carries no timbre, so this is not a measurement of the instrument. Never describe it as the player's overtones.",
-      "When true, the rhythm lens draws an overtone strip for partials 3, 5, 7 and 9 of every note (P5, M3, m7, M2 above it) at their real pitch, not snapped to the pitch-class columns: the 7th partial sits visibly flat of the ♭7 column. Partials 2, 4 and 8 share the note's own pitch class and are not drawn. Brightness is set by system:harmonic-series:level.",
+      "Harmonic series overlay on the rhythm lens. Theoretical: the harmonic series each sounding note implies, modelled with a generic rolloff. MIDI carries no timbre, so this is not a measurement of the instrument. Never describe it as the player's overtones.",
+      "When true, the rhythm lens draws an overtone strip for partials 3, 5, 7 and 9 of every note (P5, M3, m7, M2 above it) at their real pitch, not snapped to the pitch-class columns: the 7th partial sits visibly flat of the ♭7 column. Partials 2, 4 and 8 share the note's own pitch class and are not drawn. Independent of harmony:overtones (the chord glyph's halo). Brightness, rolloff and colour are shared: system:harmonic-series:level / :rolloff / :colour.",
       "What to look for: shared partials pile up. Under C major, D and B glow although neither was played. G alone puts a faint, flat F (its 7th partial) — the dominant seventh's ♭7 is already in the root's series. In C–E, C's 5th partial sits just flat beside the played E; in C–E♭ no partial of C lands on E♭.",
     ],
     humanNotes: [
       "Shows the overtones each note implies as faint, soft strips in the rhythm view.",
-      "This is the theoretical harmonic series, not a measurement of your instrument. Where overtones from different notes line up, they add together. Fine-tune brightness and colour under Advanced.",
+      "This is the theoretical harmonic series, not a measurement of your instrument. Where overtones from different notes line up, they add together. Brightness and colour are under Advanced.",
     ],
-    consumers: [{ kind: "vocab", id: "musical-visual", macroKey: "system:harmonic-series:enabled" }],
+    consumers: [{ kind: "lens", id: "rhythm-lens", macroKey: "overtones" }],
+  },
+
+  {
+    id: "harmony:overtones",
+    name: "Overtone halo",
+    aliases: ["chord overtones", "glyph overtones", "overtone halo", "harmonic series on the chord"],
+    type: "toggle",
+    default: true, // matches HarmonyLens macros.overtones
+    affects: ["harmony"],
+    notes: [
+      "Harmonic series overlay on the chord glyph: a ring of steam just outside the glyph at each partial's angle (30° per semitone from the root, cents included), one set per distinct pitch class of the chord. Theoretical, not measured — never describe it as the player's overtones.",
+      "Shared partials pile up: under C major the ring is densest at the D (9th) and B (major 7th) angles. Independent of rhythm:overtones. Brightness, rolloff and colour are shared: system:harmonic-series:level / :rolloff / :colour.",
+    ],
+    humanNotes: [
+      "Shows the overtones of the current chord as a ring of steam around the chord glyph, at each overtone's pitch angle.",
+      "This is the theoretical harmonic series, not a measurement of your instrument. Brightness and colour are under Advanced.",
+    ],
+    consumers: [{ kind: "lens", id: "harmony-lens", macroKey: "overtones" }],
+  },
+
+  {
+    id: "harmony:interval-names",
+    name: "Interval names",
+    aliases: ["interval labels", "chord dial", "interval dial", "show intervals"],
+    type: "toggle",
+    default: false, // matches HarmonyLens macros.intervalNames
+    affects: ["harmony"],
+    notes: [
+      "A fixed dial of simple-interval names around the chord glyph, one per semitone from the root at the spoke angles: R m2 M2 m3 M3 P4 d5 P5 m6 M6 m7 M7. R is upright at the top; d5 is upside down at the bottom. Labels sit on the inner edge of the overtone steam ring, in the NOW line's grey.",
+      "The dial names pitch distance from the root, so some chords spell an angle differently (an augmented triad's ♯5 sits under m6; 9ths, 11ths and 13ths under M2, P4 and M6).",
+    ],
+    humanNotes: [
+      "Labels each angle around the chord glyph with its interval from the root (R, m3, P5…), so you can read which intervals the spokes are.",
+    ],
+    consumers: [{ kind: "lens", id: "harmony-lens", macroKey: "intervalNames" }],
+  },
+
+  {
+    id: "harmony:modal-interchange-hints",
+    name: "Modal-interchange hints",
+    aliases: ["borrowed chord hints", "modal interchange", "borrowed chords", "show borrowed options"],
+    type: "toggle",
+    default: false, // matches HarmonyLens macros.modalInterchangeHints
+    affects: ["harmony"],
+    notes: [
+      "Major (Ionian) keys only. When true, the progression clock's outer (borrowed) ring shows the common modal-interchange chords greyed, as suggestions: ♭II, ♭III, iv, ♭VI, ♭VII — chords borrowed mostly from the parallel minor (♭II from Phrygian). Each tends to move to a diatonic chord: ♭VII→IV, ♭III→vi, ♭VI→ii or IV, iv→I, ♭II→V. These are the same relationships the connector arcs draw when such a chord is played.",
+      "Hints are not chords the player played. A hint is hidden while a played chord occupies its slot. Nothing is shown in minor or modal keys, or without a key.",
+    ],
+    humanNotes: [
+      "In major keys, shows greyed suggestions on the clock's outer ring for chords commonly borrowed from the parallel minor: ♭II, ♭III, iv, ♭VI and ♭VII.",
+      "Each tends to resolve to a chord in the key (♭VII→IV, ♭III→vi, ♭VI→ii or IV, iv→I, ♭II→V). Hidden in minor and modal keys.",
+    ],
+    consumers: [{ kind: "lens", id: "harmony-lens", macroKey: "modalInterchangeHints" }],
   },
 
   {
@@ -356,11 +426,11 @@ const macros: MacroAnnotation[] = [
       },
     },
     notes: [
-      "Brightness of the harmonic series overlay. Only has an effect while system:harmonic-series:enabled is true.",
+      "Brightness of the harmonic series overlay, shared by the rhythm lens (rhythm:overtones) and the chord glyph (harmony:overtones). Only visible where one of those toggles is on. 0 annotates no partials.",
       "Values well below 1 read best. Near 1 the strongest overtone columns approach the opacity of played notes.",
     ],
     humanNotes: [
-      "How bright the overtone strips are. Only applies while the harmonic series overlay is on.",
+      "How bright the overtones are, in both the rhythm view and the chord glyph halo. Only applies where an overtone toggle is on.",
       "Low values keep overtones in the background; high values make shared overtones rival the notes you played.",
     ],
     consumers: [{ kind: "vocab", id: "musical-visual", macroKey: "system:harmonic-series:level" }],
@@ -386,12 +456,12 @@ const macros: MacroAnnotation[] = [
     },
     notes: [
       "Exponent of the modelled partial level, n^(−rolloff). 1.0 ≈ sawtooth (−6 dB/octave); 2.0 ≈ plucked or struck strings (−12 dB/octave). A generic curve, not an instrument model.",
-      "No visible effect while system:harmonic-series:enabled is false.",
+      "No visible effect unless rhythm:overtones or harmony:overtones is on.",
       "Above about 2 the 7th partial (the dominant seventh's ♭7) is too faint to see.",
     ],
     humanNotes: [
       "How quickly the higher overtones fade relative to the fifth. Low shows more overtones; high leaves only the fifth.",
-      "Has no effect while the harmonic series overlay is off.",
+      "Has no effect unless an overtone toggle is on.",
     ],
     consumers: [{ kind: "vocab", id: "musical-visual", macroKey: "system:harmonic-series:rolloff" }],
   },
@@ -399,6 +469,27 @@ const macros: MacroAnnotation[] = [
   // -----------------------------------------------------------------
   // Discrete — enum with labels
   // -----------------------------------------------------------------
+  {
+    id: "system:note-names:spelling",
+    name: "Default note spelling",
+    aliases: ["sharps or flats", "accidentals", "note spelling", "enharmonic spelling"],
+    type: "discrete",
+    enumValues: [
+      { value: "sharps", label: "sharps (C♯, D♯, F♯…)" },
+      { value: "flats", label: "flats (D♭, E♭, G♭…)" },
+    ],
+    default: "sharps", // matches MusicalVisualVocabulary.DEFAULT_CONFIG
+    affects: ["melody", "harmony"],
+    notes: [
+      "How note names are spelled when no key is prescribed. With a key set, names follow the key's own spelling (e.g. B♭ in F major, D♯ in E major) and this setting is not used.",
+      "Applies to the rhythm lens's note-name legend (rhythm:note-names).",
+    ],
+    humanNotes: [
+      "Whether note names use sharps or flats when no key is set. With a key, names follow the key.",
+    ],
+    consumers: [{ kind: "vocab", id: "musical-visual", macroKey: "system:note-names:spelling" }],
+  },
+
   {
     id: "rhythm:quantise-resolution",
     name: "Quantise resolution",
@@ -438,7 +529,7 @@ const macros: MacroAnnotation[] = [
     notes: [
       "How overtone strips are coloured. `pitch`: each overtone strip takes the hue of the pitch class it lands on, like a played note in that column, so coincident partials from different notes share a colour and pile up as one. `fundamental`: each overtone strip takes the hue of the note that produced it, so you can see which note an overtone comes from.",
       "`fundamental` shows origin at the expense of harmonic intuition: the column's colour no longer names its pitch, and coincident partials from different notes appear as mixed colours rather than one reinforced pitch. Suggest it when the user asks where an overtone comes from; otherwise keep `pitch`.",
-      "No visible effect while system:harmonic-series:enabled is false.",
+      "No visible effect unless rhythm:overtones or harmony:overtones is on.",
     ],
     humanNotes: [
       "Pitch colours each overtone by the note it sounds as, matching the rest of the view. Fundamental colours it by the note that produced it.",
@@ -794,12 +885,19 @@ const concepts: SystemConceptAnnotation[] = [
   {
     term: "harmonic-series-overlay",
     definition:
-      "An optional theoretical overlay of the harmonic series each sounding note implies, drawn in the rhythm lens as overtone strips. Partial levels are modelled from a generic rolloff, not measured — MIDI carries no timbre. Off by default (system:harmonic-series:enabled = false). Partials are never notes: chord detection, dynamics and harmony analysis do not see them.",
+      "An optional theoretical overlay of the harmonic series each sounding note implies, drawn in the rhythm lens as overtone strips. Partial levels are modelled from a generic rolloff, not measured — MIDI carries no timbre. Toggled per lens: rhythm:overtones (default off), harmony:overtones (default on). Partials are never notes: chord detection, dynamics and harmony analysis do not see them.",
     related: ["overtone-strip", "note-strip"],
     examples: [
       "Under a held C major triad, D and B light up although neither was played: C's 9th and G's 3rd partials coincide at D; E's 3rd and G's 5th at B.",
       "C then G: C's strongest overtone strip (its 3rd partial) sits in the G column. Played detached, the G lands below it in the same column; with C held, the G lands inside it.",
     ],
+  },
+
+  {
+    term: "overtone-halo",
+    definition:
+      "A ring of steam just outside the chord glyph, beyond a gap of negative space, when the harmonic series overlay is on. Each partial of each chord tone sits at its pitch's angle around the glyph — the same 30°-per-semitone frame as the spokes, so a partial landing on a chord tone's angle appears just beyond that spoke. Its shape is fixed and it never touches the spokes: steam is never a chord tone. Overlapping partials add up. One set per distinct pitch class; octave doubling is ignored.",
+    related: ["harmonic-series-overlay", "chord-quality-glyph", "overtone-strip"],
   },
 
   {
@@ -813,7 +911,7 @@ const concepts: SystemConceptAnnotation[] = [
   {
     term: "progression-clock",
     definition:
-      "The circular chord progression layout in the bottom cell of the harmony lens (also called the harmony clock). Chord numerals sit around a clock face by pitch-class angle (I at 0). When a key is prescribed, an inner ring shows diatonic degrees (I–vii) and an outer ring shows borrowed chords; connector arcs indicate modal-interchange relationships between them.",
+      "The circular chord progression layout in the bottom cell of the harmony lens (also called the harmony clock). Chord numerals sit around a clock face by pitch-class angle (I at 0). When a key is prescribed, an inner ring shows diatonic degrees (I–vii) and an outer ring shows borrowed chords; connector arcs indicate modal-interchange relationships between them. With a key set, the key's diatonic numerals are always shown greyed as guides; played chords appear in colour over them.",
     related: ["guide-ring", "connector-strip", "borrowed-chord", "modal-interchange"],
   },
 
@@ -987,7 +1085,15 @@ const lenses: LensAnnotation[] = [
         responsiveness: "strong",
         notes: "compound; fans to rhythm:pulse-intensity + rhythm:reference-linger",
       },
-      "system:harmonic-series:enabled": {
+      "rhythm:note-names": {
+        responsiveness: "strong",
+        notes: "pitch-name legend under the NOW line",
+      },
+      "system:note-names:spelling": {
+        responsiveness: "moderate",
+        notes: "legend spelling when no key is set",
+      },
+      "rhythm:overtones": {
         responsiveness: "strong",
         notes: "draws overtone strips (harmonic series overlay) when true",
       },
@@ -1037,6 +1143,30 @@ const lenses: LensAnnotation[] = [
       "system:colour-mapping:reference": {
         responsiveness: "strong",
         notes: "shifts the palette of all chord numerals, connector strips, and glyph shapes",
+      },
+      "harmony:interval-names": {
+        responsiveness: "strong",
+        notes: "interval-name dial around the chord glyph",
+      },
+      "harmony:modal-interchange-hints": {
+        responsiveness: "strong",
+        notes: "greyed ♭II ♭III iv ♭VI ♭VII suggestions on the borrowed ring (major keys)",
+      },
+      "harmony:overtones": {
+        responsiveness: "strong",
+        notes: "draws the overtone halo (a ring of steam around the chord glyph) when true",
+      },
+      "system:harmonic-series:level": {
+        responsiveness: "strong",
+        notes: "density of the overtone halo",
+      },
+      "system:harmonic-series:rolloff": {
+        responsiveness: "moderate",
+        notes: "relative strength of the halo's upper partials against the fifth",
+      },
+      "system:harmonic-series:colour": {
+        responsiveness: "moderate",
+        notes: "halo hue: landing pitch (default) or originating chord tone",
       },
       "time-horizon": {
         responsiveness: "strong",

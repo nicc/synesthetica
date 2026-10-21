@@ -358,6 +358,22 @@
       line-height: 1.55;
       color: #ccc;
     }
+    /* Not-built-for-mobile warning: narrow screens only. Hue 45° sits
+       between C♯ (30°) and D (60°) in the default colour mapping.
+       Keep the media query in sync with NARROW_SCREEN_QUERY
+       (src/panel/aboutPanel.ts). */
+    .syn-about-mobile-warning {
+      display: none;
+      margin: 0 0 12px;
+      padding: 8px 12px;
+      border-radius: 4px;
+      background: #f2c230;
+      color: #1a1a1a;
+      font-weight: 600;
+    }
+    @media (max-width: 814px), (max-height: 499px) {
+      .syn-about-mobile-warning { display: block; }
+    }
     .syn-about h1 { font-size: 15px; color: #fff; margin: 0 0 8px; }
     .syn-about h2 {
       font-size: 12px;

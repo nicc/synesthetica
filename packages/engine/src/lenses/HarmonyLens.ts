@@ -31,6 +31,7 @@ import type {
   ChordShapeElement,
   MarginStyle,
   FunctionalChord,
+  KeyChord,
   FunctionalEdge,
   ModeId,
   PitchClass,
@@ -48,9 +49,11 @@ import { buildRomanNumeralGlyph } from "../utils/RomanNumeralGlyphBuilder";
 import {
   HARMONY_CHORD_CENTER_X,
   HARMONY_CHORD_CENTER_Y,
+  STRUCTURAL_TEXT_COLOR,
+  keyboardRelativeTextSize,
   HARMONY_PROGRESSION_CENTER_X,
   HARMONY_PROGRESSION_CENTER_Y,
-  HARMONY_CELL_SIZE,
+  GLYPH_STEAM_BAND_RADIUS,
   CHORD_STRIP_CENTER_X,
   CHORD_STRIP_BAR_WIDTH,
 } from "./layout";
@@ -85,38 +88,13 @@ const RELEASE_BRIGHTNESS_STEP = 0.30;
  */
 const WIDTH_COMPENSATION_EXPONENT = 1.8;
 
-/** Stroke width (pixels) while chord is held or fresh */
-const STROKE_WIDTH_FRESH = 2;
+/** Stroke width (pixels) while chord is held or fresh. Scaled with the
+ *  clock (CLOCK_SCALE, defined below). */
+const STROKE_WIDTH_FRESH_BASE = 2;
 
 /** Stroke width (pixels) at full fade — chunky, blocky */
-const STROKE_WIDTH_FADED = 8;
+const STROKE_WIDTH_FADED_BASE = 8;
 
-/** Clock radius as fraction of cell size. Sized so the outer guide ring
- *  fits within the cell vertically (worldHeight < worldWidth, so a
- *  larger fraction would clip the cell vertically and overlap the
- *  chord glyph above). */
-const CLOCK_RADIUS_FRACTION = 0.35;
-
-/**
- * Layout fractions of clock radius (SPEC 011). Three guide rings,
- * defining two equal-width annular bands (one for each numeral ring):
- *   - Inner guide  (0.32) — outer edge of chord-label area
- *   - Middle guide (0.62) — between diatonic and borrowed numerals
- *   - Outer guide  (0.92) — outer bound of borrowed band; bands are
- *     0.30 wide each so diatonic and borrowed read as the same width
- * Numeral rings sit at the radial centres of their bands so they read
- * as "centred between guide rings".
- */
-const GUIDE_RING_INNER_FRACTION = 0.32;
-const GUIDE_RING_MIDDLE_FRACTION = 0.62;
-const GUIDE_RING_OUTER_FRACTION = 0.92;
-const DIATONIC_GLYPH_RADIUS_FRACTION =
-  (GUIDE_RING_INNER_FRACTION + GUIDE_RING_MIDDLE_FRACTION) / 2; // 0.47
-const BORROWED_GLYPH_RADIUS_FRACTION =
-  (GUIDE_RING_MIDDLE_FRACTION + GUIDE_RING_OUTER_FRACTION) / 2; // 0.77
-
-/** Glyph size in world units (height of uppercase diatonic numeral). */
-const GLYPH_SIZE = 2.4;
 
 /**
  * Scale factor applied to diatonic-ring glyphs (size + stroke). Diatonic
@@ -132,6 +110,61 @@ const DIATONIC_SCALE = 0.8;
  * coincidentally resize the other.
  */
 const BORROWED_SCALE = 1 / 1.618033988749895;
+
+/**
+ * Layout fractions of clock radius (SPEC 011). Three guide rings,
+ * defining two annular bands (one for each numeral ring):
+ *   - Inner guide  (0.32) — outer edge of chord-label area
+ *   - Middle guide (0.62) — between diatonic and borrowed numerals
+ *   - Outer guide  — outer bound of the borrowed band. The borrowed band
+ *     is narrower than the diatonic band (0.30) in proportion to its
+ *     smaller numerals (BORROWED_SCALE / DIATONIC_SCALE ≈ 0.77).
+ * Numeral rings sit at the radial centres of their bands so they read
+ * as "centred between guide rings".
+ */
+const GUIDE_RING_INNER_FRACTION = 0.32;
+const GUIDE_RING_MIDDLE_FRACTION = 0.62;
+const GUIDE_RING_OUTER_FRACTION =
+  GUIDE_RING_MIDDLE_FRACTION +
+  (GUIDE_RING_MIDDLE_FRACTION - GUIDE_RING_INNER_FRACTION) *
+    (BORROWED_SCALE / DIATONIC_SCALE); // ≈ 0.852
+const DIATONIC_GLYPH_RADIUS_FRACTION =
+  (GUIDE_RING_INNER_FRACTION + GUIDE_RING_MIDDLE_FRACTION) / 2; // 0.47
+const BORROWED_GLYPH_RADIUS_FRACTION =
+  (GUIDE_RING_MIDDLE_FRACTION + GUIDE_RING_OUTER_FRACTION) / 2; // ≈ 0.736
+
+/** Interval-name dial around the chord glyph (harmony:interval-names).
+ *  Labels sit with their baseline on the inner edge of the overtone
+ *  steam ring, rotated to their angle (R upright at the top, d5 upside
+ *  down at the bottom). Size is a multiple of the on-screen keyboard's
+ *  label size, independent of the rhythm lens's note names. */
+const INTERVAL_NAME_FONT_SCALE = 0.8;
+const INTERVAL_NAME_SIZE = keyboardRelativeTextSize(INTERVAL_NAME_FONT_SCALE);
+/** Radial nudge of the labels' baseline from the steam ring's inner
+ *  edge, normalized (positive = outward). */
+const INTERVAL_NAME_BASELINE_OFFSET = 0;
+/** Simple-interval names by semitones from the root. */
+const INTERVAL_NAMES = ["R", "m2", "M2", "m3", "M3", "P4", "d5", "P5", "m6", "M6", "m7", "M7"];
+
+/** Clock radius, normalized. Sized so the outer guide ring matches the
+ *  inner edge of the chord glyph's overtone steam ring above it: the
+ *  glyph and the clock share one outer proportion. */
+const CLOCK_RADIUS = GLYPH_STEAM_BAND_RADIUS / GUIDE_RING_OUTER_FRACTION;
+
+/** Clock radius the absolute sizes below (numerals, strokes, connector
+ *  arcs, centre label) were tuned at. They scale by CLOCK_RADIUS over
+ *  this, so every clock element keeps its proportion. */
+const REFERENCE_CLOCK_RADIUS = 0.42 * 0.35;
+const CLOCK_SCALE = CLOCK_RADIUS / REFERENCE_CLOCK_RADIUS;
+
+/** Glyph size in world units (height of uppercase diatonic numeral). */
+const GLYPH_SIZE = 2.4 * CLOCK_SCALE;
+
+/** Line height of the chord name at the clock's centre (world units). */
+const CHORD_LABEL_SIZE = 1.75 * CLOCK_SCALE;
+
+const STROKE_WIDTH_FRESH = STROKE_WIDTH_FRESH_BASE * CLOCK_SCALE;
+const STROKE_WIDTH_FADED = STROKE_WIDTH_FADED_BASE * CLOCK_SCALE;
 
 /**
  * Viewport aspect ratio (worldWidth / worldHeight from the default
@@ -188,7 +221,7 @@ const CONNECTOR_ANIMATION_MS = 60;
  *  full stroke thickness is 2×. Chosen to read as ~2× the guide ring
  *  stroke while staying much thinner than the strip's radial extent
  *  (STRIP_RADIAL_FRACTION * clockRadius ≈ 0.01 normalized). */
-const CONNECTOR_HALF_THICKNESS_NORMALIZED = 0.001;
+const CONNECTOR_HALF_THICKNESS_NORMALIZED = 0.001 * CLOCK_SCALE;
 
 /** Arrow indicator height as a multiple of the arc's full stroke
  *  thickness. The arrow's flat base sits flush against the arc at
@@ -347,6 +380,15 @@ interface HarmonyLensMacros {
    *  - Without tempo: value is in seconds (default 3 s)
    *  Matches PROGRESSION_FADE_VALUE's semantic. */
   linger: number;
+  /** Draw the chord glyph's overtone halo (harmonic series overlay,
+   *  RFC 012). Lens-level so the glyph and the rhythm lens can be
+   *  toggled independently. */
+  overtones: boolean;
+  /** Show common modal-interchange chords (major keys) as greyed hints
+   *  on the borrowed ring. */
+  modalInterchangeHints: boolean;
+  /** Show the interval-name dial around the chord glyph. */
+  intervalNames: boolean;
 }
 
 export class HarmonyLens implements IVisualLens {
@@ -357,6 +399,9 @@ export class HarmonyLens implements IVisualLens {
 
   private macros: HarmonyLensMacros = {
     linger: PROGRESSION_FADE_VALUE,
+    overtones: true,
+    modalInterchangeHints: false,
+    intervalNames: false,
   };
 
   // Fade-out state: when no chord is active, keep rendering the most
@@ -460,6 +505,11 @@ export class HarmonyLens implements IVisualLens {
           quality: chord.chord.harmonic.quality,
           elements: chord.shape.elements,
           margin: chord.shape.margin,
+          // Harmonic series overlay (RFC 012): a ring of steam around the
+          // glyph at each partial's angle. Breaks into wisps as
+          // the glyph fades.
+          partials: this.macros.overtones ? chord.partials : undefined,
+          overtoneDissipation: 1 - chordOpacity,
         },
       });
 
@@ -492,6 +542,7 @@ export class HarmonyLens implements IVisualLens {
           style: {
             color: { h: 0, s: 0, v: 1, a: 1 },
             opacity: chordOpacity,
+            size: CHORD_LABEL_SIZE,
           },
           data: {
             type: "chord-label",
@@ -499,6 +550,12 @@ export class HarmonyLens implements IVisualLens {
           },
         });
       }
+    }
+
+    // Interval-name dial around the glyph: structural, so it stays put
+    // whether or not a chord is showing.
+    if (this.macros.intervalNames) {
+      entities.push(...this.createIntervalNames(t, part));
     }
 
     // --- Progression clock (bottom cell) ---
@@ -512,6 +569,34 @@ export class HarmonyLens implements IVisualLens {
       entities.push(
         ...this.createClockStructure(t, part),
       );
+      // Diatonic numerals as guides; played numerals draw over them.
+      entities.push(
+        ...this.createGuideNumerals(
+          input.harmonicContext.diatonicChords ?? [],
+          progression,
+          t,
+          part,
+          key.root,
+          key.mode,
+          this.macros.linger * 1000,
+          "guide-numeral",
+        ),
+      );
+      // Optional modal-interchange hints on the borrowed ring (major keys).
+      if (this.macros.modalInterchangeHints) {
+        entities.push(
+          ...this.createGuideNumerals(
+            input.harmonicContext.modalInterchangeChords ?? [],
+            progression,
+            t,
+            part,
+            key.root,
+            key.mode,
+            this.macros.linger * 1000,
+            "hint-numeral",
+          ),
+        );
+      }
     }
 
     if (key && progression.length > 0) {
@@ -572,7 +657,7 @@ export class HarmonyLens implements IVisualLens {
    */
   private createClockStructure(t: number, part: string): Entity[] {
     const entities: Entity[] = [];
-    const clockRadius = HARMONY_CELL_SIZE * CLOCK_RADIUS_FRACTION;
+    const clockRadius = CLOCK_RADIUS;
 
     for (const [suffix, fraction] of [
       ["inner", GUIDE_RING_INNER_FRACTION],
@@ -646,9 +731,6 @@ export class HarmonyLens implements IVisualLens {
     hueInvariant: PitchHueInvariant,
   ): Entity[] {
     const entities: Entity[] = [];
-    const clockRadius = HARMONY_CELL_SIZE * CLOCK_RADIUS_FRACTION;
-    const diatonicRadius = clockRadius * DIATONIC_GLYPH_RADIUS_FRACTION;
-    const borrowedRadius = clockRadius * BORROWED_GLYPH_RADIUS_FRACTION;
 
     for (let i = 0; i < progression.length; i++) {
       const fc = progression[i];
@@ -680,56 +762,166 @@ export class HarmonyLens implements IVisualLens {
       }
       if (opacity < 0.01) continue;
 
-      // Angular position: 7 equally-spaced slots for diatonic degrees,
-      // with borrowed chords interpolated between adjacent diatonic
-      // positions based on chromatic distance. Borrowed chords also sit
-      // on a larger radius ring so they are visually outside the key.
-      const semitonesFromTonic = (fc.rootPc - tonicPc + 12) % 12;
-      const angleDeg = modalWheelAngle(semitonesFromTonic, mode);
-      const angleRad = ((angleDeg - 90) * Math.PI) / 180; // -90 puts 0° at top
-      const radius = fc.borrowed ? borrowedRadius : diatonicRadius;
-      const scale = fc.borrowed ? BORROWED_SCALE : DIATONIC_SCALE;
-
-      // Position on the clock, centered on progression cell.
-      // y is multiplied by VIEWPORT_ASPECT to compensate for the
-      // renderer's worldHeight < worldWidth — without this, numerals
-      // at 12/6 o'clock fall short of their ring (the ring uses
-      // worldWidth for both axes, the position scales y by worldHeight).
-      const x = HARMONY_PROGRESSION_CENTER_X + radius * Math.cos(angleRad);
-      const y =
-        HARMONY_PROGRESSION_CENTER_Y +
-        radius * VIEWPORT_ASPECT * Math.sin(angleRad);
-
       // Colour from root pitch class
       const hue = pcToHue(fc.rootPc, hueInvariant);
       const color: ColorHSVA = { h: hue, s: 0.7, v: 0.9, a: 1 };
 
-      // Build glyph geometry
-      const glyph = buildRomanNumeralGlyph(fc.roman);
-
-      entities.push({
-        id: `${this.id}:prog:${i}`,
-        part,
-        kind: "glyph",
-        createdAt: fc.onset,
-        updatedAt: t,
-        position: { x, y },
-        style: {
+      entities.push(
+        this.clockNumeral(`${this.id}:prog:${i}`, fc, tonicPc, mode, {
           color,
           opacity,
-          size: GLYPH_SIZE * scale,
-        },
-        data: {
-          type: "roman-numeral",
-          polylines: glyph.polylines,
-          arcs: glyph.arcs,
-          width: glyph.width,
-          height: glyph.height,
-          strokeWidth: strokeWidth * scale,
-        },
-      });
+          strokeWidth,
+          createdAt: fc.onset,
+          t,
+          part,
+        }),
+      );
     }
 
+    return entities;
+  }
+
+  /**
+   * The interval-name dial: one label per semitone from the root, its
+   * baseline on the steam ring's inner edge, rotated to its angle so the
+   * text reads outward (upright at the top, upside down at the bottom).
+   */
+  private createIntervalNames(t: number, part: string): Entity[] {
+    const r = GLYPH_STEAM_BAND_RADIUS + INTERVAL_NAME_BASELINE_OFFSET;
+    return INTERVAL_NAMES.map((name, semitones) => {
+      const angleDeg = semitones * 30;
+      const a = (angleDeg * Math.PI) / 180;
+      return {
+        id: `${this.id}:interval-name-${semitones}`,
+        part,
+        kind: "glyph" as const,
+        createdAt: t,
+        updatedAt: t,
+        position: {
+          x: HARMONY_CHORD_CENTER_X + r * Math.sin(a),
+          y: HARMONY_CHORD_CENTER_Y - r * VIEWPORT_ASPECT * Math.cos(a),
+        },
+        style: { color: STRUCTURAL_TEXT_COLOR, size: INTERVAL_NAME_SIZE, opacity: 1 },
+        data: {
+          type: "text-label",
+          text: name,
+          font: "mono",
+          anchor: "baseline",
+          rotationDeg: angleDeg,
+        },
+      };
+    });
+  }
+
+  /**
+   * One Roman numeral on the clock. Angular position: 7 equally-spaced
+   * slots for diatonic degrees, with borrowed chords interpolated between
+   * adjacent diatonic positions by chromatic distance; borrowed chords sit
+   * on the outer ring so they read as outside the key.
+   */
+  private clockNumeral(
+    id: string,
+    chord: { rootPc: PitchClass; roman: string; borrowed: boolean },
+    tonicPc: PitchClass,
+    mode: ModeId,
+    look: {
+      color: ColorHSVA;
+      opacity: number;
+      strokeWidth: number;
+      createdAt: number;
+      t: number;
+      part: string;
+    },
+  ): Entity {
+    const semitonesFromTonic = (chord.rootPc - tonicPc + 12) % 12;
+    const angleDeg = modalWheelAngle(semitonesFromTonic, mode);
+    const angleRad = ((angleDeg - 90) * Math.PI) / 180; // -90 puts 0° at top
+    const radius =
+      CLOCK_RADIUS *
+      (chord.borrowed ? BORROWED_GLYPH_RADIUS_FRACTION : DIATONIC_GLYPH_RADIUS_FRACTION);
+    const scale = chord.borrowed ? BORROWED_SCALE : DIATONIC_SCALE;
+
+    // y is multiplied by VIEWPORT_ASPECT to compensate for the renderer's
+    // worldHeight < worldWidth — without this, numerals at 12/6 o'clock
+    // fall short of their ring (the ring uses worldWidth for both axes,
+    // the position scales y by worldHeight).
+    const x = HARMONY_PROGRESSION_CENTER_X + radius * Math.cos(angleRad);
+    const y =
+      HARMONY_PROGRESSION_CENTER_Y + radius * VIEWPORT_ASPECT * Math.sin(angleRad);
+
+    const glyph = buildRomanNumeralGlyph(chord.roman);
+    return {
+      id,
+      part: look.part,
+      kind: "glyph",
+      createdAt: look.createdAt,
+      updatedAt: look.t,
+      position: { x, y },
+      style: {
+        color: look.color,
+        opacity: look.opacity,
+        size: GLYPH_SIZE * scale,
+      },
+      data: {
+        type: "roman-numeral",
+        polylines: glyph.polylines,
+        arcs: glyph.arcs,
+        width: glyph.width,
+        height: glyph.height,
+        strokeWidth: look.strokeWidth * scale,
+      },
+    };
+  }
+
+  /**
+   * Always-on guide numerals (greyed, in the structure colour) for chords
+   * the key defines. While a played numeral occupies a slot the guide is
+   * hidden; as the played numeral fades the guide fades back in over the
+   * same window (a handover rather than a pop). With several occupants
+   * the most present one wins.
+   */
+  private createGuideNumerals(
+    chords: KeyChord[],
+    progression: FunctionalChord[],
+    t: number,
+    part: string,
+    tonicPc: PitchClass,
+    mode: ModeId,
+    fadeMs: number,
+    idPrefix: string,
+  ): Entity[] {
+    const slot = (rootPc: number, borrowed: boolean) =>
+      `${borrowed ? "b" : "d"}:${rootPc}`;
+    // Occupancy per slot, 1 (held) → 0 (fully faded).
+    const occupancy = new Map<string, number>();
+    for (const fc of progression) {
+      let presence: number;
+      if (fc.releaseTime === null) {
+        presence = 1;
+      } else {
+        const age = t - fc.releaseTime;
+        if (age < 0 || age >= fadeMs) continue;
+        presence = 1 - age / fadeMs;
+      }
+      const key = slot(fc.rootPc, fc.borrowed);
+      occupancy.set(key, Math.max(occupancy.get(key) ?? 0, presence));
+    }
+    const entities: Entity[] = [];
+    for (const c of chords) {
+      const key = slot(c.rootPc, c.borrowed);
+      const opacity = STRUCTURE_OPACITY * (1 - (occupancy.get(key) ?? 0));
+      if (opacity < 0.005) continue;
+      entities.push(
+        this.clockNumeral(`${this.id}:${idPrefix}-${key}`, c, tonicPc, mode, {
+          color: STRUCTURE_COLOR,
+          opacity,
+          strokeWidth: STROKE_WIDTH_FRESH,
+          createdAt: t,
+          t,
+          part,
+        }),
+      );
+    }
     return entities;
   }
 
@@ -775,7 +967,7 @@ export class HarmonyLens implements IVisualLens {
     if (edges.length === 0) return [];
 
     const entities: Entity[] = [];
-    const clockRadius = HARMONY_CELL_SIZE * CLOCK_RADIUS_FRACTION;
+    const clockRadius = CLOCK_RADIUS;
     const stripRadialHeight = clockRadius * STRIP_RADIAL_FRACTION;
 
     // Build a chord-id index for source-chord lookup.

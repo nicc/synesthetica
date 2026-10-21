@@ -27,9 +27,18 @@ import type {
   SceneFrame,
   Entity,
   ChordShapeElement,
+  ChordPartial,
   MarginStyle,
 } from "@synesthetica/contracts";
-import { ChordShapeBuilder, getThreeDashParams } from "../utils/ChordShapeBuilder";
+import {
+  ChordShapeBuilder,
+  getThreeDashParams,
+  HUB_RADIUS,
+  ARM_LENGTH,
+  BASE_WIDTH,
+} from "../utils/ChordShapeBuilder";
+// Shared with HarmonyLens: the band gap also sizes the progression clock.
+import { GLYPH_STEAM_BAND_GAP } from "../lenses/layout";
 
 // ============================================================================
 // Configuration
@@ -134,30 +143,12 @@ const OVERTONE_STEAM_VERTEX = `
  *  shader coordinates stay small and precise in long sessions. */
 const STEAM_PERIOD = 64;
 
-const OVERTONE_STEAM_FRAGMENT = `
-  uniform vec3 color;
-  uniform float topOpacity;
-  uniform float bottomOpacity;
-  uniform float edgeSoftness;
-  uniform float dissipationTop;
-  uniform float dissipationBottom;
-  uniform float fieldShift;   // timeline scroll + rise, noise units, wrapped to PERIOD
-  uniform float swirlPhase;   // warp evolution, noise units, wrapped to PERIOD
-  uniform float worldWidth;
-  uniform float stripHeight;  // world units
-  varying vec2 vUv;
-  varying vec2 vWorld;
-
-  const vec2 SCALE = vec2(${glslFloat(STEAM_SCALE_X)}, ${glslFloat(STEAM_SCALE_Y)});
+/** Noise shared by overtone strips and glyph steam: one set of field
+ *  rules for every overtone surface. */
+const STEAM_NOISE_GLSL = `
   const int OCTAVES = ${STEAM_OCTAVES};
   const float OCTAVE_GAIN = ${glslFloat(STEAM_OCTAVE_GAIN)};
   const float PERIOD = ${glslFloat(STEAM_PERIOD)};
-  const float WARP = ${glslFloat(STEAM_WARP)};
-  const float THRESH_YOUNG = ${glslFloat(STEAM_THRESHOLD_YOUNG)};
-  const float THRESH_OLD = ${glslFloat(STEAM_THRESHOLD_OLD)};
-  const float THRESH_SOFT = ${glslFloat(STEAM_THRESHOLD_SOFTNESS)};
-  const float EDGE_BREAKUP = ${glslFloat(STEAM_EDGE_BREAKUP)};
-  const float END_SOFT = ${glslFloat(STEAM_END_SOFTNESS)};
 
   // Hash without sine (Dave Hoskins); precise for small inputs.
   float hash(vec2 p) {
@@ -195,6 +186,31 @@ const OVERTONE_STEAM_FRAGMENT = `
     }
     return v / norm;
   }
+`;
+
+const OVERTONE_STEAM_FRAGMENT = `
+  uniform vec3 color;
+  uniform float topOpacity;
+  uniform float bottomOpacity;
+  uniform float edgeSoftness;
+  uniform float dissipationTop;
+  uniform float dissipationBottom;
+  uniform float fieldShift;   // timeline scroll + rise, noise units, wrapped to PERIOD
+  uniform float swirlPhase;   // warp evolution, noise units, wrapped to PERIOD
+  uniform float worldWidth;
+  uniform float stripHeight;  // world units
+  varying vec2 vUv;
+  varying vec2 vWorld;
+
+  const vec2 SCALE = vec2(${glslFloat(STEAM_SCALE_X)}, ${glslFloat(STEAM_SCALE_Y)});
+  const float WARP = ${glslFloat(STEAM_WARP)};
+  const float THRESH_YOUNG = ${glslFloat(STEAM_THRESHOLD_YOUNG)};
+  const float THRESH_OLD = ${glslFloat(STEAM_THRESHOLD_OLD)};
+  const float THRESH_SOFT = ${glslFloat(STEAM_THRESHOLD_SOFTNESS)};
+  const float EDGE_BREAKUP = ${glslFloat(STEAM_EDGE_BREAKUP)};
+  const float END_SOFT = ${glslFloat(STEAM_END_SOFTNESS)};
+
+  ${STEAM_NOISE_GLSL}
 
   void main() {
     // Shared field: x = pitch position, y = timeline time (the scroll and
@@ -224,6 +240,174 @@ const OVERTONE_STEAM_FRAGMENT = `
     gl_FragColor = vec4(color, opacity);
   }
 `;
+
+// ============================================================================
+// Glyph overtone steam (RFC 012)
+// ============================================================================
+//
+// The chord glyph's overtones: a ring of steam outside the glyph (or,
+// with "edge" placement, emitted from its outline) at each partial's
+// angle (30° per semitone from the root, cents included).
+// Same field rules as overtone strips, in polar form: x runs around the
+// circle (one noise period per turn, so it wraps seamlessly), y runs
+// outward from the emitting edge and rises outward over time. Density is
+// the partial level; overlapping partials add. Fixed shape: radial
+// length does not encode anything.
+
+/** Glyph base radius in group-local units (spokes and hub scale by it). */
+const GLYPH_BASE_RADIUS = 10;
+
+/** Where glyph steam starts. "edge": the glyph outline at each angle —
+ *  hub, spoke tip, or spoke side for near-misses. "band": a fixed ring
+ *  just outside the longest spoke (RFC 012 option A). */
+const GLYPH_STEAM_PLACEMENT: "edge" | "band" = "band";
+
+
+/** Radial length of glyph steam (fraction of base radius). Equal to an
+ *  extension spoke; the outward fade makes the visible steam shorter,
+ *  so it never reads as a spoke. */
+const GLYPH_STEAM_LENGTH = 0.3;
+
+/** Brightness multiplier for glyph steam alone. The halo fades outward
+ *  over a short distance, so at the same level it reads fainter than
+ *  overtone strips; this compensates without touching the shared level. */
+const GLYPH_STEAM_GAIN = 1.68;
+
+/** Angular half-width of one partial's steam, degrees (30° per semitone). */
+const GLYPH_STEAM_HALF_WIDTH_DEG = 11;
+
+/** Radial noise frequency per base radius. */
+const GLYPH_STEAM_SCALE_R = 6;
+
+/** Outward rise, base radii per second. */
+const GLYPH_STEAM_RISE_PER_S = 0.05;
+
+const GLYPH_STEAM_MAX_ARMS = 12;
+const GLYPH_STEAM_MAX_PARTIALS = 32;
+
+const GLYPH_STEAM_VERTEX = `
+  varying vec2 vLocal;
+  void main() {
+    vLocal = position.xy;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const GLYPH_STEAM_FRAGMENT = `
+  uniform float armAngles[${GLYPH_STEAM_MAX_ARMS}];   // math radians
+  uniform float armTips[${GLYPH_STEAM_MAX_ARMS}];     // tip radius; 0 = not a spoke
+  uniform int armCount;
+  uniform float hubRadius;
+  uniform float bandRadius;     // > 0 selects band placement
+  uniform float steamLength;
+  uniform float baseRadius;
+  uniform float partialAngles[${GLYPH_STEAM_MAX_PARTIALS}];  // math radians
+  uniform float partialLevels[${GLYPH_STEAM_MAX_PARTIALS}];
+  uniform float partialColors[${GLYPH_STEAM_MAX_PARTIALS * 3}];
+  uniform int partialCount;
+  uniform float fade;           // glyph fade-out
+  uniform float dissipation;    // 0 held .. 1 fully faded
+  uniform float fieldShift;     // outward rise, noise units, wrapped
+  uniform float swirlPhase;     // warp evolution, noise units, wrapped
+  varying vec2 vLocal;
+
+  const float PI = 3.14159265359;
+  const float TWO_PI = 6.28318530718;
+  const float HALF_ARM = ${glslFloat((BASE_WIDTH / 2) * (Math.PI / 180))};
+  const float PUFF_HALF = ${glslFloat(GLYPH_STEAM_HALF_WIDTH_DEG * (Math.PI / 180))};
+  const float SCALE_R = ${glslFloat(GLYPH_STEAM_SCALE_R)};
+  const float WARP = ${glslFloat(STEAM_WARP)};
+  const float THRESH_YOUNG = ${glslFloat(STEAM_THRESHOLD_YOUNG)};
+  const float THRESH_OLD = ${glslFloat(STEAM_THRESHOLD_OLD)};
+  const float THRESH_SOFT = ${glslFloat(STEAM_THRESHOLD_SOFTNESS)};
+  const float EDGE_BREAKUP = ${glslFloat(STEAM_EDGE_BREAKUP)};
+  const float GAIN = ${glslFloat(GLYPH_STEAM_GAIN)};
+
+  ${STEAM_NOISE_GLSL}
+
+  float wrapAngle(float a) {
+    return a - TWO_PI * floor((a + PI) / TWO_PI);
+  }
+
+  // Radius of the glyph outline along angle theta: the hub, or the
+  // triangular spoke's edge where theta falls within a spoke.
+  float outlineRadius(float theta) {
+    if (bandRadius > 0.0) return bandRadius;
+    float r0 = hubRadius;
+    vec2 dir = vec2(cos(theta), sin(theta));
+    for (int i = 0; i < ${GLYPH_STEAM_MAX_ARMS}; i++) {
+      if (i >= armCount) break;
+      float tipR = armTips[i];
+      if (tipR <= 0.0) continue;
+      float d = wrapAngle(theta - armAngles[i]);
+      if (abs(d) >= HALF_ARM) continue;
+      float side = d < 0.0 ? -HALF_ARM : HALF_ARM;
+      vec2 a = hubRadius * vec2(cos(armAngles[i] + side), sin(armAngles[i] + side));
+      vec2 b = tipR * vec2(cos(armAngles[i]), sin(armAngles[i]));
+      vec2 e = b - a;
+      float den = dir.x * e.y - dir.y * e.x;
+      if (abs(den) < 1e-6) continue;
+      r0 = max(r0, (a.x * e.y - a.y * e.x) / den);
+    }
+    return r0;
+  }
+
+  void main() {
+    float r = length(vLocal);
+    float theta = atan(vLocal.y, vLocal.x);
+    float s = r - outlineRadius(theta);
+    if (s < 0.0 || s > steamLength) discard;
+
+    // Shared polar field: around the circle, and outward from the edge.
+    vec2 p = vec2((theta / TWO_PI + 0.5) * PERIOD, s / baseRadius * SCALE_R - fieldShift);
+    vec2 q = vec2(
+      fbm(p + vec2(0.0, swirlPhase)),
+      fbm(p + vec2(5.2, 1.3) - vec2(swirlPhase, 0.0))
+    );
+    float n = fbm(p + WARP * (q - 0.5));
+
+    float threshold = mix(THRESH_YOUNG, THRESH_OLD, dissipation);
+    float density = smoothstep(threshold - THRESH_SOFT, threshold + THRESH_SOFT, n);
+
+    // Dense at the emitting edge (after a short soft start), thinning outward.
+    float u = s / steamLength;
+    float radial = (1.0 - u) * smoothstep(0.0, 0.15, u + 0.1 * EDGE_BREAKUP * (n - 0.5));
+
+    vec3 acc = vec3(0.0);
+    for (int j = 0; j < ${GLYPH_STEAM_MAX_PARTIALS}; j++) {
+      if (j >= partialCount) break;
+      float d = abs(wrapAngle(theta - partialAngles[j])) / PUFF_HALF + EDGE_BREAKUP * (n - 0.5);
+      float w = 1.0 - smoothstep(0.0, 1.0, clamp(d, 0.0, 1.0));
+      vec3 c = vec3(partialColors[j * 3], partialColors[j * 3 + 1], partialColors[j * 3 + 2]);
+      acc += c * partialLevels[j] * w;
+    }
+
+    gl_FragColor = vec4(acc * density * radial * fade * GAIN, 1.0);
+  }
+`;
+
+// ============================================================================
+// Text labels
+// ============================================================================
+
+/** Font stacks for text-label entities. "mono" matches the on-screen
+ *  keyboard (web-app index.html .syn-onscreen-key). */
+const TEXT_LABEL_MONO_FONT = "ui-monospace, SFMono-Regular, monospace";
+const TEXT_LABEL_SANS_FONT = `"Lucida Sans Unicode", "Lucida Grande", "Lucida Sans", sans-serif`;
+
+/** Canvas rasterisation size for text labels (pixels); mipmaps keep it
+ *  crisp when scaled down. */
+const TEXT_LABEL_CANVAS_PX = 64;
+
+/** Font weight for text labels. Thin strokes lose contrast when the
+ *  canvas is scaled down to ~10px on screen; a heavier weight keeps
+ *  similar letters (E/F) distinct. */
+const TEXT_LABEL_FONT_WEIGHT = 600;
+
+/** ♭ and ♯ are drawn in the sans stack (Lucida has real music symbols;
+ *  the monospace stack falls back to a tiny glyph), scaled by this
+ *  relative to the letters. */
+const TEXT_LABEL_ACCIDENTAL_SCALE = 1.1;
 
 // ============================================================================
 // Renderer Implementation
@@ -1336,6 +1520,8 @@ export class ThreeJSRenderer implements IRenderer {
 
     if (glyphType === "chord-shape") {
       this.updateChordShape(entity);
+    } else if (glyphType === "text-label") {
+      this.updateTextLabel(entity);
     } else if (glyphType === "chord-label") {
       this.updateChordLabel(entity);
     } else if (glyphType === "tension-bar") {
@@ -1454,6 +1640,109 @@ export class ThreeJSRenderer implements IRenderer {
         mat.opacity = entityOpacity;
       }
     });
+
+    this.updateGlyphSteam(
+      group,
+      elements,
+      entity.data?.partials as ChordPartial[] | undefined,
+      entityOpacity,
+      (entity.data?.overtoneDissipation as number) ?? 0,
+    );
+  }
+
+  /**
+   * Glyph overtone steam (RFC 012). Lives inside the chord-shape group so
+   * it moves, scales and fades with the glyph; created on first use and
+   * hidden when the overlay is off.
+   */
+  private updateGlyphSteam(
+    group: THREE.Group,
+    elements: ChordShapeElement[],
+    partials: ChordPartial[] | undefined,
+    fade: number,
+    dissipation: number,
+  ): void {
+    const name = "overtone-steam";
+    let mesh = group.getObjectByName(name) as THREE.Mesh | undefined;
+    const count = Math.min(partials?.length ?? 0, GLYPH_STEAM_MAX_PARTIALS);
+    if (count === 0) {
+      if (mesh) mesh.visible = false;
+      return;
+    }
+
+    const R = GLYPH_BASE_RADIUS;
+    if (!mesh) {
+      const extent =
+        R * (HUB_RADIUS + ARM_LENGTH.triadic + GLYPH_STEAM_BAND_GAP + GLYPH_STEAM_LENGTH);
+      const material = new THREE.ShaderMaterial({
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        uniforms: {
+          armAngles: { value: new Float32Array(GLYPH_STEAM_MAX_ARMS) },
+          armTips: { value: new Float32Array(GLYPH_STEAM_MAX_ARMS) },
+          armCount: { value: 0 },
+          hubRadius: { value: R * HUB_RADIUS },
+          bandRadius: {
+            value:
+              GLYPH_STEAM_PLACEMENT === "band"
+                ? R * (HUB_RADIUS + ARM_LENGTH.triadic + GLYPH_STEAM_BAND_GAP)
+                : 0,
+          },
+          steamLength: { value: R * GLYPH_STEAM_LENGTH },
+          baseRadius: { value: R },
+          partialAngles: { value: new Float32Array(GLYPH_STEAM_MAX_PARTIALS) },
+          partialLevels: { value: new Float32Array(GLYPH_STEAM_MAX_PARTIALS) },
+          partialColors: { value: new Float32Array(GLYPH_STEAM_MAX_PARTIALS * 3) },
+          partialCount: { value: 0 },
+          fade: { value: 1 },
+          dissipation: { value: 0 },
+          fieldShift: { value: 0 },
+          swirlPhase: { value: 0 },
+        },
+        vertexShader: GLYPH_STEAM_VERTEX,
+        fragmentShader: GLYPH_STEAM_FRAGMENT,
+      });
+      mesh = new THREE.Mesh(new THREE.PlaneGeometry(extent * 2, extent * 2), material);
+      mesh.name = name;
+      mesh.renderOrder = -1;
+      group.add(mesh);
+    }
+    mesh.visible = true;
+
+    const toMathRad = (clockDeg: number) => ((90 - clockDeg) * Math.PI) / 180;
+    const u = (mesh.material as THREE.ShaderMaterial).uniforms;
+    const armAngles = u.armAngles.value as Float32Array;
+    const armTips = u.armTips.value as Float32Array;
+    const arms = elements.slice(0, GLYPH_STEAM_MAX_ARMS);
+    arms.forEach((el, i) => {
+      armAngles[i] = toMathRad(el.angle);
+      armTips[i] =
+        el.style === "line"
+          ? 0
+          : R * (HUB_RADIUS + (ARM_LENGTH[el.tier] ?? ARM_LENGTH.triadic));
+    });
+    u.armCount.value = arms.length;
+
+    const angles = u.partialAngles.value as Float32Array;
+    const levels = u.partialLevels.value as Float32Array;
+    const colors = u.partialColors.value as Float32Array;
+    for (let i = 0; i < count; i++) {
+      const p = partials![i];
+      angles[i] = toMathRad(p.angle);
+      levels[i] = p.level;
+      const rgb = this.hsvToThreeColor(p.color);
+      colors[i * 3] = rgb.r;
+      colors[i * 3 + 1] = rgb.g;
+      colors[i * 3 + 2] = rgb.b;
+    }
+    u.partialCount.value = count;
+    u.fade.value = fade;
+    u.dissipation.value = dissipation;
+
+    const wrap = (v: number) => ((v % STEAM_PERIOD) + STEAM_PERIOD) % STEAM_PERIOD;
+    u.fieldShift.value = wrap(this.frameTimeSec * GLYPH_STEAM_RISE_PER_S * GLYPH_STEAM_SCALE_R);
+    u.swirlPhase.value = wrap(this.frameTimeSec * STEAM_SWIRL_PER_S);
   }
 
   /**
@@ -1466,7 +1755,7 @@ export class ThreeJSRenderer implements IRenderer {
     margin: MarginStyle
   ): THREE.Group {
     const group = new THREE.Group();
-    const baseRadius = 10;
+    const baseRadius = GLYPH_BASE_RADIUS;
 
     const builder = new ChordShapeBuilder(elements, margin, {
       scale: baseRadius,
@@ -1864,7 +2153,8 @@ export class ThreeJSRenderer implements IRenderer {
     // Per-line height in world units. Slash chords (e.g. "EbM/G") split
     // across two lines with the slash on the second line, so total mesh
     // height is lineHeight × number of lines.
-    const LINE_HEIGHT_WORLD = 1.75;
+    // Lens may set style.size (the progression clock scales its label).
+    const LINE_HEIGHT_WORLD = entity.style.size ?? 1.75;
     const CANVAS_TEXT_PX = 72;
     const LINE_GAP_FRACTION = 0.1; // Tight gap between stacked slash lines
     // Lucida Sans family — humanist sans that natively contains music
@@ -2035,6 +2325,127 @@ export class ThreeJSRenderer implements IRenderer {
 
     const material = mesh.material as THREE.MeshBasicMaterial;
     material.opacity = entity.style.opacity ?? 1;
+  }
+
+  // ==========================================================================
+  // Text Labels
+  // ==========================================================================
+
+  /**
+   * Render a single-line text label (note names, interval names).
+   *
+   * Entity contract:
+   * - data.text: the string (music symbols allowed)
+   * - data.font: "mono" (the on-screen keyboard's monospace stack) or
+   *   omitted for the default sans
+   * - data.anchor: "center" (default) or "baseline" — the position is the
+   *   centre of the text, or the centre of its baseline
+   * - data.rotationDeg: clock-style rotation (clockwise, degrees) about
+   *   the anchor; 0 = upright
+   * - style.size: line height in world units (cap height to descender)
+   * - style.color / style.opacity: fill colour; colour alpha multiplies
+   *   opacity (structural greys are defined as translucent colours)
+   */
+  private updateTextLabel(entity: Entity): void {
+    if (!this.scene || typeof document === "undefined") return;
+    const text = entity.data?.text as string | undefined;
+    if (!text) return;
+
+    const font = (entity.data?.font as string | undefined) === "mono"
+      ? TEXT_LABEL_MONO_FONT
+      : TEXT_LABEL_SANS_FONT;
+    const anchor = (entity.data?.anchor as string | undefined) ?? "center";
+    const lineHeight = entity.style.size ?? 1;
+    const cacheKey = `${text}|${font}|${anchor}|${lineHeight}`;
+
+    let mesh = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
+    if (!mesh || mesh.userData?.textLabelKey !== cacheKey) {
+      if (mesh) {
+        this.scene.remove(mesh);
+        this.disposeObject(mesh);
+      }
+      const canvasFont = `${TEXT_LABEL_FONT_WEIGHT} ${TEXT_LABEL_CANVAS_PX}px ${font}`;
+      const accidentalFont = `${TEXT_LABEL_FONT_WEIGHT} ${Math.round(
+        TEXT_LABEL_CANVAS_PX * TEXT_LABEL_ACCIDENTAL_SCALE,
+      )}px ${TEXT_LABEL_SANS_FONT}`;
+      const measure = document.createElement("canvas").getContext("2d");
+      if (!measure) return;
+      // Fixed reference metrics so every label shares one text-to-world
+      // ratio regardless of its own ink (see updateChordLabel).
+      measure.font = canvasFont;
+      const ref = measure.measureText("Hg");
+      const ascent = ref.actualBoundingBoxAscent || TEXT_LABEL_CANVAS_PX * 0.75;
+      const descent = ref.actualBoundingBoxDescent || TEXT_LABEL_CANVAS_PX * 0.25;
+      const lineHeightPx = Math.ceil(ascent + descent);
+
+      // Split into letter runs and accidental runs; accidentals use the
+      // sans font so they render as real music symbols.
+      const runs: Array<{ text: string; font: string; width: number }> = [];
+      for (const ch of text) {
+        const runFont = ch === "♭" || ch === "♯" ? accidentalFont : canvasFont;
+        const last = runs[runs.length - 1];
+        if (last && last.font === runFont) last.text += ch;
+        else runs.push({ text: ch, font: runFont, width: 0 });
+      }
+      for (const run of runs) {
+        measure.font = run.font;
+        run.width = measure.measureText(run.text).width;
+      }
+      const textWidth = runs.reduce((sum, r) => sum + r.width, 0);
+
+      const padding = 8;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(textWidth) + padding * 2;
+      canvas.height = lineHeightPx + padding * 2;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      const baselinePx = padding + ascent;
+      let cursor = (canvas.width - textWidth) / 2;
+      for (const run of runs) {
+        ctx.font = run.font;
+        ctx.fillText(run.text, cursor, baselinePx);
+        cursor += run.width;
+      }
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = true;
+      texture.anisotropy = this.renderer?.capabilities?.getMaxAnisotropy?.() ?? 1;
+      texture.needsUpdate = true;
+
+      const pxToWorld = lineHeight / lineHeightPx;
+      const planeW = canvas.width * pxToWorld;
+      const planeH = canvas.height * pxToWorld;
+      const geometry = new THREE.PlaneGeometry(planeW, planeH);
+      if (anchor === "baseline") {
+        // Move the baseline's centre to the origin so position and
+        // rotation are about the baseline.
+        geometry.translate(0, -(planeH / 2 - baselinePx * pxToWorld), 0);
+      }
+      const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+      });
+      mesh = new THREE.Mesh(geometry, material);
+      mesh.userData = { textLabelKey: cacheKey };
+      this.scene.add(mesh);
+      this.entityObjects.set(entity.id, mesh);
+    }
+
+    const worldX = (entity.position?.x ?? 0.5) * this.config.worldWidth;
+    const worldY = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
+    mesh.position.set(worldX, worldY, 0.05);
+    mesh.rotation.z = -(((entity.data?.rotationDeg as number) ?? 0) * Math.PI) / 180;
+
+    const color = entity.style.color ?? { h: 0, s: 0, v: 1, a: 1 };
+    const material = mesh.material as THREE.MeshBasicMaterial;
+    material.color.copy(this.hsvToThreeColor(color));
+    material.opacity = (entity.style.opacity ?? 1) * (color.a ?? 1);
   }
 
   // ==========================================================================

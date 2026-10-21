@@ -99,6 +99,8 @@ const provenance: Provenance = {
 };
 
 // ============================================================================
+const PITCH_CLASS_NAMES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
+
 // Helper functions
 // ============================================================================
 
@@ -286,6 +288,7 @@ export const frame1: AnnotatedMusicalFrame = {
     },
   },
   prescribedTempo: 120,
+  pitchClassNames: PITCH_CLASS_NAMES,
   prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
   bars: [],
   phrases: [],
@@ -363,6 +366,7 @@ export const frame2: AnnotatedMusicalFrame = {
     },
   },
   prescribedTempo: 120,
+  pitchClassNames: PITCH_CLASS_NAMES,
   prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
   bars: [],
   phrases: [],
@@ -477,6 +481,7 @@ export const frame3: AnnotatedMusicalFrame = {
     },
   },
   prescribedTempo: 120,
+  pitchClassNames: PITCH_CLASS_NAMES,
   prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
   bars: [
     {
@@ -565,6 +570,7 @@ export const frame4: AnnotatedMusicalFrame = {
     },
   },
   prescribedTempo: 120,
+  pitchClassNames: PITCH_CLASS_NAMES,
   prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
   bars: [],
   phrases: [],
@@ -642,6 +648,7 @@ export const frame5: AnnotatedMusicalFrame = {
     },
   },
   prescribedTempo: 120,
+  pitchClassNames: PITCH_CLASS_NAMES,
   prescribedMeter: { beatsPerBar: 4, beatUnit: 4 },
   bars: [],
   phrases: [],

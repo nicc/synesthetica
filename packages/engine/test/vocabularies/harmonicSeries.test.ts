@@ -10,7 +10,7 @@ import {
 } from "../../src/vocabularies/harmonicSeries";
 import { MusicalVisualVocabulary } from "../../src/vocabularies/MusicalVisualVocabulary";
 import { createTestMusicalFrame } from "../_harness/frames";
-import type { Note, PitchClass } from "@synesthetica/contracts";
+import type { MusicalChord, Note, Pitch, PitchClass } from "@synesthetica/contracts";
 import { pcToHue } from "@synesthetica/contracts";
 
 function note(id: string, pc: PitchClass, onset = 0): Note {
@@ -85,15 +85,14 @@ describe("partialPitch", () => {
 describe("MusicalVisualVocabulary partial annotation", () => {
   const frame = createTestMusicalFrame(100, "main", { notes: [note("c", 0)] });
 
-  it("annotates no partials by default (overlay off)", () => {
-    const vocab = new MusicalVisualVocabulary();
+  it("annotates no partials at level 0", () => {
+    const vocab = new MusicalVisualVocabulary({ harmonicSeriesLevel: 0 });
     const annotated = vocab.annotate(frame);
     expect(annotated.notes[0].partials).toBeUndefined();
   });
 
   it("annotates partials when enabled, at the level macro's gain", () => {
     const vocab = new MusicalVisualVocabulary();
-    vocab.setMacro("system:harmonic-series:enabled", true);
     vocab.setMacro("system:harmonic-series:level", 0.5);
     vocab.setMacro("system:harmonic-series:rolloff", 1);
     const partials = vocab.annotate(frame).notes[0].partials ?? [];
@@ -102,16 +101,13 @@ describe("MusicalVisualVocabulary partial annotation", () => {
   });
 
   it("does not add partials to the note list (partials are not notes)", () => {
-    const vocab = new MusicalVisualVocabulary({ harmonicSeriesEnabled: true });
+    const vocab = new MusicalVisualVocabulary({});
     vocab.setMacro("system:harmonic-series:level", 1);
     expect(vocab.annotate(frame).notes).toHaveLength(1);
   });
 
   it("reads back the overlay macros", () => {
     const vocab = new MusicalVisualVocabulary();
-    expect(vocab.readMacros()["system:harmonic-series:enabled"]).toBe(false);
-    vocab.setMacro("system:harmonic-series:enabled", true);
-    expect(vocab.readMacros()["system:harmonic-series:enabled"]).toBe(true);
     vocab.setMacro("system:harmonic-series:level", 0.3);
     vocab.setMacro("system:harmonic-series:rolloff", 2);
     const macros = vocab.readMacros();
@@ -121,7 +117,7 @@ describe("MusicalVisualVocabulary partial annotation", () => {
 
   it("colours partials by pitch or by fundamental", () => {
     const hueConfig = { referencePc: 0 as PitchClass, referenceHue: 0, direction: "cw" as const };
-    const vocab = new MusicalVisualVocabulary({ harmonicSeriesEnabled: true, harmonicSeriesLevel: 1 });
+    const vocab = new MusicalVisualVocabulary({ harmonicSeriesLevel: 1 });
     expect(vocab.readMacros()["system:harmonic-series:colour"]).toBe("pitch");
     const fifthPitch = vocab.annotate(frame).notes[0].partials![0];
     expect(fifthPitch.color.h).toBe(pcToHue(7, hueConfig));
@@ -132,5 +128,101 @@ describe("MusicalVisualVocabulary partial annotation", () => {
 
     vocab.setMacro("system:harmonic-series:colour", "nonsense");
     expect(vocab.readMacros()["system:harmonic-series:colour"]).toBe("fundamental");
+  });
+});
+
+function chord(root: PitchClass, quality: string, tones: number[], voicing: Pitch[]): MusicalChord {
+  const interp = { root, quality, chordTones: tones, name: "", confidence: 1.0 as const };
+  return {
+    id: `test:0:${root}${quality}`,
+    bass: voicing[0].pc,
+    inversion: 0,
+    isInverted: false,
+    voicing,
+    noteIds: [],
+    harmonic: interp,
+    bassLed: interp,
+    onset: 0,
+    duration: 1000,
+    phase: "active",
+    provenance: { source: "test", stream: "test", version: "1.0" },
+  } as MusicalChord;
+}
+
+describe("MusicalVisualVocabulary chord partials (glyph)", () => {
+  // C major with C doubled an octave up
+  const cMajor = chord(0, "maj", [0, 4, 7], [
+    { pc: 0, octave: 3 },
+    { pc: 4, octave: 4 },
+    { pc: 7, octave: 4 },
+    { pc: 0, octave: 5 },
+  ]);
+  const frameWith = (c: MusicalChord) => createTestMusicalFrame(100, "main", { chords: [c] });
+  const enabled = () =>
+    new MusicalVisualVocabulary({ harmonicSeriesLevel: 1, harmonicSeriesRolloff: 1 });
+
+  it("annotates no chord partials at level 0", () => {
+    expect(
+      new MusicalVisualVocabulary({ harmonicSeriesLevel: 0 }).annotate(frameWith(cMajor)).chords[0].partials,
+    ).toBeUndefined();
+  });
+
+  it("computes partials once per distinct pitch class (octave doubling ignored)", () => {
+    const partials = enabled().annotate(frameWith(cMajor)).chords[0].partials!;
+    expect(partials).toHaveLength(3 * 4);
+    expect(new Set(partials.map((p) => p.sourcePc))).toEqual(new Set([0, 4, 7]));
+  });
+
+  it("places partials in the glyph's angular frame, relative to the root, with cents", () => {
+    const partials = enabled().annotate(frameWith(cMajor)).chords[0].partials!;
+    const cFifth = partials.find((p) => p.sourcePc === 0 && p.n === 3)!;
+    expect(cFifth.angle).toBeCloseTo((7 + 0.0196) * 30, 1);
+
+    const g7 = chord(7, "dom7", [0, 4, 7, 10], [
+      { pc: 7, octave: 3 },
+      { pc: 11, octave: 3 },
+      { pc: 2, octave: 4 },
+      { pc: 5, octave: 4 },
+    ]);
+    const gSeventh = enabled().annotate(frameWith(g7)).chords[0].partials!.find(
+      (p) => p.sourcePc === 7 && p.n === 7,
+    )!;
+    // F, 31 cents flat, just short of the b7 angle (300°)
+    expect(gSeventh.pc).toBe(5);
+    expect(gSeventh.angle).toBeCloseTo(300 - 0.3117 * 30, 1);
+  });
+
+  it("colours by landing pitch, or by source tone in fundamental mode", () => {
+    const hueConfig = { referencePc: 0 as PitchClass, referenceHue: 0, direction: "cw" as const };
+    const vocab = enabled();
+    const fifth = () =>
+      vocab.annotate(frameWith(cMajor)).chords[0].partials!.find((p) => p.sourcePc === 0 && p.n === 3)!;
+    expect(fifth().color.h).toBe(pcToHue(7, hueConfig));
+    vocab.setMacro("system:harmonic-series:colour", "fundamental");
+    expect(fifth().color.h).toBe(pcToHue(0, hueConfig));
+  });
+});
+
+describe("MusicalVisualVocabulary pitch-class names", () => {
+  const frame = (key: { root: PitchClass; mode: "ionian" | "aeolian" } | null) =>
+    createTestMusicalFrame(0, "main", { prescribedKey: key });
+
+  it("defaults to sharps with music symbols", () => {
+    const names = new MusicalVisualVocabulary().annotate(frame(null)).pitchClassNames;
+    expect(names).toEqual(["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"]);
+  });
+
+  it("switches the default to flats", () => {
+    const vocab = new MusicalVisualVocabulary();
+    vocab.setMacro("system:note-names:spelling", "flats");
+    expect(vocab.annotate(frame(null)).pitchClassNames[10]).toBe("B♭");
+    expect(vocab.readMacros()["system:note-names:spelling"]).toBe("flats");
+  });
+
+  it("follows the key when one is prescribed, overriding the default", () => {
+    const vocab = new MusicalVisualVocabulary(); // sharps by default
+    expect(vocab.annotate(frame({ root: 5, mode: "ionian" })).pitchClassNames[10]).toBe("B♭"); // F major
+    vocab.setMacro("system:note-names:spelling", "flats");
+    expect(vocab.annotate(frame({ root: 4, mode: "ionian" })).pitchClassNames[3]).toBe("D♯"); // E major
   });
 });

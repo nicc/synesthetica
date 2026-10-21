@@ -118,6 +118,56 @@ export const HARMONY_PROGRESSION_CELL_HEIGHT = HARMONY_COLUMN_WIDTH;
  *  math. Refers to the progression cell, which is square. */
 export const HARMONY_CELL_SIZE = HARMONY_PROGRESSION_CELL_HEIGHT;
 
+// ----------------------------------------------------------------------------
+// Chord glyph overtone ring (RFC 012), shared by HarmonyLens and the renderer
+// ----------------------------------------------------------------------------
+
+/** Chord glyph base radius, normalized (renderer GLYPH_BASE_RADIUS = 10
+ *  world units at chord-shape size 100, over worldWidth 100). */
+export const CHORD_GLYPH_RADIUS = 0.1;
+
+/** Hub radius and triadic spoke length as fractions of the glyph base
+ *  radius (mirrors ChordShapeBuilder / renderChordShape). */
+const GLYPH_HUB_FRACTION = 0.3;
+const GLYPH_TRIADIC_ARM_FRACTION = 0.7;
+
+/** Negative-space gap between the triadic spoke tip and the overtone
+ *  steam ring, as a fraction of the glyph base radius. */
+export const GLYPH_STEAM_BAND_GAP = 0.08;
+
+/** Inner radius of the glyph's overtone steam ring, normalized. The
+ *  progression clock's outer guide ring is sized to match it. */
+export const GLYPH_STEAM_BAND_RADIUS =
+  CHORD_GLYPH_RADIUS *
+  (GLYPH_HUB_FRACTION + GLYPH_TRIADIC_ARM_FRACTION + GLYPH_STEAM_BAND_GAP);
+
+// ----------------------------------------------------------------------------
+// Structural text (note names, interval names)
+// ----------------------------------------------------------------------------
+
+/** The NOW line's translucent grey. */
+export const NOW_LINE_COLOR = { h: 0, s: 0, v: 0.8, a: 0.6 };
+
+/** Opacity for structural text (note names, interval names). Text needs
+ *  more than the NOW line's 0.6 to stay legible at ~10px. */
+export const STRUCTURAL_TEXT_ALPHA = 0.9;
+
+/** The NOW line's grey at text opacity. */
+export const STRUCTURAL_TEXT_COLOR = { ...NOW_LINE_COLOR, a: STRUCTURAL_TEXT_ALPHA };
+
+/** On-screen keyboard label size (web-app .syn-onscreen-key) and the
+ *  window height at which world-unit text matches it. Text in the
+ *  visualisation scales with the window from there. */
+export const KEYBOARD_FONT_PX = 12;
+export const REFERENCE_VIEWPORT_PX = 900;
+
+/** Renderer world height (ThreeJSRenderer default). */
+export const ASSUMED_WORLD_HEIGHT = 75;
+
+/** World-unit line height for text at `scale` × the keyboard's size. */
+export const keyboardRelativeTextSize = (scale: number): number =>
+  (scale * KEYBOARD_FONT_PX * ASSUMED_WORLD_HEIGHT) / REFERENCE_VIEWPORT_PX;
+
 /** Vertical gap between chord cell and progression cell */
 const CELL_GAP = 0.04;
 

@@ -41,7 +41,7 @@ Cells are square (column width = larger cell vertical = 0.42). The rhythm column
 
 ### Clock Interior Radii
 
-All radii expressed as fractions of clock radius. The clock radius equals half the progression cell width (0.21 in normalized viewport coords).
+All radii expressed as fractions of clock radius. The clock radius is derived from the chord glyph above it: the outer guide ring equals the inner radius of the glyph's overtone steam ring (`GLYPH_STEAM_BAND_RADIUS` in `lenses/layout.ts`, ≈ 0.108 normalized), so clock radius ≈ 0.127. Numeral sizes, strokes, connector arcs and the centre label scale with the clock relative to the radius they were tuned at (0.147).
 
 | Element | Fraction | Anchored to |
 |---|---|---|
@@ -49,10 +49,18 @@ All radii expressed as fractions of clock radius. The clock radius equals half t
 | Inner guide ring | **0.32** | Outer edge of label area |
 | Diatonic numeral ring | **0.47** | Centre of diatonic band |
 | Middle guide ring | **0.62** | Between diatonic and borrowed numerals |
-| Borrowed numeral ring | **0.77** | Centre of borrowed band |
-| Outer guide ring | **0.92** | Outer bound of borrowed band |
+| Borrowed numeral ring | **≈ 0.736** | Centre of borrowed band |
+| Outer guide ring | **≈ 0.852** | Outer bound of borrowed band |
 
-Three guide rings define two equal-width annular bands (each 0.30 wide). Numeral rings sit at the radial centre of each band, so diatonic and borrowed read as the same width with their numerals visually centred between guide rings.
+Three guide rings define two annular bands. The diatonic band is 0.30 wide; the borrowed band is narrower in proportion to its smaller numerals (0.30 × BORROWED_SCALE / DIATONIC_SCALE ≈ 0.232). Numeral rings sit at the radial centre of each band, so numerals stay visually centred between guide rings.
+
+### Guide Numerals
+
+When a key is prescribed, the key's seven diatonic numerals (e.g. C major: I ii iii IV V vi vii°) are always drawn on the diatonic ring in the structure colour and opacity (same as the guide rings), as part of the clock's guides. Played numerals are drawn in colour on top. A guide is hidden while a played numeral is held in its slot; as the played numeral fades after release, the guide fades back in over the same window (opacity × elapsed fraction), so the slot hands over rather than popping. With several occupants in one slot, the most present one sets the guide's opacity. Without a key no guide numerals are drawn and the chord name stands alone.
+
+The harmony stabilizer publishes the guides as `HarmonicContext.diatonicChords` (`KeyChord[]`: rootPc, roman, borrowed), so the lens never recomputes key theory.
+
+**Modal-interchange hints** (`harmony:modal-interchange-hints`, off by default): in major keys, the borrowed ring also shows the common modal-interchange chords greyed — ♭II, ♭III, iv, ♭VI, ♭VII, the keys of the analyser's interchange table — with the same slot-occupancy rule. Published as `HarmonicContext.modalInterchangeChords` (empty outside Ionian).
 
 ### Slot Tick Marks
 
@@ -199,6 +207,10 @@ interface HarmonicContext {
   // ... existing fields ...
   /** Active functional edges (one per source chord, expires with source). */
   functionalEdges: FunctionalEdge[];
+  /** The key's diatonic triads for the clock's guide numerals (empty without a key). */
+  diatonicChords: KeyChord[];
+  /** Modal-interchange hints for the borrowed ring (major keys only). */
+  modalInterchangeChords: KeyChord[];
 }
 ```
 

@@ -112,6 +112,7 @@ export function createTestAnnotatedFrame(
       referenceHue: 0, // red
       direction: "cw",
     },
+    pitchClassNames: ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"],
     harmonicContext: overrides.harmonicContext ?? { ...EMPTY_HARMONIC_CONTEXT },
     bars: [],
     phrases: [],

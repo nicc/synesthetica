@@ -971,3 +971,149 @@ describe("HarmonyLens", () => {
   });
 
 });
+
+describe("HarmonyLens glyph overtones (RFC 012)", () => {
+  it("passes chord partials and fade-driven dissipation to the chord-shape entity", () => {
+    const lens = new HarmonyLens();
+    const c = createTestChord(0 as PitchClass, "maj", [0, 4, 7]);
+    const partials = [
+      { n: 3, pc: 7 as PitchClass, cents: 2, level: 0.3, color: { h: 210, s: 0.8, v: 0.8, a: 1 }, sourcePc: 0 as PitchClass, angle: 210.6 },
+    ];
+    const withPartials = { ...c, partials };
+
+    const held = lens.update(createTestFrame(1000, withPartials, 0), null)
+      .entities.find((e) => e.data?.type === "chord-shape")!;
+    expect(held.data!.partials).toEqual(partials);
+    expect(held.data!.overtoneDissipation).toBe(0);
+
+    // Chord ends: the glyph fades and its steam dissipates with it
+    lens.update(createTestFrame(1016, null, 0), null);
+    const fading = lens.update(createTestFrame(1076, null, 0), null)
+      .entities.find((e) => e.data?.type === "chord-shape")!;
+    expect(fading.data!.overtoneDissipation as number).toBeGreaterThan(0);
+    expect(fading.data!.overtoneDissipation as number).toBeCloseTo(1 - (fading.style.opacity ?? 1), 9);
+  });
+
+  it("withholds partials when the glyph toggle is off; on by default", () => {
+    const lens = new HarmonyLens();
+    expect(lens.readMacros().overtones).toBe(true);
+    lens.setMacros({ overtones: false });
+    const c = createTestChord(0 as PitchClass, "maj", [0, 4, 7]);
+    const partials = [
+      { n: 3, pc: 7 as PitchClass, cents: 2, level: 0.3, color: { h: 210, s: 0.8, v: 0.8, a: 1 }, sourcePc: 0 as PitchClass, angle: 210.6 },
+    ];
+    const shape = lens.update(createTestFrame(1000, { ...c, partials }, 0), null)
+      .entities.find((e) => e.data?.type === "chord-shape")!;
+    expect(shape.data!.partials).toBeUndefined();
+  });
+});
+
+describe("HarmonyLens guide numerals", () => {
+  const C_MAJOR = [
+    { rootPc: 0, roman: "I" }, { rootPc: 2, roman: "ii" }, { rootPc: 4, roman: "iii" },
+    { rootPc: 5, roman: "IV" }, { rootPc: 7, roman: "V" }, { rootPc: 9, roman: "vi" },
+    { rootPc: 11, roman: "vii°" },
+  ].map((c) => ({ ...c, rootPc: c.rootPc as PitchClass, borrowed: false }));
+  const frameWith = (progression: unknown[], key = true) =>
+    createTestAnnotatedFrame(1000, "main", {
+      prescribedKey: key ? { root: 0 as PitchClass, mode: "ionian" } : null,
+      harmonicContext: {
+        tension: 0,
+        keyAware: key,
+        currentFunction: null,
+        functionalProgression: progression as never,
+        functionalEdges: [],
+        diatonicChords: key ? C_MAJOR : [],
+      },
+    });
+  const guides = (scene: { entities: Array<{ id: string; style: { opacity?: number } }> }) =>
+    scene.entities.filter((e) => e.id.includes(":guide-numeral-"));
+
+  it("draws the key's diatonic numerals greyed when a key is set", () => {
+    const g = guides(new HarmonyLens().update(frameWith([]), null));
+    expect(g).toHaveLength(7);
+    for (const e of g) expect(e.style.opacity).toBe(0.25);
+  });
+
+  it("draws none without a key (the chord name stands alone)", () => {
+    expect(guides(new HarmonyLens().update(frameWith([], false), null))).toHaveLength(0);
+  });
+
+  it("fades the guide back in as a released numeral fades out (handover)", () => {
+    const lens = new HarmonyLens(); // linger 3 s → 3000 ms fade
+    const at = (released: number) => {
+      const ii = { degree: 2, roman: "ii", quality: "min", rootPc: 2 as PitchClass, borrowed: false, chordId: "x", onset: 0, releaseTime: released };
+      return guides(lens.update(frameWith([ii]), null)).find((e) => e.id.endsWith("d:2"));
+    };
+    // frame t = 1000: released 250 ms ago → guide at 1/12 of full; 2500 ms ago → 5/6
+    expect(at(750)!.style.opacity).toBeCloseTo(0.25 * (250 / 3000), 5);
+    expect(at(-1500)!.style.opacity).toBeCloseTo(0.25 * (2500 / 3000), 5);
+  });
+
+  it("hides the guide in a slot a played numeral occupies", () => {
+    const ii = { degree: 2, roman: "ii", quality: "min", rootPc: 2 as PitchClass, borrowed: false, chordId: "x", onset: 900, releaseTime: null };
+    const g = guides(new HarmonyLens().update(frameWith([ii]), null));
+    expect(g).toHaveLength(6);
+    expect(g.some((e) => e.id.endsWith("d:2"))).toBe(false);
+  });
+});
+
+describe("HarmonyLens modal-interchange hints", () => {
+  const HINTS = [
+    { rootPc: 10, roman: "♭VII" }, { rootPc: 3, roman: "♭III" }, { rootPc: 8, roman: "♭VI" },
+    { rootPc: 5, roman: "iv" }, { rootPc: 1, roman: "♭II" },
+  ].map((c) => ({ ...c, rootPc: c.rootPc as PitchClass, borrowed: true }));
+  const frame = (progression: unknown[]) =>
+    createTestAnnotatedFrame(1000, "main", {
+      prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+      harmonicContext: {
+        tension: 0,
+        keyAware: true,
+        currentFunction: null,
+        functionalProgression: progression as never,
+        functionalEdges: [],
+        diatonicChords: [],
+        modalInterchangeChords: HINTS,
+      },
+    });
+  const hints = (lens: HarmonyLens, progression: unknown[] = []) =>
+    lens.update(frame(progression), null).entities.filter((e) => e.id.includes(":hint-numeral-"));
+
+  it("is off by default", () => {
+    expect(hints(new HarmonyLens())).toHaveLength(0);
+  });
+
+  it("draws the hints greyed on the borrowed ring when on, hiding occupied slots", () => {
+    const lens = new HarmonyLens();
+    lens.setMacros({ modalInterchangeHints: true });
+    expect(hints(lens)).toHaveLength(5);
+    const bVII = { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "y", onset: 900, releaseTime: null };
+    const shown = hints(lens, [bVII]);
+    expect(shown).toHaveLength(4);
+    expect(shown.some((e) => e.id.endsWith("b:10"))).toBe(false);
+  });
+});
+
+describe("HarmonyLens interval-name dial", () => {
+  const dial = (lens: HarmonyLens) =>
+    lens.update(createTestFrame(1000, null, 0), null).entities.filter((e) => e.id.includes(":interval-name-"));
+
+  it("is off by default", () => {
+    expect(dial(new HarmonyLens())).toHaveLength(0);
+  });
+
+  it("labels all twelve angles, R upright at the top and d5 upside down at the bottom", () => {
+    const lens = new HarmonyLens();
+    lens.setMacros({ intervalNames: true });
+    const labels = dial(lens);
+    expect(labels.map((e) => e.data!.text)).toEqual(
+      ["R", "m2", "M2", "m3", "M3", "P4", "d5", "P5", "m6", "M6", "m7", "M7"],
+    );
+    const root = labels[0], d5 = labels[6];
+    expect(root.data!.rotationDeg).toBe(0);
+    expect(d5.data!.rotationDeg).toBe(180);
+    expect(root.position!.y).toBeLessThan(d5.position!.y); // top vs bottom
+    expect(root.data!.anchor).toBe("baseline");
+  });
+});
+

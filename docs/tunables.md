@@ -46,6 +46,13 @@ Only RhythmLens exposes true macros at the moment. The others are configured ent
 | `GRID_COLORS.barLine` | `{h:200,s:0.3,v:0.6,a:0.5}` | Bar grid line colour | ⭐ | 🎵 | cosmetic | internal |
 | `GRID_COLORS.nowLine` | `{h:0,s:0,v:0.8,a:0.6}` | NOW line colour | ⭐⭐ | 🎵 | cosmetic | internal |
 | `GRID_COLORS.referenceLine` | `{h:0,s:0,v:0.9,a:0.7}` | Per-note reference line colour | ⭐⭐ | 🎵🎵 | cosmetic | internal |
+| `NOTE_NAME_FONT_SCALE` | 0.8 | Note-name legend size as a multiple of the on-screen keyboard's 12px labels (matched at a 900px-tall window; scales with the window) | ⭐⭐ | 🎵 | cosmetic | internal |
+| `STRUCTURAL_TEXT_ALPHA` (layout.ts) | 0.9 | Opacity of note names and interval names (the NOW line's grey, more opaque than the line's 0.6 for legibility) | ⭐⭐ | — | cosmetic | internal |
+| `TEXT_LABEL_FONT_WEIGHT` (ThreeJSRenderer) | 600 | Weight of text labels; heavier keeps small letters distinct | ⭐⭐ | — | cosmetic | internal |
+| `TEXT_LABEL_ACCIDENTAL_SCALE` (ThreeJSRenderer) | 1.1 | Size of ♭/♯ (drawn in the Lucida stack) relative to the letters | ⭐ | — | cosmetic | internal |
+| `NOTE_NAME_GAP` | 0.6 | Gap between the NOW line and the note names, world units | ⭐ | — | layout | internal |
+| `INTERVAL_NAME_FONT_SCALE` (HarmonyLens) | 0.8 | Interval-name dial size as a multiple of the on-screen keyboard's 12px labels (independent of note names) | ⭐⭐ | 🎵 | cosmetic | internal |
+| `INTERVAL_NAME_BASELINE_OFFSET` (HarmonyLens) | 0 | Radial nudge of the dial's baselines from the steam ring's inner edge (normalized) | ⭐ | — | layout | internal |
 | `OVERTONE_WIDTH_RATIO` | 2.5 | Overtone strip width as a multiple of note-strip width (RFC 012). Must exceed 1 so a coincident partial is not hidden behind the note strip it reinforces | ⭐⭐ | 🎵🎵 | cosmetic | internal |
 | `OVERTONE_CULL_OPACITY` | 0.02 | Overtone strips whose brighter end is below this are not emitted | ⭐ | 🎵 | cosmetic | internal |
 | `OVERTONE_EDGE_SOFTNESS` | 1.0 | Horizontal edge falloff of overtone strips, 0 hard .. 1 soft from centre; passed to the renderer as `data.edgeSoftness` | ⭐⭐ | 🎵 | cosmetic | internal |
@@ -61,11 +68,12 @@ Progression clock:
 | `WIDTH_COMPENSATION_EXPONENT` | 1.8 | Non-linear opacity compensation as strokes thicken through the fade | ⭐ | — | cosmetic | internal |
 | `STROKE_WIDTH_FRESH` | 2 | Chord numeral stroke while held or fresh | ⭐ | 🎵 | cosmetic | internal |
 | `STROKE_WIDTH_FADED` | 8 | Chord numeral stroke at full fade (chunky/blocky) | ⭐⭐ | 🎵 | cosmetic | internal |
-| `CLOCK_RADIUS_FRACTION` | 0.35 | Clock radius as fraction of cell size | ⭐ | — | layout | internal |
+| `CLOCK_RADIUS` | `GLYPH_STEAM_BAND_RADIUS / GUIDE_RING_OUTER_FRACTION` ≈ 0.127 | Clock radius, derived so the outer guide ring matches the glyph's steam ring | ⭐ | — | layout | internal |
+| `CLOCK_SCALE` | ≈ 0.86 | Scales numerals, strokes, connector arcs and the centre label relative to the radius they were tuned at (0.147) | ⭐ | — | layout | internal |
 | `GUIDE_RING_INNER_FRACTION` | 0.32 | Inner guide ring radius | ⭐ | — | layout | internal |
 | `GUIDE_RING_MIDDLE_FRACTION` | 0.62 | Middle guide ring (diatonic edge) | ⭐ | — | layout | internal |
-| `GUIDE_RING_OUTER_FRACTION` | 0.92 | Outer guide ring (borrowed edge) | ⭐ | — | layout | internal |
-| `GLYPH_SIZE` | 2.4 | Uppercase numeral height (world units) | ⭐ | — | layout | internal |
+| `GUIDE_RING_OUTER_FRACTION` | ≈ 0.852 (derived) | Outer guide ring; borrowed band narrowed by BORROWED_SCALE / DIATONIC_SCALE | ⭐ | — | layout | internal |
+| `GLYPH_SIZE` | 2.4 × `CLOCK_SCALE` | Uppercase numeral height (world units) | ⭐ | — | layout | internal |
 | `DIATONIC_SCALE` | 0.8 | Diatonic-ring glyph scale relative to `GLYPH_SIZE` | ⭐ | 🎵 | cosmetic | internal |
 | `BORROWED_SCALE` | 1/φ ≈ 0.618 | Borrowed-ring glyph scale — lighter visual weight for outside-the-key chords | ⭐⭐ | 🎵🎵 | interpretive | internal |
 | `VIEWPORT_ASPECT` | 100/75 | Compensates renderer's asymmetric x/y scaling — technical, not a design lever | — | — | layout | internal |
@@ -139,7 +147,6 @@ The "vocabulary" is the ruleset that maps musical events to visual style. It has
 | `referencePc` | 0 (C) | Which pitch class anchors the hue wheel | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | internal |
 | `referenceHue` | 0 (red) | Which colour = referencePc | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | system:colour-mapping:reference |
 | `hueDirection` | "cw" | Chromatic step direction on the colour wheel | ⭐⭐⭐ | 🎵🎵🎵 | interpretive |system:colour-mapping:direction |
-| `harmonicSeriesEnabled` | false | Harmonic series overlay on/off (RFC 012) | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | system:harmonic-series:enabled |
 | `harmonicSeriesLevel` | 0.2 | Harmonic series overlay level while enabled; 0 annotates no partials | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | system:harmonic-series:level |
 | `harmonicSeriesRolloff` | 0.15 | Partial level exponent, n^(−rolloff) | ⭐⭐ | 🎵🎵 | interpretive | system:harmonic-series:rolloff |
 | `partialColourMode` | "pitch" | Overtone strip hue: landing pitch class or originating note | ⭐⭐ | 🎵🎵 | interpretive | system:harmonic-series:colour |
@@ -281,6 +288,18 @@ Overtone steam (top-level constants in `ThreeJSRenderer.ts`, RFC 012). Spatial u
 | `STEAM_PERIOD` | 64 | Noise lattice period; lets offsets wrap so long sessions keep shader precision | — | — | internal | internal |
 
 Motion follows the session clock (`SceneFrame.t`) and is frozen when the viewer prefers reduced motion.
+
+Glyph overtone steam / overtone halo (top-level constants in `ThreeJSRenderer.ts`). Shares the noise, warp, threshold and swirl constants above.
+
+| Constant | Value | Controls | Impact | Pertinence | Class | Decision |
+|---|---|---|---|---|---|---|
+| `GLYPH_STEAM_PLACEMENT` | "band" | "band": a fixed ring outside the longest spoke (RFC 012 option A, chosen). "edge": emitted from the glyph outline at each angle | ⭐⭐⭐ | 🎵 | layout | internal |
+| `GLYPH_STEAM_LENGTH` | 0.3 | Radial length of the steam ring, fraction of base radius | ⭐⭐ | 🎵 | layout | internal |
+| `GLYPH_STEAM_BAND_GAP` | 0.08 | Negative-space gap between the triadic tip and the steam ring (band placement). Also sets the progression clock's outer radius | ⭐ | — | layout | internal |
+| `GLYPH_STEAM_GAIN` | 1.68 | Brightness multiplier for the glyph halo only; compensates for its short outward fade relative to overtone strips | ⭐⭐ | — | cosmetic | internal |
+| `GLYPH_STEAM_HALF_WIDTH_DEG` | 11 | Angular half-width of one partial's steam (30° per semitone) | ⭐⭐ | 🎵 | cosmetic | internal |
+| `GLYPH_STEAM_SCALE_R` | 6 | Radial noise frequency per base radius | ⭐ | — | cosmetic | internal |
+| `GLYPH_STEAM_RISE_PER_S` | 0.05 | Outward rise, base radii per second | ⭐⭐ | — | dynamics | internal |
 
 ---
 

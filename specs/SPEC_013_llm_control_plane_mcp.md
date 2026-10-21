@@ -306,7 +306,7 @@ The web app renders a control panel derived from the same annotation manifest th
 Controls are grouped by annotation namespace into three collapsible sections. Each section is collapsed by default to keep the panel small.
 
 - **Input** — controls in the `input:*` namespace. Currently just `input:source`; renders as a dropdown of available MIDI devices + audio devices (see §Audio input selection).
-- **Basics** — controls in the `session:*` namespace: key (paired `session:tonic` + `session:mode`), tempo, meter (paired `session:beats-per-bar` + `session:beat-value`), chord mode, metronome, followed by every toggle macro (`ToggleMacroAnnotation`, e.g. `system:harmonic-series:enabled`) — feature on/off switches sit with the basics while their fine controls stay in Advanced. Compact widgets — pair-typed controls render as a single grouped widget (e.g. key selector combines root + mode).
+- **Basics** — controls in the `session:*` namespace: key (paired `session:tonic` + `session:mode`), tempo, meter (paired `session:beats-per-bar` + `session:beat-value`), chord mode, metronome, followed by every toggle macro (`ToggleMacroAnnotation`, e.g. `rhythm:overtones`, `harmony:overtones`) — feature on/off switches sit with the basics while their fine controls stay in Advanced. Compact widgets — pair-typed controls render as a single grouped widget (e.g. key selector combines root + mode).
 - **Advanced** — everything else: all non-toggle aesthetic macros (`system:*`, bare cross-cutting, and lens-scoped). Grouped by scope prefix so the LLM's namespace conventions are visible in the UI.
 
 ### Widget generation

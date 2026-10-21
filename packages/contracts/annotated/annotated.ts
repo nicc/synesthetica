@@ -259,6 +259,21 @@ export interface HarmonicPartial {
   color: ColorHSVA;
 }
 
+/**
+ * A partial of one of a chord's tones, placed in the chord glyph's
+ * angular frame (RFC 012). Computed once per distinct pitch class of the
+ * voicing: octave doubling is ignored, matching the glyph.
+ */
+export interface ChordPartial extends HarmonicPartial {
+  /** Pitch class of the chord tone that produced this partial */
+  sourcePc: PitchClass;
+
+  /** Clock angle in degrees relative to the interpretation's root
+   *  (30° per semitone, cents included) — the same frame as
+   *  ChordShapeElement.angle */
+  angle: number;
+}
+
 // ============================================================================
 // Annotated Musical Elements
 // ============================================================================
@@ -311,6 +326,14 @@ export interface AnnotatedChord {
 
   /** Shape geometry for rendering (Invariant I18) */
   shape: ChordShapeGeometry;
+
+  /**
+   * Partials of the chord's tones for the harmonic series overlay
+   * (RFC 012), alongside the shape rather than part of it: the shape
+   * encodes chord quality (I18); partials are not chord tones (I31).
+   * Present only when the overlay is enabled.
+   */
+  partials?: ChordPartial[];
 }
 
 // AnnotatedRhythm removed 2026-08-20 with the removal of tempo/beat
@@ -420,6 +443,14 @@ export interface AnnotatedMusicalFrame {
    * lenses when the mapping is retuned.
    */
   hueInvariant: PitchHueInvariant;
+
+  /**
+   * Display name for each pitch class (index = pitch class), with music
+   * symbols (♯ ♭). Key-aware when a key is prescribed; otherwise follows
+   * the default spelling (system:note-names:spelling). The vocabulary is
+   * the single source of note spelling for lenses.
+   */
+  pitchClassNames: string[];
 
   /**
    * Harmonic context including tension analysis.

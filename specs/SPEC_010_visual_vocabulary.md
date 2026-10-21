@@ -129,9 +129,11 @@ template that covers triads and common 7ths only. Future work: alterations
 (♭9, ♯9, ♯11) should be classified as lines even when present in
 `chordTones` — tracked under the chord-detection umbrella.
 
+**Interval-name dial (optional, `harmony:interval-names`, default off):** a fixed dial of simple-interval names at the spoke angles — R m2 M2 m3 M3 P4 d5 P5 m6 M6 m7 M7 — with each label's baseline on the inner edge of the overtone steam ring and rotated to its angle (R upright at the top, d5 upside down at the bottom). Drawn in the NOW line's grey whatever the chord, as structure; colour stays with the spokes and steam. The dial names pitch distance from the root, so chord-specific spellings (♯5, 9, 11, 13) read under their simple-interval angle.
+
 ### 6. Harmonic Series Overlay
 
-Source: RFC 012. Optional; off by default (`system:harmonic-series:enabled` = false). Brightness is `system:harmonic-series:level` (default 0.2), applied while enabled.
+Source: RFC 012. Optional, toggled per lens: `rhythm:overtones` (overtone strips, default off) and `harmony:overtones` (the glyph's overtone halo, default on). The vocabulary annotates partials whenever `system:harmonic-series:level` (default 0.2) is above 0; each lens decides whether to draw them.
 
 The vocabulary annotates each note with the partials of the harmonic series it implies. Levels are modelled from a generic rolloff, not measured: MIDI carries no timbre, so this is a theoretical overlay and must be described as such in the manifest and primer. The rhythm lens renders each partial as an overtone strip.
 
@@ -148,6 +150,16 @@ The vocabulary annotates each note with the partials of the harmonic series it i
 - Register: wider than a note strip, soft-edged, translucent, additive; an overtone strip must be visibly distinct from a played note. Surface is slow procedural steam (renderer shader): breakup stays inside the strip's footprint, the noise field is shared across strips (indexed by pitch position and timeline time) so coincident partials add as denser steam of the same kind, and haze breaks into sparse wisps with age. Motion is uniform across strips and carries no meaning; it follows the session clock and is frozen under reduced motion.
 - Colour (`system:harmonic-series:colour`): `pitch` (default) takes the hue of the pitch class the partial lands on, consistent with I14. `fundamental` takes the hue of the originating note, so colour shows origin rather than landing pitch. This is a user-selected exception to I14 for overtone strips only; it trades the colour-means-pitch reading for provenance.
 - Velocity brightening is not applied.
+- **Chord glyph:** the chord's own tones (once per distinct pitch class; octave doubling ignored) show steam in a ring just outside the glyph's longest spoke, separated from it by a gap of negative space, at each partial's angle — 30° per semitone from the root, cents included. Angle carries pitch; spoke length does not apply (partials are not chord tones): the steam has a fixed radial length and fades outward, and the gap keeps it visibly separate from the spokes. Density is the partial level; overlapping partials add. Steam fades with the glyph and breaks into wisps as it fades. The shape geometry (I18) is unchanged; partials sit beside it on `AnnotatedChord.partials`.
+
+### 7. Note Names
+
+The vocabulary is the single source of note spelling. It annotates each frame with `pitchClassNames` (index = pitch class) using music symbols (♯ ♭):
+
+- With a prescribed key, names follow the key's spelling (`utils/pitchSpelling.buildSpellingTable`): B♭ in F major, D♯ in E major.
+- Without a key, names follow `system:note-names:spelling` (`sharps` default, or `flats`).
+
+Lenses display names from the frame and never spell pitches themselves. The rhythm lens shows a note-name legend under the NOW line (`rhythm:note-names`, on by default).
 
 ## Chord Interpretation Modes
 
@@ -350,7 +362,19 @@ interface HarmonicPartial {
 
 interface AnnotatedNote {
   // ...
-  partials?: HarmonicPartial[]; // present only when the overlay level > 0
+  partials?: HarmonicPartial[]; // present only when the overlay is enabled
+}
+
+/** A chord tone's partial, in the glyph's angular frame (§6). */
+interface ChordPartial extends HarmonicPartial {
+  sourcePc: PitchClass; // the chord tone that produced it
+  angle: number;        // clock degrees from the root, cents included
+}
+
+interface AnnotatedChord {
+  // ...
+  shape: ChordShapeGeometry;   // chord quality (I18), unchanged
+  partials?: ChordPartial[];   // alongside the shape; one set per distinct pitch class
 }
 ```
 
