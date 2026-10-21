@@ -37,6 +37,8 @@ import {
   ARM_LENGTH,
   BASE_WIDTH,
 } from "../utils/ChordShapeBuilder";
+// Shared with HarmonyLens: the band gap also sizes the progression clock.
+import { GLYPH_STEAM_BAND_GAP } from "../lenses/layout";
 
 // ============================================================================
 // Configuration
@@ -260,9 +262,6 @@ const GLYPH_BASE_RADIUS = 10;
  *  just outside the longest spoke (RFC 012 option A). */
 const GLYPH_STEAM_PLACEMENT: "edge" | "band" = "band";
 
-/** Gap between the triadic spoke tip and the ring, band placement only
- *  (fraction of base radius). */
-const GLYPH_STEAM_BAND_GAP = 0.08;
 
 /** Radial length of glyph steam (fraction of base radius). Equal to an
  *  extension spoke; the outward fade makes the visible steam shorter,
@@ -2129,7 +2128,8 @@ export class ThreeJSRenderer implements IRenderer {
     // Per-line height in world units. Slash chords (e.g. "EbM/G") split
     // across two lines with the slash on the second line, so total mesh
     // height is lineHeight × number of lines.
-    const LINE_HEIGHT_WORLD = 1.75;
+    // Lens may set style.size (the progression clock scales its label).
+    const LINE_HEIGHT_WORLD = entity.style.size ?? 1.75;
     const CANVAS_TEXT_PX = 72;
     const LINE_GAP_FRACTION = 0.1; // Tight gap between stacked slash lines
     // Lucida Sans family — humanist sans that natively contains music

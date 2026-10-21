@@ -41,7 +41,7 @@ Cells are square (column width = larger cell vertical = 0.42). The rhythm column
 
 ### Clock Interior Radii
 
-All radii expressed as fractions of clock radius. The clock radius equals half the progression cell width (0.21 in normalized viewport coords).
+All radii expressed as fractions of clock radius. The clock radius is derived from the chord glyph above it: the outer guide ring equals the inner radius of the glyph's overtone steam ring (`GLYPH_STEAM_BAND_RADIUS` in `lenses/layout.ts`, ≈ 0.108 normalized), so clock radius ≈ 0.127. Numeral sizes, strokes, connector arcs and the centre label scale with the clock relative to the radius they were tuned at (0.147).
 
 | Element | Fraction | Anchored to |
 |---|---|---|
@@ -49,10 +49,10 @@ All radii expressed as fractions of clock radius. The clock radius equals half t
 | Inner guide ring | **0.32** | Outer edge of label area |
 | Diatonic numeral ring | **0.47** | Centre of diatonic band |
 | Middle guide ring | **0.62** | Between diatonic and borrowed numerals |
-| Borrowed numeral ring | **0.77** | Centre of borrowed band |
-| Outer guide ring | **0.92** | Outer bound of borrowed band |
+| Borrowed numeral ring | **≈ 0.736** | Centre of borrowed band |
+| Outer guide ring | **≈ 0.852** | Outer bound of borrowed band |
 
-Three guide rings define two equal-width annular bands (each 0.30 wide). Numeral rings sit at the radial centre of each band, so diatonic and borrowed read as the same width with their numerals visually centred between guide rings.
+Three guide rings define two annular bands. The diatonic band is 0.30 wide; the borrowed band is narrower in proportion to its smaller numerals (0.30 × BORROWED_SCALE / DIATONIC_SCALE ≈ 0.232). Numeral rings sit at the radial centre of each band, so numerals stay visually centred between guide rings.
 
 ### Slot Tick Marks
 

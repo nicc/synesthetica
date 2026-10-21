@@ -118,6 +118,29 @@ export const HARMONY_PROGRESSION_CELL_HEIGHT = HARMONY_COLUMN_WIDTH;
  *  math. Refers to the progression cell, which is square. */
 export const HARMONY_CELL_SIZE = HARMONY_PROGRESSION_CELL_HEIGHT;
 
+// ----------------------------------------------------------------------------
+// Chord glyph overtone ring (RFC 012), shared by HarmonyLens and the renderer
+// ----------------------------------------------------------------------------
+
+/** Chord glyph base radius, normalized (renderer GLYPH_BASE_RADIUS = 10
+ *  world units at chord-shape size 100, over worldWidth 100). */
+export const CHORD_GLYPH_RADIUS = 0.1;
+
+/** Hub radius and triadic spoke length as fractions of the glyph base
+ *  radius (mirrors ChordShapeBuilder / renderChordShape). */
+const GLYPH_HUB_FRACTION = 0.3;
+const GLYPH_TRIADIC_ARM_FRACTION = 0.7;
+
+/** Negative-space gap between the triadic spoke tip and the overtone
+ *  steam ring, as a fraction of the glyph base radius. */
+export const GLYPH_STEAM_BAND_GAP = 0.08;
+
+/** Inner radius of the glyph's overtone steam ring, normalized. The
+ *  progression clock's outer guide ring is sized to match it. */
+export const GLYPH_STEAM_BAND_RADIUS =
+  CHORD_GLYPH_RADIUS *
+  (GLYPH_HUB_FRACTION + GLYPH_TRIADIC_ARM_FRACTION + GLYPH_STEAM_BAND_GAP);
+
 /** Vertical gap between chord cell and progression cell */
 const CELL_GAP = 0.04;
 

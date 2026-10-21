@@ -61,11 +61,12 @@ Progression clock:
 | `WIDTH_COMPENSATION_EXPONENT` | 1.8 | Non-linear opacity compensation as strokes thicken through the fade | ⭐ | — | cosmetic | internal |
 | `STROKE_WIDTH_FRESH` | 2 | Chord numeral stroke while held or fresh | ⭐ | 🎵 | cosmetic | internal |
 | `STROKE_WIDTH_FADED` | 8 | Chord numeral stroke at full fade (chunky/blocky) | ⭐⭐ | 🎵 | cosmetic | internal |
-| `CLOCK_RADIUS_FRACTION` | 0.35 | Clock radius as fraction of cell size | ⭐ | — | layout | internal |
+| `CLOCK_RADIUS` | `GLYPH_STEAM_BAND_RADIUS / GUIDE_RING_OUTER_FRACTION` ≈ 0.127 | Clock radius, derived so the outer guide ring matches the glyph's steam ring | ⭐ | — | layout | internal |
+| `CLOCK_SCALE` | ≈ 0.86 | Scales numerals, strokes, connector arcs and the centre label relative to the radius they were tuned at (0.147) | ⭐ | — | layout | internal |
 | `GUIDE_RING_INNER_FRACTION` | 0.32 | Inner guide ring radius | ⭐ | — | layout | internal |
 | `GUIDE_RING_MIDDLE_FRACTION` | 0.62 | Middle guide ring (diatonic edge) | ⭐ | — | layout | internal |
-| `GUIDE_RING_OUTER_FRACTION` | 0.92 | Outer guide ring (borrowed edge) | ⭐ | — | layout | internal |
-| `GLYPH_SIZE` | 2.4 | Uppercase numeral height (world units) | ⭐ | — | layout | internal |
+| `GUIDE_RING_OUTER_FRACTION` | ≈ 0.852 (derived) | Outer guide ring; borrowed band narrowed by BORROWED_SCALE / DIATONIC_SCALE | ⭐ | — | layout | internal |
+| `GLYPH_SIZE` | 2.4 × `CLOCK_SCALE` | Uppercase numeral height (world units) | ⭐ | — | layout | internal |
 | `DIATONIC_SCALE` | 0.8 | Diatonic-ring glyph scale relative to `GLYPH_SIZE` | ⭐ | 🎵 | cosmetic | internal |
 | `BORROWED_SCALE` | 1/φ ≈ 0.618 | Borrowed-ring glyph scale — lighter visual weight for outside-the-key chords | ⭐⭐ | 🎵🎵 | interpretive | internal |
 | `VIEWPORT_ASPECT` | 100/75 | Compensates renderer's asymmetric x/y scaling — technical, not a design lever | — | — | layout | internal |

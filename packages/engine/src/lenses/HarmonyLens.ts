@@ -50,7 +50,7 @@ import {
   HARMONY_CHORD_CENTER_Y,
   HARMONY_PROGRESSION_CENTER_X,
   HARMONY_PROGRESSION_CENTER_Y,
-  HARMONY_CELL_SIZE,
+  GLYPH_STEAM_BAND_RADIUS,
   CHORD_STRIP_CENTER_X,
   CHORD_STRIP_BAR_WIDTH,
 } from "./layout";
@@ -85,38 +85,13 @@ const RELEASE_BRIGHTNESS_STEP = 0.30;
  */
 const WIDTH_COMPENSATION_EXPONENT = 1.8;
 
-/** Stroke width (pixels) while chord is held or fresh */
-const STROKE_WIDTH_FRESH = 2;
+/** Stroke width (pixels) while chord is held or fresh. Scaled with the
+ *  clock (CLOCK_SCALE, defined below). */
+const STROKE_WIDTH_FRESH_BASE = 2;
 
 /** Stroke width (pixels) at full fade — chunky, blocky */
-const STROKE_WIDTH_FADED = 8;
+const STROKE_WIDTH_FADED_BASE = 8;
 
-/** Clock radius as fraction of cell size. Sized so the outer guide ring
- *  fits within the cell vertically (worldHeight < worldWidth, so a
- *  larger fraction would clip the cell vertically and overlap the
- *  chord glyph above). */
-const CLOCK_RADIUS_FRACTION = 0.35;
-
-/**
- * Layout fractions of clock radius (SPEC 011). Three guide rings,
- * defining two equal-width annular bands (one for each numeral ring):
- *   - Inner guide  (0.32) — outer edge of chord-label area
- *   - Middle guide (0.62) — between diatonic and borrowed numerals
- *   - Outer guide  (0.92) — outer bound of borrowed band; bands are
- *     0.30 wide each so diatonic and borrowed read as the same width
- * Numeral rings sit at the radial centres of their bands so they read
- * as "centred between guide rings".
- */
-const GUIDE_RING_INNER_FRACTION = 0.32;
-const GUIDE_RING_MIDDLE_FRACTION = 0.62;
-const GUIDE_RING_OUTER_FRACTION = 0.92;
-const DIATONIC_GLYPH_RADIUS_FRACTION =
-  (GUIDE_RING_INNER_FRACTION + GUIDE_RING_MIDDLE_FRACTION) / 2; // 0.47
-const BORROWED_GLYPH_RADIUS_FRACTION =
-  (GUIDE_RING_MIDDLE_FRACTION + GUIDE_RING_OUTER_FRACTION) / 2; // 0.77
-
-/** Glyph size in world units (height of uppercase diatonic numeral). */
-const GLYPH_SIZE = 2.4;
 
 /**
  * Scale factor applied to diatonic-ring glyphs (size + stroke). Diatonic
@@ -132,6 +107,48 @@ const DIATONIC_SCALE = 0.8;
  * coincidentally resize the other.
  */
 const BORROWED_SCALE = 1 / 1.618033988749895;
+
+/**
+ * Layout fractions of clock radius (SPEC 011). Three guide rings,
+ * defining two annular bands (one for each numeral ring):
+ *   - Inner guide  (0.32) — outer edge of chord-label area
+ *   - Middle guide (0.62) — between diatonic and borrowed numerals
+ *   - Outer guide  — outer bound of the borrowed band. The borrowed band
+ *     is narrower than the diatonic band (0.30) in proportion to its
+ *     smaller numerals (BORROWED_SCALE / DIATONIC_SCALE ≈ 0.77).
+ * Numeral rings sit at the radial centres of their bands so they read
+ * as "centred between guide rings".
+ */
+const GUIDE_RING_INNER_FRACTION = 0.32;
+const GUIDE_RING_MIDDLE_FRACTION = 0.62;
+const GUIDE_RING_OUTER_FRACTION =
+  GUIDE_RING_MIDDLE_FRACTION +
+  (GUIDE_RING_MIDDLE_FRACTION - GUIDE_RING_INNER_FRACTION) *
+    (BORROWED_SCALE / DIATONIC_SCALE); // ≈ 0.852
+const DIATONIC_GLYPH_RADIUS_FRACTION =
+  (GUIDE_RING_INNER_FRACTION + GUIDE_RING_MIDDLE_FRACTION) / 2; // 0.47
+const BORROWED_GLYPH_RADIUS_FRACTION =
+  (GUIDE_RING_MIDDLE_FRACTION + GUIDE_RING_OUTER_FRACTION) / 2; // ≈ 0.736
+
+/** Clock radius, normalized. Sized so the outer guide ring matches the
+ *  inner edge of the chord glyph's overtone steam ring above it: the
+ *  glyph and the clock share one outer proportion. */
+const CLOCK_RADIUS = GLYPH_STEAM_BAND_RADIUS / GUIDE_RING_OUTER_FRACTION;
+
+/** Clock radius the absolute sizes below (numerals, strokes, connector
+ *  arcs, centre label) were tuned at. They scale by CLOCK_RADIUS over
+ *  this, so every clock element keeps its proportion. */
+const REFERENCE_CLOCK_RADIUS = 0.42 * 0.35;
+const CLOCK_SCALE = CLOCK_RADIUS / REFERENCE_CLOCK_RADIUS;
+
+/** Glyph size in world units (height of uppercase diatonic numeral). */
+const GLYPH_SIZE = 2.4 * CLOCK_SCALE;
+
+/** Line height of the chord name at the clock's centre (world units). */
+const CHORD_LABEL_SIZE = 1.75 * CLOCK_SCALE;
+
+const STROKE_WIDTH_FRESH = STROKE_WIDTH_FRESH_BASE * CLOCK_SCALE;
+const STROKE_WIDTH_FADED = STROKE_WIDTH_FADED_BASE * CLOCK_SCALE;
 
 /**
  * Viewport aspect ratio (worldWidth / worldHeight from the default
@@ -188,7 +205,7 @@ const CONNECTOR_ANIMATION_MS = 60;
  *  full stroke thickness is 2×. Chosen to read as ~2× the guide ring
  *  stroke while staying much thinner than the strip's radial extent
  *  (STRIP_RADIAL_FRACTION * clockRadius ≈ 0.01 normalized). */
-const CONNECTOR_HALF_THICKNESS_NORMALIZED = 0.001;
+const CONNECTOR_HALF_THICKNESS_NORMALIZED = 0.001 * CLOCK_SCALE;
 
 /** Arrow indicator height as a multiple of the arc's full stroke
  *  thickness. The arrow's flat base sits flush against the arc at
@@ -497,6 +514,7 @@ export class HarmonyLens implements IVisualLens {
           style: {
             color: { h: 0, s: 0, v: 1, a: 1 },
             opacity: chordOpacity,
+            size: CHORD_LABEL_SIZE,
           },
           data: {
             type: "chord-label",
@@ -577,7 +595,7 @@ export class HarmonyLens implements IVisualLens {
    */
   private createClockStructure(t: number, part: string): Entity[] {
     const entities: Entity[] = [];
-    const clockRadius = HARMONY_CELL_SIZE * CLOCK_RADIUS_FRACTION;
+    const clockRadius = CLOCK_RADIUS;
 
     for (const [suffix, fraction] of [
       ["inner", GUIDE_RING_INNER_FRACTION],
@@ -651,7 +669,7 @@ export class HarmonyLens implements IVisualLens {
     hueInvariant: PitchHueInvariant,
   ): Entity[] {
     const entities: Entity[] = [];
-    const clockRadius = HARMONY_CELL_SIZE * CLOCK_RADIUS_FRACTION;
+    const clockRadius = CLOCK_RADIUS;
     const diatonicRadius = clockRadius * DIATONIC_GLYPH_RADIUS_FRACTION;
     const borrowedRadius = clockRadius * BORROWED_GLYPH_RADIUS_FRACTION;
 
@@ -780,7 +798,7 @@ export class HarmonyLens implements IVisualLens {
     if (edges.length === 0) return [];
 
     const entities: Entity[] = [];
-    const clockRadius = HARMONY_CELL_SIZE * CLOCK_RADIUS_FRACTION;
+    const clockRadius = CLOCK_RADIUS;
     const stripRadialHeight = clockRadius * STRIP_RADIAL_FRACTION;
 
     // Build a chord-id index for source-chord lookup.
