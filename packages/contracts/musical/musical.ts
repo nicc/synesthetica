@@ -388,6 +388,24 @@ export interface HarmonicContext {
    * when it falls out.
    */
   functionalEdges: FunctionalEdge[];
+
+  /**
+   * The prescribed key's diatonic triads, one per scale degree, as the
+   * progression clock shows them (e.g. C major: I ii iii IV V vi vii°).
+   * Empty without a key. Stable for a given key, so the clock can draw
+   * them as always-on guides.
+   */
+  diatonicChords: KeyChord[];
+}
+
+/** A chord the key defines (not one that was played), for clock guides. */
+export interface KeyChord {
+  /** Root pitch class */
+  rootPc: PitchClass;
+  /** Roman numeral relative to the key (e.g. "ii", "vii°", "♭VII") */
+  roman: string;
+  /** True for chords outside the key (drawn on the borrowed ring) */
+  borrowed: boolean;
 }
 
 /**
@@ -528,6 +546,7 @@ export const EMPTY_HARMONIC_CONTEXT: Readonly<HarmonicContext> = Object.freeze({
   currentFunction: null,
   functionalProgression: [],
   functionalEdges: [],
+  diatonicChords: [],
 });
 
 /**

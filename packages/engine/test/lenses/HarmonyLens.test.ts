@@ -1007,3 +1007,43 @@ describe("HarmonyLens glyph overtones (RFC 012)", () => {
     expect(shape.data!.partials).toBeUndefined();
   });
 });
+
+describe("HarmonyLens guide numerals", () => {
+  const C_MAJOR = [
+    { rootPc: 0, roman: "I" }, { rootPc: 2, roman: "ii" }, { rootPc: 4, roman: "iii" },
+    { rootPc: 5, roman: "IV" }, { rootPc: 7, roman: "V" }, { rootPc: 9, roman: "vi" },
+    { rootPc: 11, roman: "vii°" },
+  ].map((c) => ({ ...c, rootPc: c.rootPc as PitchClass, borrowed: false }));
+  const frameWith = (progression: unknown[], key = true) =>
+    createTestAnnotatedFrame(1000, "main", {
+      prescribedKey: key ? { root: 0 as PitchClass, mode: "ionian" } : null,
+      harmonicContext: {
+        tension: 0,
+        keyAware: key,
+        currentFunction: null,
+        functionalProgression: progression as never,
+        functionalEdges: [],
+        diatonicChords: key ? C_MAJOR : [],
+      },
+    });
+  const guides = (scene: { entities: Array<{ id: string; style: { opacity?: number } }> }) =>
+    scene.entities.filter((e) => e.id.includes(":guide-numeral-"));
+
+  it("draws the key's diatonic numerals greyed when a key is set", () => {
+    const g = guides(new HarmonyLens().update(frameWith([]), null));
+    expect(g).toHaveLength(7);
+    for (const e of g) expect(e.style.opacity).toBe(0.25);
+  });
+
+  it("draws none without a key (the chord name stands alone)", () => {
+    expect(guides(new HarmonyLens().update(frameWith([], false), null))).toHaveLength(0);
+  });
+
+  it("hides the guide in a slot a played numeral occupies", () => {
+    const ii = { degree: 2, roman: "ii", quality: "min", rootPc: 2 as PitchClass, borrowed: false, chordId: "x", onset: 900, releaseTime: null };
+    const g = guides(new HarmonyLens().update(frameWith([ii]), null));
+    expect(g).toHaveLength(6);
+    expect(g.some((e) => e.id.endsWith("d:2"))).toBe(false);
+  });
+});
+

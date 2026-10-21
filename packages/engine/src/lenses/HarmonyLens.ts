@@ -31,6 +31,7 @@ import type {
   ChordShapeElement,
   MarginStyle,
   FunctionalChord,
+  KeyChord,
   FunctionalEdge,
   ModeId,
   PitchClass,
@@ -540,6 +541,19 @@ export class HarmonyLens implements IVisualLens {
       entities.push(
         ...this.createClockStructure(t, part),
       );
+      // Diatonic numerals as guides; played numerals draw over them.
+      entities.push(
+        ...this.createGuideNumerals(
+          input.harmonicContext.diatonicChords ?? [],
+          progression,
+          t,
+          part,
+          key.root,
+          key.mode,
+          this.macros.linger * 1000,
+          "guide-numeral",
+        ),
+      );
     }
 
     if (key && progression.length > 0) {
@@ -674,9 +688,6 @@ export class HarmonyLens implements IVisualLens {
     hueInvariant: PitchHueInvariant,
   ): Entity[] {
     const entities: Entity[] = [];
-    const clockRadius = CLOCK_RADIUS;
-    const diatonicRadius = clockRadius * DIATONIC_GLYPH_RADIUS_FRACTION;
-    const borrowedRadius = clockRadius * BORROWED_GLYPH_RADIUS_FRACTION;
 
     for (let i = 0; i < progression.length; i++) {
       const fc = progression[i];
@@ -708,57 +719,123 @@ export class HarmonyLens implements IVisualLens {
       }
       if (opacity < 0.01) continue;
 
-      // Angular position: 7 equally-spaced slots for diatonic degrees,
-      // with borrowed chords interpolated between adjacent diatonic
-      // positions based on chromatic distance. Borrowed chords also sit
-      // on a larger radius ring so they are visually outside the key.
-      const semitonesFromTonic = (fc.rootPc - tonicPc + 12) % 12;
-      const angleDeg = modalWheelAngle(semitonesFromTonic, mode);
-      const angleRad = ((angleDeg - 90) * Math.PI) / 180; // -90 puts 0° at top
-      const radius = fc.borrowed ? borrowedRadius : diatonicRadius;
-      const scale = fc.borrowed ? BORROWED_SCALE : DIATONIC_SCALE;
-
-      // Position on the clock, centered on progression cell.
-      // y is multiplied by VIEWPORT_ASPECT to compensate for the
-      // renderer's worldHeight < worldWidth — without this, numerals
-      // at 12/6 o'clock fall short of their ring (the ring uses
-      // worldWidth for both axes, the position scales y by worldHeight).
-      const x = HARMONY_PROGRESSION_CENTER_X + radius * Math.cos(angleRad);
-      const y =
-        HARMONY_PROGRESSION_CENTER_Y +
-        radius * VIEWPORT_ASPECT * Math.sin(angleRad);
-
       // Colour from root pitch class
       const hue = pcToHue(fc.rootPc, hueInvariant);
       const color: ColorHSVA = { h: hue, s: 0.7, v: 0.9, a: 1 };
 
-      // Build glyph geometry
-      const glyph = buildRomanNumeralGlyph(fc.roman);
-
-      entities.push({
-        id: `${this.id}:prog:${i}`,
-        part,
-        kind: "glyph",
-        createdAt: fc.onset,
-        updatedAt: t,
-        position: { x, y },
-        style: {
+      entities.push(
+        this.clockNumeral(`${this.id}:prog:${i}`, fc, tonicPc, mode, {
           color,
           opacity,
-          size: GLYPH_SIZE * scale,
-        },
-        data: {
-          type: "roman-numeral",
-          polylines: glyph.polylines,
-          arcs: glyph.arcs,
-          width: glyph.width,
-          height: glyph.height,
-          strokeWidth: strokeWidth * scale,
-        },
-      });
+          strokeWidth,
+          createdAt: fc.onset,
+          t,
+          part,
+        }),
+      );
     }
 
     return entities;
+  }
+
+  /**
+   * One Roman numeral on the clock. Angular position: 7 equally-spaced
+   * slots for diatonic degrees, with borrowed chords interpolated between
+   * adjacent diatonic positions by chromatic distance; borrowed chords sit
+   * on the outer ring so they read as outside the key.
+   */
+  private clockNumeral(
+    id: string,
+    chord: { rootPc: PitchClass; roman: string; borrowed: boolean },
+    tonicPc: PitchClass,
+    mode: ModeId,
+    look: {
+      color: ColorHSVA;
+      opacity: number;
+      strokeWidth: number;
+      createdAt: number;
+      t: number;
+      part: string;
+    },
+  ): Entity {
+    const semitonesFromTonic = (chord.rootPc - tonicPc + 12) % 12;
+    const angleDeg = modalWheelAngle(semitonesFromTonic, mode);
+    const angleRad = ((angleDeg - 90) * Math.PI) / 180; // -90 puts 0° at top
+    const radius =
+      CLOCK_RADIUS *
+      (chord.borrowed ? BORROWED_GLYPH_RADIUS_FRACTION : DIATONIC_GLYPH_RADIUS_FRACTION);
+    const scale = chord.borrowed ? BORROWED_SCALE : DIATONIC_SCALE;
+
+    // y is multiplied by VIEWPORT_ASPECT to compensate for the renderer's
+    // worldHeight < worldWidth — without this, numerals at 12/6 o'clock
+    // fall short of their ring (the ring uses worldWidth for both axes,
+    // the position scales y by worldHeight).
+    const x = HARMONY_PROGRESSION_CENTER_X + radius * Math.cos(angleRad);
+    const y =
+      HARMONY_PROGRESSION_CENTER_Y + radius * VIEWPORT_ASPECT * Math.sin(angleRad);
+
+    const glyph = buildRomanNumeralGlyph(chord.roman);
+    return {
+      id,
+      part: look.part,
+      kind: "glyph",
+      createdAt: look.createdAt,
+      updatedAt: look.t,
+      position: { x, y },
+      style: {
+        color: look.color,
+        opacity: look.opacity,
+        size: GLYPH_SIZE * scale,
+      },
+      data: {
+        type: "roman-numeral",
+        polylines: glyph.polylines,
+        arcs: glyph.arcs,
+        width: glyph.width,
+        height: glyph.height,
+        strokeWidth: look.strokeWidth * scale,
+      },
+    };
+  }
+
+  /**
+   * Always-on guide numerals (greyed, in the structure colour) for chords
+   * the key defines. A slot is skipped while a played numeral occupies it
+   * — held or still fading — so two different glyphs never overlap.
+   */
+  private createGuideNumerals(
+    chords: KeyChord[],
+    progression: FunctionalChord[],
+    t: number,
+    part: string,
+    tonicPc: PitchClass,
+    mode: ModeId,
+    fadeMs: number,
+    idPrefix: string,
+  ): Entity[] {
+    const slot = (rootPc: number, borrowed: boolean) =>
+      `${borrowed ? "b" : "d"}:${rootPc}`;
+    const occupied = new Set(
+      progression
+        .filter(
+          (fc) =>
+            fc.releaseTime === null ||
+            (t - fc.releaseTime >= 0 && t - fc.releaseTime < fadeMs),
+        )
+        .map((fc) => slot(fc.rootPc, fc.borrowed)),
+    );
+    return chords
+      .filter((c) => !occupied.has(slot(c.rootPc, c.borrowed)))
+      .map((c) =>
+        this.clockNumeral(`${this.id}:${idPrefix}-${slot(c.rootPc, c.borrowed)}`, c, tonicPc, mode, {
+          color: STRUCTURE_COLOR,
+          opacity: STRUCTURE_OPACITY,
+          strokeWidth: STROKE_WIDTH_FRESH,
+          createdAt: t,
+          t,
+          part,
+        }),
+      );
   }
 
   // ==========================================================================

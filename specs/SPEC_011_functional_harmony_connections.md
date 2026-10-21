@@ -54,6 +54,12 @@ All radii expressed as fractions of clock radius. The clock radius is derived fr
 
 Three guide rings define two annular bands. The diatonic band is 0.30 wide; the borrowed band is narrower in proportion to its smaller numerals (0.30 × BORROWED_SCALE / DIATONIC_SCALE ≈ 0.232). Numeral rings sit at the radial centre of each band, so numerals stay visually centred between guide rings.
 
+### Guide Numerals
+
+When a key is prescribed, the key's seven diatonic numerals (e.g. C major: I ii iii IV V vi vii°) are always drawn on the diatonic ring in the structure colour and opacity (same as the guide rings), as part of the clock's guides. Played numerals are drawn in colour on top. A guide is hidden while a played numeral occupies its slot (held or still fading), so two different glyphs never overlap (e.g. a played II major at ii's slot). Without a key no guide numerals are drawn and the chord name stands alone.
+
+The harmony stabilizer publishes the guides as `HarmonicContext.diatonicChords` (`KeyChord[]`: rootPc, roman, borrowed), so the lens never recomputes key theory.
+
 ### Slot Tick Marks
 
 Small radial ticks at each of the seven diatonic-ring slot angles, sized to mark the slot position even when no chord is currently played there. Helps hold the spatial structure in sparse states.
@@ -199,6 +205,8 @@ interface HarmonicContext {
   // ... existing fields ...
   /** Active functional edges (one per source chord, expires with source). */
   functionalEdges: FunctionalEdge[];
+  /** The key's diatonic triads for the clock's guide numerals (empty without a key). */
+  diatonicChords: KeyChord[];
 }
 ```
 

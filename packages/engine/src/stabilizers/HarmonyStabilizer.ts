@@ -37,6 +37,7 @@ import type {
   ModeId,
   ChordQuality,
   ChordInterpretationMode,
+  KeyChord,
 } from "@synesthetica/contracts";
 import {
   createEmptyMusicalFrame,
@@ -281,6 +282,15 @@ function formatRoman(
   }
 
   return prefix + base + suffix;
+}
+
+/** The key's diatonic triads as clock guides (degree order). */
+function diatonicKeyChords(table: DiatonicEntry[]): KeyChord[] {
+  return table.map((entry, i) => ({
+    rootPc: entry.rootPc as PitchClass,
+    roman: formatRoman(i + 1, entry.quality, false, 0),
+    borrowed: false,
+  }));
 }
 
 /**
@@ -736,6 +746,7 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
       currentFunction,
       functionalProgression: key ? [...this.progression] : [],
       functionalEdges,
+      diatonicChords: diatonicTable ? diatonicKeyChords(diatonicTable) : [],
     };
 
     return {

@@ -876,7 +876,7 @@ const concepts: SystemConceptAnnotation[] = [
   {
     term: "progression-clock",
     definition:
-      "The circular chord progression layout in the bottom cell of the harmony lens (also called the harmony clock). Chord numerals sit around a clock face by pitch-class angle (I at 0). When a key is prescribed, an inner ring shows diatonic degrees (I–vii) and an outer ring shows borrowed chords; connector arcs indicate modal-interchange relationships between them.",
+      "The circular chord progression layout in the bottom cell of the harmony lens (also called the harmony clock). Chord numerals sit around a clock face by pitch-class angle (I at 0). When a key is prescribed, an inner ring shows diatonic degrees (I–vii) and an outer ring shows borrowed chords; connector arcs indicate modal-interchange relationships between them. With a key set, the key's diatonic numerals are always shown greyed as guides; played chords appear in colour over them.",
     related: ["guide-ring", "connector-strip", "borrowed-chord", "modal-interchange"],
   },
 

@@ -17,6 +17,9 @@ An annular region within the harmony clock, bounded by guide rings. The harmony 
 **Diatonic ring**
 The inner guide band where chords whose roots are diatonic to the prescribed key sit. Contains seven equally-spaced angular slots, one per scale degree.
 
+**Guide numeral**
+A greyed diatonic numeral (structure colour and opacity) always shown on the diatonic ring when a key is prescribed, as part of the clock's guides. Played numerals draw in colour over it; a guide is hidden while a played numeral occupies its slot.
+
 **Slot**
 One of seven angular positions on the diatonic ring, spaced at 360/7 (approximately 51.4 degrees). Degree I sits at 12 o'clock, proceeding clockwise through VII.
 

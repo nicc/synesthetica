@@ -760,3 +760,26 @@ describe("defaultDissonanceAlgorithm", () => {
     expect(defaultDissonanceAlgorithm(chord)).toBeLessThanOrEqual(1.0);
   });
 });
+
+describe("HarmonyStabilizer diatonic chords (clock guides)", () => {
+  it("publishes the key's diatonic triads as Roman numerals", () => {
+    const stabilizer = new HarmonyStabilizer({ partId: "main" });
+    stabilizer.init();
+    const result = stabilizer.apply(
+      createTestRawFrame(1000),
+      createUpstreamFrame(1000, [], { root: 0 as PitchClass, mode: "ionian" }),
+    );
+    const chords = result.harmonicContext!.diatonicChords;
+    expect(chords.map((c) => c.roman)).toEqual(["I", "ii", "iii", "IV", "V", "vi", "vii°"]);
+    expect(chords.map((c) => c.rootPc)).toEqual([0, 2, 4, 5, 7, 9, 11]);
+    expect(chords.every((c) => !c.borrowed)).toBe(true);
+  });
+
+  it("publishes none without a key", () => {
+    const stabilizer = new HarmonyStabilizer({ partId: "main" });
+    stabilizer.init();
+    const result = stabilizer.apply(createTestRawFrame(1000), createUpstreamFrame(1000, []));
+    expect(result.harmonicContext!.diatonicChords).toEqual([]);
+  });
+});
+
