@@ -68,6 +68,9 @@ Vertical strip representing a played note. Width is constant (velocity is not ye
 **Overtone strip** (SPEC 010 §6)
 The rhythm-lens rendering of one partial with n ≥ 3. Partials 1, 2, 4 and 8 share the fundamental's pitch class in this octave-agnostic lens and are not drawn; other octave duplicates fold into the pitch class they land on (6 into 3). Placed at the partial's real pitch, not snapped to a pitch-class column. Wider and less opaque than a note strip, soft-edged; it must read as ethereal, never as a played note. Spans the same time extent as its fundamental's note strip and scrolls with it. Opacity is the partial level multiplied by the note strip's own opacity, so the ratio between the two holds as both fade. Overlapping overtone strips blend additively. Colour follows `system:harmonic-series:colour`: the landing pitch class by default, or the originating note. Surface: slow steam, like the surface of a cup of tea on a cold day. The haze curls and rises within the strip's footprint (inward breakup only), shares one field with coincident strips so they add as denser steam of the same kind, and breaks into sparse wisps as it ages. All overtone strips follow the same motion rules; motion carries no meaning.
 
+**Note-name legend**
+A fixed row of pitch names under the NOW line, one centred under each pitch-class column, in the NOW line's grey and the on-screen keyboard's monospace font. Spelling comes from the frame (key-aware; default sharps). Toggled by `rhythm:note-names` (on by default).
+
 **Overtone halo** (proposed name, RFC 012)
 The chord glyph's rendering of its tones' partials: a ring of steam just outside the longest spoke, beyond a gap of negative space, at each partial's angle; one set per distinct pitch class of the chord. Fixed shape, with density as the partial level. Same steam rules as overtone strips; fades with the glyph.
 

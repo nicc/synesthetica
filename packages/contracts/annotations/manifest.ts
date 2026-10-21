@@ -319,6 +319,23 @@ const macros: MacroAnnotation[] = [
   },
 
   {
+    id: "rhythm:note-names",
+    name: "Note names",
+    aliases: ["note labels", "pitch names", "column labels", "show note names"],
+    type: "toggle",
+    default: true, // matches RhythmLens macros.noteNames
+    affects: ["melody"],
+    notes: [
+      "Shows a fixed row of pitch names under the rhythm lens's NOW line, one centred under each pitch-class column, in the NOW line's grey. Spelling follows the prescribed key when one is set; otherwise system:note-names:spelling (sharps by default).",
+    ],
+    humanNotes: [
+      "Labels each column of the rhythm view with its note name, just under the NOW line.",
+      "With a key set, names follow the key's spelling; otherwise the default spelling under Advanced.",
+    ],
+    consumers: [{ kind: "lens", id: "rhythm-lens", macroKey: "noteNames" }],
+  },
+
+  {
     id: "rhythm:overtones",
     name: "Overtone strips",
     aliases: ["rhythm overtones", "overtones on the timeline", "overtone strips", "harmonic series on rhythm"],
@@ -417,6 +434,27 @@ const macros: MacroAnnotation[] = [
   // -----------------------------------------------------------------
   // Discrete — enum with labels
   // -----------------------------------------------------------------
+  {
+    id: "system:note-names:spelling",
+    name: "Default note spelling",
+    aliases: ["sharps or flats", "accidentals", "note spelling", "enharmonic spelling"],
+    type: "discrete",
+    enumValues: [
+      { value: "sharps", label: "sharps (C♯, D♯, F♯…)" },
+      { value: "flats", label: "flats (D♭, E♭, G♭…)" },
+    ],
+    default: "sharps", // matches MusicalVisualVocabulary.DEFAULT_CONFIG
+    affects: ["melody", "harmony"],
+    notes: [
+      "How note names are spelled when no key is prescribed. With a key set, names follow the key's own spelling (e.g. B♭ in F major, D♯ in E major) and this setting is not used.",
+      "Applies to the rhythm lens's note-name legend (rhythm:note-names).",
+    ],
+    humanNotes: [
+      "Whether note names use sharps or flats when no key is set. With a key, names follow the key.",
+    ],
+    consumers: [{ kind: "vocab", id: "musical-visual", macroKey: "system:note-names:spelling" }],
+  },
+
   {
     id: "rhythm:quantise-resolution",
     name: "Quantise resolution",
@@ -1011,6 +1049,14 @@ const lenses: LensAnnotation[] = [
       "rhythm:emphasis": {
         responsiveness: "strong",
         notes: "compound; fans to rhythm:pulse-intensity + rhythm:reference-linger",
+      },
+      "rhythm:note-names": {
+        responsiveness: "strong",
+        notes: "pitch-name legend under the NOW line",
+      },
+      "system:note-names:spelling": {
+        responsiveness: "moderate",
+        notes: "legend spelling when no key is set",
       },
       "rhythm:overtones": {
         responsiveness: "strong",

@@ -780,3 +780,32 @@ describe("RhythmLens snapshots", () => {
     expect(metrics.byType["streak"]).toBeGreaterThan(0);
   });
 });
+
+describe("RhythmLens note-name legend", () => {
+  it("shows one name per column under the NOW line by default, in the NOW line colour", () => {
+    const lens = new RhythmLens();
+    lens.init(ctx);
+    const scene = lens.update(createTestFrame(1000, {}), null);
+    const names = scene.entities.filter((e) => e.data?.type === "text-label");
+    expect(names.map((e) => e.data!.text)).toEqual(
+      ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"],
+    );
+    const nowLine = scene.entities.find((e) => e.data?.type === "now-line")!;
+    for (const e of names) {
+      expect(e.position!.y).toBeGreaterThan(0.85);
+      expect(e.data!.font).toBe("mono");
+    }
+    expect(names[0].style.color).toEqual(nowLine.style.color ?? names[0].style.color);
+    // Centred on the columns: C left of C♯ left of B
+    expect(names[0].position!.x).toBeLessThan(names[1].position!.x);
+  });
+
+  it("hides the legend when toggled off", () => {
+    const lens = new RhythmLens();
+    lens.init(ctx);
+    lens.setMacros({ noteNames: false });
+    const scene = lens.update(createTestFrame(1000, {}), null);
+    expect(scene.entities.some((e) => e.data?.type === "text-label")).toBe(false);
+  });
+});
+

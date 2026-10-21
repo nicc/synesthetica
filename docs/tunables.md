@@ -46,6 +46,8 @@ Only RhythmLens exposes true macros at the moment. The others are configured ent
 | `GRID_COLORS.barLine` | `{h:200,s:0.3,v:0.6,a:0.5}` | Bar grid line colour | ⭐ | 🎵 | cosmetic | internal |
 | `GRID_COLORS.nowLine` | `{h:0,s:0,v:0.8,a:0.6}` | NOW line colour | ⭐⭐ | 🎵 | cosmetic | internal |
 | `GRID_COLORS.referenceLine` | `{h:0,s:0,v:0.9,a:0.7}` | Per-note reference line colour | ⭐⭐ | 🎵🎵 | cosmetic | internal |
+| `NOTE_NAME_FONT_SCALE` | 0.8 | Note-name legend size as a multiple of the on-screen keyboard's 12px labels (matched at a 900px-tall window; scales with the window) | ⭐⭐ | 🎵 | cosmetic | internal |
+| `NOTE_NAME_GAP` | 0.6 | Gap between the NOW line and the note names, world units | ⭐ | — | layout | internal |
 | `OVERTONE_WIDTH_RATIO` | 2.5 | Overtone strip width as a multiple of note-strip width (RFC 012). Must exceed 1 so a coincident partial is not hidden behind the note strip it reinforces | ⭐⭐ | 🎵🎵 | cosmetic | internal |
 | `OVERTONE_CULL_OPACITY` | 0.02 | Overtone strips whose brighter end is below this are not emitted | ⭐ | 🎵 | cosmetic | internal |
 | `OVERTONE_EDGE_SOFTNESS` | 1.0 | Horizontal edge falloff of overtone strips, 0 hard .. 1 soft from centre; passed to the renderer as `data.edgeSoftness` | ⭐⭐ | 🎵 | cosmetic | internal |

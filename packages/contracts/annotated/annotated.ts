@@ -445,6 +445,14 @@ export interface AnnotatedMusicalFrame {
   hueInvariant: PitchHueInvariant;
 
   /**
+   * Display name for each pitch class (index = pitch class), with music
+   * symbols (♯ ♭). Key-aware when a key is prescribed; otherwise follows
+   * the default spelling (system:note-names:spelling). The vocabulary is
+   * the single source of note spelling for lenses.
+   */
+  pitchClassNames: string[];
+
+  /**
    * Harmonic context including tension analysis.
    * See HarmonicContext for tier 1 (key-agnostic) vs tier 2 (key-aware) behavior.
    */

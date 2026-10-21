@@ -150,6 +150,15 @@ The vocabulary annotates each note with the partials of the harmonic series it i
 - Velocity brightening is not applied.
 - **Chord glyph:** the chord's own tones (once per distinct pitch class; octave doubling ignored) show steam in a ring just outside the glyph's longest spoke, separated from it by a gap of negative space, at each partial's angle — 30° per semitone from the root, cents included. Angle carries pitch; spoke length does not apply (partials are not chord tones): the steam has a fixed radial length and fades outward, and the gap keeps it visibly separate from the spokes. Density is the partial level; overlapping partials add. Steam fades with the glyph and breaks into wisps as it fades. The shape geometry (I18) is unchanged; partials sit beside it on `AnnotatedChord.partials`.
 
+### 7. Note Names
+
+The vocabulary is the single source of note spelling. It annotates each frame with `pitchClassNames` (index = pitch class) using music symbols (♯ ♭):
+
+- With a prescribed key, names follow the key's spelling (`utils/pitchSpelling.buildSpellingTable`): B♭ in F major, D♯ in E major.
+- Without a key, names follow `system:note-names:spelling` (`sharps` default, or `flats`).
+
+Lenses display names from the frame and never spell pitches themselves. The rhythm lens shows a note-name legend under the NOW line (`rhythm:note-names`, on by default).
+
 ## Chord Interpretation Modes
 
 Every played voicing admits multiple valid readings. A voicing like

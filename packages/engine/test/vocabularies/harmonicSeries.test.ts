@@ -202,3 +202,27 @@ describe("MusicalVisualVocabulary chord partials (glyph)", () => {
     expect(fifth().color.h).toBe(pcToHue(0, hueConfig));
   });
 });
+
+describe("MusicalVisualVocabulary pitch-class names", () => {
+  const frame = (key: { root: PitchClass; mode: "ionian" | "aeolian" } | null) =>
+    createTestMusicalFrame(0, "main", { prescribedKey: key });
+
+  it("defaults to sharps with music symbols", () => {
+    const names = new MusicalVisualVocabulary().annotate(frame(null)).pitchClassNames;
+    expect(names).toEqual(["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"]);
+  });
+
+  it("switches the default to flats", () => {
+    const vocab = new MusicalVisualVocabulary();
+    vocab.setMacro("system:note-names:spelling", "flats");
+    expect(vocab.annotate(frame(null)).pitchClassNames[10]).toBe("B♭");
+    expect(vocab.readMacros()["system:note-names:spelling"]).toBe("flats");
+  });
+
+  it("follows the key when one is prescribed, overriding the default", () => {
+    const vocab = new MusicalVisualVocabulary(); // sharps by default
+    expect(vocab.annotate(frame({ root: 5, mode: "ionian" })).pitchClassNames[10]).toBe("B♭"); // F major
+    vocab.setMacro("system:note-names:spelling", "flats");
+    expect(vocab.annotate(frame({ root: 4, mode: "ionian" })).pitchClassNames[3]).toBe("D♯"); // E major
+  });
+});

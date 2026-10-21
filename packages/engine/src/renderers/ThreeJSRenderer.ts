@@ -387,6 +387,19 @@ const GLYPH_STEAM_FRAGMENT = `
 `;
 
 // ============================================================================
+// Text labels
+// ============================================================================
+
+/** Font stacks for text-label entities. "mono" matches the on-screen
+ *  keyboard (web-app index.html .syn-onscreen-key). */
+const TEXT_LABEL_MONO_FONT = "ui-monospace, SFMono-Regular, monospace";
+const TEXT_LABEL_SANS_FONT = `"Lucida Sans Unicode", "Lucida Grande", "Lucida Sans", sans-serif`;
+
+/** Canvas rasterisation size for text labels (pixels); mipmaps keep it
+ *  crisp when scaled down. */
+const TEXT_LABEL_CANVAS_PX = 64;
+
+// ============================================================================
 // Renderer Implementation
 // ============================================================================
 
@@ -1497,6 +1510,8 @@ export class ThreeJSRenderer implements IRenderer {
 
     if (glyphType === "chord-shape") {
       this.updateChordShape(entity);
+    } else if (glyphType === "text-label") {
+      this.updateTextLabel(entity);
     } else if (glyphType === "chord-label") {
       this.updateChordLabel(entity);
     } else if (glyphType === "tension-bar") {
@@ -2300,6 +2315,104 @@ export class ThreeJSRenderer implements IRenderer {
 
     const material = mesh.material as THREE.MeshBasicMaterial;
     material.opacity = entity.style.opacity ?? 1;
+  }
+
+  // ==========================================================================
+  // Text Labels
+  // ==========================================================================
+
+  /**
+   * Render a single-line text label (note names, interval names).
+   *
+   * Entity contract:
+   * - data.text: the string (music symbols allowed)
+   * - data.font: "mono" (the on-screen keyboard's monospace stack) or
+   *   omitted for the default sans
+   * - data.anchor: "center" (default) or "baseline" — the position is the
+   *   centre of the text, or the centre of its baseline
+   * - data.rotationDeg: clock-style rotation (clockwise, degrees) about
+   *   the anchor; 0 = upright
+   * - style.size: line height in world units (cap height to descender)
+   * - style.color / style.opacity: fill colour; colour alpha multiplies
+   *   opacity (structural greys are defined as translucent colours)
+   */
+  private updateTextLabel(entity: Entity): void {
+    if (!this.scene || typeof document === "undefined") return;
+    const text = entity.data?.text as string | undefined;
+    if (!text) return;
+
+    const font = (entity.data?.font as string | undefined) === "mono"
+      ? TEXT_LABEL_MONO_FONT
+      : TEXT_LABEL_SANS_FONT;
+    const anchor = (entity.data?.anchor as string | undefined) ?? "center";
+    const lineHeight = entity.style.size ?? 1;
+    const cacheKey = `${text}|${font}|${anchor}|${lineHeight}`;
+
+    let mesh = this.entityObjects.get(entity.id) as THREE.Mesh | undefined;
+    if (!mesh || mesh.userData?.textLabelKey !== cacheKey) {
+      if (mesh) {
+        this.scene.remove(mesh);
+        this.disposeObject(mesh);
+      }
+      const canvasFont = `${TEXT_LABEL_CANVAS_PX}px ${font}`;
+      const measure = document.createElement("canvas").getContext("2d");
+      if (!measure) return;
+      measure.font = canvasFont;
+      // Fixed reference metrics so every label shares one text-to-world
+      // ratio regardless of its own ink (see updateChordLabel).
+      const ref = measure.measureText("Hg♭♯");
+      const ascent = ref.actualBoundingBoxAscent || TEXT_LABEL_CANVAS_PX * 0.75;
+      const descent = ref.actualBoundingBoxDescent || TEXT_LABEL_CANVAS_PX * 0.25;
+      const lineHeightPx = Math.ceil(ascent + descent);
+      const padding = 8;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(measure.measureText(text).width) + padding * 2;
+      canvas.height = lineHeightPx + padding * 2;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.font = canvasFont;
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+      const baselinePx = padding + ascent;
+      ctx.fillText(text, canvas.width / 2, baselinePx);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = true;
+      texture.anisotropy = this.renderer?.capabilities?.getMaxAnisotropy?.() ?? 1;
+      texture.needsUpdate = true;
+
+      const pxToWorld = lineHeight / lineHeightPx;
+      const planeW = canvas.width * pxToWorld;
+      const planeH = canvas.height * pxToWorld;
+      const geometry = new THREE.PlaneGeometry(planeW, planeH);
+      if (anchor === "baseline") {
+        // Move the baseline's centre to the origin so position and
+        // rotation are about the baseline.
+        geometry.translate(0, -(planeH / 2 - baselinePx * pxToWorld), 0);
+      }
+      const material = new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+      });
+      mesh = new THREE.Mesh(geometry, material);
+      mesh.userData = { textLabelKey: cacheKey };
+      this.scene.add(mesh);
+      this.entityObjects.set(entity.id, mesh);
+    }
+
+    const worldX = (entity.position?.x ?? 0.5) * this.config.worldWidth;
+    const worldY = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
+    mesh.position.set(worldX, worldY, 0.05);
+    mesh.rotation.z = -(((entity.data?.rotationDeg as number) ?? 0) * Math.PI) / 180;
+
+    const color = entity.style.color ?? { h: 0, s: 0, v: 1, a: 1 };
+    const material = mesh.material as THREE.MeshBasicMaterial;
+    material.color.copy(this.hsvToThreeColor(color));
+    material.opacity = (entity.style.opacity ?? 1) * (color.a ?? 1);
   }
 
   // ==========================================================================

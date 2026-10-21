@@ -108,6 +108,23 @@ const OVERTONE_EDGE_SOFTNESS = 1.0;
  *  same axis in this lens. */
 const dissipationAt = (y: number): number => 1 - Math.min(Math.max(y, 0) / NOW_LINE_Y, 1);
 
+/** Note-name legend under the NOW line (rhythm:note-names). Size is a
+ *  multiple of the on-screen keyboard's 12px labels, matched at a
+ *  900px-tall window; like the rest of the view it scales with the
+ *  window rather than staying a fixed pixel size. */
+const NOTE_NAME_FONT_SCALE = 0.8;
+const KEYBOARD_FONT_PX = 12;
+const REFERENCE_VIEWPORT_PX = 900;
+/** Renderer world height (ThreeJSRenderer default); converts world-unit
+ *  text sizes to the lens's normalized y. */
+const ASSUMED_WORLD_HEIGHT = 75;
+/** Note-name line height in world units. */
+const NOTE_NAME_SIZE =
+  (NOTE_NAME_FONT_SCALE * KEYBOARD_FONT_PX * ASSUMED_WORLD_HEIGHT) /
+  REFERENCE_VIEWPORT_PX;
+/** Gap between the NOW line and the top of the note names, world units. */
+const NOTE_NAME_GAP = 0.6;
+
 // Grid colors
 const GRID_COLORS = {
   beatLine: { h: 200, s: 0.2, v: 0.5, a: 0.4 } as ColorHSVA,
@@ -163,6 +180,8 @@ interface RhythmLensMacros {
    *  overlay, RFC 012). Lens-level so the rhythm lens and the chord glyph
    *  can be toggled independently. */
   overtones: boolean;
+  /** Show the note-name legend under the NOW line. */
+  noteNames: boolean;
 }
 
 /**
@@ -206,6 +225,7 @@ export class RhythmLens implements IVisualLens {
     tightnessTolerance: TIGHT_TOLERANCE_DEFAULT_MS,
     pulseIntensity: PULSE_INTENSITY_DEFAULT,
     overtones: false,
+    noteNames: true,
   };
 
   /** Drift frozen at first computation per note. Ensures referential transparency:
@@ -256,6 +276,11 @@ export class RhythmLens implements IVisualLens {
 
     // Always render NOW line
     entities.push(this.createNowLine(t, part, prescribed));
+
+    // Note-name legend: one name per pitch-class column, under the NOW line
+    if (this.macros.noteNames) {
+      entities.push(...this.createNoteNames(input.pitchClassNames, t, part));
+    }
 
     // Render grid lines (visibility controlled by horizon)
     if (tier >= 2) {
@@ -734,6 +759,27 @@ export class RhythmLens implements IVisualLens {
     });
 
     return entities;
+  }
+
+  // ============================================================================
+  // Note-Name Legend
+  // ============================================================================
+
+  /** A fixed row of pitch names centred under each column, in the NOW
+   *  line's colour. Spelling comes from the vocabulary (key-aware). */
+  private createNoteNames(names: string[], t: number, part: string): Entity[] {
+    const y =
+      NOW_LINE_Y + (NOTE_NAME_GAP + NOTE_NAME_SIZE / 2) / ASSUMED_WORLD_HEIGHT;
+    return names.map((name, pc) => ({
+      id: this.entityId(`note-name-${pc}`),
+      part,
+      kind: "glyph" as const,
+      createdAt: t,
+      updatedAt: t,
+      position: { x: this.pitchClassToX(pc as PitchClass), y },
+      style: { color: GRID_COLORS.nowLine, size: NOTE_NAME_SIZE, opacity: 1 },
+      data: { type: "text-label", text: name, font: "mono", anchor: "center" },
+    }));
   }
 
   // ============================================================================
