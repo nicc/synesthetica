@@ -782,7 +782,7 @@ describe("RhythmLens snapshots", () => {
 });
 
 describe("RhythmLens note-name legend", () => {
-  it("shows one name per column under the NOW line by default, in the NOW line colour", () => {
+  it("shows one name per column under the NOW line by default, in the NOW line grey", () => {
     const lens = new RhythmLens();
     lens.init(ctx);
     const scene = lens.update(createTestFrame(1000, {}), null);
@@ -795,7 +795,9 @@ describe("RhythmLens note-name legend", () => {
       expect(e.position!.y).toBeGreaterThan(0.85);
       expect(e.data!.font).toBe("mono");
     }
-    expect(names[0].style.color).toEqual(nowLine.style.color ?? names[0].style.color);
+    // The NOW line's grey, at the higher structural-text opacity
+    const { h, s, v } = nowLine.style.color!;
+    expect(names[0].style.color).toMatchObject({ h, s, v, a: 0.9 });
     // Centred on the columns: C left of C♯ left of B
     expect(names[0].position!.x).toBeLessThan(names[1].position!.x);
   });

@@ -47,6 +47,9 @@ Only RhythmLens exposes true macros at the moment. The others are configured ent
 | `GRID_COLORS.nowLine` | `{h:0,s:0,v:0.8,a:0.6}` | NOW line colour | ⭐⭐ | 🎵 | cosmetic | internal |
 | `GRID_COLORS.referenceLine` | `{h:0,s:0,v:0.9,a:0.7}` | Per-note reference line colour | ⭐⭐ | 🎵🎵 | cosmetic | internal |
 | `NOTE_NAME_FONT_SCALE` | 0.8 | Note-name legend size as a multiple of the on-screen keyboard's 12px labels (matched at a 900px-tall window; scales with the window) | ⭐⭐ | 🎵 | cosmetic | internal |
+| `STRUCTURAL_TEXT_ALPHA` (layout.ts) | 0.9 | Opacity of note names and interval names (the NOW line's grey, more opaque than the line's 0.6 for legibility) | ⭐⭐ | — | cosmetic | internal |
+| `TEXT_LABEL_FONT_WEIGHT` (ThreeJSRenderer) | 600 | Weight of text labels; heavier keeps small letters distinct | ⭐⭐ | — | cosmetic | internal |
+| `TEXT_LABEL_ACCIDENTAL_SCALE` (ThreeJSRenderer) | 1.1 | Size of ♭/♯ (drawn in the Lucida stack) relative to the letters | ⭐ | — | cosmetic | internal |
 | `NOTE_NAME_GAP` | 0.6 | Gap between the NOW line and the note names, world units | ⭐ | — | layout | internal |
 | `INTERVAL_NAME_FONT_SCALE` (HarmonyLens) | 0.8 | Interval-name dial size as a multiple of the on-screen keyboard's 12px labels (independent of note names) | ⭐⭐ | 🎵 | cosmetic | internal |
 | `INTERVAL_NAME_BASELINE_OFFSET` (HarmonyLens) | 0 | Radial nudge of the dial's baselines from the steam ring's inner edge (normalized) | ⭐ | — | layout | internal |

@@ -399,6 +399,16 @@ const TEXT_LABEL_SANS_FONT = `"Lucida Sans Unicode", "Lucida Grande", "Lucida Sa
  *  crisp when scaled down. */
 const TEXT_LABEL_CANVAS_PX = 64;
 
+/** Font weight for text labels. Thin strokes lose contrast when the
+ *  canvas is scaled down to ~10px on screen; a heavier weight keeps
+ *  similar letters (E/F) distinct. */
+const TEXT_LABEL_FONT_WEIGHT = 600;
+
+/** ♭ and ♯ are drawn in the sans stack (Lucida has real music symbols;
+ *  the monospace stack falls back to a tiny glyph), scaled by this
+ *  relative to the letters. */
+const TEXT_LABEL_ACCIDENTAL_SCALE = 1.1;
+
 // ============================================================================
 // Renderer Implementation
 // ============================================================================
@@ -2354,28 +2364,51 @@ export class ThreeJSRenderer implements IRenderer {
         this.scene.remove(mesh);
         this.disposeObject(mesh);
       }
-      const canvasFont = `${TEXT_LABEL_CANVAS_PX}px ${font}`;
+      const canvasFont = `${TEXT_LABEL_FONT_WEIGHT} ${TEXT_LABEL_CANVAS_PX}px ${font}`;
+      const accidentalFont = `${TEXT_LABEL_FONT_WEIGHT} ${Math.round(
+        TEXT_LABEL_CANVAS_PX * TEXT_LABEL_ACCIDENTAL_SCALE,
+      )}px ${TEXT_LABEL_SANS_FONT}`;
       const measure = document.createElement("canvas").getContext("2d");
       if (!measure) return;
-      measure.font = canvasFont;
       // Fixed reference metrics so every label shares one text-to-world
       // ratio regardless of its own ink (see updateChordLabel).
-      const ref = measure.measureText("Hg♭♯");
+      measure.font = canvasFont;
+      const ref = measure.measureText("Hg");
       const ascent = ref.actualBoundingBoxAscent || TEXT_LABEL_CANVAS_PX * 0.75;
       const descent = ref.actualBoundingBoxDescent || TEXT_LABEL_CANVAS_PX * 0.25;
       const lineHeightPx = Math.ceil(ascent + descent);
+
+      // Split into letter runs and accidental runs; accidentals use the
+      // sans font so they render as real music symbols.
+      const runs: Array<{ text: string; font: string; width: number }> = [];
+      for (const ch of text) {
+        const runFont = ch === "♭" || ch === "♯" ? accidentalFont : canvasFont;
+        const last = runs[runs.length - 1];
+        if (last && last.font === runFont) last.text += ch;
+        else runs.push({ text: ch, font: runFont, width: 0 });
+      }
+      for (const run of runs) {
+        measure.font = run.font;
+        run.width = measure.measureText(run.text).width;
+      }
+      const textWidth = runs.reduce((sum, r) => sum + r.width, 0);
+
       const padding = 8;
       const canvas = document.createElement("canvas");
-      canvas.width = Math.ceil(measure.measureText(text).width) + padding * 2;
+      canvas.width = Math.ceil(textWidth) + padding * 2;
       canvas.height = lineHeightPx + padding * 2;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-      ctx.font = canvasFont;
       ctx.fillStyle = "#ffffff";
-      ctx.textAlign = "center";
+      ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
       const baselinePx = padding + ascent;
-      ctx.fillText(text, canvas.width / 2, baselinePx);
+      let cursor = (canvas.width - textWidth) / 2;
+      for (const run of runs) {
+        ctx.font = run.font;
+        ctx.fillText(run.text, cursor, baselinePx);
+        cursor += run.width;
+      }
 
       const texture = new THREE.CanvasTexture(canvas);
       texture.minFilter = THREE.LinearMipmapLinearFilter;

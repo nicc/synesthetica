@@ -49,7 +49,7 @@ import { buildRomanNumeralGlyph } from "../utils/RomanNumeralGlyphBuilder";
 import {
   HARMONY_CHORD_CENTER_X,
   HARMONY_CHORD_CENTER_Y,
-  NOW_LINE_COLOR,
+  STRUCTURAL_TEXT_COLOR,
   keyboardRelativeTextSize,
   HARMONY_PROGRESSION_CENTER_X,
   HARMONY_PROGRESSION_CENTER_Y,
@@ -801,7 +801,7 @@ export class HarmonyLens implements IVisualLens {
           x: HARMONY_CHORD_CENTER_X + r * Math.sin(a),
           y: HARMONY_CHORD_CENTER_Y - r * VIEWPORT_ASPECT * Math.cos(a),
         },
-        style: { color: NOW_LINE_COLOR, size: INTERVAL_NAME_SIZE, opacity: 1 },
+        style: { color: STRUCTURAL_TEXT_COLOR, size: INTERVAL_NAME_SIZE, opacity: 1 },
         data: {
           type: "text-label",
           text: name,

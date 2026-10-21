@@ -145,8 +145,15 @@ export const GLYPH_STEAM_BAND_RADIUS =
 // Structural text (note names, interval names)
 // ----------------------------------------------------------------------------
 
-/** The NOW line's translucent grey, shared by structural text labels. */
+/** The NOW line's translucent grey. */
 export const NOW_LINE_COLOR = { h: 0, s: 0, v: 0.8, a: 0.6 };
+
+/** Opacity for structural text (note names, interval names). Text needs
+ *  more than the NOW line's 0.6 to stay legible at ~10px. */
+export const STRUCTURAL_TEXT_ALPHA = 0.9;
+
+/** The NOW line's grey at text opacity. */
+export const STRUCTURAL_TEXT_COLOR = { ...NOW_LINE_COLOR, a: STRUCTURAL_TEXT_ALPHA };
 
 /** On-screen keyboard label size (web-app .syn-onscreen-key) and the
  *  window height at which world-unit text matches it. Text in the

@@ -44,6 +44,7 @@ import {
   RHYTHM_LEFT,
   RHYTHM_RIGHT,
   NOW_LINE_COLOR,
+  STRUCTURAL_TEXT_COLOR,
   ASSUMED_WORLD_HEIGHT,
   keyboardRelativeTextSize,
 } from "./layout";
@@ -776,7 +777,7 @@ export class RhythmLens implements IVisualLens {
       createdAt: t,
       updatedAt: t,
       position: { x: this.pitchClassToX(pc as PitchClass), y },
-      style: { color: GRID_COLORS.nowLine, size: NOTE_NAME_SIZE, opacity: 1 },
+      style: { color: STRUCTURAL_TEXT_COLOR, size: NOTE_NAME_SIZE, opacity: 1 },
       data: { type: "text-label", text: name, font: "mono", anchor: "center" },
     }));
   }
