@@ -401,7 +401,7 @@ export class HarmonyLens implements IVisualLens {
     linger: PROGRESSION_FADE_VALUE,
     overtones: true,
     modalInterchangeHints: false,
-    intervalNames: false,
+    intervalNames: true,
   };
 
   // Fade-out state: when no chord is active, keep rendering the most

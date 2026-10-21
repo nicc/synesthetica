@@ -194,8 +194,10 @@ describe("HarmonyLens", () => {
       const frame = createTestFrame(1000, null, 0);
       const scene = lens.update(frame, null);
 
-      // No chord shape, no tension bar (disabled by default)
-      expect(scene.entities.length).toBe(0);
+      // No chord shape, no tension bar (disabled by default); only the
+      // interval-name dial, which is structural and on by default
+      expect(scene.entities.some((e) => e.data?.type === "chord-shape")).toBe(false);
+      expect(scene.entities.every((e) => e.id.includes(":interval-name-"))).toBe(true);
     });
   });
 
@@ -1098,8 +1100,11 @@ describe("HarmonyLens interval-name dial", () => {
   const dial = (lens: HarmonyLens) =>
     lens.update(createTestFrame(1000, null, 0), null).entities.filter((e) => e.id.includes(":interval-name-"));
 
-  it("is off by default", () => {
-    expect(dial(new HarmonyLens())).toHaveLength(0);
+  it("is on by default, and can be turned off", () => {
+    expect(dial(new HarmonyLens())).toHaveLength(12);
+    const lens = new HarmonyLens();
+    lens.setMacros({ intervalNames: false });
+    expect(dial(lens)).toHaveLength(0);
   });
 
   it("labels all twelve angles, R upright at the top and d5 upside down at the bottom", () => {

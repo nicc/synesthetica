@@ -129,7 +129,7 @@ template that covers triads and common 7ths only. Future work: alterations
 (♭9, ♯9, ♯11) should be classified as lines even when present in
 `chordTones` — tracked under the chord-detection umbrella.
 
-**Interval-name dial (optional, `harmony:interval-names`, default off):** a fixed dial of simple-interval names at the spoke angles — R m2 M2 m3 M3 P4 d5 P5 m6 M6 m7 M7 — with each label's baseline on the inner edge of the overtone steam ring and rotated to its angle (R upright at the top, d5 upside down at the bottom). Drawn in the NOW line's grey whatever the chord, as structure; colour stays with the spokes and steam. The dial names pitch distance from the root, so chord-specific spellings (♯5, 9, 11, 13) read under their simple-interval angle.
+**Interval-name dial (optional, `harmony:interval-names`, default on):** a fixed dial of simple-interval names at the spoke angles — R m2 M2 m3 M3 P4 d5 P5 m6 M6 m7 M7 — with each label's baseline on the inner edge of the overtone steam ring and rotated to its angle (R upright at the top, d5 upside down at the bottom). Drawn in the NOW line's grey whatever the chord, as structure; colour stays with the spokes and steam. The dial names pitch distance from the root, so chord-specific spellings (♯5, 9, 11, 13) read under their simple-interval angle.
 
 ### 6. Harmonic Series Overlay
 

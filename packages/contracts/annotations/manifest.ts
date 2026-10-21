@@ -377,7 +377,7 @@ const macros: MacroAnnotation[] = [
     name: "Interval names",
     aliases: ["interval labels", "chord dial", "interval dial", "show intervals"],
     type: "toggle",
-    default: false, // matches HarmonyLens macros.intervalNames
+    default: true, // matches HarmonyLens macros.intervalNames
     affects: ["harmony"],
     notes: [
       "A fixed dial of simple-interval names around the chord glyph, one per semitone from the root at the spoke angles: R m2 M2 m3 M3 P4 d5 P5 m6 M6 m7 M7. R is upright at the top; d5 is upside down at the bottom. Labels sit on the inner edge of the overtone steam ring, in the NOW line's grey.",
