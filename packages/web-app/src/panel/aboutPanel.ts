@@ -37,9 +37,30 @@ marked.setOptions({
   breaks: true,
 });
 
+/**
+ * Narrow screens (phones, including landscape) get a warning strip on
+ * the About page and see About on every load. Keep in sync with the
+ * @media rule for .syn-about-mobile-warning in index.html.
+ */
+export const NARROW_SCREEN_QUERY = "(max-width: 767px), (max-height: 499px)";
+
+export function isNarrowScreen(): boolean {
+  try {
+    return window.matchMedia(NARROW_SCREEN_QUERY).matches;
+  } catch {
+    return false;
+  }
+}
+
 export async function buildAboutPanel(): Promise<HTMLElement> {
   const wrap = document.createElement("div");
   wrap.className = "syn-about";
+
+  // Not-built-for-mobile warning; hidden by CSS except on narrow screens.
+  const warning = document.createElement("p");
+  warning.className = "syn-about-mobile-warning";
+  warning.textContent = "This app is not built for mobile, please view on desktop.";
+  wrap.appendChild(warning);
 
   // User-facing intro (short, prose, points at repo for depth).
   wrap.appendChild(renderMarkdown(aboutMd));

@@ -45,7 +45,7 @@ import {
 import { renderPanel, type RenderedPanel } from "./panel/renderPanel.js";
 import { bindPanelToEngine } from "./panel/bindPanel.js";
 import { mountPanelShell } from "./panel/panelShell.js";
-import { buildAboutPanel } from "./panel/aboutPanel.js";
+import { buildAboutPanel, isNarrowScreen } from "./panel/aboutPanel.js";
 import { startWsReceiver, type WsReceiverHandle } from "./engine/wsReceiver.js";
 import {
   attachRecentEventsBuffer,
@@ -912,8 +912,9 @@ function mountPanels(): void {
   // First-ever load: open About as the orientation gesture. Any
   // dismissal (X / ESC / click-outside / tab-swap) then flips the
   // localStorage flag via onOpenChange above, so subsequent loads
-  // leave About untouched.
-  if (!hasSeenAbout()) {
+  // leave About untouched. Narrow screens always see About, which
+  // carries the not-built-for-mobile warning.
+  if (!hasSeenAbout() || isNarrowScreen()) {
     shell.open("about");
   }
 }
