@@ -364,6 +364,10 @@ interface HarmonyLensMacros {
    *  - Without tempo: value is in seconds (default 3 s)
    *  Matches PROGRESSION_FADE_VALUE's semantic. */
   linger: number;
+  /** Draw the chord glyph's overtone halo (harmonic series overlay,
+   *  RFC 012). Lens-level so the glyph and the rhythm lens can be
+   *  toggled independently. */
+  overtones: boolean;
 }
 
 export class HarmonyLens implements IVisualLens {
@@ -374,6 +378,7 @@ export class HarmonyLens implements IVisualLens {
 
   private macros: HarmonyLensMacros = {
     linger: PROGRESSION_FADE_VALUE,
+    overtones: true,
   };
 
   // Fade-out state: when no chord is active, keep rendering the most
@@ -480,7 +485,7 @@ export class HarmonyLens implements IVisualLens {
           // Harmonic series overlay (RFC 012): a ring of steam around the
           // glyph at each partial's angle. Breaks into wisps as
           // the glyph fades.
-          partials: chord.partials,
+          partials: this.macros.overtones ? chord.partials : undefined,
           overtoneDissipation: 1 - chordOpacity,
         },
       });

@@ -159,6 +159,10 @@ interface RhythmLensMacros {
    *  duration + amplitude of the pulse on the NOW line; 0.5 preserves
    *  the historic baseline exactly. */
   pulseIntensity: number;
+  /** Draw overtone strips for annotated partials (harmonic series
+   *  overlay, RFC 012). Lens-level so the rhythm lens and the chord glyph
+   *  can be toggled independently. */
+  overtones: boolean;
 }
 
 /**
@@ -201,6 +205,7 @@ export class RhythmLens implements IVisualLens {
     referenceLinger: DEFAULT_REFERENCE_LINGER_MULTIPLIER,
     tightnessTolerance: TIGHT_TOLERANCE_DEFAULT_MS,
     pulseIntensity: PULSE_INTENSITY_DEFAULT,
+    overtones: false,
   };
 
   /** Drift frozen at first computation per note. Ensures referential transparency:
@@ -753,7 +758,7 @@ export class RhythmLens implements IVisualLens {
       bottomOpacity: number;
     },
   ): Entity[] {
-    if (!an.partials) return [];
+    if (!this.macros.overtones || !an.partials) return [];
     const note = an.note;
     const entities: Entity[] = [];
     // How far the timeline has scrolled since t = 0, so the renderer can

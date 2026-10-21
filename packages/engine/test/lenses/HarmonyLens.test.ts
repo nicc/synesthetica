@@ -993,5 +993,17 @@ describe("HarmonyLens glyph overtones (RFC 012)", () => {
     expect(fading.data!.overtoneDissipation as number).toBeGreaterThan(0);
     expect(fading.data!.overtoneDissipation as number).toBeCloseTo(1 - (fading.style.opacity ?? 1), 9);
   });
-});
 
+  it("withholds partials when the glyph toggle is off; on by default", () => {
+    const lens = new HarmonyLens();
+    expect(lens.readMacros().overtones).toBe(true);
+    lens.setMacros({ overtones: false });
+    const c = createTestChord(0 as PitchClass, "maj", [0, 4, 7]);
+    const partials = [
+      { n: 3, pc: 7 as PitchClass, cents: 2, level: 0.3, color: { h: 210, s: 0.8, v: 0.8, a: 1 }, sourcePc: 0 as PitchClass, angle: 210.6 },
+    ];
+    const shape = lens.update(createTestFrame(1000, { ...c, partials }, 0), null)
+      .entities.find((e) => e.data?.type === "chord-shape")!;
+    expect(shape.data!.partials).toBeUndefined();
+  });
+});

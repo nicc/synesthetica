@@ -140,7 +140,6 @@ The "vocabulary" is the ruleset that maps musical events to visual style. It has
 | `referencePc` | 0 (C) | Which pitch class anchors the hue wheel | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | internal |
 | `referenceHue` | 0 (red) | Which colour = referencePc | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | system:colour-mapping:reference |
 | `hueDirection` | "cw" | Chromatic step direction on the colour wheel | ⭐⭐⭐ | 🎵🎵🎵 | interpretive |system:colour-mapping:direction |
-| `harmonicSeriesEnabled` | false | Harmonic series overlay on/off (RFC 012) | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | system:harmonic-series:enabled |
 | `harmonicSeriesLevel` | 0.2 | Harmonic series overlay level while enabled; 0 annotates no partials | ⭐⭐⭐ | 🎵🎵🎵 | interpretive | system:harmonic-series:level |
 | `harmonicSeriesRolloff` | 0.15 | Partial level exponent, n^(−rolloff) | ⭐⭐ | 🎵🎵 | interpretive | system:harmonic-series:rolloff |
 | `partialColourMode` | "pitch" | Overtone strip hue: landing pitch class or originating note | ⭐⭐ | 🎵🎵 | interpretive | system:harmonic-series:colour |

@@ -60,19 +60,19 @@ describe("set_macro — toggle", () => {
   const engine = new StubEngineHandle();
 
   it("defaults to the manifest value and accepts a boolean", async () => {
-    expect((await engine.getStateSnapshot()).macros.intents["system:harmonic-series:enabled"]).toBe(false);
+    expect((await engine.getStateSnapshot()).macros.intents["rhythm:overtones"]).toBe(false);
     const r = await setMacroTool.handle(
-      { name: "system:harmonic-series:enabled", value: true },
+      { name: "rhythm:overtones", value: true },
       engine,
     );
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.state.macros.intents["system:harmonic-series:enabled"]).toBe(true);
+    if (r.ok) expect(r.state.macros.intents["rhythm:overtones"]).toBe(true);
   });
 
   it("rejects non-boolean values", async () => {
     for (const value of ["on", 1]) {
       const r = await setMacroTool.handle(
-        { name: "system:harmonic-series:enabled", value },
+        { name: "rhythm:overtones", value },
         engine,
       );
       expect(r.ok).toBe(false);

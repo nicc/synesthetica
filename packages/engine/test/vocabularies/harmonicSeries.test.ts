@@ -85,15 +85,14 @@ describe("partialPitch", () => {
 describe("MusicalVisualVocabulary partial annotation", () => {
   const frame = createTestMusicalFrame(100, "main", { notes: [note("c", 0)] });
 
-  it("annotates no partials by default (overlay off)", () => {
-    const vocab = new MusicalVisualVocabulary();
+  it("annotates no partials at level 0", () => {
+    const vocab = new MusicalVisualVocabulary({ harmonicSeriesLevel: 0 });
     const annotated = vocab.annotate(frame);
     expect(annotated.notes[0].partials).toBeUndefined();
   });
 
   it("annotates partials when enabled, at the level macro's gain", () => {
     const vocab = new MusicalVisualVocabulary();
-    vocab.setMacro("system:harmonic-series:enabled", true);
     vocab.setMacro("system:harmonic-series:level", 0.5);
     vocab.setMacro("system:harmonic-series:rolloff", 1);
     const partials = vocab.annotate(frame).notes[0].partials ?? [];
@@ -102,16 +101,13 @@ describe("MusicalVisualVocabulary partial annotation", () => {
   });
 
   it("does not add partials to the note list (partials are not notes)", () => {
-    const vocab = new MusicalVisualVocabulary({ harmonicSeriesEnabled: true });
+    const vocab = new MusicalVisualVocabulary({});
     vocab.setMacro("system:harmonic-series:level", 1);
     expect(vocab.annotate(frame).notes).toHaveLength(1);
   });
 
   it("reads back the overlay macros", () => {
     const vocab = new MusicalVisualVocabulary();
-    expect(vocab.readMacros()["system:harmonic-series:enabled"]).toBe(false);
-    vocab.setMacro("system:harmonic-series:enabled", true);
-    expect(vocab.readMacros()["system:harmonic-series:enabled"]).toBe(true);
     vocab.setMacro("system:harmonic-series:level", 0.3);
     vocab.setMacro("system:harmonic-series:rolloff", 2);
     const macros = vocab.readMacros();
@@ -121,7 +117,7 @@ describe("MusicalVisualVocabulary partial annotation", () => {
 
   it("colours partials by pitch or by fundamental", () => {
     const hueConfig = { referencePc: 0 as PitchClass, referenceHue: 0, direction: "cw" as const };
-    const vocab = new MusicalVisualVocabulary({ harmonicSeriesEnabled: true, harmonicSeriesLevel: 1 });
+    const vocab = new MusicalVisualVocabulary({ harmonicSeriesLevel: 1 });
     expect(vocab.readMacros()["system:harmonic-series:colour"]).toBe("pitch");
     const fifthPitch = vocab.annotate(frame).notes[0].partials![0];
     expect(fifthPitch.color.h).toBe(pcToHue(7, hueConfig));
@@ -163,10 +159,12 @@ describe("MusicalVisualVocabulary chord partials (glyph)", () => {
   ]);
   const frameWith = (c: MusicalChord) => createTestMusicalFrame(100, "main", { chords: [c] });
   const enabled = () =>
-    new MusicalVisualVocabulary({ harmonicSeriesEnabled: true, harmonicSeriesLevel: 1, harmonicSeriesRolloff: 1 });
+    new MusicalVisualVocabulary({ harmonicSeriesLevel: 1, harmonicSeriesRolloff: 1 });
 
-  it("annotates no chord partials when the overlay is off", () => {
-    expect(new MusicalVisualVocabulary().annotate(frameWith(cMajor)).chords[0].partials).toBeUndefined();
+  it("annotates no chord partials at level 0", () => {
+    expect(
+      new MusicalVisualVocabulary({ harmonicSeriesLevel: 0 }).annotate(frameWith(cMajor)).chords[0].partials,
+    ).toBeUndefined();
   });
 
   it("computes partials once per distinct pitch class (octave doubling ignored)", () => {

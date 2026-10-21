@@ -131,7 +131,7 @@ template that covers triads and common 7ths only. Future work: alterations
 
 ### 6. Harmonic Series Overlay
 
-Source: RFC 012. Optional; off by default (`system:harmonic-series:enabled` = false). Brightness is `system:harmonic-series:level` (default 0.2), applied while enabled.
+Source: RFC 012. Optional, toggled per lens: `rhythm:overtones` (overtone strips, default off) and `harmony:overtones` (the glyph's overtone halo, default on). The vocabulary annotates partials whenever `system:harmonic-series:level` (default 0.2) is above 0; each lens decides whether to draw them.
 
 The vocabulary annotates each note with the partials of the harmonic series it implies. Levels are modelled from a generic rolloff, not measured: MIDI carries no timbre, so this is a theoretical overlay and must be described as such in the manifest and primer. The rhythm lens renders each partial as an overtone strip.
 
