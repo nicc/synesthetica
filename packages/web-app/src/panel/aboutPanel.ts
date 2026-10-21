@@ -38,13 +38,14 @@ marked.setOptions({
 });
 
 /**
- * Narrow screens get a warning strip on the About page and see About on
- * every load. 815px is where the layout starts to be cut off in a
- * typical desktop window; the height clause catches phones in
- * landscape. Keep in sync with the @media rule for
- * .syn-about-mobile-warning in index.html.
+ * Small screens get a warning strip on the About page and see About on
+ * every load. The renderer contains the 4:3 world in the viewport
+ * (nothing is cropped), so the limit is legibility: the world renders
+ * smaller than 768×576px below these sizes (note names ~6px). Catches
+ * all phones in either orientation. Keep in sync with the @media rule
+ * for .syn-about-mobile-warning in index.html.
  */
-export const NARROW_SCREEN_QUERY = "(max-width: 814px), (max-height: 499px)";
+export const NARROW_SCREEN_QUERY = "(max-width: 767px), (max-height: 575px)";
 
 export const SMALL_SCREEN_WARNING =
   "This app is not built for small screens. Best on desktop.";
