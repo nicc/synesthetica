@@ -40,7 +40,13 @@ import type {
  * Rhythm lens occupies the central column between dynamics
  * and harmony columns. See layout.ts for the three-column system.
  */
-import { RHYTHM_LEFT, RHYTHM_RIGHT } from "./layout";
+import {
+  RHYTHM_LEFT,
+  RHYTHM_RIGHT,
+  NOW_LINE_COLOR,
+  ASSUMED_WORLD_HEIGHT,
+  keyboardRelativeTextSize,
+} from "./layout";
 import { NOW_LINE_Y, timeToY, timeToYUniform } from "./timeMapping";
 const PITCH_MARGIN_LEFT = RHYTHM_LEFT;
 const PITCH_MARGIN_RIGHT = 1 - RHYTHM_RIGHT;
@@ -113,15 +119,8 @@ const dissipationAt = (y: number): number => 1 - Math.min(Math.max(y, 0) / NOW_L
  *  900px-tall window; like the rest of the view it scales with the
  *  window rather than staying a fixed pixel size. */
 const NOTE_NAME_FONT_SCALE = 0.8;
-const KEYBOARD_FONT_PX = 12;
-const REFERENCE_VIEWPORT_PX = 900;
-/** Renderer world height (ThreeJSRenderer default); converts world-unit
- *  text sizes to the lens's normalized y. */
-const ASSUMED_WORLD_HEIGHT = 75;
 /** Note-name line height in world units. */
-const NOTE_NAME_SIZE =
-  (NOTE_NAME_FONT_SCALE * KEYBOARD_FONT_PX * ASSUMED_WORLD_HEIGHT) /
-  REFERENCE_VIEWPORT_PX;
+const NOTE_NAME_SIZE = keyboardRelativeTextSize(NOTE_NAME_FONT_SCALE);
 /** Gap between the NOW line and the top of the note names, world units. */
 const NOTE_NAME_GAP = 0.6;
 
@@ -129,7 +128,7 @@ const NOTE_NAME_GAP = 0.6;
 const GRID_COLORS = {
   beatLine: { h: 200, s: 0.2, v: 0.5, a: 0.4 } as ColorHSVA,
   barLine: { h: 200, s: 0.3, v: 0.6, a: 0.5 } as ColorHSVA,
-  nowLine: { h: 0, s: 0, v: 0.8, a: 0.6 } as ColorHSVA,
+  nowLine: NOW_LINE_COLOR as ColorHSVA,
   referenceLine: { h: 0, s: 0, v: 0.9, a: 0.7 } as ColorHSVA,
 };
 

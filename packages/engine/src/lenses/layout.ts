@@ -141,6 +141,26 @@ export const GLYPH_STEAM_BAND_RADIUS =
   CHORD_GLYPH_RADIUS *
   (GLYPH_HUB_FRACTION + GLYPH_TRIADIC_ARM_FRACTION + GLYPH_STEAM_BAND_GAP);
 
+// ----------------------------------------------------------------------------
+// Structural text (note names, interval names)
+// ----------------------------------------------------------------------------
+
+/** The NOW line's translucent grey, shared by structural text labels. */
+export const NOW_LINE_COLOR = { h: 0, s: 0, v: 0.8, a: 0.6 };
+
+/** On-screen keyboard label size (web-app .syn-onscreen-key) and the
+ *  window height at which world-unit text matches it. Text in the
+ *  visualisation scales with the window from there. */
+export const KEYBOARD_FONT_PX = 12;
+export const REFERENCE_VIEWPORT_PX = 900;
+
+/** Renderer world height (ThreeJSRenderer default). */
+export const ASSUMED_WORLD_HEIGHT = 75;
+
+/** World-unit line height for text at `scale` × the keyboard's size. */
+export const keyboardRelativeTextSize = (scale: number): number =>
+  (scale * KEYBOARD_FONT_PX * ASSUMED_WORLD_HEIGHT) / REFERENCE_VIEWPORT_PX;
+
 /** Vertical gap between chord cell and progression cell */
 const CELL_GAP = 0.04;
 

@@ -77,6 +77,9 @@ The rhythm-lens rendering of one partial with n ≥ 3. Partials 1, 2, 4 and 8 sh
 **Note-name legend**
 A fixed row of pitch names under the NOW line, one centred under each pitch-class column, in the NOW line's grey and the on-screen keyboard's monospace font. Spelling comes from the frame (key-aware; default sharps). Toggled by `rhythm:note-names` (on by default).
 
+**Interval-name dial**
+Simple-interval names (R m2 M2 m3 M3 P4 d5 P5 m6 M6 m7 M7) around the chord glyph at the spoke angles, baselines on the steam ring's inner edge, rotated to their angle. NOW-line grey; toggled by `harmony:interval-names` (off by default).
+
 **Overtone halo** (proposed name, RFC 012)
 The chord glyph's rendering of its tones' partials: a ring of steam just outside the longest spoke, beyond a gap of negative space, at each partial's angle; one set per distinct pitch class of the chord. Fixed shape, with density as the partial level. Same steam rules as overtone strips; fades with the glyph.
 

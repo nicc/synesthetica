@@ -1083,3 +1083,26 @@ describe("HarmonyLens modal-interchange hints", () => {
   });
 });
 
+describe("HarmonyLens interval-name dial", () => {
+  const dial = (lens: HarmonyLens) =>
+    lens.update(createTestFrame(1000, null, 0), null).entities.filter((e) => e.id.includes(":interval-name-"));
+
+  it("is off by default", () => {
+    expect(dial(new HarmonyLens())).toHaveLength(0);
+  });
+
+  it("labels all twelve angles, R upright at the top and d5 upside down at the bottom", () => {
+    const lens = new HarmonyLens();
+    lens.setMacros({ intervalNames: true });
+    const labels = dial(lens);
+    expect(labels.map((e) => e.data!.text)).toEqual(
+      ["R", "m2", "M2", "m3", "M3", "P4", "d5", "P5", "m6", "M6", "m7", "M7"],
+    );
+    const root = labels[0], d5 = labels[6];
+    expect(root.data!.rotationDeg).toBe(0);
+    expect(d5.data!.rotationDeg).toBe(180);
+    expect(root.position!.y).toBeLessThan(d5.position!.y); // top vs bottom
+    expect(root.data!.anchor).toBe("baseline");
+  });
+});
+

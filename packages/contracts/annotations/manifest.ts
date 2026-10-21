@@ -373,6 +373,23 @@ const macros: MacroAnnotation[] = [
   },
 
   {
+    id: "harmony:interval-names",
+    name: "Interval names",
+    aliases: ["interval labels", "chord dial", "interval dial", "show intervals"],
+    type: "toggle",
+    default: false, // matches HarmonyLens macros.intervalNames
+    affects: ["harmony"],
+    notes: [
+      "A fixed dial of simple-interval names around the chord glyph, one per semitone from the root at the spoke angles: R m2 M2 m3 M3 P4 d5 P5 m6 M6 m7 M7. R is upright at the top; d5 is upside down at the bottom. Labels sit on the inner edge of the overtone steam ring, in the NOW line's grey.",
+      "The dial names pitch distance from the root, so some chords spell an angle differently (an augmented triad's ♯5 sits under m6; 9ths, 11ths and 13ths under M2, P4 and M6).",
+    ],
+    humanNotes: [
+      "Labels each angle around the chord glyph with its interval from the root (R, m3, P5…), so you can read which intervals the spokes are.",
+    ],
+    consumers: [{ kind: "lens", id: "harmony-lens", macroKey: "intervalNames" }],
+  },
+
+  {
     id: "harmony:modal-interchange-hints",
     name: "Modal-interchange hints",
     aliases: ["borrowed chord hints", "modal interchange", "borrowed chords", "show borrowed options"],
@@ -1126,6 +1143,10 @@ const lenses: LensAnnotation[] = [
       "system:colour-mapping:reference": {
         responsiveness: "strong",
         notes: "shifts the palette of all chord numerals, connector strips, and glyph shapes",
+      },
+      "harmony:interval-names": {
+        responsiveness: "strong",
+        notes: "interval-name dial around the chord glyph",
       },
       "harmony:modal-interchange-hints": {
         responsiveness: "strong",

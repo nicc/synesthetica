@@ -49,6 +49,8 @@ import { buildRomanNumeralGlyph } from "../utils/RomanNumeralGlyphBuilder";
 import {
   HARMONY_CHORD_CENTER_X,
   HARMONY_CHORD_CENTER_Y,
+  NOW_LINE_COLOR,
+  keyboardRelativeTextSize,
   HARMONY_PROGRESSION_CENTER_X,
   HARMONY_PROGRESSION_CENTER_Y,
   GLYPH_STEAM_BAND_RADIUS,
@@ -130,6 +132,19 @@ const DIATONIC_GLYPH_RADIUS_FRACTION =
   (GUIDE_RING_INNER_FRACTION + GUIDE_RING_MIDDLE_FRACTION) / 2; // 0.47
 const BORROWED_GLYPH_RADIUS_FRACTION =
   (GUIDE_RING_MIDDLE_FRACTION + GUIDE_RING_OUTER_FRACTION) / 2; // ≈ 0.736
+
+/** Interval-name dial around the chord glyph (harmony:interval-names).
+ *  Labels sit with their baseline on the inner edge of the overtone
+ *  steam ring, rotated to their angle (R upright at the top, d5 upside
+ *  down at the bottom). Size is a multiple of the on-screen keyboard's
+ *  label size, independent of the rhythm lens's note names. */
+const INTERVAL_NAME_FONT_SCALE = 0.8;
+const INTERVAL_NAME_SIZE = keyboardRelativeTextSize(INTERVAL_NAME_FONT_SCALE);
+/** Radial nudge of the labels' baseline from the steam ring's inner
+ *  edge, normalized (positive = outward). */
+const INTERVAL_NAME_BASELINE_OFFSET = 0;
+/** Simple-interval names by semitones from the root. */
+const INTERVAL_NAMES = ["R", "m2", "M2", "m3", "M3", "P4", "d5", "P5", "m6", "M6", "m7", "M7"];
 
 /** Clock radius, normalized. Sized so the outer guide ring matches the
  *  inner edge of the chord glyph's overtone steam ring above it: the
@@ -372,6 +387,8 @@ interface HarmonyLensMacros {
   /** Show common modal-interchange chords (major keys) as greyed hints
    *  on the borrowed ring. */
   modalInterchangeHints: boolean;
+  /** Show the interval-name dial around the chord glyph. */
+  intervalNames: boolean;
 }
 
 export class HarmonyLens implements IVisualLens {
@@ -384,6 +401,7 @@ export class HarmonyLens implements IVisualLens {
     linger: PROGRESSION_FADE_VALUE,
     overtones: true,
     modalInterchangeHints: false,
+    intervalNames: false,
   };
 
   // Fade-out state: when no chord is active, keep rendering the most
@@ -532,6 +550,12 @@ export class HarmonyLens implements IVisualLens {
           },
         });
       }
+    }
+
+    // Interval-name dial around the glyph: structural, so it stays put
+    // whether or not a chord is showing.
+    if (this.macros.intervalNames) {
+      entities.push(...this.createIntervalNames(t, part));
     }
 
     // --- Progression clock (bottom cell) ---
@@ -755,6 +779,38 @@ export class HarmonyLens implements IVisualLens {
     }
 
     return entities;
+  }
+
+  /**
+   * The interval-name dial: one label per semitone from the root, its
+   * baseline on the steam ring's inner edge, rotated to its angle so the
+   * text reads outward (upright at the top, upside down at the bottom).
+   */
+  private createIntervalNames(t: number, part: string): Entity[] {
+    const r = GLYPH_STEAM_BAND_RADIUS + INTERVAL_NAME_BASELINE_OFFSET;
+    return INTERVAL_NAMES.map((name, semitones) => {
+      const angleDeg = semitones * 30;
+      const a = (angleDeg * Math.PI) / 180;
+      return {
+        id: `${this.id}:interval-name-${semitones}`,
+        part,
+        kind: "glyph" as const,
+        createdAt: t,
+        updatedAt: t,
+        position: {
+          x: HARMONY_CHORD_CENTER_X + r * Math.sin(a),
+          y: HARMONY_CHORD_CENTER_Y - r * VIEWPORT_ASPECT * Math.cos(a),
+        },
+        style: { color: NOW_LINE_COLOR, size: INTERVAL_NAME_SIZE, opacity: 1 },
+        data: {
+          type: "text-label",
+          text: name,
+          font: "mono",
+          anchor: "baseline",
+          rotationDeg: angleDeg,
+        },
+      };
+    });
   }
 
   /**
