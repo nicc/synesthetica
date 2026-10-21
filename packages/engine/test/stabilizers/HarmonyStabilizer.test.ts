@@ -783,3 +783,23 @@ describe("HarmonyStabilizer diatonic chords (clock guides)", () => {
   });
 });
 
+describe("HarmonyStabilizer modal-interchange hints", () => {
+  const run = (key: PrescribedKey) => {
+    const stabilizer = new HarmonyStabilizer({ partId: "main" });
+    stabilizer.init();
+    return stabilizer.apply(createTestRawFrame(1000), createUpstreamFrame(1000, [], key))
+      .harmonicContext!.modalInterchangeChords;
+  };
+
+  it("publishes the major-key interchange chords on the borrowed ring", () => {
+    const hints = run({ root: 0 as PitchClass, mode: "ionian" });
+    const byRoman = Object.fromEntries(hints.map((h) => [h.roman, h.rootPc]));
+    expect(byRoman).toEqual({ "♭VII": 10, "♭III": 3, "♭VI": 8, iv: 5, "♭II": 1 });
+    expect(hints.every((h) => h.borrowed)).toBe(true);
+  });
+
+  it("publishes none outside major keys", () => {
+    expect(run({ root: 9 as PitchClass, mode: "aeolian" })).toEqual([]);
+  });
+});
+

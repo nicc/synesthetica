@@ -494,6 +494,26 @@ const MODAL_INTERCHANGE_MAJOR: Record<string, RelationshipEntry[]> = {
   "♭II": [{ targetDegree: 5, weight: 0.80, type: "modal-interchange" }],
 };
 
+/** Semitones above the tonic for each MODAL_INTERCHANGE_MAJOR chord,
+ *  for placing them on the clock as hints. */
+const MODAL_INTERCHANGE_MAJOR_ROOTS: Record<string, number> = {
+  "♭II": 1,
+  "♭III": 3,
+  "iv": 5,
+  "♭VI": 8,
+  "♭VII": 10,
+};
+
+/** Modal-interchange chords for a major key as clock hints. */
+function modalInterchangeKeyChords(key: PrescribedKey): KeyChord[] {
+  if (key.mode !== "ionian") return [];
+  return Object.keys(MODAL_INTERCHANGE_MAJOR).map((roman) => ({
+    rootPc: ((key.root + MODAL_INTERCHANGE_MAJOR_ROOTS[roman]) % 12) as PitchClass,
+    roman,
+    borrowed: true,
+  }));
+}
+
 /** Conventional weights for V/X → X resolutions, keyed by target degree. */
 const SECONDARY_DOMINANT_WEIGHTS: Record<number, number> = {
   2: 0.88, // V/ii → ii
@@ -747,6 +767,7 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
       functionalProgression: key ? [...this.progression] : [],
       functionalEdges,
       diatonicChords: diatonicTable ? diatonicKeyChords(diatonicTable) : [],
+      modalInterchangeChords: key ? modalInterchangeKeyChords(key) : [],
     };
 
     return {

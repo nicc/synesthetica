@@ -369,6 +369,9 @@ interface HarmonyLensMacros {
    *  RFC 012). Lens-level so the glyph and the rhythm lens can be
    *  toggled independently. */
   overtones: boolean;
+  /** Show common modal-interchange chords (major keys) as greyed hints
+   *  on the borrowed ring. */
+  modalInterchangeHints: boolean;
 }
 
 export class HarmonyLens implements IVisualLens {
@@ -380,6 +383,7 @@ export class HarmonyLens implements IVisualLens {
   private macros: HarmonyLensMacros = {
     linger: PROGRESSION_FADE_VALUE,
     overtones: true,
+    modalInterchangeHints: false,
   };
 
   // Fade-out state: when no chord is active, keep rendering the most
@@ -554,6 +558,21 @@ export class HarmonyLens implements IVisualLens {
           "guide-numeral",
         ),
       );
+      // Optional modal-interchange hints on the borrowed ring (major keys).
+      if (this.macros.modalInterchangeHints) {
+        entities.push(
+          ...this.createGuideNumerals(
+            input.harmonicContext.modalInterchangeChords ?? [],
+            progression,
+            t,
+            part,
+            key.root,
+            key.mode,
+            this.macros.linger * 1000,
+            "hint-numeral",
+          ),
+        );
+      }
     }
 
     if (key && progression.length > 0) {

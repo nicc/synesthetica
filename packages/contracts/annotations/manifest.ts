@@ -373,6 +373,24 @@ const macros: MacroAnnotation[] = [
   },
 
   {
+    id: "harmony:modal-interchange-hints",
+    name: "Modal-interchange hints",
+    aliases: ["borrowed chord hints", "modal interchange", "borrowed chords", "show borrowed options"],
+    type: "toggle",
+    default: false, // matches HarmonyLens macros.modalInterchangeHints
+    affects: ["harmony"],
+    notes: [
+      "Major (Ionian) keys only. When true, the progression clock's outer (borrowed) ring shows the common modal-interchange chords greyed, as suggestions: ♭II, ♭III, iv, ♭VI, ♭VII — chords borrowed mostly from the parallel minor (♭II from Phrygian). Each tends to move to a diatonic chord: ♭VII→IV, ♭III→vi, ♭VI→ii or IV, iv→I, ♭II→V. These are the same relationships the connector arcs draw when such a chord is played.",
+      "Hints are not chords the player played. A hint is hidden while a played chord occupies its slot. Nothing is shown in minor or modal keys, or without a key.",
+    ],
+    humanNotes: [
+      "In major keys, shows greyed suggestions on the clock's outer ring for chords commonly borrowed from the parallel minor: ♭II, ♭III, iv, ♭VI and ♭VII.",
+      "Each tends to resolve to a chord in the key (♭VII→IV, ♭III→vi, ♭VI→ii or IV, iv→I, ♭II→V). Hidden in minor and modal keys.",
+    ],
+    consumers: [{ kind: "lens", id: "harmony-lens", macroKey: "modalInterchangeHints" }],
+  },
+
+  {
     id: "system:harmonic-series:level",
     name: "Overtone level",
     aliases: ["overtone brightness", "overtone amount", "overtone strength"],
@@ -1108,6 +1126,10 @@ const lenses: LensAnnotation[] = [
       "system:colour-mapping:reference": {
         responsiveness: "strong",
         notes: "shifts the palette of all chord numerals, connector strips, and glyph shapes",
+      },
+      "harmony:modal-interchange-hints": {
+        responsiveness: "strong",
+        notes: "greyed ♭II ♭III iv ♭VI ♭VII suggestions on the borrowed ring (major keys)",
       },
       "harmony:overtones": {
         responsiveness: "strong",

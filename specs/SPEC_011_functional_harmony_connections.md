@@ -60,6 +60,8 @@ When a key is prescribed, the key's seven diatonic numerals (e.g. C major: I ii 
 
 The harmony stabilizer publishes the guides as `HarmonicContext.diatonicChords` (`KeyChord[]`: rootPc, roman, borrowed), so the lens never recomputes key theory.
 
+**Modal-interchange hints** (`harmony:modal-interchange-hints`, off by default): in major keys, the borrowed ring also shows the common modal-interchange chords greyed — ♭II, ♭III, iv, ♭VI, ♭VII, the keys of the analyser's interchange table — with the same slot-occupancy rule. Published as `HarmonicContext.modalInterchangeChords` (empty outside Ionian).
+
 ### Slot Tick Marks
 
 Small radial ticks at each of the seven diatonic-ring slot angles, sized to mark the slot position even when no chord is currently played there. Helps hold the spatial structure in sparse states.
@@ -207,6 +209,8 @@ interface HarmonicContext {
   functionalEdges: FunctionalEdge[];
   /** The key's diatonic triads for the clock's guide numerals (empty without a key). */
   diatonicChords: KeyChord[];
+  /** Modal-interchange hints for the borrowed ring (major keys only). */
+  modalInterchangeChords: KeyChord[];
 }
 ```
 

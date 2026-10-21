@@ -396,6 +396,13 @@ export interface HarmonicContext {
    * them as always-on guides.
    */
   diatonicChords: KeyChord[];
+
+  /**
+   * Common modal-interchange chords for the key, drawn as optional hints
+   * on the clock's borrowed ring. Major (Ionian) keys only — the
+   * analyser's interchange table is defined for major; empty otherwise.
+   */
+  modalInterchangeChords: KeyChord[];
 }
 
 /** A chord the key defines (not one that was played), for clock guides. */
@@ -547,6 +554,7 @@ export const EMPTY_HARMONIC_CONTEXT: Readonly<HarmonicContext> = Object.freeze({
   functionalProgression: [],
   functionalEdges: [],
   diatonicChords: [],
+  modalInterchangeChords: [],
 });
 
 /**

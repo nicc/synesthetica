@@ -1047,3 +1047,39 @@ describe("HarmonyLens guide numerals", () => {
   });
 });
 
+describe("HarmonyLens modal-interchange hints", () => {
+  const HINTS = [
+    { rootPc: 10, roman: "♭VII" }, { rootPc: 3, roman: "♭III" }, { rootPc: 8, roman: "♭VI" },
+    { rootPc: 5, roman: "iv" }, { rootPc: 1, roman: "♭II" },
+  ].map((c) => ({ ...c, rootPc: c.rootPc as PitchClass, borrowed: true }));
+  const frame = (progression: unknown[]) =>
+    createTestAnnotatedFrame(1000, "main", {
+      prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+      harmonicContext: {
+        tension: 0,
+        keyAware: true,
+        currentFunction: null,
+        functionalProgression: progression as never,
+        functionalEdges: [],
+        diatonicChords: [],
+        modalInterchangeChords: HINTS,
+      },
+    });
+  const hints = (lens: HarmonyLens, progression: unknown[] = []) =>
+    lens.update(frame(progression), null).entities.filter((e) => e.id.includes(":hint-numeral-"));
+
+  it("is off by default", () => {
+    expect(hints(new HarmonyLens())).toHaveLength(0);
+  });
+
+  it("draws the hints greyed on the borrowed ring when on, hiding occupied slots", () => {
+    const lens = new HarmonyLens();
+    lens.setMacros({ modalInterchangeHints: true });
+    expect(hints(lens)).toHaveLength(5);
+    const bVII = { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "y", onset: 900, releaseTime: null };
+    const shown = hints(lens, [bVII]);
+    expect(shown).toHaveLength(4);
+    expect(shown.some((e) => e.id.endsWith("b:10"))).toBe(false);
+  });
+});
+
