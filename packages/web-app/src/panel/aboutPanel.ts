@@ -38,11 +38,16 @@ marked.setOptions({
 });
 
 /**
- * Narrow screens (phones, including landscape) get a warning strip on
- * the About page and see About on every load. Keep in sync with the
- * @media rule for .syn-about-mobile-warning in index.html.
+ * Narrow screens get a warning strip on the About page and see About on
+ * every load. 815px is where the layout starts to be cut off in a
+ * typical desktop window; the height clause catches phones in
+ * landscape. Keep in sync with the @media rule for
+ * .syn-about-mobile-warning in index.html.
  */
-export const NARROW_SCREEN_QUERY = "(max-width: 767px), (max-height: 499px)";
+export const NARROW_SCREEN_QUERY = "(max-width: 814px), (max-height: 499px)";
+
+export const SMALL_SCREEN_WARNING =
+  "This app is not built for small screens. Best on desktop.";
 
 export function isNarrowScreen(): boolean {
   try {
@@ -59,7 +64,7 @@ export async function buildAboutPanel(): Promise<HTMLElement> {
   // Not-built-for-mobile warning; hidden by CSS except on narrow screens.
   const warning = document.createElement("p");
   warning.className = "syn-about-mobile-warning";
-  warning.textContent = "This app is not built for mobile, please view on desktop.";
+  warning.textContent = SMALL_SCREEN_WARNING;
   wrap.appendChild(warning);
 
   // User-facing intro (short, prose, points at repo for depth).

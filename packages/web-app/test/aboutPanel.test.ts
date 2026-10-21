@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { buildAboutPanel, isNarrowScreen, NARROW_SCREEN_QUERY } from "../src/panel/aboutPanel.js";
+import {
+  buildAboutPanel,
+  isNarrowScreen,
+  NARROW_SCREEN_QUERY,
+  SMALL_SCREEN_WARNING,
+} from "../src/panel/aboutPanel.js";
 
 describe("About panel mobile warning", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -9,7 +14,7 @@ describe("About panel mobile warning", () => {
     const panel = await buildAboutPanel();
     const first = panel.firstElementChild as HTMLElement;
     expect(first.className).toBe("syn-about-mobile-warning");
-    expect(first.textContent).toBe("This app is not built for mobile, please view on desktop.");
+    expect(first.textContent).toBe(SMALL_SCREEN_WARNING);
   });
 
   it("detects narrow screens with the shared media query", () => {
