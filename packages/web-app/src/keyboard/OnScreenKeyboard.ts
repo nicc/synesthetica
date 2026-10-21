@@ -30,10 +30,19 @@
 import type { ComputerKeyboardSource } from "@synesthetica/adapters";
 import { KEY_MAP, KEY_LABEL, NATURAL_ORDER } from "@synesthetica/adapters";
 import { pcToHue } from "@synesthetica/contracts";
+import {
+  worldToViewportFraction,
+  WORLD_WIDTH,
+  WORLD_HEIGHT,
+  NOW_LINE_Y,
+  HARMONY_PROGRESSION_CENTER_X,
+} from "@synesthetica/engine";
 
 const NATURAL_KEY_PX = 26;
 const NATURAL_KEY_GAP = 3;
 const ROW_GAP = 4;
+/** Two rows plus the gap between them (matches the CSS comment). */
+const KEYBOARD_HEIGHT_PX = NATURAL_KEY_PX * 2 + ROW_GAP;
 
 export interface OnScreenKeyboardHandle {
   root: HTMLElement;
@@ -140,26 +149,26 @@ export function mountOnScreenKeyboard(
   }
 
   /**
-   * Position the keyboard horizontally so its centre lands under the
-   * progression clock. Vertical positioning is pure CSS (see the
-   * .syn-onscreen-keyboard rule) — no JS math involved on that axis.
-   *
-   * The clock's on-screen x depends on the current canvas aspect —
-   * the ThreeJS perspective camera keeps worldHeight (75) exactly
-   * filling the viewport vertically, so horizontal world extent is
-   * `75 × aspect`. The clock centre sits at world x = 79 (from
-   * HARMONY_LEFT + HARMONY_COLUMN_WIDTH/2 in the layout module,
-   * times worldWidth = 100). Its viewport-x fraction reduces to
-   * `29 / (75·aspect) + 0.5` — 0.5 when the world fills the viewport
-   * horizontally, drifting further right as the viewport widens.
+   * Position the keyboard so its centre lands under the progression
+   * clock and its sharp row's top edge sits on the NOW line. Both depend
+   * on how the renderer fits the world to the viewport (it contains the
+   * world: side margins on wide viewports, bands above and below on
+   * narrow ones), so the maths is shared via worldToViewportFraction.
+   * The CSS rule's vh-based bottom is the fallback if JS never runs.
    */
   function reposition(): void {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     if (vw <= 0 || vh <= 0) return;
     const aspect = vw / vh;
-    const clockXFraction = 29 / (75 * aspect) + 0.5;
-    root.style.left = `${clockXFraction * vw}px`;
+    const clock = worldToViewportFraction(
+      HARMONY_PROGRESSION_CENTER_X * WORLD_WIDTH,
+      0,
+      aspect,
+    );
+    const nowLine = worldToViewportFraction(0, (1 - NOW_LINE_Y) * WORLD_HEIGHT, aspect);
+    root.style.left = `${clock.fromLeft * vw}px`;
+    root.style.bottom = `${Math.max(0, nowLine.fromBottom * vh - KEYBOARD_HEIGHT_PX)}px`;
   }
 
   return {

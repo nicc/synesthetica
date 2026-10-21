@@ -371,7 +371,7 @@
       color: #1a1a1a;
       font-weight: 600;
     }
-    @media (max-width: 814px), (max-height: 499px) {
+    @media (max-width: 767px), (max-height: 575px) {
       .syn-about-mobile-warning { display: block; }
     }
     .syn-about h1 { font-size: 15px; color: #fff; margin: 0 0 8px; }
@@ -493,19 +493,13 @@
      * intensifies the glow AND depresses the key slightly.
      * ----------------------------------------------------------------- */
     .syn-onscreen-keyboard {
-      /* Vertical positioning lives ENTIRELY in CSS — pure vh units,
-       * no JS computation. The sharp row's top edge is at NOW_LINE_Y
-       * (0.85·vh from viewport top = 0.15·vh from bottom), and the
-       * keyboard is 56px tall (2 × 26px rows + 4px stack gap), so
-       * the element's bottom sits at (15vh − 56px) from the viewport
-       * bottom. `max(0px, …)` clamps for viewports too short to fit
-       * the natural placement, so the keyboard never disappears
-       * below the fold.
-       *
-       * Horizontal placement (left) IS JS-driven — it depends on the
-       * canvas aspect ratio, which CSS can't read. See reposition().
-       * The default `left: 50vw` keeps the keyboard vaguely centred
-       * if JS never runs. */
+      /* Position is JS-driven (OnScreenKeyboard reposition()): the
+       * renderer contains the world in the viewport (bands above and
+       * below on narrow windows), so the NOW line and the clock move
+       * with the window's aspect. These vh/vw values are the fallback
+       * if JS never runs — correct for 4:3-and-wider windows, where the
+       * NOW line sits at 0.85·vh: the sharp row's top edge lands on it
+       * with the 56px keyboard's bottom at (15vh − 56px), clamped at 0. */
       position: fixed;
       bottom: max(0px, calc(15vh - 56px));
       left: 50vw;
