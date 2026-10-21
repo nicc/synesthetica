@@ -875,8 +875,10 @@ export class HarmonyLens implements IVisualLens {
 
   /**
    * Always-on guide numerals (greyed, in the structure colour) for chords
-   * the key defines. A slot is skipped while a played numeral occupies it
-   * — held or still fading — so two different glyphs never overlap.
+   * the key defines. While a played numeral occupies a slot the guide is
+   * hidden; as the played numeral fades the guide fades back in over the
+   * same window (a handover rather than a pop). With several occupants
+   * the most present one wins.
    */
   private createGuideNumerals(
     chords: KeyChord[],
@@ -890,27 +892,37 @@ export class HarmonyLens implements IVisualLens {
   ): Entity[] {
     const slot = (rootPc: number, borrowed: boolean) =>
       `${borrowed ? "b" : "d"}:${rootPc}`;
-    const occupied = new Set(
-      progression
-        .filter(
-          (fc) =>
-            fc.releaseTime === null ||
-            (t - fc.releaseTime >= 0 && t - fc.releaseTime < fadeMs),
-        )
-        .map((fc) => slot(fc.rootPc, fc.borrowed)),
-    );
-    return chords
-      .filter((c) => !occupied.has(slot(c.rootPc, c.borrowed)))
-      .map((c) =>
-        this.clockNumeral(`${this.id}:${idPrefix}-${slot(c.rootPc, c.borrowed)}`, c, tonicPc, mode, {
+    // Occupancy per slot, 1 (held) → 0 (fully faded).
+    const occupancy = new Map<string, number>();
+    for (const fc of progression) {
+      let presence: number;
+      if (fc.releaseTime === null) {
+        presence = 1;
+      } else {
+        const age = t - fc.releaseTime;
+        if (age < 0 || age >= fadeMs) continue;
+        presence = 1 - age / fadeMs;
+      }
+      const key = slot(fc.rootPc, fc.borrowed);
+      occupancy.set(key, Math.max(occupancy.get(key) ?? 0, presence));
+    }
+    const entities: Entity[] = [];
+    for (const c of chords) {
+      const key = slot(c.rootPc, c.borrowed);
+      const opacity = STRUCTURE_OPACITY * (1 - (occupancy.get(key) ?? 0));
+      if (opacity < 0.005) continue;
+      entities.push(
+        this.clockNumeral(`${this.id}:${idPrefix}-${key}`, c, tonicPc, mode, {
           color: STRUCTURE_COLOR,
-          opacity: STRUCTURE_OPACITY,
+          opacity,
           strokeWidth: STROKE_WIDTH_FRESH,
           createdAt: t,
           t,
           part,
         }),
       );
+    }
+    return entities;
   }
 
   // ==========================================================================

@@ -1039,6 +1039,17 @@ describe("HarmonyLens guide numerals", () => {
     expect(guides(new HarmonyLens().update(frameWith([], false), null))).toHaveLength(0);
   });
 
+  it("fades the guide back in as a released numeral fades out (handover)", () => {
+    const lens = new HarmonyLens(); // linger 3 s → 3000 ms fade
+    const at = (released: number) => {
+      const ii = { degree: 2, roman: "ii", quality: "min", rootPc: 2 as PitchClass, borrowed: false, chordId: "x", onset: 0, releaseTime: released };
+      return guides(lens.update(frameWith([ii]), null)).find((e) => e.id.endsWith("d:2"));
+    };
+    // frame t = 1000: released 250 ms ago → guide at 1/12 of full; 2500 ms ago → 5/6
+    expect(at(750)!.style.opacity).toBeCloseTo(0.25 * (250 / 3000), 5);
+    expect(at(-1500)!.style.opacity).toBeCloseTo(0.25 * (2500 / 3000), 5);
+  });
+
   it("hides the guide in a slot a played numeral occupies", () => {
     const ii = { degree: 2, roman: "ii", quality: "min", rootPc: 2 as PitchClass, borrowed: false, chordId: "x", onset: 900, releaseTime: null };
     const g = guides(new HarmonyLens().update(frameWith([ii]), null));

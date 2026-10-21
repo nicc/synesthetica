@@ -56,7 +56,7 @@ Three guide rings define two annular bands. The diatonic band is 0.30 wide; the 
 
 ### Guide Numerals
 
-When a key is prescribed, the key's seven diatonic numerals (e.g. C major: I ii iii IV V vi vii°) are always drawn on the diatonic ring in the structure colour and opacity (same as the guide rings), as part of the clock's guides. Played numerals are drawn in colour on top. A guide is hidden while a played numeral occupies its slot (held or still fading), so two different glyphs never overlap (e.g. a played II major at ii's slot). Without a key no guide numerals are drawn and the chord name stands alone.
+When a key is prescribed, the key's seven diatonic numerals (e.g. C major: I ii iii IV V vi vii°) are always drawn on the diatonic ring in the structure colour and opacity (same as the guide rings), as part of the clock's guides. Played numerals are drawn in colour on top. A guide is hidden while a played numeral is held in its slot; as the played numeral fades after release, the guide fades back in over the same window (opacity × elapsed fraction), so the slot hands over rather than popping. With several occupants in one slot, the most present one sets the guide's opacity. Without a key no guide numerals are drawn and the chord name stands alone.
 
 The harmony stabilizer publishes the guides as `HarmonicContext.diatonicChords` (`KeyChord[]`: rootPc, roman, borrowed), so the lens never recomputes key theory.
 

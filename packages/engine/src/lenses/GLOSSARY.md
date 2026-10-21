@@ -18,7 +18,7 @@ An annular region within the harmony clock, bounded by guide rings. The harmony 
 The inner guide band where chords whose roots are diatonic to the prescribed key sit. Contains seven equally-spaced angular slots, one per scale degree.
 
 **Guide numeral**
-A greyed diatonic numeral (structure colour and opacity) always shown on the diatonic ring when a key is prescribed, as part of the clock's guides. Played numerals draw in colour over it; a guide is hidden while a played numeral occupies its slot.
+A greyed diatonic numeral (structure colour and opacity) always shown on the diatonic ring when a key is prescribed, as part of the clock's guides. Played numerals draw in colour over it; a guide is hidden while a played numeral is held in its slot and fades back in as that numeral fades out.
 
 **Modal-interchange hint**
 A greyed borrowed-ring numeral (♭II, ♭III, iv, ♭VI, ♭VII) shown in major keys when `harmony:modal-interchange-hints` is on: a suggestion of a commonly borrowed chord, not a played one. Same occupancy rule as guide numerals.
