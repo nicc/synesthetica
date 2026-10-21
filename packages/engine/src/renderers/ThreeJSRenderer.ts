@@ -492,15 +492,13 @@ export class ThreeJSRenderer implements IRenderer {
       1000
     );
 
-    // Position camera to view the world plane
-    // Calculate distance so worldHeight fits in view
-    const vFov = (this.config.fov * Math.PI) / 180;
-    const cameraZ = this.config.worldHeight / 2 / Math.tan(vFov / 2);
+    // Position camera to view the world plane, containing it (see fitCamera)
     this.camera.position.set(
       this.config.worldWidth / 2,
       this.config.worldHeight / 2,
-      cameraZ
+      0
     );
+    this.fitCamera(aspect);
     this.camera.lookAt(
       this.config.worldWidth / 2,
       this.config.worldHeight / 2,
@@ -596,11 +594,27 @@ export class ThreeJSRenderer implements IRenderer {
     const dpr = this.renderer.getPixelRatio?.() ?? 1;
     this.resolution.set(width * dpr, height * dpr);
     this.camera.aspect = width / height;
+    this.fitCamera(width / height);
     this.camera.updateProjectionMatrix();
 
     // Update resolution on all cached LineMaterial instances so line widths
     // stay correct after resize (LineMaterial copies resolution at creation time)
     this.updateLineMaterialResolutions();
+  }
+
+  /**
+   * Set the camera distance so the whole world is visible: full height on
+   * wide viewports, full width (bands above and below) on viewports
+   * narrower than the world's aspect. Never crops (synesthetica-50dc).
+   */
+  private fitCamera(aspect: number): void {
+    if (!this.camera) return;
+    const vFov = (this.config.fov * Math.PI) / 180;
+    const visibleHeight = Math.max(
+      this.config.worldHeight,
+      this.config.worldWidth / aspect,
+    );
+    this.camera.position.z = visibleHeight / 2 / Math.tan(vFov / 2);
   }
 
   /**
