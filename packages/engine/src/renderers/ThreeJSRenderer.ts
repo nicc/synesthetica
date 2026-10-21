@@ -257,7 +257,7 @@ const GLYPH_BASE_RADIUS = 10;
 /** Where glyph steam starts. "edge": the glyph outline at each angle —
  *  hub, spoke tip, or spoke side for near-misses. "band": a fixed ring
  *  just outside the longest spoke (RFC 012 option A). */
-const GLYPH_STEAM_PLACEMENT: "edge" | "band" = "edge";
+const GLYPH_STEAM_PLACEMENT: "edge" | "band" = "band";
 
 /** Gap between the triadic spoke tip and the ring, band placement only
  *  (fraction of base radius). */
@@ -267,6 +267,11 @@ const GLYPH_STEAM_BAND_GAP = 0.08;
  *  extension spoke; the outward fade makes the visible steam shorter,
  *  so it never reads as a spoke. */
 const GLYPH_STEAM_LENGTH = ARM_LENGTH.extension;
+
+/** Brightness multiplier for glyph steam alone. The halo fades outward
+ *  over a short distance, so at the same level it reads fainter than
+ *  overtone strips; this compensates without touching the shared level. */
+const GLYPH_STEAM_GAIN = 2.0;
 
 /** Angular half-width of one partial's steam, degrees (30° per semitone). */
 const GLYPH_STEAM_HALF_WIDTH_DEG = 11;
@@ -316,6 +321,7 @@ const GLYPH_STEAM_FRAGMENT = `
   const float THRESH_OLD = ${glslFloat(STEAM_THRESHOLD_OLD)};
   const float THRESH_SOFT = ${glslFloat(STEAM_THRESHOLD_SOFTNESS)};
   const float EDGE_BREAKUP = ${glslFloat(STEAM_EDGE_BREAKUP)};
+  const float GAIN = ${glslFloat(GLYPH_STEAM_GAIN)};
 
   ${STEAM_NOISE_GLSL}
 
@@ -376,7 +382,7 @@ const GLYPH_STEAM_FRAGMENT = `
       acc += c * partialLevels[j] * w;
     }
 
-    gl_FragColor = vec4(acc * density * radial * fade, 1.0);
+    gl_FragColor = vec4(acc * density * radial * fade * GAIN, 1.0);
   }
 `;
 
