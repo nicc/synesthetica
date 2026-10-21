@@ -266,12 +266,12 @@ const GLYPH_STEAM_BAND_GAP = 0.08;
 /** Radial length of glyph steam (fraction of base radius). Equal to an
  *  extension spoke; the outward fade makes the visible steam shorter,
  *  so it never reads as a spoke. */
-const GLYPH_STEAM_LENGTH = ARM_LENGTH.extension;
+const GLYPH_STEAM_LENGTH = 0.3;
 
 /** Brightness multiplier for glyph steam alone. The halo fades outward
  *  over a short distance, so at the same level it reads fainter than
  *  overtone strips; this compensates without touching the shared level. */
-const GLYPH_STEAM_GAIN = 2.0;
+const GLYPH_STEAM_GAIN = 1.45;
 
 /** Angular half-width of one partial's steam, degrees (30° per semitone). */
 const GLYPH_STEAM_HALF_WIDTH_DEG = 11;
