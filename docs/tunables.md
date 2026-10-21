@@ -286,10 +286,10 @@ Glyph overtone steam / overtone halo (top-level constants in `ThreeJSRenderer.ts
 
 | Constant | Value | Controls | Impact | Pertinence | Class | Decision |
 |---|---|---|---|---|---|---|
-| `GLYPH_STEAM_PLACEMENT` | "edge" | "edge": emitted from the glyph outline at each angle. "band": a fixed ring outside the longest spoke (RFC 012 option A) | ⭐⭐⭐ | 🎵 | layout | internal |
-| `GLYPH_STEAM_LENGTH` | `ARM_LENGTH.extension` (0.25) | Radial length of the steam, fraction of base radius; with the outward fade it reads shorter than an extension spoke | ⭐⭐ | 🎵 | layout | internal |
-| `GLYPH_STEAM_BAND_GAP` | 0.08 | Ring gap beyond the triadic tip (band placement only) | ⭐ | — | layout | internal |
-| `GLYPH_STEAM_GAIN` | 2.0 | Brightness multiplier for the glyph halo only; compensates for its short outward fade relative to overtone strips | ⭐⭐ | — | cosmetic | internal |
+| `GLYPH_STEAM_PLACEMENT` | "band" | "band": a fixed ring outside the longest spoke (RFC 012 option A, chosen). "edge": emitted from the glyph outline at each angle | ⭐⭐⭐ | 🎵 | layout | internal |
+| `GLYPH_STEAM_LENGTH` | 0.3 | Radial length of the steam ring, fraction of base radius | ⭐⭐ | 🎵 | layout | internal |
+| `GLYPH_STEAM_BAND_GAP` | 0.08 | Negative-space gap between the triadic tip and the steam ring (band placement). Also sets the progression clock's outer radius | ⭐ | — | layout | internal |
+| `GLYPH_STEAM_GAIN` | 1.45 | Brightness multiplier for the glyph halo only; compensates for its short outward fade relative to overtone strips | ⭐⭐ | — | cosmetic | internal |
 | `GLYPH_STEAM_HALF_WIDTH_DEG` | 11 | Angular half-width of one partial's steam (30° per semitone) | ⭐⭐ | 🎵 | cosmetic | internal |
 | `GLYPH_STEAM_SCALE_R` | 6 | Radial noise frequency per base radius | ⭐ | — | cosmetic | internal |
 | `GLYPH_STEAM_RISE_PER_S` | 0.05 | Outward rise, base radii per second | ⭐⭐ | — | dynamics | internal |

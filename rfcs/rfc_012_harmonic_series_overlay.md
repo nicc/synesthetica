@@ -18,7 +18,7 @@ An optional overlay showing the harmonic series each sounding note *implies*: wi
 
 The goal is a harmony lesson, not a timbre model. The information is in the interaction between notes: shared partials pile up where intervals cohere, and the overlay makes that coincidence visible so the player can perceive why a fifth sits inside a root, why a major triad's partials land on its 9th and major 7th, and why the dominant seventh's ♭7 is already present in the root's series.
 
-The chord glyph shows the same overtones as steam emitted from its edge (added 2026-10-20, §Chord glyph treatment).
+The chord glyph shows the same overtones as a ring of steam around it (added 2026-10-20, §Chord glyph treatment).
 
 ## Motivation
 
@@ -47,7 +47,7 @@ Agreed 2026-10-06 unless marked.
 3. Partials are **vocabulary annotations, never `Note`s**. Chord detection, dynamics and harmony stabilizers are unaffected, and the overlay must not read as notes beyond what was played.
 4. Controls are **continuous**, not boolean. Level 0 is off.
 5. *(Revised 2026-10-20.)* Register is **ethereal**: overtone strips are wider and less opaque than note strips, soft-edged, and visually distinct from the clean strips of what was played. A wider strip is required, not just preferred: a coincident partial (C's 3rd under a played G, +2 ¢) would otherwise sit entirely behind the note strip it reinforces. Surface treatment (steam, dust, swirl) is a later rendering decision; it must not be busy.
-6. *(Revised 2026-10-20.)* **Chord glyph: steam emitted from the edge** (option B), not more lines inside the outline. See §Chord glyph treatment.
+6. *(Revised 2026-10-21.)* **Chord glyph: a ring of steam outside the glyph** (option A, after testing option B), not more lines inside the outline. See §Chord glyph treatment.
 7. *(Revised 2026-10-20.)* Overtone strip **colour is a user toggle**, `system:harmonic-series:colour`: `pitch` (default, the landing pitch class's hue) or `fundamental` (the originating note's hue). Fundamental shows origin at the expense of harmonic intuition, and is recorded as an I14 exception for overtone strips only.
 8. *(Revised 2026-10-20.)* **Modelled partials are computed in the vocabulary.** Measured partials, if added, would come from an upstream stabilizer (audio spectral features, SPEC 012) as a separate frame field, and the vocabulary would read those instead of calling the model. No provider interface until a second source exists; the seam is a pure function returning partial levels.
 9. *(2026-10-20.)* Partials whose harmonic number is a power of two (1, 2, 4, 8) share the fundamental's pitch class in these octave-agnostic lenses and are **not drawn**.
@@ -154,10 +154,10 @@ For each annotated note with `partials`, emit one overtone strip per partial:
 
 ## Chord glyph treatment (decided 2026-10-20)
 
-Two placements were mocked up against the real glyph geometry: A, a fixed band just outside the longest spoke; B, steam emitted from the glyph's edge. B was chosen; A remains a one-constant switch (`GLYPH_STEAM_PLACEMENT` in ThreeJSRenderer) in case testing favours it.
+Two placements were mocked up against the real glyph geometry: A, a fixed band just outside the longest spoke; B, steam emitted from the glyph's edge (hub, spoke tip or spoke side). B was built first; after testing in the app, A was chosen (2026-10-21). B remains a one-constant switch (`GLYPH_STEAM_PLACEMENT` in ThreeJSRenderer).
 
-- **Whose partials:** the chord's own tones (once per distinct pitch class; octave doubling ignored) emit steam from the glyph's edge at each partial's angle — 30° per semitone from the root, cents included — whether that edge is the hub, a spoke tip or a spoke's side. The rhythm lens keeps one set per note, since it shows every played note.
-- **Angle, not length:** angle carries pitch (the glyph's own frame). Spoke length encodes a chord tone's role, and partials are not chord tones (I31), so steam has a fixed shape: its radial length equals an extension spoke, and the outward fade makes the visible steam shorter so it never reads as a spoke.
+- **Whose partials:** the chord's own tones (once per distinct pitch class; octave doubling ignored) show steam in a ring just outside the glyph's longest spoke, separated from it by a gap of negative space, at each partial's angle — 30° per semitone from the root, cents included. The rhythm lens keeps one set per note, since it shows every played note.
+- **Angle, not length:** angle carries pitch (the glyph's own frame). Spoke length encodes a chord tone's role, and partials are not chord tones (I31), so steam has a fixed shape and sits outside the glyph beyond a gap, where it cannot read as a spoke. The gap ring also sets the progression clock's outer radius, tying the two cells' proportions together.
 - **Stacking:** density is the partial level; overlapping partials add (additive, as in the rhythm lens). Partials are not pre-summed per angle, so near-misses stay distinct (synesthetica-xt7e).
 - **Field and motion:** the same steam rules as overtone strips, in polar form — around the circle and outward from the edge, rising outward. Uniform, meaningless, session clock, frozen under reduced motion.
 - **Lifecycle:** steam fades with the glyph and breaks into wisps over the glyph's fade-out.

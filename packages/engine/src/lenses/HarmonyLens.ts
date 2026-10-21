@@ -460,8 +460,8 @@ export class HarmonyLens implements IVisualLens {
           quality: chord.chord.harmonic.quality,
           elements: chord.shape.elements,
           margin: chord.shape.margin,
-          // Harmonic series overlay (RFC 012): steam emitted from the
-          // glyph's edge at each partial's angle. Breaks into wisps as
+          // Harmonic series overlay (RFC 012): a ring of steam around the
+          // glyph at each partial's angle. Breaks into wisps as
           // the glyph fades.
           partials: chord.partials,
           overtoneDissipation: 1 - chordOpacity,

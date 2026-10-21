@@ -243,8 +243,9 @@ const OVERTONE_STEAM_FRAGMENT = `
 // Glyph overtone steam (RFC 012)
 // ============================================================================
 //
-// The chord glyph's overtones: steam emitted from the glyph's edge at
-// each partial's angle (30° per semitone from the root, cents included).
+// The chord glyph's overtones: a ring of steam outside the glyph (or,
+// with "edge" placement, emitted from its outline) at each partial's
+// angle (30° per semitone from the root, cents included).
 // Same field rules as overtone strips, in polar form: x runs around the
 // circle (one noise period per turn, so it wraps seamlessly), y runs
 // outward from the emitting edge and rises outward over time. Density is
