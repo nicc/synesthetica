@@ -70,9 +70,11 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Type-check
+        run: npm run typecheck
+
       - name: Test
-        # --if-present skips workspaces without a test script.
-        run: npm test -ws --if-present
+        run: npm test
 
       - name: Lint
         run: npm run lint
