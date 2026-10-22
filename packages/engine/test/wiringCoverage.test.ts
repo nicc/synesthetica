@@ -111,12 +111,11 @@ function pickTestValue(
 ): number | string | boolean {
   if (macro.type === "toggle") return !baseline;
   if (macro.type === "continuous" && range) {
+    // Two in-range candidates; at most one can equal the baseline.
     const [lo, hi] = range;
-    // Try halfway between default and hi; if that equals baseline,
-    // try halfway to lo.
-    const candidateA = (typeof macro.default === "number" ? macro.default : lo) + (hi - lo) * 0.37;
+    const candidateA = lo + (hi - lo) * 0.37;
     if (candidateA !== baseline) return candidateA;
-    return lo + (hi - lo) * 0.13;
+    return lo + (hi - lo) * 0.63;
   }
   if (macro.type === "discrete" && enumValues) {
     for (const v of enumValues) {
@@ -181,5 +180,26 @@ describe("Wiring coverage — pipeline.setMacro reaches consumers", () => {
         ).toBe(testValue);
       }
     });
+  }
+});
+
+// -----------------------------------------------------------------
+// Defaults: each consumer starts at the manifest's declared default.
+// The manifest default is what the LLM primer and the web panel show;
+// a consumer with its own hard-coded default would silently disagree.
+// This is the one place defaults are pinned (CLAUDE.md testing rule 5).
+// -----------------------------------------------------------------
+describe("Wiring coverage — consumers start at the manifest default", () => {
+  const { consumerLookup } = buildPipeline();
+  for (const macro of productionManifest.macros) {
+    if (macro.type === "compound") continue;
+    for (const consumer of macro.consumers as MacroConsumer[]) {
+      it(`${macro.id} → '${consumer.id}' defaults to ${JSON.stringify(macro.default)}`, () => {
+        const instance = consumerLookup.get(consumer.id) as
+          | { readMacros?: () => Record<string, number | string | boolean> }
+          | undefined;
+        expect(instance?.readMacros?.()[consumer.macroKey]).toBe(macro.default);
+      });
+    }
   }
 });

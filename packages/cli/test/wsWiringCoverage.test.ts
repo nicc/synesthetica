@@ -19,7 +19,7 @@
  * coverage test can't see. SPEC 014 §Wiring coverage.
  */
 
-import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import WebSocket from "ws";
 import { startWsBridge, type WsBridgeHandle } from "../src/engine/wsBridge.js";
 import { setMacroTool } from "../src/tools/macroTools.js";
@@ -113,8 +113,6 @@ class FakeBrowserWithPipeline {
     };
     this.ws.send(JSON.stringify(hello));
     this.ws.on("message", (raw) => this.onMessage(raw));
-    // Let the bridge process hello + register the handle.
-    await new Promise((r) => setTimeout(r, 20));
   }
 
   close(): void {
@@ -193,6 +191,9 @@ beforeEach(async () => {
   bridge = await startWsBridge({ port: 0, log: () => {} });
   browser = new FakeBrowserWithPipeline(bridge.port, "default");
   await browser.connect();
+  // The bridge flips the handle to running when it processes the hello.
+  const handle = bridge.handleFor("default");
+  await vi.waitFor(() => expect(handle.status).toBe("running"));
 });
 afterEach(async () => {
   browser.close();
@@ -235,23 +236,21 @@ describe("WS wiring coverage — set_macro reaches consumer through the full cha
         { name: macro.id, value: testValue },
         engine,
       );
-      expect(result.ok, JSON.stringify(result)).toBe(true);
-      if (!result.ok) return;
+      if (!result.ok) throw new Error(`set_macro failed: ${JSON.stringify(result.error)}`);
 
-      // Intent recorded (user-facing view).
-      expect(
-        result.state.macros.intents[macro.id],
-        `intent for ${macro.id} not recorded`,
-      ).toBe(testValue);
-
-      // Effective view built from live consumers — proves the value
-      // survived the WS transport AND was accepted by every declared
-      // consumer of this macro.
-      expect(
-        result.state.macros.effective[macro.id],
-        `effective value for ${macro.id} not observed on consumer — ` +
-          `declared consumers: ${JSON.stringify((macro.consumers as MacroConsumer[]).map((c) => `${c.kind}:${c.id}.${c.macroKey}`))}`,
-      ).toBe(testValue);
+      // Intent recorded (user-facing view), and effective view built
+      // from live consumers — proves the value survived the WS
+      // transport AND was accepted by every declared consumer of this
+      // macro. Consumers are in the compared object so a failure names
+      // the consumer that dropped the value.
+      const consumers = (macro.consumers as MacroConsumer[]).map(
+        (c) => `${c.kind}:${c.id}.${c.macroKey}`,
+      );
+      expect({
+        consumers,
+        intent: result.state.macros.intents[macro.id],
+        effective: result.state.macros.effective[macro.id],
+      }).toEqual({ consumers, intent: testValue, effective: testValue });
     });
   }
 });

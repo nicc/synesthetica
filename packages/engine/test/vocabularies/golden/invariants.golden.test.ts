@@ -17,7 +17,12 @@ import type {
   AnnotatedNote,
   MusicalFrame,
 } from "@synesthetica/contracts";
-import { pcToHue } from "@synesthetica/contracts";
+import {
+  pcToHue,
+  octaveToBrightness,
+  velocityToSizeMultiplier,
+  velocityToAttackMs,
+} from "@synesthetica/contracts";
 import { createTestMusicalFrame } from "../../_harness/frames";
 
 // ============================================================================
@@ -73,12 +78,21 @@ describe("Invariant: Pitch class → hue mapping", () => {
     ruleset = new MusicalVisualVocabulary();
   });
 
-  it("C (reference pitch) maps to hue 0 (red)", () => {
-    const frame = makeFrame(0, [makeNote("n1", makePitch(0, 4), 100, "sustain")]);
-    const annotated = getAnnotatedNote(ruleset, frame);
+  /** Hue the vocabulary gives pitch class `pc`. */
+  const hueOf = (pc: number) =>
+    getAnnotatedNote(
+      ruleset,
+      makeFrame(0, [makeNote("n1", makePitch(pc as PitchClass, 4), 100, "sustain")]),
+    )!.visual.palette.primary.h;
 
-    expect(annotated).toBeDefined();
-    expect(annotated!.visual.palette.primary.h).toBe(0);
+  /** The invariant the vocabulary reports — not a retyped default
+   *  (defaults are checked once, in wiringCoverage.test.ts). */
+  const invariantOf = (vocab: MusicalVisualVocabulary) =>
+    vocab.annotate(makeFrame(0, [])).hueInvariant;
+
+  it("the reference pitch class maps to the reference hue", () => {
+    const inv = invariantOf(ruleset);
+    expect(hueOf(inv.referencePc)).toBe(inv.referenceHue);
   });
 
   it("all 12 pitch classes map to distinct hues", () => {
@@ -97,33 +111,24 @@ describe("Invariant: Pitch class → hue mapping", () => {
   });
 
   it("each semitone step equals 30° hue rotation", () => {
+    const inv = invariantOf(ruleset);
+    const step = inv.direction === "ccw" ? -30 : 30;
     for (let pc = 0; pc < 12; pc++) {
-      const frame = makeFrame(0, [
-        makeNote("n1", makePitch(pc as PitchClass, 4), 100, "sustain"),
-      ]);
-      const annotated = getAnnotatedNote(ruleset, frame);
-      const expectedHue = pcToHue(pc as PitchClass, {
-        referencePc: 0,
-        referenceHue: 0,
-        direction: "cw",
-      });
-
-      expect(annotated!.visual.palette.primary.h).toBe(expectedHue);
+      expect(hueOf(pc)).toBe(pcToHue(pc as PitchClass, inv));
+      expect(hueOf((pc + 1) % 12)).toBe((hueOf(pc) + step + 360) % 360);
     }
   });
 
   it("counterclockwise direction inverts hue progression", () => {
+    const { referencePc, referenceHue } = invariantOf(ruleset);
+    const above = (referencePc + 1) % 12;
+    const cwHue = hueOf(above);
     ruleset = new MusicalVisualVocabulary({ hueDirection: "ccw" });
 
-    // C♯ (pc=1) is 1 semitone above C (reference).
-    // CW: 0 + 1*30 = 30°
-    // CCW: 0 - 1*30 = -30 → 330°
-    const frame = makeFrame(0, [
-      makeNote("n1", makePitch(1, 4), 100, "sustain"),
-    ]);
-    const annotated = getAnnotatedNote(ruleset, frame);
-
-    expect(annotated!.visual.palette.primary.h).toBe(330);
+    // One semitone above the reference: +30° clockwise, −30° counterclockwise.
+    expect(hueOf(referencePc)).toBe(referenceHue);
+    expect(hueOf(above)).toBe((2 * referenceHue - cwHue + 720) % 360);
+    expect(hueOf(above)).not.toBe(cwHue);
   });
 
   it("custom reference point shifts all hues equally", () => {
@@ -171,33 +176,30 @@ describe("Invariant I15: Octave → brightness mapping", () => {
     }
   });
 
-  it("octave 8 produces brightness near 0.95 (max)", () => {
-    const frame = makeFrame(0, [
-      makeNote("n1", makePitch(0, 8), 64, "sustain"),
-    ]);
-    const annotated = getAnnotatedNote(ruleset, frame);
+  // SPEC 010's endpoints (0.3 / 0.95) live in the contracts mapping;
+  // these tests check the vocabulary uses it and the clamping
+  // properties, rather than retyping the numbers.
+  const brightnessAt = (octave: number) =>
+    getAnnotatedNote(
+      ruleset,
+      makeFrame(0, [makeNote("n1", makePitch(0, octave), 64, "sustain")]),
+    )!.visual.palette.primary.v;
 
-    expect(annotated!.visual.palette.primary.v).toBeCloseTo(0.95, 2);
-  });
-
-  it("octave 1 produces brightness near 0.3 (min, visible)", () => {
-    const frame = makeFrame(0, [
-      makeNote("n1", makePitch(0, 1), 64, "sustain"),
-    ]);
-    const annotated = getAnnotatedNote(ruleset, frame);
-
-    expect(annotated!.visual.palette.primary.v).toBeCloseTo(0.3, 2);
-  });
-
-  it("brightness stays within [0.3, 0.95] range for all octaves", () => {
+  it("brightness follows the SPEC 010 octave mapping", () => {
     for (let oct = 0; oct <= 9; oct++) {
-      const frame = makeFrame(0, [
-        makeNote("n1", makePitch(0, oct), 64, "sustain"),
-      ]);
-      const annotated = getAnnotatedNote(ruleset, frame);
+      expect(brightnessAt(oct)).toBe(octaveToBrightness(oct));
+    }
+  });
 
-      expect(annotated!.visual.palette.primary.v).toBeGreaterThanOrEqual(0.3);
-      expect(annotated!.visual.palette.primary.v).toBeLessThanOrEqual(0.95);
+  it("brightness saturates at both ends and stays visible", () => {
+    // Clamped: octaves past the range don't keep getting brighter or darker.
+    expect(brightnessAt(9)).toBe(brightnessAt(8));
+    expect(brightnessAt(0)).toBe(brightnessAt(1));
+    expect(brightnessAt(1)).toBeGreaterThan(0);
+    expect(brightnessAt(8)).toBeLessThanOrEqual(1);
+    for (let oct = 0; oct <= 9; oct++) {
+      expect(brightnessAt(oct)).toBeGreaterThanOrEqual(brightnessAt(1));
+      expect(brightnessAt(oct)).toBeLessThanOrEqual(brightnessAt(8));
     }
   });
 });
@@ -224,22 +226,15 @@ describe("Invariant I16: Velocity → size/attack mapping", () => {
     }
   });
 
-  it("velocity 127 produces size multiplier near 2.0 (max)", () => {
-    const frame = makeFrame(0, [
-      makeNote("n1", makePitch(0, 4), 127, "sustain"),
-    ]);
-    const annotated = getAnnotatedNote(ruleset, frame);
-
-    expect(annotated!.velocity.sizeMultiplier).toBeCloseTo(2.0, 2);
-  });
-
-  it("velocity 0 produces size multiplier near 0.5 (min)", () => {
-    const frame = makeFrame(0, [
-      makeNote("n1", makePitch(0, 4), 0, "sustain"),
-    ]);
-    const annotated = getAnnotatedNote(ruleset, frame);
-
-    expect(annotated!.velocity.sizeMultiplier).toBeCloseTo(0.5, 2);
+  it("size multiplier follows the SPEC 010 velocity mapping", () => {
+    for (const velocity of [0, 32, 64, 96, 127]) {
+      const annotated = getAnnotatedNote(
+        ruleset,
+        makeFrame(0, [makeNote("n1", makePitch(0, 4), velocity, "sustain")]),
+      );
+      expect(annotated!.velocity.sizeMultiplier).toBe(velocityToSizeMultiplier(velocity));
+      expect(annotated!.velocity.attackMs).toBe(velocityToAttackMs(velocity));
+    }
   });
 
   it("higher velocity → shorter attack (sharper onset)", () => {
@@ -254,8 +249,7 @@ describe("Invariant I16: Velocity → size/attack mapping", () => {
     const annotated0 = getAnnotatedNote(ruleset, frame0);
 
     expect(annotated127!.velocity.attackMs).toBeLessThan(annotated0!.velocity.attackMs);
-    expect(annotated127!.velocity.attackMs).toBeCloseTo(0, 1); // Near instant
-    expect(annotated0!.velocity.attackMs).toBeCloseTo(50, 1); // Max fade-in
+    expect(annotated127!.velocity.attackMs).toBeGreaterThanOrEqual(0);
   });
 });
 

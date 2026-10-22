@@ -51,9 +51,8 @@ jobs:
         run: npm run typecheck
 
       - name: Test
-        # --if-present skips workspaces without a test script
-        # (packages/contracts is types-only, no runtime to test).
-        run: npm test -ws --if-present
+        # One vitest run across every package (vitest.workspace.ts).
+        run: npm test
 
       - name: Lint
         run: npm run lint

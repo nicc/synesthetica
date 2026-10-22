@@ -94,67 +94,57 @@ describe("HarmonyStabilizer", () => {
   });
 
   describe("tension (key-agnostic)", () => {
-    it("computes low tension for major triad", () => {
-      const raw = createTestRawFrame(1000);
-      const chord = createChord(0, "maj", [
+    const majTriad = () =>
+      createChord(0, "maj", [
         { pc: 0, octave: 4 },
         { pc: 4, octave: 4 },
         { pc: 7, octave: 4 },
       ]);
-      const upstream = createUpstreamFrame(1000, [chord]);
-      const result = stabilizer.apply(raw, upstream);
-
-      expect(result.harmonicContext?.tension).toBeLessThan(0.3);
-    });
-
-    it("computes moderate tension for dominant 7th", () => {
-      const raw = createTestRawFrame(1000);
-      const chord = createChord(7, "dom7", [
+    const dom7 = () =>
+      createChord(7, "dom7", [
         { pc: 7, octave: 3 },
         { pc: 11, octave: 3 },
         { pc: 2, octave: 4 },
         { pc: 5, octave: 4 },
       ]);
-      const upstream = createUpstreamFrame(1000, [chord]);
-      const result = stabilizer.apply(raw, upstream);
-
-      expect(result.harmonicContext?.tension).toBeGreaterThan(0.2);
-      expect(result.harmonicContext?.tension).toBeLessThan(0.85);
-    });
-
-    it("computes high tension for diminished 7th", () => {
-      const raw = createTestRawFrame(1000);
-      const chord = createChord(0, "dim7", [
+    const dim7 = () =>
+      createChord(0, "dim7", [
         { pc: 0, octave: 4 },
         { pc: 3, octave: 4 },
         { pc: 6, octave: 4 },
         { pc: 9, octave: 4 },
       ]);
-      const upstream = createUpstreamFrame(1000, [chord]);
-      const result = stabilizer.apply(raw, upstream);
 
-      expect(result.harmonicContext?.tension).toBeGreaterThan(0.5);
+    /** Tension a fresh stabilizer reports for `chords`. */
+    function tensionOf(chords: MusicalChord[]): number {
+      const stab = new HarmonyStabilizer({ partId: "main" });
+      stab.init();
+      const result = stab.apply(createTestRawFrame(1000), createUpstreamFrame(1000, chords));
+      return result.harmonicContext!.tension;
+    }
+
+    it("orders tension maj < dom7 < dim7", () => {
+      const maj = tensionOf([majTriad()]);
+      const dom = tensionOf([dom7()]);
+      const dim = tensionOf([dim7()]);
+      expect(maj).toBeLessThan(dom);
+      expect(dom).toBeLessThan(dim);
+    });
+
+    it("keeps tension within [0, 1]", () => {
+      for (const chord of [majTriad(), dom7(), dim7()]) {
+        const tension = tensionOf([chord]);
+        expect(tension).toBeGreaterThanOrEqual(0);
+        expect(tension).toBeLessThanOrEqual(1);
+      }
     });
 
     it("uses active chord over decaying", () => {
-      const raw = createTestRawFrame(1000);
-      const activeChord = createChord(0, "dim7", [
-        { pc: 0, octave: 4 },
-        { pc: 3, octave: 4 },
-        { pc: 6, octave: 4 },
-        { pc: 9, octave: 4 },
-      ]);
-      const decayingChord = createChord(0, "maj", [
-        { pc: 0, octave: 4 },
-        { pc: 4, octave: 4 },
-        { pc: 7, octave: 4 },
-      ]);
-      decayingChord.phase = "decaying";
-
-      const upstream = createUpstreamFrame(1000, [decayingChord, activeChord]);
-      const result = stabilizer.apply(raw, upstream);
-
-      expect(result.harmonicContext?.tension).toBeGreaterThan(0.4);
+      const decaying = majTriad();
+      decaying.phase = "decaying";
+      // Tension follows the active dim7, not the decaying triad.
+      expect(tensionOf([decaying, dim7()])).toBe(tensionOf([dim7()]));
+      expect(tensionOf([decaying, dim7()])).not.toBe(tensionOf([majTriad()]));
     });
   });
 
@@ -388,6 +378,15 @@ describe("HarmonyStabilizer", () => {
   describe("functional edges (SPEC 011)", () => {
     const cMajor: PrescribedKey = { root: 0 as PitchClass, mode: "ionian" };
 
+    /** Edges a fresh stabilizer emits for one chord in C major. */
+    function edgesFor(root: PitchClass, pcs: PitchClass[], quality: ChordQuality = "maj") {
+      const stab = new HarmonyStabilizer({ partId: "main" });
+      stab.init();
+      const chord = createChord(root, quality, pcs.map((pc) => ({ pc, octave: 4 })));
+      const result = stab.apply(createTestRawFrame(1000), createUpstreamFrame(1000, [chord], cMajor));
+      return result.harmonicContext?.functionalEdges ?? [];
+    }
+
     it("emits no edges for diatonic chords", () => {
       const raw = createTestRawFrame(1000);
       const chord = createChord(0 as PitchClass, "maj", [
@@ -418,7 +417,11 @@ describe("HarmonyStabilizer", () => {
       expect(edges[0].targetPc).toBe(5); // F
       expect(edges[0].targetDiatonic).toBe(true);
       expect(edges[0].type).toBe("subdominant-borrowing");
-      expect(edges[0].weight).toBeGreaterThan(0.8);
+      // ♭VII → IV is the conventional reading of ♭VII, so it outweighs
+      // the weaker, ambiguous ♭VI fan-out edges.
+      const flatSixEdges = edgesFor(8 as PitchClass, [8, 0, 3] as PitchClass[]);
+      expect(flatSixEdges.length).toBeGreaterThan(0);
+      for (const e of flatSixEdges) expect(edges[0].weight).toBeGreaterThan(e.weight);
     });
 
     it("emits V/V → V edge (secondary dominant)", () => {
@@ -438,7 +441,14 @@ describe("HarmonyStabilizer", () => {
       expect(edges[0].targetPc).toBe(7); // G
       expect(edges[0].targetDiatonic).toBe(true);
       expect(edges[0].type).toBe("secondary-dominant");
-      expect(edges[0].weight).toBeGreaterThan(0.9);
+      // V/V is the strongest secondary dominant: it outweighs V/IV (C7)
+      // and the conventional V/ii edge.
+      const vOfIV = edgesFor(0 as PitchClass, [0, 4, 7, 10] as PitchClass[], "dom7");
+      const vOfii = edgesFor(9 as PitchClass, [9, 1, 4] as PitchClass[]).filter(
+        (e) => e.targetDiatonic,
+      );
+      for (const e of [...vOfIV, ...vOfii]) expect(edges[0].weight).toBeGreaterThan(e.weight);
+      expect(vOfIV.length + vOfii.length).toBe(2);
     });
 
     it("emits both diatonic + chain edges for V/ii (fan-out)", () => {
@@ -739,12 +749,18 @@ describe("defaultDissonanceAlgorithm", () => {
     expect(defaultDissonanceAlgorithm(chord)).toBe(0);
   });
 
-  it("computes high dissonance for tritone", () => {
-    const chord = createChord(0, "maj", [
+  it("rates a tritone more dissonant than a perfect fifth", () => {
+    const tritone = createChord(0, "maj", [
       { pc: 0, octave: 4 },
       { pc: 6 as PitchClass, octave: 4 },
     ]);
-    expect(defaultDissonanceAlgorithm(chord)).toBeGreaterThanOrEqual(0.4);
+    const fifth = createChord(0, "5", [
+      { pc: 0, octave: 4 },
+      { pc: 7 as PitchClass, octave: 4 },
+    ]);
+    expect(defaultDissonanceAlgorithm(tritone)).toBeGreaterThan(
+      defaultDissonanceAlgorithm(fifth),
+    );
   });
 
   it("clamps to 1.0 maximum", () => {

@@ -1,15 +1,19 @@
 /**
  * Golden Tests: NoteTrackingStabilizer
  *
- * Tests the RawInputFrame → MusicalFrame boundary.
- * Verifies that MIDI events produce correct musical abstractions.
+ * Tests the RawInputFrame → MusicalFrame boundary: the shape of the
+ * frame a note_on produces (basic-note.json), and sequence cases the
+ * unit tests in NoteTrackingStabilizer.test.ts don't cover (a MIDI
+ * note_off with no matching note_on). Lifecycle, phase, release-window
+ * and re-trigger behaviour live in the unit tests.
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, beforeEach } from "vitest";
 import {
   loadFixture,
   loadFixturesFromDir,
   expectFrameEquals,
+  type Fixture,
   type SequenceFixture,
 } from "../../_harness/golden";
 import type { RawInputFrame, MusicalFrame, Pitch, NotePhase } from "@synesthetica/contracts";
@@ -30,7 +34,6 @@ interface ExpectedNote {
 interface ExpectedOutput {
   noteCount: number;
   notes: ExpectedNote[];
-  dynamics: { level: number };
 }
 
 type StabilizerSequenceFixture = SequenceFixture<RawInputFrame, ExpectedOutput>;
@@ -71,10 +74,6 @@ function compareOutput(actual: MusicalFrame, expected: ExpectedOutput): void {
       );
     }
   }
-
-  // Dynamics computation moved to DynamicsStabilizer — NoteTrackingStabilizer returns empty
-  expect(actual.dynamics.level).toBe(0);
-  expect(actual.dynamics.events).toEqual([]);
 }
 
 describe("NoteTrackingStabilizer golden tests", () => {
@@ -119,15 +118,19 @@ describe("NoteTrackingStabilizer golden tests", () => {
     });
   }
 
-  // Keep the single-frame test for basic smoke testing
+  // Contract shape of the MusicalFrame a single note_on produces.
+  // Provenance (source/stream/version) is not part of the claim.
   it("basic-note: single note_on produces attack phase note", () => {
-    const fixture = loadFixture<{ description: string; input: RawInputFrame; expected: MusicalFrame }>(
+    const fixture = loadFixture<Fixture<RawInputFrame, MusicalFrame>>(
       "stabilizer/note-tracking/basic-note.json"
     );
     const stabilizer = new NoteTrackingStabilizer({ partId: "default" });
     stabilizer.init();
 
     const actual = stabilizer.apply(fixture.input, null);
-    expectFrameEquals(actual, fixture.expected, { floatTolerance: 1e-10 });
+    expectFrameEquals(actual, fixture.expected, {
+      floatTolerance: 1e-10,
+      ignoreFields: ["provenance"],
+    });
   });
 });

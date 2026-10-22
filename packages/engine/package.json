@@ -14,6 +14,7 @@
     "build": "tsc --build tsconfig.json",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "test": "vitest run",
+    "snapshots": "vitest run --config vitest.snapshots.config.ts",
     "test:watch": "vitest"
   },
   "dependencies": {

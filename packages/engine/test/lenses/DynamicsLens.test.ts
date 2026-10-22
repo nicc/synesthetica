@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   DynamicsLens,
+  DEFAULT_FADE_MS,
+  MIN_OPACITY,
   OUTLINE_THICKNESS,
 } from "../../src/lenses/DynamicsLens";
 import type {
@@ -98,9 +100,8 @@ describe("DynamicsLens", () => {
 
       expect(ticks).toHaveLength(3);
 
-      const OT = 0.001; // OUTLINE_THICKNESS
       const expectedYs = [0.25, 0.5, 0.75].map(
-        (f) => BAR_BOTTOM - f * BAR_HEIGHT - OT / 2,
+        (f) => BAR_BOTTOM - f * BAR_HEIGHT - OUTLINE_THICKNESS / 2,
       );
 
       for (let i = 0; i < ticks.length; i++) {
@@ -139,20 +140,18 @@ describe("DynamicsLens", () => {
     });
 
     it("omits events older than fade window", () => {
+      const t = 2 * DEFAULT_FADE_MS;
       const dynamics: DynamicsState = {
         events: [
-          { t: 100, intensity: 0.5 },
-          { t: 2000, intensity: 0.7 },
+          { t: t - DEFAULT_FADE_MS - 1, intensity: 0.5 },
+          { t: t - DEFAULT_FADE_MS / 4, intensity: 0.7 },
         ],
         level: 0.7,
-        contour: [
-          { t: 100, level: 0.5 },
-          { t: 2000, level: 0.7 },
-        ],
+        contour: [],
         range: { min: 0.5, max: 0.7, variance: 0.01 },
       };
 
-      const frame = createTestFrame(2500, dynamics);
+      const frame = createTestFrame(t, dynamics);
       const scene = lens.update(frame, null);
 
       expect(indicators(scene.entities)).toHaveLength(1);
@@ -184,7 +183,7 @@ describe("DynamicsLens", () => {
       };
 
       // At significant age the width still stays constant
-      const frame = createTestFrame(1500, dynamics);
+      const frame = createTestFrame(0.75 * DEFAULT_FADE_MS, dynamics);
       const scene = lens.update(frame, null);
       const ind = indicators(scene.entities)[0];
 
@@ -202,7 +201,7 @@ describe("DynamicsLens", () => {
       };
 
       // Aged so thickness is near max
-      const frame = createTestFrame(1500, dynamics);
+      const frame = createTestFrame(0.75 * DEFAULT_FADE_MS, dynamics);
       const scene = lens.update(frame, null);
       const inds = indicators(scene.entities);
 
@@ -221,7 +220,7 @@ describe("DynamicsLens", () => {
       };
 
       const fresh = lens.update(createTestFrame(500, dynamics), null);
-      const aged = lens.update(createTestFrame(1500, dynamics), null);
+      const aged = lens.update(createTestFrame(500 + DEFAULT_FADE_MS / 2, dynamics), null);
 
       const freshH = indicators(fresh.entities)[0].data?.h as number;
       const agedH = indicators(aged.entities)[0].data?.h as number;
@@ -234,40 +233,46 @@ describe("DynamicsLens", () => {
     it("opacity uses min floor for quiet notes", () => {
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
-        events: [{ t: 1000, intensity: 0.1 }],
+        events: [
+          { t: 1000, intensity: MIN_OPACITY / 2 },
+          { t: 1000, intensity: MIN_OPACITY / 4 },
+        ],
       };
 
       const frame = createTestFrame(1000, dynamics);
       const scene = lens.update(frame, null);
       const inds = indicators(scene.entities);
 
-      expect(inds[0].style.opacity).toBeCloseTo(0.25, 2);
+      expect(inds[0].style.opacity).toBeCloseTo(MIN_OPACITY, 9);
+      expect(inds[1].style.opacity).toBeCloseTo(MIN_OPACITY, 9);
     });
 
     it("loud notes use their actual intensity as opacity", () => {
+      const loud = (1 + MIN_OPACITY) / 2; // above the floor
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
-        events: [{ t: 1000, intensity: 0.9 }],
+        events: [{ t: 1000, intensity: loud }],
       };
 
       const frame = createTestFrame(1000, dynamics);
       const scene = lens.update(frame, null);
 
-      expect(indicators(scene.entities)[0].style.opacity).toBeCloseTo(0.9, 2);
+      expect(indicators(scene.entities)[0].style.opacity).toBeCloseTo(loud, 9);
     });
 
-    it("opacity fades over time", () => {
+    it("opacity fades linearly over the fade window", () => {
+      const intensity = (1 + MIN_OPACITY) / 2;
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
-        events: [{ t: 500, intensity: 0.8 }],
+        events: [{ t: 500, intensity }],
       };
 
-      const frame = createTestFrame(1500, dynamics);
-      const scene = lens.update(frame, null);
-      const inds = indicators(scene.entities);
+      const opacityAt = (fraction: number) =>
+        indicators(lens.update(createTestFrame(500 + fraction * DEFAULT_FADE_MS, dynamics), null).entities)[0]
+          .style.opacity!;
 
-      expect(inds).toHaveLength(1);
-      expect(inds[0].style.opacity).toBeCloseTo(0.4, 2);
+      expect(opacityAt(0.5)).toBeCloseTo(intensity / 2, 9);
+      expect(opacityAt(0.75)).toBeCloseTo(intensity / 4, 9);
     });
   });
 
@@ -294,19 +299,19 @@ describe("DynamicsLens", () => {
 
   describe("macros", () => {
     it("setMacros({ linger }) shortens the fade window — indicators drop out earlier", () => {
-      // Event at t=800, sampled at t=2000 → age=1200 ms.
-      // Default fade is 2000 ms → indicator visible (age < fade).
-      // With linger=500 → indicator hidden (age > fade).
+      // Sampled at half the default fade: visible by default, hidden
+      // once linger is shorter than the event's age.
+      const age = DEFAULT_FADE_MS / 2;
       const dynamics: DynamicsState = {
         ...EMPTY_DYNAMICS,
         events: [{ t: 800, intensity: 0.5 }],
       };
-      const sample = createTestFrame(2000, dynamics);
+      const sample = createTestFrame(800 + age, dynamics);
 
       const defaultScene = lens.update(sample, null);
       expect(indicators(defaultScene.entities)).toHaveLength(1);
 
-      lens.setMacros({ linger: 500 });
+      lens.setMacros({ linger: age / 2 });
       const shortScene = lens.update(sample, null);
       expect(indicators(shortScene.entities)).toHaveLength(0);
     });

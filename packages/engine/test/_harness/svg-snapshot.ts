@@ -4,12 +4,14 @@
  * Renders SceneFrame entities to SVG for visual review during lens development.
  * SVG files can be opened in a browser to see the visual output without running the app.
  *
- * Usage:
- *   const svg = renderSceneToSVG(scene, { width: 800, height: 600 });
- *   writeSnapshot('my-test', svg);
+ * Usage (from a .snapshot.ts file under test/):
+ *   maybeWriteSnapshot("my-scene", scene);
  *
- * To generate snapshots:
- *   GENERATE_SNAPSHOTS=1 npm test
+ * Each SVG carries the scene's metrics (see formatMetrics) in a header
+ * comment, so diagnostics live with the image rather than the console.
+ *
+ * To generate snapshots (writes to test/_snapshots/, gitignored):
+ *   npm run snapshots -w packages/engine
  */
 
 import { writeFileSync, mkdirSync, existsSync } from "fs";
@@ -385,6 +387,7 @@ export function renderSceneToSVG(scene: SceneFrame, options: SVGOptions = {}): s
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
     `  <rect width="100%" height="100%" fill="${background}" />`,
     `  <!-- Frame t=${scene.t}ms, ${scene.entities.length} entities -->`,
+    `  <!--\n${escapeXMLComment(formatMetrics(extractMetrics(scene)))}\n  -->`,
   ];
 
   // Grid layer

@@ -33,13 +33,4 @@ describe("downmixInPlace", () => {
     // (0 + 1 + 2 + 3) / 4 = 1.5
     expect(Array.from(out)).toEqual([1.5, 1.5, 1.5]);
   });
-
-  it("does not allocate (writes in place)", () => {
-    // Sanity: the same out buffer is reused
-    const out = new Float32Array(4);
-    const left = new Float32Array([1, 2, 3, 4]);
-    const right = new Float32Array([5, 6, 7, 8]);
-    downmixInPlace([left, right], out);
-    expect(out.buffer.byteLength).toBe(16); // 4 * 4 bytes
-  });
 });

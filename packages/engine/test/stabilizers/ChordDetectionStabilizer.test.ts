@@ -15,6 +15,7 @@ import type {
   Note,
   PitchClass,
   NotePhase,
+  PrescribedKey,
 } from "@synesthetica/contracts";
 import { createTestRawFrame, createTestMusicalFrame } from "../_harness/frames";
 
@@ -36,36 +37,56 @@ function makeNote(pc: PitchClass, octave: number, t: number): Note {
   };
 }
 
-function createUpstreamFrame(t: number, notes: Note[]) {
-  return createTestMusicalFrame(t, "main", { notes, progression: [] });
+/**
+ * Explicit config for every stabilizer under test (CLAUDE.md testing
+ * rule 3). Timings below derive from it (rule 4), so retuning the
+ * production defaults — or these values — cannot break the tests.
+ */
+const CFG = { partId: "main", pitchDecayMs: 400, minPitchClasses: 2, hysteresisMs: 50 };
+
+/** First frame time at which a candidate chord seen at `t` is displayed. */
+function afterHysteresis(t: number): number {
+  return t + CFG.hysteresisMs + 1;
 }
 
 /**
- * Feed notes into the stabilizer and return the detected chord quality.
- * Sends two frames separated by hysteresis window to ensure chord is displayed.
+ * Feed `notes` at `t`, then again after the hysteresis window so the
+ * candidate chord becomes displayed. Returns the second frame.
  */
+function settle(
+  stabilizer: ChordDetectionStabilizer,
+  notes: Note[],
+  t = 1000,
+  prescribedKey?: PrescribedKey,
+) {
+  const keyOverride = prescribedKey ? { prescribedKey } : {};
+  stabilizer.apply(
+    createTestRawFrame(t),
+    createTestMusicalFrame(t, "main", { notes, progression: [], ...keyOverride }),
+  );
+  const t2 = afterHysteresis(t);
+  const notes2 = notes.map((n) => ({ ...n, onset: t2 }));
+  return stabilizer.apply(
+    createTestRawFrame(t2),
+    createTestMusicalFrame(t2, "main", { notes: notes2, progression: [], ...keyOverride }),
+  );
+}
+
+/**
+ * Voice `pitchClasses` with the first one as the bass (octave 3) —
+ * the "first pc is the intended root/bass" convention these tests use.
+ */
+function voice(pitchClasses: PitchClass[], t: number): Note[] {
+  return pitchClasses.map((pc, i) => makeNote(pc, i === 0 ? 3 : 4, t));
+}
+
+/** Settle `pitchClasses` and return the displayed chord quality. */
 function detectQuality(
   stabilizer: ChordDetectionStabilizer,
   pitchClasses: PitchClass[],
   t: number = 1000
 ): string | null {
-  // First pc placed at octave 3 so it's the MIDI-lowest (bass) note —
-  // matches the "various roots" convention where first pc in the array
-  // is the intended chord root/bass.
-  const notes = pitchClasses.map((pc, i) => makeNote(pc, i === 0 ? 3 : 4, t));
-  const upstream = createUpstreamFrame(t, notes);
-  const raw = createTestRawFrame(t);
-
-  // First frame: chord enters candidate state
-  stabilizer.apply(raw, upstream);
-
-  // Second frame after hysteresis: chord becomes displayed
-  const t2 = t + 100;
-  const notes2 = pitchClasses.map((pc, i) => makeNote(pc, i === 0 ? 3 : 4, t2));
-  const upstream2 = createUpstreamFrame(t2, notes2);
-  const raw2 = createTestRawFrame(t2);
-  const result = stabilizer.apply(raw2, upstream2);
-
+  const result = settle(stabilizer, voice(pitchClasses, t), t);
   if (result.chords.length === 0) return null;
   return result.chords[0].harmonic.quality;
 }
@@ -121,7 +142,7 @@ describe("ChordDetectionStabilizer", () => {
   let stabilizer: ChordDetectionStabilizer;
 
   beforeEach(() => {
-    stabilizer = new ChordDetectionStabilizer({ partId: "main" });
+    stabilizer = new ChordDetectionStabilizer(CFG);
     stabilizer.init();
   });
 
@@ -220,26 +241,7 @@ describe("ChordDetectionStabilizer", () => {
       key: { root: PitchClass; mode: "ionian" | "aeolian" },
       t = 1000,
     ): PitchClass | null {
-      // First pc placed at octave 3 so it's the MIDI-lowest (bass) note,
-      // matching root-position voicings the tests describe.
-      const notes = pcs.map((pc, i) => makeNote(pc, i === 0 ? 3 : 4, t));
-      const raw1 = createTestRawFrame(t);
-      const upstream1 = createTestMusicalFrame(t, "main", {
-        notes,
-        progression: [],
-        prescribedKey: key,
-      });
-      stabilizer.apply(raw1, upstream1);
-
-      const t2 = t + 100;
-      const notes2 = pcs.map((pc, i) => makeNote(pc, i === 0 ? 3 : 4, t2));
-      const raw2 = createTestRawFrame(t2);
-      const upstream2 = createTestMusicalFrame(t2, "main", {
-        notes: notes2,
-        progression: [],
-        prescribedKey: key,
-      });
-      const result = stabilizer.apply(raw2, upstream2);
+      const result = settle(stabilizer, voice(pcs, t), t, key);
       if (result.chords.length === 0) return null;
       return result.chords[0].harmonic.root;
     }
@@ -292,33 +294,11 @@ describe("ChordDetectionStabilizer", () => {
         }),
       );
 
-      // Now play Ab-C-Eb with Ab as bass (octave 3).
-      const t2 = 2000;
-      const abmNotes: Note[] = [
-        {
-          ...makeNote(8 as PitchClass, 3, t2),
-          pitch: { pc: 8 as PitchClass, octave: 3 },
-        },
-        makeNote(0 as PitchClass, 4, t2),
-        makeNote(3 as PitchClass, 4, t2),
-      ];
-      stabilizer.apply(
-        createTestRawFrame(t2),
-        createTestMusicalFrame(t2, "main", {
-          notes: abmNotes,
-          progression: [],
-          prescribedKey: ab,
-        }),
-      );
-      const t3 = 2100;
-      const result = stabilizer.apply(
-        createTestRawFrame(t3),
-        createTestMusicalFrame(t3, "main", {
-          notes: abmNotes.map((n) => ({ ...n, onset: t3 })),
-          progression: [],
-          prescribedKey: ab,
-        }),
-      );
+      // Now play Ab-C-Eb with Ab as bass (octave 3), once the Caug's E
+      // has decayed out of the pot.
+      const t2 = t1 + CFG.pitchDecayMs + 1;
+      const abmNotes = voice([8, 0, 3] as PitchClass[], t2);
+      const result = settle(stabilizer, abmNotes, t2, ab);
 
       // Should detect Ab major despite C being earlier in the pc map.
       const current = result.chords.find((c) => c.phase === "active");
@@ -349,26 +329,7 @@ describe("ChordDetectionStabilizer", () => {
       key: { root: PitchClass; mode: "ionian" | "aeolian" },
       t = 1000,
     ): { root: PitchClass; quality: string } | null {
-      // First pc placed at octave 3 so it's the MIDI-lowest (bass) note,
-      // matching root-position voicings the tests describe.
-      const notes = pcs.map((pc, i) => makeNote(pc, i === 0 ? 3 : 4, t));
-      const raw1 = createTestRawFrame(t);
-      const upstream1 = createTestMusicalFrame(t, "main", {
-        notes,
-        progression: [],
-        prescribedKey: key,
-      });
-      stabilizer.apply(raw1, upstream1);
-
-      const t2 = t + 100;
-      const notes2 = pcs.map((pc, i) => makeNote(pc, i === 0 ? 3 : 4, t2));
-      const raw2 = createTestRawFrame(t2);
-      const upstream2 = createTestMusicalFrame(t2, "main", {
-        notes: notes2,
-        progression: [],
-        prescribedKey: key,
-      });
-      const result = stabilizer.apply(raw2, upstream2);
+      const result = settle(stabilizer, voice(pcs, t), t, key);
       if (result.chords.length === 0) return null;
       return {
         root: result.chords[0].harmonic.root,
@@ -445,28 +406,7 @@ describe("ChordDetectionStabilizer", () => {
         makeNote(10 as PitchClass, 4, 1000),
         makeNote(3 as PitchClass, 4, 1000),
       ];
-      stabilizer.apply(
-        createTestRawFrame(1000),
-        createTestMusicalFrame(1000, "main", {
-          notes,
-          progression: [],
-          prescribedKey: { root: 3 as PitchClass, mode: "ionian" },
-        }),
-      );
-      const t2 = 1100;
-      const notes2 = [
-        makeNote(7 as PitchClass, 3, t2),
-        makeNote(10 as PitchClass, 4, t2),
-        makeNote(3 as PitchClass, 4, t2),
-      ];
-      const result = stabilizer.apply(
-        createTestRawFrame(t2),
-        createTestMusicalFrame(t2, "main", {
-          notes: notes2,
-          progression: [],
-          prescribedKey: { root: 3 as PitchClass, mode: "ionian" },
-        }),
-      );
+      const result = settle(stabilizer, notes, 1000, { root: 3 as PitchClass, mode: "ionian" });
       const chord = result.chords.find((c) => c.phase === "active");
       expect(chord).toBeDefined();
       // Harmonic reading: Eb major
@@ -498,16 +438,7 @@ describe("ChordDetectionStabilizer", () => {
         makeNote(0 as PitchClass, 5, 1000), // C5 (72)
         makeNote(3 as PitchClass, 5, 1000), // Eb5 (75)
       ];
-      stabilizer.apply(
-        createTestRawFrame(1000),
-        createTestMusicalFrame(1000, "main", { notes, progression: [] }),
-      );
-      const t2 = 1100;
-      const notes2 = notes.map((n) => ({ ...n, onset: t2 }));
-      const result = stabilizer.apply(
-        createTestRawFrame(t2),
-        createTestMusicalFrame(t2, "main", { notes: notes2, progression: [] }),
-      );
+      const result = settle(stabilizer, notes, 1000);
       const chord = result.chords.find((c) => c.phase === "active");
       expect(chord).toBeDefined();
       // Bass-first, four entries preserved including the C4/C5 doubling.
@@ -531,16 +462,7 @@ describe("ChordDetectionStabilizer", () => {
         makeNote(3 as PitchClass, 4, 1000), // Eb4
         makeNote(8 as PitchClass, 4, 1000), // Ab4
       ];
-      stabilizer.apply(
-        createTestRawFrame(1000),
-        createTestMusicalFrame(1000, "main", { notes, progression: [] }),
-      );
-      const t2 = 1100;
-      const notes2 = notes.map((n) => ({ ...n, onset: t2 }));
-      const result = stabilizer.apply(
-        createTestRawFrame(t2),
-        createTestMusicalFrame(t2, "main", { notes: notes2, progression: [] }),
-      );
+      const result = settle(stabilizer, notes, 1000);
       const chord = result.chords.find((c) => c.phase === "active");
       expect(chord).toBeDefined();
       // Harmonic: Ab major
@@ -559,24 +481,7 @@ describe("ChordDetectionStabilizer", () => {
         makeNote(3 as PitchClass, 4, 1000), // Eb4
         makeNote(8 as PitchClass, 4, 1000), // Ab4
       ];
-      stabilizer.apply(
-        createTestRawFrame(1000),
-        createTestMusicalFrame(1000, "main", {
-          notes,
-          progression: [],
-          prescribedKey: { root: 8 as PitchClass, mode: "ionian" },
-        }),
-      );
-      const t2 = 1100;
-      const notes2 = notes.map((n) => ({ ...n, onset: t2 }));
-      const result = stabilizer.apply(
-        createTestRawFrame(t2),
-        createTestMusicalFrame(t2, "main", {
-          notes: notes2,
-          progression: [],
-          prescribedKey: { root: 8 as PitchClass, mode: "ionian" },
-        }),
-      );
+      const result = settle(stabilizer, notes, 1000, { root: 8 as PitchClass, mode: "ionian" });
       const chord = result.chords.find((c) => c.phase === "active");
       expect(chord).toBeDefined();
       expect(chord?.harmonic.root).toBe(8); // Ab
@@ -594,24 +499,7 @@ describe("ChordDetectionStabilizer", () => {
         makeNote(0 as PitchClass, 4, 1000),
         makeNote(3 as PitchClass, 4, 1000),
       ];
-      stabilizer.apply(
-        createTestRawFrame(1000),
-        createTestMusicalFrame(1000, "main", {
-          notes,
-          progression: [],
-          prescribedKey: { root: 8 as PitchClass, mode: "ionian" },
-        }),
-      );
-      const t2 = 1100;
-      const notes2 = notes.map((n) => ({ ...n, onset: t2 }));
-      const result = stabilizer.apply(
-        createTestRawFrame(t2),
-        createTestMusicalFrame(t2, "main", {
-          notes: notes2,
-          progression: [],
-          prescribedKey: { root: 8 as PitchClass, mode: "ionian" },
-        }),
-      );
+      const result = settle(stabilizer, notes, 1000, { root: 8 as PitchClass, mode: "ionian" });
       const chord = result.chords.find((c) => c.phase === "active");
       expect(chord?.harmonic.root).toBe(8); // Ab
       expect(chord?.bassLed.root).toBe(8); // Ab — same
@@ -652,10 +540,32 @@ describe("ChordDetectionStabilizer", () => {
 
   describe("runtime setConfig", () => {
     it("setConfig({ pitchDecayMs }) changes how long released pitches linger in the pot", () => {
-      const stab = new ChordDetectionStabilizer({ partId: "test-part" });
-      expect(stab.getConfig().pitchDecayMs).toBe(400);
-      stab.setConfig({ pitchDecayMs: 1000 });
-      expect(stab.getConfig().pitchDecayMs).toBe(1000);
+      const stab = new ChordDetectionStabilizer(CFG);
+      stab.init();
+      // Longer than CFG's window, so a setter that didn't land would
+      // let the pitches decay early and fail the middle assertion.
+      const decayMs = CFG.pitchDecayMs * 2;
+      stab.setConfig({ pitchDecayMs: decayMs });
+
+      const t0 = 1000;
+      expect(settle(stab, voice([0, 4, 7] as PitchClass[], t0), t0).chords).toHaveLength(1);
+      // settle()'s second frame is the last one with the triad held.
+      const lastHeld = afterHysteresis(t0);
+      const silence = (t: number) =>
+        stab.apply(
+          createTestRawFrame(t),
+          createTestMusicalFrame(t, "main", { notes: [], progression: [] }),
+        );
+
+      // With nothing sounding, the pitches keep the chord alive past
+      // CFG's window and up to the configured one...
+      expect(silence(lastHeld + CFG.pitchDecayMs + 1).chords).toHaveLength(1);
+      const atEdge = silence(lastHeld + decayMs).chords;
+      expect(atEdge).toHaveLength(1);
+      expect(atEdge[0].harmonic.root).toBe(0);
+      expect(atEdge[0].harmonic.quality).toBe("maj");
+      // ...and are gone one millisecond later.
+      expect(silence(lastHeld + decayMs + 1).chords).toHaveLength(0);
     });
 
     it("setConfig is partial — unsupplied fields keep their prior value", () => {

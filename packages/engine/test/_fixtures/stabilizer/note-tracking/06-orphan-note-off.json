@@ -24,10 +24,7 @@
       },
       "expected": {
         "noteCount": 0,
-        "notes": [],
-        "dynamics": {
-          "level": 0
-        }
+        "notes": []
       }
     },
     {
@@ -57,10 +54,7 @@
             "phase": "attack",
             "velocity": 80
           }
-        ],
-        "dynamics": {
-          "level": 0.6299212598425197
-        }
+        ]
       }
     },
     {
@@ -89,10 +83,7 @@
             "phase": "sustain",
             "velocity": 80
           }
-        ],
-        "dynamics": {
-          "level": 0.6299212598425197
-        }
+        ]
       }
     }
   ]

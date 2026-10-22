@@ -17,6 +17,8 @@
  * - Suppresses OS auto-repeat (event.repeat) — we want one note-on
  *   per physical press.
  * - Fixed mid-range velocity (see KEYBOARD_VELOCITY in keyMap).
+ * - Ignores keydowns with Cmd / Ctrl / Alt held, so browser and OS
+ *   shortcuts keep working.
  * - Does NOT intercept when the user is typing into an input /
  *   textarea / contenteditable — the About panel search boxes and
  *   any future text fields must not swallow letters as piano notes.
@@ -41,6 +43,9 @@ export class ComputerKeyboardSource implements MidiSource {
   private readonly keydownHandler = (event: KeyboardEvent) => {
     if (event.repeat) return;
     if (this.isTypingContext(event)) return;
+    // Leave shortcuts (Cmd/Ctrl+C, Cmd/Ctrl+Z, …) to the browser. Shift
+    // is not a shortcut modifier on its own, so it still plays.
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
     const mapping = KEY_MAP[event.code];
     if (!mapping) return;
     if (this.pressedKeys.has(event.code)) return;

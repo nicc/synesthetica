@@ -40,7 +40,7 @@ import {
 
 /** Default fade window for indicator lines (ms). Overridable via
  *  setMacros({ linger }) to serve the dynamics:linger macro. */
-const DEFAULT_FADE_MS = 2000;
+export const DEFAULT_FADE_MS = 2000;
 
 /**
  * Indicator thickness in normalized coords (fraction of BAR_HEIGHT).
@@ -52,7 +52,7 @@ const INDICATOR_THICKNESS_MIN = 0.003;
 const INDICATOR_THICKNESS_MAX = 0.012;
 
 /** Minimum starting opacity so quiet notes are still visible */
-const MIN_OPACITY = 0.25;
+export const MIN_OPACITY = 0.25;
 
 /** Minimum playable MIDI intensity (velocity 1/127) — maps to bar bottom */
 const MIN_INTENSITY = 1 / 127;

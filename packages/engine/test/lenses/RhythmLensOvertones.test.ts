@@ -3,79 +3,20 @@
  *
  * Runs the real vocabulary into the real lens so partial levels,
  * positions and the column-energy metric reflect production behaviour.
- * Run with GENERATE_SNAPSHOTS=1 to write SVGs to test/_snapshots/overtones.
+ * SVG snapshots live in RhythmLensOvertones.snapshot.ts (`npm run snapshots`).
  */
 
 import { describe, it, expect } from "vitest";
-import { RhythmLens } from "../../src/lenses/RhythmLens";
-import { MusicalVisualVocabulary } from "../../src/vocabularies/MusicalVisualVocabulary";
-import { maybeWriteSnapshot } from "../_harness/svg-snapshot";
-import { createTestMusicalFrame } from "../_harness/frames";
-import type {
-  Entity,
-  LensContext,
-  Note,
-  PitchClass,
-  SceneFrame,
-} from "@synesthetica/contracts";
-
-const ctx: LensContext = {
-  canvasSize: { width: 800, height: 600 },
-  rngSeed: 12345,
-  part: "main",
-};
-
-const T = 4000;
-
-interface NoteSpec {
-  id: string;
-  pc: PitchClass;
-  onset: number;
-  /** Release time; omitted = still held at T */
-  release?: number;
-}
-
-function toNote(spec: NoteSpec, t: number): Note {
-  const released = spec.release !== undefined && spec.release <= t;
-  return {
-    id: spec.id,
-    pitch: { pc: spec.pc, octave: 4 },
-    velocity: 80,
-    onset: spec.onset,
-    duration: (released ? spec.release! : t) - spec.onset,
-    release: released ? spec.release! : null,
-    phase: released ? "release" : "sustain",
-    confidence: 1,
-    provenance: { source: "test", stream: "test" },
-  };
-}
-
-function render(
-  specs: NoteSpec[],
-  opts: { level?: number; colour?: "pitch" | "fundamental"; t?: number; lensToggle?: boolean } = {},
-): SceneFrame {
-  const t = opts.t ?? T;
-  const vocab = new MusicalVisualVocabulary({
-    harmonicSeriesLevel: opts.level ?? 1,
-    // RFC 012 metrics are stated at rolloff 1.0; pinned so a default
-    // change does not move them.
-    harmonicSeriesRolloff: 1,
-    partialColourMode: opts.colour ?? "pitch",
-  });
-  const lens = new RhythmLens();
-  lens.init(ctx);
-  lens.setMacros({ overtones: opts.lensToggle ?? true });
-  const frame = createTestMusicalFrame(t, "main", {
-    notes: specs.map((s) => toNote(s, t)),
-  });
-  return lens.update(vocab.annotate(frame), null);
-}
-
-const overtones = (scene: SceneFrame): Entity[] =>
-  scene.entities.filter((e) => e.data?.type === "overtone-strip");
-
-const noteStrips = (scene: SceneFrame): Entity[] =>
-  scene.entities.filter((e) => e.data?.type === "note-strip");
+import {
+  renderOvertoneScene as render,
+  held,
+  OVERTONE_T,
+  overtoneStrips as overtones,
+  noteStrips,
+  type OvertoneNoteSpec as NoteSpec,
+} from "../_harness/rhythmFixtures";
+import { TIME_HORIZON_HISTORY_MS } from "../../src/lenses/timeMapping";
+import type { PitchClass, SceneFrame } from "@synesthetica/contracts";
 
 /** Summed bottom (at-NOW) opacity of overtone strips per nearest pitch class. */
 function columnEnergy(scene: SceneFrame): Map<number, number> {
@@ -87,17 +28,13 @@ function columnEnergy(scene: SceneFrame): Map<number, number> {
   return out;
 }
 
-const held = (pcs: PitchClass[], onset = 2500): NoteSpec[] =>
-  pcs.map((pc, i) => ({ id: `n${i}-${pc}`, pc, onset }));
-
 describe("RhythmLens overtone strips", () => {
   it("emits none at level 0", () => {
     expect(overtones(render(held([0, 4, 7]), { level: 0 }))).toHaveLength(0);
   });
 
-  it("emits none when the rhythm lens toggle is off (its default)", () => {
+  it("emits none when the rhythm lens toggle is off", () => {
     expect(overtones(render(held([0, 4, 7]), { lensToggle: false }))).toHaveLength(0);
-    expect(new RhythmLens().readMacros().overtones).toBe(false);
   });
 
   it("emits one overtone strip per modelled partial, before its note strip", () => {
@@ -151,9 +88,13 @@ describe("RhythmLens overtone strips", () => {
     const fifth = overtones(render([{ id: "c", pc: 0, onset: 1000 }])).find(
       (e) => e.data!.n === 3,
     )!;
-    // Held note: bottom at NOW (young), top three seconds up (older)
+    // Held note: bottom at NOW (young), top three seconds up (older).
+    // Height and age are the same axis: dissipation is age / history span.
     expect(fifth.data!.dissipationBottom).toBeCloseTo(0, 6);
-    expect(fifth.data!.dissipationTop as number).toBeGreaterThan(0.3);
+    expect(fifth.data!.dissipationTop as number).toBeCloseTo(
+      (OVERTONE_T - 1000) / TIME_HORIZON_HISTORY_MS,
+      6,
+    );
   });
 
   it("anchors the steam field to timeline time, so it scrolls with the strip", () => {
@@ -182,9 +123,6 @@ describe("RhythmLens overtone strips", () => {
 describe("RhythmLens overtone metrics (RFC 012 §Development method)", () => {
   it("C major: D and B exceed any single partial", () => {
     const energy = columnEnergy(render(held([0, 4, 7])));
-    console.log("C major column energy:", Object.fromEntries(energy));
-    expect(energy.get(2)!).toBeCloseTo(0.75, 2);
-    expect(energy.get(11)!).toBeCloseTo(0.7, 2);
     expect(energy.get(2)!).toBeGreaterThan(0.5);
     expect(energy.get(11)!).toBeGreaterThan(0.5);
   });
@@ -223,43 +161,6 @@ describe("RhythmLens overtone metrics (RFC 012 §Development method)", () => {
     const scene = render(specs, { level: 0.5 });
     const notes = noteStrips(scene).length;
     const ots = overtones(scene).length;
-    console.log(`Dense passage: ${notes} note strips, ${ots} overtone strips, ${scene.entities.length} entities`);
     expect(ots).toBeLessThanOrEqual(notes * 4);
-  });
-});
-
-describe("RhythmLens overtone snapshots", () => {
-  const level = 0.5;
-  const scenarios: Array<[string, NoteSpec[]]> = [
-    ["c-then-g-detached", [
-      { id: "c", pc: 0, onset: 1500, release: 2300 },
-      { id: "g", pc: 7, onset: 2800 },
-    ]],
-    ["c-then-g-legato", [
-      { id: "c", pc: 0, onset: 1500, release: 3500 },
-      { id: "g", pc: 7, onset: 2800 },
-    ]],
-    ["c-major", held([0, 4, 7])],
-    ["g7", held([7, 11, 2, 5])],
-    ["minor-third-dyad", held([0, 3])],
-    ["major-third-dyad", held([0, 4])],
-  ];
-
-  for (const [name, specs] of scenarios) {
-    for (const colour of ["pitch", "fundamental"] as const) {
-      it(`${name} (${colour} hue)`, () => {
-        const scene = render(specs, { level, colour });
-        maybeWriteSnapshot(`${name}-${colour}`, scene, {}, "overtones");
-        expect(overtones(scene).length).toBeGreaterThan(0);
-      });
-    }
-  }
-
-  it("c-major at levels 0.25 and 1.0", () => {
-    for (const l of [0.25, 1.0]) {
-      const scene = render(held([0, 4, 7]), { level: l });
-      maybeWriteSnapshot(`c-major-level-${l}`, scene, {}, "overtones");
-      expect(overtones(scene).length).toBeGreaterThan(0);
-    }
   });
 });

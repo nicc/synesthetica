@@ -28,17 +28,19 @@ Where the design is quantitative (positions, levels, thresholds), generate the A
 
 ### 2. SVG Snapshots for Visual Feedback
 
-Tests generate SVG snapshots of SceneFrame output. These provide visual feedback without running the full application:
+SVG snapshots of SceneFrame output give visual feedback without running the full application. They are review artefacts, not tests: generators live next to the tests as `test/**/<Name>.snapshot.ts` (e.g. `test/lenses/RhythmLens.snapshot.ts`) and are excluded from `npm test`.
 
 ```bash
-GENERATE_SNAPSHOTS=1 npm test -w packages/engine
+npm run snapshots -w packages/engine
 ```
 
-Snapshots live in `test/_snapshots/` (gitignored) and can be opened in a browser for review.
+This runs `vitest.snapshots.config.ts`, which sets `GENERATE_SNAPSHOTS=1` and writes SVGs to `test/_snapshots/<lens>/` (gitignored) for opening in a browser. A snapshot file asserts no more than that an SVG was produced. When a scene shows a behaviour worth protecting, assert that behaviour in the sibling `.test.ts` instead.
+
+Rendering helpers live in `test/_harness/`: `svg-snapshot.ts` renders a SceneFrame, `harmonySvg.ts` renders the harmony lens's chord shape, and `rhythmFixtures.ts` / `harmonyFixtures.ts` build the frames shared by tests and snapshots.
 
 ### 3. Simulation Metrics for Properties
 
-Tests emit quantitative metrics (entity counts, position distributions, color clustering) that can be analyzed without visual inspection. This supports Principle 8 (Experiential Feedback Through Simulation).
+`extractMetrics` summarises a scene quantitatively (entity counts, position distributions, colour clustering). Each scene SVG carries these metrics in a header comment, so they can be read without visual inspection. This supports Principle 8 (Experiential Feedback Through Simulation). Properties drawn from the metrics belong in the `.test.ts` as assertions; diagnostics never go to the console.
 
 ### 4. Parameter Exploration
 

@@ -12,7 +12,7 @@
  * state and the state comes back correctly.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import WebSocket from "ws";
 import { startWsBridge, type WsBridgeHandle } from "../src/engine/wsBridge.js";
 import { buildToolRegistry } from "../src/tools/registry.js";
@@ -23,6 +23,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   ENGINE_BRIDGE_PROTOCOL,
+  productionManifest,
   type BrowserToCli,
   type CliToBrowser,
   type EngineStateSnapshot,
@@ -68,8 +69,6 @@ class FakeBrowser {
     };
     this.ws.send(JSON.stringify(hello));
     this.ws.on("message", (raw) => this.onMessage(raw));
-    // Wait a tick so the bridge processes the hello.
-    await new Promise((r) => setTimeout(r, 30));
   }
 
   private onMessage(raw: WebSocket.RawData): void {
@@ -140,6 +139,9 @@ beforeEach(async () => {
   bridge = await startWsBridge({ port: 0, log: () => {} });
   browser = new FakeBrowser(bridge.port, "default");
   await browser.connect();
+  // The bridge flips the handle to running when it processes the hello.
+  const handle = bridge.handleFor("default");
+  await vi.waitFor(() => expect(handle.status).toBe("running"));
   presetDir = mkdtempSync(join(tmpdir(), "syn-e2e-presets-"));
 });
 afterEach(async () => {
@@ -173,16 +175,19 @@ describe("E2E: MCP tool → WS bridge → fake browser → back", () => {
   });
 
   it("set_macro flows through with the value", async () => {
+    const linger = productionManifest.macros.find((m) => m.id === "harmony:linger");
+    if (linger?.type !== "continuous") throw new Error("harmony:linger should be continuous");
+    const lingerValue = (linger.range[0] + linger.range[1]) / 2;
     const engine = bridge.handleFor("default");
     const registry = buildToolRegistry(createPresetStore(presetDir), makeSession());
     const setMacro = registry.get("set_macro")!;
     const result = await setMacro.handle(
-      { name: "harmony:linger", value: 5 },
+      { name: "harmony:linger", value: lingerValue },
       engine,
     );
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.state.macros.intents["harmony:linger"]).toBe(5);
+      expect(result.state.macros.intents["harmony:linger"]).toBe(lingerValue);
     }
   });
 
@@ -191,15 +196,17 @@ describe("E2E: MCP tool → WS bridge → fake browser → back", () => {
     const registry = buildToolRegistry(createPresetStore(presetDir), makeSession());
     const setTempo = registry.get("set_tempo")!;
 
-    const seen: number[] = [];
-    engine.subscribe("state-changed", (s) => {
-      if (typeof s.session.tempo === "number") seen.push(s.session.tempo);
+    // The fake browser sends the push after the call's result, so the
+    // tool can resolve before the push lands. Wait for the push itself.
+    const pushedTempo = new Promise<number | null>((resolve) => {
+      const unsubscribe = engine.subscribe("state-changed", (s) => {
+        unsubscribe();
+        resolve(s.session.tempo);
+      });
     });
 
     await setTempo.handle({ bpm: 90 }, engine);
-    // Give the state-changed push a moment to propagate.
-    await new Promise((r) => setTimeout(r, 30));
-    expect(seen).toContain(90);
+    expect(await pushedTempo).toBe(90);
   });
 
   it("multiple consecutive tool calls all round-trip", async () => {
