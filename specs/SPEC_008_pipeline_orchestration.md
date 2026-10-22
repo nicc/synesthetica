@@ -45,21 +45,21 @@ export interface IPipeline {
 │         ▼                                                                │
 │  ┌──────────────┐                                                        │
 │  │    Router    │  router.route(frame) → Map<PartId, RawInputFrame>      │
-│  └──────┬───────┘                                                        │
+│  └──────┬───────┘  (not implemented — single part; see §2 Routing)      │
 │         │                                                                │
 │         ▼  For each part:                                                │
 │  ┌──────────────┐                                                        │
-│  │  Stabilizers │  stabilizer.apply(raw) → MusicalFrame                  │
+│  │  Stabilizers │  stabilizer.apply(raw, upstream) → MusicalFrame        │
 │  └──────┬───────┘                                                        │
 │         │                                                                │
 │         ▼                                                                │
 │  ┌──────────────┐                                                        │
-│  │   Vocabulary    │  vocabulary.annotate(musical) → AnnotatedMusicalFrame     │
+│  │  Vocabulary  │  vocabulary.annotate(musical) → AnnotatedMusicalFrame  │
 │  └──────┬───────┘                                                        │
 │         │                                                                │
 │         ▼                                                                │
 │  ┌──────────────┐                                                        │
-│  │   Lenses   │  lens.update(annotated, prev) → SceneFrame          │
+│  │    Lenses    │  lens.update(annotated, prev) → SceneFrame             │
 │  └──────┬───────┘                                                        │
 │         │                                                                │
 │         └─────────────────────────┐                                      │
@@ -82,11 +82,11 @@ See SPEC_009 for detailed frame type definitions. Summary:
 | Adapters | External input | RawInputFrame | IRawSourceAdapter |
 | Stabilizers | RawInputFrame | MusicalFrame | IMusicalStabilizer |
 | Vocabularies | MusicalFrame | AnnotatedMusicalFrame | IVisualVocabulary |
-| Lenses | AnnotatedMusicalFrame | SceneFrame | IVisualGrammar |
+| Lenses | AnnotatedMusicalFrame | SceneFrame | IVisualLens |
 
 ## Stabilizer DAG
 
-Stabilizers form a directed acyclic graph (DAG) based on their dependencies. Some stabilizers are independent (can run in parallel), while others depend on upstream stabilizer output.
+Stabilizers form a directed acyclic graph (DAG) based on their dependencies. Some stabilizers are independent, while others depend on upstream stabilizer output. All run sequentially on the frame thread.
 
 ### Independent Stabilizers
 
@@ -102,10 +102,11 @@ prescribed. See RFC 007 for historical rationale.)
 
 These require output from upstream stabilizers:
 
-- **DynamicsStabilizer** — Analyzes velocity patterns from Note[] (depends on note-tracking)
-- **ChordDetectionStabilizer** — Needs active notes from NoteTrackingStabilizer
-- **PhraseDetectionStabilizer** — Needs beats and note density patterns
-- **ProgressionStabilizer** — Needs chords over time
+- **DynamicsStabilizer** (`dynamics`) — Analyzes velocity patterns from Note[] (depends on `note-tracking`)
+- **ChordDetectionStabilizer** (`chord-detection`) — Detects chords from active notes and maintains the recent `progression` (depends on `note-tracking`)
+- **HarmonyStabilizer** (`harmony`) — Produces `harmonicContext`: tension, and functional analysis when a key is prescribed (depends on `chord-detection`)
+
+Not implemented: phrase detection (synesthetica-nob). `MusicalFrame.phrases` exists in the contract but no stabilizer writes it, and the merge step below does not carry it.
 
 ### DAG Resolution
 
@@ -121,24 +122,28 @@ export interface IMusicalStabilizer {
 }
 ```
 
-Execution order:
-1. Run all stabilizers with no dependencies (in parallel if supported)
-2. Merge their outputs into an intermediate MusicalFrame
-3. Run stabilizers that depend only on completed ones
-4. Repeat until all stabilizers have run
-5. Final MusicalFrame goes to vocabulary
+Execution order (`VisualPipeline.applyStabilizers`):
+1. Stabilizers are topologically sorted once, when the part's state is created. A dependency cycle, or a dependency on an id that no registered stabilizer has, throws (a configuration error; SPEC_007).
+2. Stabilizers run sequentially in that order.
+3. A stabilizer with dependencies receives the merged outputs of those dependencies as `upstream`. A stabilizer with no dependencies receives its own previous output instead.
+4. Each output is merged into the running MusicalFrame. A stabilizer that throws is reset and its `upstream` (or an empty frame) stands in for its output, so dependants and lenses still run (SPEC_007).
+5. The final MusicalFrame goes to the vocabulary.
 
 ### Merge Semantics
 
-When multiple stabilizers produce output, their contributions merge:
+When multiple stabilizers produce output, `VisualPipeline.mergeMusicalFrames` combines them field by field:
 
-- `notes[]` — Union of all notes (NoteTrackingStabilizer owns this)
-- `chords[]` — Union of all chords (ChordDetectionStabilizer owns this)
-- `dynamics` — Single authoritative source (DynamicsStabilizer owns this)
-- `progression` — ChordId references (ProgressionStabilizer owns this)
-- `phrases` — Phrase boundaries (PhraseDetectionStabilizer owns this)
+| Field | Merge rule | Intended owner |
+|-------|-----------|----------------|
+| `notes[]` | Union, deduplicated by note id; on a duplicate id the later frame wins | NoteTrackingStabilizer |
+| `chords[]` | Union, deduplicated by chord id; later frame wins | ChordDetectionStabilizer |
+| `progression` | Union of chord ids in first-seen order; `undefined` if empty | ChordDetectionStabilizer |
+| `dynamics` | Last frame whose `dynamics.events` is non-empty; otherwise an empty state | DynamicsStabilizer |
+| `harmonicContext` | Last frame that has one | HarmonyStabilizer |
+| `prescribedTempo`, `prescribedMeter`, `prescribedKey`, `chordInterpretation` | Always taken from the pipeline (control ops), never from stabilizer output | — |
+| `phrases` | Dropped | — |
 
-Ownership is enforced: only one stabilizer may write to each field.
+Ownership is a convention, not enforced: the pipeline does not check which stabilizer wrote a field. If two stabilizers write the same field, the merge is last-writer-wins in execution order (or union, for the array fields). The current stabilizers each write distinct fields, so no conflict arises in practice. Derived stabilizers pass upstream fields through in their output, which the dedupe absorbs.
 
 ## Processing Steps
 
@@ -167,31 +172,36 @@ Adapters are **state-writers**, not frame-pushers. They maintain current raw inp
 
 ### 2. Routing
 
-The router splits collected raw input by part:
+**Not implemented.** `IRouter` is defined in `packages/contracts/routing/router.ts`, but `VisualPipeline` does not use one. It concatenates all adapters' inputs into one RawInputFrame and processes a single part (`config.partId`, default `"default"`).
+
+The intended model: the router splits collected raw input by part, and each part receives only its own raw input.
 
 ```ts
 const partFrames: Map<PartId, RawInputFrame> = router.route(mergedFrame);
 ```
 
-Each part receives only its own raw input.
-
 ### 3. Per-Part Processing
 
-For each part, the pipeline runs:
+For the part, the pipeline runs:
 
 ```ts
-for (const [partId, rawFrame] of partFrames) {
-  // Stabilizers transform raw input to musical abstractions
-  const musicalFrame = stabilizer.apply(rawFrame, previousMusical);
+// Stabilizers transform raw input to musical abstractions (see §Stabilizer DAG)
+const musicalFrame = applyStabilizers(partState, rawFrame);
 
-  // Vocabulary annotates musical elements with visual properties
-  const annotatedFrame = vocabulary.annotate(musicalFrame);
+// Musical-frame listeners (e.g. the recent-events buffer) see the frame before annotation
+for (const cb of musicalFrameListeners) cb(musicalFrame);
 
-  // Lens produces scene from annotated musical elements
-  const scene = lens.update(annotatedFrame, previousScene);
+// Vocabulary annotates musical elements with visual properties
+const annotatedFrame = vocabulary.annotate(musicalFrame);
+
+// Each lens produces a scene from the same annotated frame
+for (const lens of lenses) {
+  const scene = lens.update(annotatedFrame, previousScenes.get(lens.id));
   partScenes.push(scene);
 }
 ```
+
+If no vocabulary is set, the pipeline returns an empty scene with a `pipeline-no-vocabulary` warning diagnostic. A lens that throws is skipped for that frame with an error diagnostic; the other lenses still draw (SPEC_007).
 
 ### 4. Composition
 
@@ -201,7 +211,7 @@ The compositor merges all part scenes:
 const finalScene = compositor.compose(partScenes);
 ```
 
-This applies layout transforms, blending, and z-ordering per the active policies.
+The only compositor is `IdentityCompositor` (`packages/engine/src/stubs/IdentityCompositor.ts`), which concatenates entities and diagnostics. Layout transforms, blending, and z-ordering are not implemented. If no compositor is set, the pipeline concatenates scenes itself.
 
 ### 5. Return
 
@@ -247,7 +257,9 @@ const pipeline = new VisualPipeline({
 
 pipeline.addAdapter(adapter);
 pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+pipeline.addStabilizerFactory(() => new DynamicsStabilizer({ partId }));
 pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
+pipeline.addStabilizerFactory(() => new HarmonyStabilizer({ partId }));
 pipeline.setVocabulary(new MusicalVisualVocabulary());
 // Lenses receive AnnotatedMusicalFrame and decide how to render
 pipeline.addLens(new RhythmLens());
@@ -275,8 +287,8 @@ pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
 This orchestration model preserves all system invariants:
 
 - **I1**: Same vocabulary processes all parts regardless of source
-- **I3**: Meaning lives in vocabulary; lenses see annotated musical elements (categories only, not analysis)
-- **I6**: Every raw input can be routed to a part
+- **I3**: Meaning lives in vocabulary. Lenses consume stabilizer-derived analysis (e.g. `harmonicContext`) and vocabulary annotations through the AnnotatedMusicalFrame; they do not compute musical analysis themselves (I4)
+- **I6**: Every raw input can be routed to a part (trivially, while there is a single part — see §2 Routing)
 - **I7**: Lenses don't read other parts (per-part instantiation)
 - **I8**: Layout/blending handled by compositor only
 
@@ -305,19 +317,17 @@ const composed: SceneFrame = {
 
 For additive composition to produce coherent visuals, lenses must be designed to **not overlap**:
 
-1. **Non-overlapping entity types**: Each lens should produce distinct visual entity types
-   - Example: TestRhythmGrammar produces `onset-marker`, `drift-ring`, `beat-line`, `bar-line`, `division-tick`, `downbeat-glow`
-   - Example: TestChordProgressionGrammar produces `chord-glow`, `chord-history`, `chord-note`
-   - These entity types never overlap, so combining lenses produces complementary visuals
+1. **Non-overlapping screen regions**: The three lenses share a three-column layout (`packages/engine/src/lenses/layout.ts`): DynamicsLens in the left column, RhythmLens in the centre, HarmonyLens on the right. Each positions its entities within its own column.
 
-2. **Non-overlapping input consumption**: Lenses should focus on different aspects of the input
-   - Example: TestRhythmGrammar ignores chords entirely
-   - Example: TestChordProgressionGrammar ignores rhythm information
+2. **Distinct entity identity**: Entity ids are prefixed with the lens id (e.g. `rhythm-lens:…`, `harmony-lens:…`), so entities from different lenses never collide. Entity `data.type` values are mostly lens-specific (RhythmLens: `beat-line`, `bar-line`, `now-line`, `streak`; HarmonyLens: `chord-shape`, `roman-numeral`, `connector-strip`; DynamicsLens: `dynamics-indicator`), but some renderer primitives are shared (`note-strip` and `text-label` are used by both RhythmLens and HarmonyLens).
+
+3. **Non-overlapping input emphasis**: Lenses focus on different aspects of the input
+   - RhythmLens reads notes and the prescribed tempo/meter; it ignores chords
+   - HarmonyLens reads chords, the prescribed key, and `harmonicContext` (tension, functional progression, functional edges)
+   - DynamicsLens reads `dynamics`
    - This prevents "doubled" responses to the same musical event
 
-3. **Consistent palette usage**: Both lenses use the same visual annotations (palette colors from vocabulary)
-   - Ensures visual coherence even when lenses produce different entity types
-   - Example: Both lenses use warm palette for major chords, cool palette for minor
+4. **Consistent palette usage**: Lenses that colour by pitch take it from the vocabulary — RhythmLens from each note's `visual.palette`, HarmonyLens from the frame's `hueInvariant` — so a pitch class has the same colour in every column. DynamicsLens uses fixed structural colours.
 
 ### Limitations
 

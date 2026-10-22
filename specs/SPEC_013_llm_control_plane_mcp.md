@@ -5,7 +5,7 @@ Source: RFC 011 (approved 2026-08-19). Extends SPEC 004 (LLM Mediation and Annot
 
 ## Summary
 
-Specifies the runtime architecture that lets an LLM control a running Synesthetica engine via natural-language user requests. An external LLM client (Claude Desktop, Claude Code, or any MCP-capable client) connects to an MCP server hosted by the Synesthetica CLI wrapper. The server exposes engine controls as MCP tools, engine state and annotation manifests as MCP resources, and LLM behavioural presets (quiet vs conversational) as MCP prompts.
+Specifies the runtime architecture that lets an LLM control a running Synesthetica engine via natural-language user requests. An external LLM client (Claude Desktop, Claude Code, or any MCP-capable client) connects to an MCP server hosted by the Synesthetica CLI wrapper. The server exposes engine controls as MCP tools, engine state and annotation manifests as MCP resources, and an onboarding primer via the `get_started` tool. (Behavioural prompts — quiet vs conversational — were dropped; see §Prompts.)
 
 SPEC 004 established the principle (annotation-driven, LLM interprets, engine executes deterministically). RFC 011 selected the transport (MCP) and the multi-instance model (one CLI, N engines). This SPEC defines the concrete contracts: the tool surface, resource URIs, storage format, lifecycle, subscription protocol, error handling, and multi-instance routing.
 
@@ -73,7 +73,7 @@ SPEC 004 established the principle (annotation-driven, LLM interprets, engine ex
 - **LLM client** — chosen by the user. Connects to the MCP server, discovers tools + resources, interprets user speech, emits tool calls.
 - **CLI wrapper** — the `synesthetica` binary. Starts and manages engine instances; hosts the MCP server; brokers between MCP and engines.
 - **MCP server** — the protocol boundary. Handles the MCP handshake, tool registration, resource serving, subscription lifecycle.
-- **Engine registry** — the CLI's map of running instances (label → engine handle).
+- **Engine registry** — the CLI's map of running instances (label → engine handle). Not implemented; one instance per CLI process (see §Multi-Instance Routing).
 - **Engine instance** — one running Synesthetica pipeline (adapter → stabilizer → lens → renderer), one browser tab or embedded surface for the rendered output.
 
 **Transport choices** (see §CLI shape for details):
@@ -84,7 +84,7 @@ SPEC 004 established the principle (annotation-driven, LLM interprets, engine ex
 
 ### Tools
 
-18 tools organised in five families: **lifecycle** (start_session / stop_session), **onboarding** (get_started), **read surface** (get_state / get_recent_events / list_inputs / list_presets / get_preset), **setter surface** (set_key / set_tempo / set_meter / set_chord_mode / set_metronome / set_input / set_hue_for_pitch / set_macro), **preset surface** (switch_preset / save_preset). All tools accept an optional `instance` parameter defaulting to the single instance today.
+20 tools organised in five families: **lifecycle** (start_session / stop_session), **onboarding** (get_started), **read surface** (get_state / get_recent_events / clear_recent_events / list_inputs / list_presets / get_preset), **setter surface** (set_key / set_tempo / set_meter / set_chord_mode / set_metronome / set_input / set_hue_for_pitch / set_macro), **preset surface** (switch_preset / save_preset / delete_preset). All tools accept an optional `instance` parameter defaulting to the single instance today.
 
 Every tool responds with either:
 - **Success**: `{ "ok": true, "state": <state-snapshot>, "data"?: <any> }` — setter tools populate `state` with the post-call snapshot; read tools may additionally populate `data` with the read payload (device list, preset list, primer text); lifecycle tools return a stub `state` with the instance label plus a `data` summary of what they did.
@@ -116,17 +116,21 @@ Returns the current engine state snapshot. Same content as `state://<label>/curr
 
 Returns the temporal envelope `{startedAt, now, events}` in `data`. Each event's `t` is milliseconds since `startedAt`. `now` is fresh at read time — anchors "how long ago" reasoning correctly regardless of think-time between events landing and the LLM reading. Pull-only per §I30.
 
+#### `clear_recent_events(instance?)`
+
+Empties the recent-events buffer. The visualiser, session clock, adapters, macros and session controls are unaffected.
+
 #### `list_inputs(instance?)` — mirror of inputs://
 
 Returns available MIDI + audio input devices in `data`. Same content as `inputs://`.
 
 #### `list_presets(instance?)` — mirror of presets://
 
-Returns preset summaries (name + savedAt + session + input at save time) in `data`. Same content as `presets://`.
+Returns preset summaries (name + savedAt + session controls at save time) in `data`. Same content as `presets://`.
 
 #### `get_preset(name, instance?)` — mirror of presets://<name>
 
-Returns one preset's full stored content (macro values, session controls, input) in `data`, WITHOUT loading it. Non-destructive: the current control surface is untouched. On unknown name, error's `details.available` lists preset names for retry.
+Returns one preset's full stored content (macro values, session controls) in `data`, WITHOUT loading it. Non-destructive: the current control surface is untouched. On unknown name, error's `details.available` lists preset names for retry.
 
 #### `set_macro(name, value, instance?)`
 
@@ -209,6 +213,12 @@ Errors: `PRESET_NOT_FOUND`.
 
 Capture the current state of the target instance as a preset. Overwrites if `name` exists.
 
+#### `delete_preset(name, instance?)`
+
+Delete a saved preset. If it is the current `activePreset`, that label remains (it is a runtime label, not a live handle).
+
+Errors: `PRESET_NOT_FOUND`.
+
 ### Resources
 
 MCP resources are content-addressable via stable URIs. Three URI schemes.
@@ -222,13 +232,13 @@ MCP resources are content-addressable via stable URIs. Three URI schemes.
 - `annotations://lenses/<id>` — one lens annotation
 - `annotations://presets/<id>` — one preset annotation
 
-Shared across all instances (the annotations describe the system, not an instance). Generated at server startup (see §Annotation storage).
+Shared across all instances (the annotations describe the system, not an instance). Built from the compiled manifest (see §Annotation storage).
 
 #### `state://<instance>/*` — engine state per instance
 
 - `state://<label>/current` — a snapshot of current macro values, active preset, prescribed context (key/tempo/meter/chord-mode/metronome/phase), and input source. **Subscribable** — see §State subscription protocol. Also reachable via the `get_state` tool for Claude-Desktop-shaped clients that don't proxy resource reads.
 - `state://<label>/recent-events?limit=<N>` — recent musical activity (see §Recent events). **Pull-only, not subscribable.** `limit` defaults to 100, capped at 1000 for in-memory reads. `?since=<eventId>` returns events after a specific ID (for cursor-style consumption). Also reachable via the `get_recent_events` tool.
-- `state://<label>/recent-events/history?limit=<N>&before=<eventId>` — **Not yet implemented.** Planned: disk-backed deeper history (see §Recent events — disk log). Same shape as `recent-events` but reading from rotated log files.
+- `state://<label>/recent-events/history?limit=<N>&before=<eventId>` — **Not implemented** (synesthetica-caje). Planned: disk-backed deeper history (see §Recent events — disk log). Same shape as `recent-events` but reading from rotated log files.
 
 Instance labels are per §Multi-instance routing.
 
@@ -256,35 +266,27 @@ Alias for `annotations://concepts/*`. Exposed as its own URI scheme because conc
 
 ### Prompts
 
-- `posture://quiet` — system prompt fragment for quiet-performance mode. Silent no-ops on ambiguity; short commands only; no clarifying questions.
-- `posture://conversational` — system prompt fragment for conversational mode. Tolerates ambiguity; may ask clarifying questions; explains changes.
+The MCP prompt registry is empty (`buildPromptResources` in `packages/cli/src/resources/promptResources.ts` returns `{}`); the prompt handlers stay wired for future use. The `posture://quiet` and `posture://conversational` prompts were dropped along with the verbosity axis.
 
 `guide://system-overview` was dropped in Route 1 (SPEC 014 §Lifecycle). The same content is now returned by the `get_started` MCP tool, which is autonomously callable by the LLM and doesn't require user attach. The MCP `initialize.instructions` field carries a short pointer to `get_started` so the LLM has the discovery cue on handshake.
 
-Prompt content is generated from source documentation (see §Annotation storage — generator step) rather than embedded in the MCP server code, so prompt refinement is a doc edit.
+The `get_started` primer is composed from `packages/contracts/prompts/system-overview.md` (via `packages/contracts/prompts/composer.ts`) rather than embedded in the MCP server code, so primer refinement is a doc edit.
 
 ## Annotation Storage and Generation
 
 ### Source of truth
 
-Annotations live in a **single canonical TypeScript source** under the CLI wrapper package (path TBD during implementation; anchor: `apps/cli/annotations.ts` or similar). The TS source is the authoring surface — Nic edits with type safety.
+Annotations live in a single TypeScript module, `packages/contracts/annotations/manifest.ts` (exported as `productionManifest`), typed against `packages/contracts/annotations/annotations.ts`. The TS source is the authoring surface — Nic edits with type safety.
 
-The smoke-test source (`docs/smoke-test/annotations.ts`) is not the production source; it's a testing artefact. Production annotations will be a separate file with the same shape.
+The smoke-test source (`docs/smoke-test/annotations.ts`) is not the production source; it's a testing artefact.
 
-### Generator
+### Validation
 
-On server startup (and on hot-reload during dev), a generator:
-1. Imports the TS annotations module.
-2. Validates each annotation against the contract (type discrimination checks, range validity, cross-references resolve).
-3. Emits an in-memory manifest keyed for O(1) URI resolution.
-4. Also emits a JSON manifest file (`manifest.json`) alongside for debugging and for manual attachment to LLM sessions.
-
-Validation errors halt server startup with a clear message identifying the offending annotation.
+Validation happens at build time, not server startup. The contracts build runs `packages/contracts/scripts/validate-manifest.mjs`, which checks unique ids, alias conflicts, default ranges, compound targets, consumer declarations (SPEC_014), and required prose, and fails the build on any error. The CLI imports the built manifest and indexes it for URI resolution (`packages/cli/src/resources/annotationResources.ts`), including the bundled `annotations://manifest` resource.
 
 ### Refresh model
 
-- **Development**: file-watch on the annotations source; regenerate on change. MCP resource list is re-published via the standard notification mechanism (`notifications/resources/list_changed`); UI controls (see §UI Controls) also re-render on the same signal.
-- **Production**: annotations are baked at CLI install time; no live reload. `synesthetica reload-annotations` (a CLI subcommand) forces a regenerate + republish for the running server.
+Annotations are compiled into the CLI; there is no live reload. Not implemented: file-watching the annotations source, re-publishing via `notifications/resources/list_changed`, and the `synesthetica reload-annotations` subcommand (the CLI parses it and reports "not yet implemented").
 
 ### Storage format decision (was Open Q #3 in RFC 011)
 
@@ -378,13 +380,13 @@ synesthetica help
 ### Startup order
 
 1. CLI parses args.
-2. MCP server initialises (validates annotations, builds resource index).
-3. Engine registry initialises (empty).
+2. MCP server initialises (builds the annotation resource index; the manifest was validated at build time).
+3. Engine registry initialises (empty). (Not implemented — see §Multi-Instance Routing.)
 4. First engine spawns (browser tab or embedded surface).
 5. Server signals `ready` to the LLM client.
 6. LLM client can list tools + resources and begin operating.
 
-If step 2 fails (annotation validation error), the CLI exits with a diagnostic. If step 4 fails (engine spawn error), the CLI reports the error and stops.
+If step 4 fails (engine spawn error), the CLI reports the error and stops.
 
 ### Shutdown
 
@@ -459,7 +461,7 @@ Standard MCP: LLM client calls `resources/subscribe` with a URI, receives notifi
 
 ### In-memory buffer (ring)
 
-A per-instance ring buffer holds the most recent N events (default: 1000; configurable via `--recent-events-buffer <N>` at CLI start). Events are pushed as they're produced by the pipeline; oldest evicted when the ring fills.
+A per-instance ring buffer holds the most recent N events (default: 10000; configurable via `--recent-events-buffer <N>` at CLI start, which the CLI passes to the web app as the `buffer-size` query param). Events are pushed as they're produced by the pipeline; oldest evicted when the ring fills.
 
 ### Event content
 
@@ -473,11 +475,13 @@ Kinds emitted, derived by diffing consecutive MusicalFrames (`packages/web-app/s
 
 Notably NOT included (called out because earlier drafts / RFCs referenced them, wrongly):
 - ~~Active lens~~ — no lens-switching concept exists; all three lenses always run
-- ~~Tempo estimate~~ — the system does not infer tempo from onset patterns under any circumstances (SPEC 013 §Non-Goals; RhythmGrammar's `getEffectiveTempo` returns prescribed tempo only). Prescribed tempo is available in `state://<label>/current` via the `prescribedTempo` field.
+- ~~Tempo estimate~~ — the system does not infer tempo from onset patterns under any circumstances (SPEC 013 §Non-Goals; RhythmLens's `getEffectiveTempo` returns prescribed tempo only). Prescribed tempo is available in `state://<label>/current` via the `prescribedTempo` field.
 
 ### Disk log (rotating)
 
-The in-memory ring is bounded (default 1000 events, ~seconds to minutes of history). For deeper lookback, events are also appended to a rotating disk log.
+> **Not implemented** (synesthetica-caje). No disk log or `history` resource exists in `packages/cli/src`. The CLI parses `--log-retention-days` but nothing reads it. The design below is the plan of record, not current behaviour.
+
+The in-memory ring is bounded (default 10000 events). For deeper lookback, events would also be appended to a rotating disk log.
 
 - **Location**: `$XDG_STATE_HOME/synesthetica/logs/<instance-label>/events-YYYY-MM-DD.jsonl` (one file per day per instance).
 - **Format**: JSONL, one event per line, same shape as in-memory events.
@@ -499,7 +503,7 @@ Every tool response is either `{ ok: true, state }` or `{ ok: false, error }`. E
 - `message` — human-readable, safe to show the user verbatim.
 - `details` — optional structured context (valid range, list of instance labels, etc.).
 
-**LLM behaviour on error** (guidance in `posture://*` prompts, not enforced by the engine):
+**LLM behaviour on error** (guidance in the `get_started` primer and SPEC_015, not enforced by the engine):
 - Validation errors (`MACRO_VALUE_OUT_OF_RANGE`, `KEY_INVALID_PAIR`, etc.) — LLM corrects and retries once. If still failing, surfaces the error to the user.
 - Missing-resource errors (`PRESET_NOT_FOUND`, `INSTANCE_NOT_FOUND`) — LLM surfaces immediately; retry doesn't help.
 - Transient errors (engine restarting, WebSocket disconnected mid-op) — LLM retries with exponential backoff (up to 3 attempts).
@@ -510,9 +514,11 @@ Every tool response is either `{ ok: true, state }` or `{ ok: false, error }`. E
 
 ## Multi-Instance Routing
 
+> **Not implemented.** Each CLI process runs one instance, labelled by `--instance` (default `default`). There is no engine registry: `mcpServer.ts` compares a tool's `instance` argument to the session's own label and returns `INSTANCE_NOT_FOUND` on a mismatch. `INSTANCE_REQUIRED`, `INSTANCE_NONE_RUNNING`, the `instances://` resource, and `synesthetica stop` (which the CLI reports as "not yet implemented") do not exist. The design below is the plan of record.
+
 ### Registry
 
-The MCP server holds an in-memory `EngineRegistry`:
+The MCP server would hold an in-memory engine registry:
 
 ```
 Map<label: string, EngineHandle>
@@ -536,7 +542,7 @@ Every tool takes an optional `instance` parameter:
 
 ### Presets are shared, not per-instance
 
-The preset store is a single per-user directory (path per XDG conventions). Any instance can load or save to it. Preset content is instance-portable — it captures macro values, prescribed context, and active input, not a physical device binding.
+The preset store is a single per-user directory (path per XDG conventions). Any instance can load or save to it. Preset content is instance-portable — it captures macro values (the user-facing intents) and session controls (prescribed context). Input source is deliberately excluded, so loading a preset never switches the active device (`packages/cli/src/presets/presetStore.ts`).
 
 ### State is per-instance
 

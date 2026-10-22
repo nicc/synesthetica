@@ -7,10 +7,10 @@ Lenses transform `AnnotatedMusicalFrame` into `SceneFrame`. Each lens interprets
 Lenses share a three-column layout defined in `layout.ts`:
 
 - **Left column** — `DynamicsLens` (VU-meter bar with fading velocity indicators)
-- **Center column** — `RhythmLens` (pitch-class note strips, beat grid, now-line)
-- **Right column** — `HarmonyLens` (chord shape top cell, progression placeholder bottom cell)
+- **Center column** — `RhythmLens` (pitch-class note strips, beat grid, NOW line)
+- **Right column** — `HarmonyLens` (chord glyph in the top cell, progression clock in the bottom cell)
 
-See `layout.ts` for exact coordinates and proportions.
+See `layout.ts` for exact coordinates and proportions, and `timeMapping.ts` for the NOW line position and time-to-Y mapping.
 
 ## Development Approach
 
@@ -74,12 +74,14 @@ Lens tests should cover a wide range of inputs:
 - Silence (no active notes)
 - Tempo changes
 - Subdivision variety
-- Tier transitions (1 → 2 → 3)
+- Rhythm tier transitions (1 free time → 2 tempo → 3 tempo and meter)
 
-See `test/_fixtures/` for fixture format and `test/_harness/frames.ts` for shared frame factories.
+Shared frame factories are in `test/_harness/frames.ts`, `rhythmFixtures.ts` and `harmonyFixtures.ts`. `test/_fixtures/` holds stabilizer fixtures only.
 
 ## Current Lenses
 
-- `RhythmLens` — Pitch-class note strips with beat/bar grid, drift streaks, and now-line
-- `HarmonyLens` — Chord shape visualization with radial geometry and gradient fill
+- `RhythmLens` — Pitch-class note strips with beat/bar grid, drift streaks, NOW line, note-name legend, and optional overtone strips
+- `HarmonyLens` — Chord glyph (with overtone halo and interval-name dial) and the functional-harmony progression clock, plus a scrolling Roman-numeral strip beside the rhythm lens, on its time axis
 - `DynamicsLens` — Vertical VU-meter bar with fading velocity indicators
+
+Visual element terms are defined in [GLOSSARY.md](GLOSSARY.md).

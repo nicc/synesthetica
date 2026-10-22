@@ -4,11 +4,29 @@ Notable changes to Synesthetica. Format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+### Added
+
+- **Overtones (harmonic series overlay).** Each played note's partials, up to the 9th harmonic, are modelled at their true pitch and drawn as slow-moving steam: a halo around the chord glyph (on by default) and overtone strips on the rhythm lens (off by default). Both toggles are in Basics; overtone level, rolloff and colour (landing pitch or originating note) are in Advanced. The model is theoretical; it does not analyse audio.
+- **Note-name legend under the rhythm lens's NOW line.** On by default, toggled in Basics. Spelling follows the prescribed key; with no key it uses sharps or flats per a new Advanced setting.
+- **Interval-name dial around the chord glyph.** R, m2 … M7 at each spoke angle, in a ring just outside the glyph. On by default, toggled in Basics.
+- **Guide numerals on the progression clock.** With a key set, the key's seven diatonic numerals are drawn greyed on the diatonic ring. A played numeral covers its slot, and the guide returns as the played numeral fades.
+- **Modal-interchange hints (major keys).** An optional Basics toggle adds greyed ♭II, ♭III, iv, ♭VI and ♭VII to the progression clock's borrowed ring.
+- **Small-screen warning.** In windows under 768×576 the About panel opens on every load and says the app is not built for small screens.
+
+### Changed
+
+- **The view is contained rather than cropped.** Windows narrower than 4:3 now show the full width with bands above and below; previously the sides were cut off. The on-screen keyboard stays aligned with the clock and the NOW line either way.
+- **Progression clock proportions.** The clock is sized so its outer guide ring meets the chord glyph's overtone halo, and the borrowed (outer) band is narrower in proportion to its smaller numerals. Numerals, strokes, arcs and the centre chord name scale with it.
+- **Smaller first load for keyboard and MIDI sessions.** The audio model library (TensorFlow.js) was bundled into the main page as well as the audio worker. It now loads only with audio input; the main bundle drops from 2.6 MB to 0.9 MB.
+- **Development tooling.** ESLint 10 with type-checked rules that enforce package and engine-layer boundaries; `npm run typecheck` covers the web app and every package's tests; `npm test` runs all packages in one vitest process, with SVG snapshot generation moved to `npm run snapshots`. CI now builds the CLI (the root build had been skipping it) and, like the publish workflow, runs an MCP handshake smoke test against the bundled binary.
+
 ### Fixed
 
 - **GPU memory grew over a long session.** Text labels (chord names, note and interval names) each own a canvas texture, and removing a label disposed its material but not the texture. Every chord change left one behind.
 - **Playing E4 on the computer keyboard overwrote the clipboard.** A frame-capture debugging shortcut was bound to the bare "c" key, which is also E4 on the on-screen keyboard. It now exists only in dev builds, on Shift+C.
 - **The computer keyboard input swallowed shortcuts.** With it active, Cmd/Ctrl+C, V, Z and other shortcuts on mapped keys played a note and had their default action blocked. Keys held with Cmd, Ctrl or Alt now pass through to the browser.
+- **A bug in one lens or analysis stage froze the whole view.** The render loop stopped on any error. Now a failing lens is skipped for that frame, a failing analysis stage is reset and bypassed, each reports a diagnostic, and the rest keeps drawing.
+- **New notes paused before scrolling.** A note strip's top edge was held still for about 75 ms after each onset, then started moving. Notes now grow out of the NOW line from their onset.
 
 ### Security
 
@@ -46,5 +64,6 @@ First public release.
 - Node.js 20+ required. Chromium-based browsers only (Web MIDI + WebAssembly Basic Pitch dependencies).
 - Swing timing not yet supported.
 
-[Unreleased]: https://github.com/nicc/synesthetica/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/nicc/synesthetica/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/nicc/synesthetica/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/nicc/synesthetica/releases/tag/v1.0.0

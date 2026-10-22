@@ -298,6 +298,8 @@ RFCs are for discovery and exploration. Specs are the source of truth. When you 
 - Does this introduce a new pattern or concept? → Consider a new spec
 - Does this remove functionality a spec describes? → Update or retire the spec
 
+**Mechanical check:** `npm run check:specs` (part of `npm run lint`) fails if a spec names a `packages/...` path or a pipeline type that doesn't exist, or uses a retired term (grammar, ruleset). It can't tell whether a spec's prose matches behaviour; that is still on you.
+
 **Spec locations:**
 - `specs/SPEC_*.md` — Approved architectural decisions
 - `specs/RFC_*.md` — Discovery documents (may be outdated, not canonical)

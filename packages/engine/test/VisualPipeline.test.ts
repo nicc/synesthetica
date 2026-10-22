@@ -1,11 +1,13 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { VisualPipeline } from "../src/VisualPipeline";
 import { NoteTrackingStabilizer } from "../src/stabilizers/NoteTrackingStabilizer";
 import { MusicalVisualVocabulary } from "../src/vocabularies/MusicalVisualVocabulary";
 import { RhythmLens } from "../src/lenses/RhythmLens";
 import { IdentityCompositor } from "../src/stubs/IdentityCompositor";
 import type {
+  IMusicalStabilizer,
   IRawSourceAdapter,
+  IVisualLens,
   RawInputFrame,
   MidiNoteOn,
   MidiNoteOff,
@@ -336,5 +338,111 @@ describe("VisualPipeline", () => {
       pipeline.setMacro("harmony:linger", 4);
       expect(rhythm.getMacros()).toEqual(before);
     });
+  });
+});
+
+describe("VisualPipeline — graceful degradation (SPEC_007)", () => {
+  const partId = "main";
+  let adapter: MockRawAdapter;
+  let pipeline: VisualPipeline;
+
+  function build(extra: (p: VisualPipeline) => void): void {
+    pipeline = new VisualPipeline({ canvasSize: { width: 100, height: 100 }, rngSeed: 1, partId });
+    adapter = new MockRawAdapter();
+    pipeline.addAdapter(adapter);
+    pipeline.setVocabulary(new MusicalVisualVocabulary());
+    pipeline.setCompositor(new IdentityCompositor());
+    extra(pipeline);
+  }
+
+  let consoleError: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    consoleError.mockRestore();
+  });
+
+  const throwingLens: IVisualLens = {
+    id: "broken-lens",
+    init: () => {},
+    dispose: () => {},
+    update: () => {
+      throw new Error("lens bug");
+    },
+  };
+
+  it("skips a lens that throws, keeps drawing the others, and reports it", () => {
+    build((p) => {
+      p.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+      p.addLens(throwingLens);
+      p.addLens(new RhythmLens());
+    });
+    adapter.addNoteOn(60, 100, 0);
+
+    const frame = pipeline.requestFrame(0);
+
+    expect(stripPitchClasses(frame)).toEqual([0]);
+    expect(frame.diagnostics).toContainEqual(
+      expect.objectContaining({ category: "lens", source: "broken-lens", severity: "error" }),
+    );
+  });
+
+  it("reports a persistent failure every frame but logs it once", () => {
+    build((p) => {
+      p.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+      p.addLens(throwingLens);
+    });
+
+    const frames = [0, 16, 32].map((t) => pipeline.requestFrame(t));
+
+    for (const frame of frames) {
+      expect(frame.diagnostics.some((d) => d.source === "broken-lens")).toBe(true);
+    }
+    expect(consoleError).toHaveBeenCalledTimes(1);
+  });
+
+  it("resets a stabilizer that throws and passes its upstream through", () => {
+    let resets = 0;
+    const throwingStabilizer: IMusicalStabilizer = {
+      id: "broken-stabilizer",
+      dependencies: ["note-tracking"],
+      init: () => {},
+      dispose: () => {},
+      reset: () => {
+        resets++;
+      },
+      apply: () => {
+        throw new Error("stabilizer bug");
+      },
+    };
+    build((p) => {
+      p.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+      p.addStabilizerFactory(() => throwingStabilizer);
+      p.addLens(new RhythmLens());
+    });
+    adapter.addNoteOn(64, 100, 0);
+
+    const frame = pipeline.requestFrame(0);
+
+    expect(resets).toBe(1);
+    expect(stripPitchClasses(frame)).toEqual([4]);
+    expect(frame.diagnostics).toContainEqual(
+      expect.objectContaining({ category: "stabilizer", source: "broken-stabilizer" }),
+    );
+  });
+
+  it("fails fast when a stabilizer depends on one that isn't registered", () => {
+    const orphan: IMusicalStabilizer = {
+      id: "orphan",
+      dependencies: ["not-registered"],
+      init: () => {},
+      dispose: () => {},
+      reset: () => {},
+      apply: (_raw, upstream) => upstream ?? createTestMusicalFrame(0, partId),
+    };
+    build((p) => p.addStabilizerFactory(() => orphan));
+
+    expect(() => pipeline.requestFrame(0)).toThrow(/depends on 'not-registered'/);
   });
 });

@@ -395,7 +395,7 @@ These extend the invariants defined in SPEC_003.
 
 ## Implementation
 
-The canonical implementation is `MusicalVisualVocabulary` in `packages/engine/src/vocabulary/MusicalVisualVocabulary.ts` (to be created).
+The canonical implementation is `MusicalVisualVocabulary` in `packages/engine/src/vocabularies/MusicalVisualVocabulary.ts`.
 
 ### Helper Functions (in contracts)
 
@@ -409,8 +409,13 @@ function velocityToAttackMs(velocity: Velocity, config?: VelocityAttackConfig): 
 ### Builder Function (in engine)
 
 ```ts
-// In packages/engine/src/vocabulary/chordShape.ts (to be created)
-function buildChordShape(chord: MusicalChord): ChordShapeGeometry;
+// In packages/engine/src/vocabularies/utils.ts
+function buildChordShape(
+  interpretation: ChordInterpretation,  // harmonic or bass-led reading
+  voicing: Pitch[],
+  invariant: PitchHueInvariant,
+  bassPc?: PitchClass | null,           // marks the bass element on inversions
+): ChordShapeGeometry;
 ```
 
 ## What This Spec Does NOT Cover

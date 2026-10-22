@@ -71,6 +71,8 @@ Just open a new chat and ask. This is the fun bit. Try stuff. You could say "I w
 
 There are three lenses.
 
+This describes the current `main` branch. Overtones, the note-name and interval-name labels, and the modal-interchange hints are not in the published npm package (1.0.1); they ship in the next release.
+
 #### Dynamics lens
 
 <img src="docs/readme/dynamics.png" alt="Dynamics lens — velocity bar" align="left" height="200" hspace="16">
@@ -196,17 +198,21 @@ npm install
 # Build every workspace, in dependency order
 npm run build
 
-# Tests (all workspaces)
-npm test -ws --if-present
+# Quality gates (CI runs these after the build)
+npm run typecheck          # web app and every package's tests (package builds check src)
+npm test                   # all packages in one vitest run
+npm run lint               # ESLint, then a check that spec references still resolve
 
-# Lint
-npm run lint
+# Lens review snapshots (SVGs written to packages/engine/test/_snapshots/, not a test)
+npm run snapshots
 
-# Run the app locally
+# Run the app locally (after a build)
 npm run start              # MCP server on stdio + bundled web-app (what Claude Desktop spawns)
-npm run start:standalone   # web-app only, no MCP server — quickest way to iterate on visuals
-npm run dev                # Vite HMR against the engine sources — best for tight UI/lens loop
+npm run start:standalone   # web-app only, no MCP server
+npm run dev                # builds contracts/adapters/engine, then Vite dev server in Chrome
 ```
+
+`npm run dev` hot-reloads changes to the web app only. The web app imports the engine, adapters and contracts from their built `dist/`, so after editing those, rebuild the package (e.g. `npm run build -w @synesthetica/engine`) to see the change.
 
 ## Acknowledgements / built with
 

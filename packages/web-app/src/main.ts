@@ -554,13 +554,22 @@ async function detachCurrentAdapter(): Promise<void> {
 }
 
 function startRenderLoop(): void {
+  let failing = false;
   function render() {
     if (!pipeline || !renderer) return;
-    const sessionMs = performance.now() - sessionStartTime;
-    const sceneFrame = pipeline.requestFrame(sessionMs);
-    lastSceneFrame = sceneFrame;
-    renderer.render(sceneFrame);
+    // Schedule first: a frame that throws (SPEC_007 — e.g. a vocabulary
+    // bug) drops that frame only, instead of stopping the loop for good.
     animationFrameId = requestAnimationFrame(render);
+    try {
+      const sessionMs = performance.now() - sessionStartTime;
+      const sceneFrame = pipeline.requestFrame(sessionMs);
+      lastSceneFrame = sceneFrame;
+      renderer.render(sceneFrame);
+      failing = false;
+    } catch (err) {
+      if (!failing) console.error("Frame failed; continuing with the next one:", err);
+      failing = true;
+    }
   }
   render();
 }

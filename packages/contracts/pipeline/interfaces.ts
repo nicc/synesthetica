@@ -2,7 +2,7 @@
  * Pipeline Interfaces
  *
  * Defines the contracts for pipeline components: adapters, stabilizers,
- * rulesets, lenses, compositor, and renderer.
+ * vocabularies, lenses, compositor, and renderer.
  *
  * See SPEC_008 for pipeline orchestration and SPEC_009 for frame types.
  */
@@ -166,7 +166,9 @@ export interface IVisualVocabulary {
  *
  * Lenses receive annotated musical elements and decide HOW to render them
  * (or whether to render them at all). They are aware of musical element
- * categories (notes, chords, beats) but not musical analysis details.
+ * categories (notes, chords, beats) and read the analysis stabilizers
+ * have already done (chord quality, harmonic context), but do not
+ * perform analysis themselves (SPEC_003 I3/I4).
  *
  * Lenses:
  * - Decide which musical elements to render
@@ -176,14 +178,14 @@ export interface IVisualVocabulary {
  * - May filter elements (e.g., rhythm lens ignores chords)
  *
  * Lenses do NOT:
- * - Perform musical analysis
- * - Know pitch class, key, chord quality details
+ * - Perform musical analysis (detect chords, infer function, etc.)
+ * - Hold musical state; only bounded presentation caches (SPEC_006)
  * - Access raw MIDI or audio data
  *
  * Example interpretive choices:
- * - Rhythm lens: renders beats as pulses, notes as timing markers, ignores harmony
- * - Chord lens: renders chords as expanding blooms, notes as particles within
- * - Both use the same visual annotations (palette, texture, motion) from the ruleset
+ * - Rhythm lens: renders notes as scrolling strips against the beat grid, ignores harmony
+ * - Harmony lens: renders the current chord as a glyph and the progression as a clock
+ * - Both use the same visual annotations (palette, texture, motion) from the vocabulary
  */
 export interface IVisualLens {
   id: string;

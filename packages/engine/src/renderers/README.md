@@ -1,6 +1,6 @@
 # Renderers
 
-A renderer consumes a `SceneFrame` (the pipeline's final stage) and draws it. The canonical renderer is WebGL via Three.js. Beyond that, there's a deliberate "playful branches" pattern (see [CONTRIBUTING.md](../../../../CONTRIBUTING.md#playful-branches)) for aesthetic experiments that live on their own branches.
+A renderer consumes a `SceneFrame` (the pipeline's final stage) and draws it. The canonical renderer is WebGL via Three.js. Aesthetic experiments follow a "playful branches" pattern: each lives on its own branch off `main`, is switched on by a URL flag, and is never merged back.
 
 ## Canonical (on `main`)
 
@@ -18,7 +18,7 @@ Each renderer below lives on its own branch off `main` and is enabled by a URL p
 | `GhibliRenderer` | [`ghibli-render`](https://github.com/nicc/synesthetica/tree/ghibli-render) | `?renderer=ghibli` | Painterly: warm sky gradient, selective bloom, drifting dust motes, film grain. Subclasses `ThreeJSRenderer`. |
 | `IRobotRenderer` | [`i-robot`](https://github.com/nicc/synesthetica/tree/i-robot) | `?renderer=i-robot` | Atari arcade flat-shaded: ten-colour primary palette via colour quantisation, low-res framebuffer, pixelated upscale. Subclasses `ThreeJSRenderer`. |
 
-To try one: `git checkout <branch>`, `cd packages/web-app && npm run dev`, load `localhost:3000/?renderer=<flag>`. Default URL still gives the canonical renderer.
+To try one: `git checkout <branch>`, build the workspaces (`npm run build -ws`; the web app imports the engine's built output), then `cd packages/web-app && npm run dev` and load `localhost:3000/?renderer=<flag>`. The default URL still gives the canonical renderer.
 
 ## Extension points
 
@@ -38,5 +38,4 @@ Non-WebGL experiments (DOM, SVG, terminal, etc.) implement `IRenderer` directly 
 
 ## See also
 
-- [CONTRIBUTING.md § Playful Branches](../../../../CONTRIBUTING.md#playful-branches) — the lifecycle and conventions
 - [SPEC_009](../../../../specs/SPEC_009_pipeline_frame_types.md) — `SceneFrame` and `Entity` types that renderers consume

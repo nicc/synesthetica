@@ -7,7 +7,7 @@
  * the scene layer, because the LLM reasons about music, not visuals
  * — see synesthetica-lnc for the trade-off analysis.
  *
- * Ring-buffer sized by --recent-events-buffer (CLI, default 1000).
+ * Ring-buffer sized by --recent-events-buffer (CLI, default 10000).
  * Pull-only per SPEC 013 §I30 — the buffer is queried on demand,
  * never pushed to the LLM.
  */

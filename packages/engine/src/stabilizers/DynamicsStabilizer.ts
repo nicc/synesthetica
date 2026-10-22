@@ -104,11 +104,20 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
   private processNotes(notes: Note[]): void {
     // Collect new attack-phase notes we haven't seen
     const newOnsets: Note[] = [];
+    const inAttack = new Set<string>();
     for (const note of notes) {
-      if (note.phase === "attack" && !this.processedOnsets.has(note.id)) {
+      if (note.phase !== "attack") continue;
+      inAttack.add(note.id);
+      if (!this.processedOnsets.has(note.id)) {
         this.processedOnsets.add(note.id);
         newOnsets.push(note);
       }
+    }
+    // Only notes still in attack can be counted again, so remember just
+    // those. Bounds the set by polyphony without forgetting a note
+    // mid-attack.
+    for (const id of this.processedOnsets) {
+      if (!inAttack.has(id)) this.processedOnsets.delete(id);
     }
 
     if (newOnsets.length === 0) return;
@@ -160,10 +169,6 @@ export class DynamicsStabilizer implements IMusicalStabilizer {
       this.contour.shift();
     }
 
-    // Prune processed onset IDs — bound the set size
-    if (this.processedOnsets.size > 200) {
-      this.processedOnsets.clear();
-    }
   }
 
   private computeRange(): DynamicsRange {

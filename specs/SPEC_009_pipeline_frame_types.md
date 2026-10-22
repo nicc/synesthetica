@@ -19,7 +19,7 @@ The pipeline transforms data through three distinct frame types:
 This separation ensures:
 - Adapters don't impose musical semantics
 - Stabilizers produce proper musical abstractions
-- Lenses see musical element categories but not musical analysis
+- Lenses consume musical elements and stabilizer-derived analysis but do not compute analysis themselves
 - Vocabularies define a consistent visual vocabulary
 
 ## Frame Types
@@ -40,7 +40,11 @@ export type RawInput =
   | MidiNoteOn
   | MidiNoteOff
   | MidiCC
-  | AudioFeatures;
+  | AudioOnset
+  | AudioPitch
+  | AudioLoudness
+  | AudioNoteOn
+  | AudioNoteOff;
 
 export interface MidiNoteOn {
   type: "midi_note_on";
@@ -76,12 +80,15 @@ export interface MusicalFrame {
   prescribedTempo: number | null;  // User-set BPM (not inferred)
   prescribedMeter: { beatsPerBar: number; beatUnit: number } | null;
   prescribedKey: PrescribedKey | null;  // User-set key+mode (not inferred)
+  chordInterpretation: ChordInterpretationMode;  // "harmonic" | "bass-led" selection
   dynamics: DynamicsState;
+  progression?: ChordId[];               // Recent chord ids (ChordDetectionStabilizer)
+  phrases?: Phrase[];                    // No stabilizer writes this yet (synesthetica-nob)
   harmonicContext?: HarmonicContext;     // Tension + functional analysis
 }
 
 // RhythmicAnalysis / OnsetDrift / SubdivisionDrift removed 2026-08-20
-// along with any BPM inference from the system. RhythmGrammar computes
+// along with any BPM inference from the system. RhythmLens computes
 // drift inline from the prescribed tempo grid; no shared "rhythmic
 // analysis" type is needed. See SPEC 013 §Non-Goals. RFCs 007 and 008
 // (which designed these types) are superseded.
@@ -126,9 +133,8 @@ export interface DynamicsRange {
 
 export interface DynamicsState {
   events: DynamicsEvent[];           // Constituent velocity observations
-  level: number;                     // Smoothed current level (EMA)
-  trend: "rising" | "falling" | "stable";  // Direction from linear regression
-  contour: DynamicsContourPoint[];   // Smoothed level history over window
+  level: number;                     // Max intensity of the most recent onset
+  contour: DynamicsContourPoint[];   // Level history, one point per onset time
   range: DynamicsRange;              // Dynamic range summary
 }
 ```
@@ -136,8 +142,8 @@ export interface DynamicsState {
 **Key properties:**
 - Notes have duration, not on/off pairs
 - Notes have phase (attack → sustain → release)
-- Includes derived state (dynamics with contour history, trend, and range)
-- DynamicsState separates constituents (events) from aggregates (level, trend, contour, range)
+- Includes derived state (dynamics with contour history and range)
+- DynamicsState separates constituents (events) from aggregates (level, contour, range)
 - Tempo/meter are user-prescribed, not stabilizer-inferred (BPM inference removed 2026-08-20)
 
 ### AnnotatedMusicalFrame (RFC 006)
@@ -150,6 +156,10 @@ export interface AnnotatedMusicalFrame {
   part: PartId;
   notes: AnnotatedNote[];
   chords: AnnotatedChord[];
+  progression: ChordId[];
+  hueInvariant: PitchHueInvariant;       // Pitch-class → hue mapping for lenses
+  pitchClassNames: string[];             // Display spelling per pitch class
+  harmonicContext: HarmonicContext;      // Passed through from HarmonyStabilizer
   bars: AnnotatedBar[];
   phrases: AnnotatedPhrase[];
   dynamics: AnnotatedDynamics;
@@ -164,12 +174,17 @@ export interface AnnotatedMusicalFrame {
 export interface AnnotatedNote {
   note: Note;                    // The underlying musical note
   visual: VisualAnnotation;      // Visual properties from vocabulary
+  velocity: VelocityAnnotation;  // I16
+  phaseState: PhaseAnnotation;   // I17
+  // ...plus harmonic-series partials; see the contract
 }
 
 export interface AnnotatedChord {
   chord: MusicalChord;
   visual: VisualAnnotation;
   noteIds: NoteId[];             // Constituent notes
+  shape: ChordShapeGeometry;     // I18
+  // ...plus partials; see the contract
 }
 
 export interface VisualAnnotation {
@@ -198,7 +213,7 @@ Adapters              Stabilizers           Vocabularies              Lenses
    │  - MidiNoteOn        │  - Note             │  - AnnotatedNote    │
    │  - MidiNoteOff       │  - MusicalChord     │  - AnnotatedChord   │
    │  - MidiCC            │  - DynamicsState    │  - AnnotatedDynamics│
-   │  - AudioFeatures     │  - HarmonicContext  │  - HarmonicContext  │
+   │  - Audio* inputs     │  - HarmonicContext  │  - HarmonicContext  │
 ```
 
 ## Note Lifecycle
@@ -209,7 +224,7 @@ Stabilizers transform MIDI note_on/note_off pairs into Note objects with phases:
 Time →
 note_on                                              note_off
    │                                                    │
-   │◄─ attack (50ms) ─►│◄───── sustain ─────────────►│◄─ release (500ms) ─►│
+   │◄─ attack (50ms) ─►│◄───── sustain ─────────────►│◄─ release (10s) ─►│
    │                   │                              │                     │
    └───────────────────┴──────────────────────────────┴─────────────────────┘
                                 Note lifetime
@@ -219,7 +234,7 @@ note_on                                              note_off
 - **sustain**: While key is held
 - **release**: After note_off, during decay tail
 
-The release window (default 500ms) allows visual effects to fade gracefully.
+The release window (`releaseWindowMs`, default 10000ms) keeps released notes in the frame so lenses can show their history and fade them.
 
 ## Lens Responsibility (RFC 006)
 
@@ -227,6 +242,7 @@ Lenses know:
 - Musical element categories (note, chord, beat, bar, phrase)
 - Element lifecycle (phase, onset, duration)
 - Visual annotations (palette, texture, motion)
+- Stabilizer-derived analysis carried on the frame (e.g. chord quality, `harmonicContext` functional edges and progression)
 
 Lenses decide:
 - Which elements to render (can ignore chords, focus on rhythm, etc.)
@@ -234,12 +250,11 @@ Lenses decide:
 - Spatial layout and animation
 - Visual emphasis/de-emphasis
 
-Lenses do NOT know:
-- Pitch class, key, or harmonic analysis
-- Chord quality or voicing details (unless they use `label`)
-- Raw MIDI or audio data
+Lenses do NOT:
+- Compute musical analysis (chord detection, functional harmony, tension) — they read the results stabilizers put on the frame
+- Read raw MIDI or audio data
 
-**Key principle**: Lenses know *categories* of musical elements, not musical *analysis*.
+**Key principle**: Lenses may *consume* analysis from the annotated frame; they never *produce* it.
 
 ## Division of Responsibility
 
@@ -262,11 +277,11 @@ Lenses do NOT know:
 - `IRawSourceAdapter`: `packages/contracts/pipeline/interfaces.ts`
 - `IMusicalStabilizer`: `packages/contracts/pipeline/interfaces.ts`
 - `IVisualVocabulary`: `packages/contracts/pipeline/interfaces.ts`
-- `IVisualGrammar`: `packages/contracts/pipeline/interfaces.ts`
+- `IVisualLens`: `packages/contracts/pipeline/interfaces.ts`
 
 ## Invariants Preserved
 
-- **I3**: Meaning lives in vocabulary; lenses see annotated elements (categories, not analysis)
+- **I3**: Meaning lives in vocabulary; lenses consume stabilizer-derived analysis via the annotated frame but do not compute it (that is I4)
 - **I4**: Lenses may not compute musical semantics
 - **New**: Adapters don't impose musical semantics — only RawInputFrame
 
@@ -274,5 +289,5 @@ Lenses do NOT know:
 
 - Specific stabilizer implementations (NoteTrackingStabilizer, etc.)
 - Specific vocabulary implementations (MusicalVisualVocabulary, etc.)
-- Audio adapter input types (AudioFeatures)
+- Audio adapter input types (`AudioOnset`, `AudioPitch`, etc.; see SPEC_012)
 - Multi-part routing

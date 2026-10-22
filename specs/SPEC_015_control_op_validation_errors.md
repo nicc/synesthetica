@@ -136,5 +136,5 @@ Filed under synesthetica-5l9 (build-time annotation validation) and the general 
 - `packages/cli/src/tools/macroTools.ts` — macro codes.
 - `packages/cli/src/tools/presetTools.ts` — preset codes.
 - `packages/cli/src/mcpServer.ts` — TOOL_UNKNOWN + isError wrapping.
-- `packages/cli/src/main.ts` — INSTANCE_NOT_FOUND.
+- `packages/cli/src/mcpServer.ts`, `packages/cli/src/session/sessionManager.ts` — INSTANCE_NOT_FOUND.
 - `packages/cli/test/{sessionTools,macroTools,presetTools}.test.ts` — behavioural coverage per code.

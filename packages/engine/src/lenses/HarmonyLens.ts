@@ -60,10 +60,10 @@ import { NOW_LINE_Y, timeToY } from "./timeMapping";
 // ============================================================================
 
 /**
- * Fade control value. Unit depends on context:
- * - Without tempo: seconds
- * - With tempo: bars
- * Default: 6 (6 seconds or 6 bars)
+ * Default fade window for the progression clock, in seconds. Default
+ * for the `linger` macro (harmony:linger). Always seconds, whether or
+ * not a tempo is set: the LLM and panel convert bars to seconds at
+ * input time (SPEC 014 §Harmony linger).
  */
 const PROGRESSION_FADE_VALUE = 3;
 
@@ -334,10 +334,8 @@ const CHORD_FADE_OUT_MS = 120;
  *  IDs (e.g. `harmony:linger`) to these fields happens at the
  *  dispatcher layer. */
 interface HarmonyLensMacros {
-  /** Fade window value. Interpretation depends on prescribed tempo:
-   *  - With tempo set: value is in bars (default 3 bars)
-   *  - Without tempo: value is in seconds (default 3 s)
-   *  Matches PROGRESSION_FADE_VALUE's semantic. */
+  /** Progression-clock fade window in seconds, regardless of tempo.
+   *  Default PROGRESSION_FADE_VALUE. */
   linger: number;
   /** Draw the chord glyph's overtone halo (harmonic series overlay,
    *  RFC 012). Lens-level so the glyph and the rhythm lens can be
@@ -389,7 +387,11 @@ export class HarmonyLens implements IVisualLens {
   }
 
   /**
-   * Update the scene with chord shape and tension bar entities.
+   * Build the frame's entities: the chord glyph (with its overtone halo
+   * and centre label) and interval-name dial, plus, when a key is
+   * prescribed, the progression clock (guide rings, guide numerals,
+   * played numerals, connector strips and arcs) and the scrolling
+   * Roman numerals.
    */
   update(input: AnnotatedMusicalFrame, _previous: SceneFrame | null): SceneFrame {
     const entities: Entity[] = [];
@@ -593,11 +595,6 @@ export class HarmonyLens implements IVisualLens {
   // ==========================================================================
 
   /**
-   * Create entities for the progression clock.
-   * Each functional chord in the progression becomes a Roman numeral glyph
-   * positioned at its pitch-class angle, coloured by root hue, fading with age.
-   */
-  /**
    * Always-on structural elements of the harmony clock — three guide
    * rings + seven slot tick marks at the diatonic ring. Renders
    * whenever a key is prescribed, regardless of whether any chord is
@@ -669,6 +666,11 @@ export class HarmonyLens implements IVisualLens {
     return entities;
   }
 
+  /**
+   * Played numerals on the progression clock. Each functional chord in
+   * the progression becomes a Roman numeral at its scale-degree slot,
+   * coloured by its root's hue, fading over `fadeMs` after release.
+   */
   private createProgressionClock(
     progression: FunctionalChord[],
     t: number,
