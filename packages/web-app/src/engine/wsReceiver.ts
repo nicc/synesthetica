@@ -34,6 +34,13 @@ export interface WsReceiverOptions {
    * expects back; throw to send an error result.
    */
   onCall: EngineCallHandler;
+  /**
+   * The page's current state, read each time the connection opens and
+   * sent ahead of pipeline-ready. The page owns this state; the CLI
+   * caches it, and must not be left holding a stale or empty copy
+   * because a push happened while the socket was closed.
+   */
+  getSnapshot: () => EngineStateSnapshot;
   /** Optional; log to console.error when omitted. */
   log?: (line: string) => void;
 }
@@ -73,13 +80,6 @@ export function startWsReceiver(opts: WsReceiverOptions): WsReceiverHandle {
    */
   let pipelineReadyIntended = false;
   let pipelineReadySent = false;
-  /**
-   * The most recent snapshot the app published. State published before
-   * the socket opens (main.ts publishes "spawned" synchronously at
-   * load) or while it is reconnecting would otherwise be lost, leaving
-   * the CLI's cached state stale, so it is resent on every open.
-   */
-  let latestSnapshot: EngineStateSnapshot | null = null;
 
   const send = (msg: BrowserToCli) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -113,9 +113,11 @@ export function startWsReceiver(opts: WsReceiverOptions): WsReceiverHandle {
       // pipeline-ready flag on reconnect too; re-signal once ready.
       pipelineReadySent = false;
       log(`wsReceiver: connected to ${opts.url} as '${opts.label}'`);
-      // State before ready: the CLI's start_session returns as soon as
-      // pipeline-ready arrives, and its cached state must be current by then.
-      if (latestSnapshot) send({ type: "state-changed", snapshot: latestSnapshot });
+      // Current state before ready: the CLI's start_session returns as
+      // soon as pipeline-ready arrives, and its cached state must be
+      // current by then. Pushes made while the socket was closed were
+      // dropped, so read the state now rather than replaying any of them.
+      send({ type: "state-changed", snapshot: opts.getSnapshot() });
       // Flush any pipeline-ready intent that arrived before we opened
       // (main.ts calls publishPipelineReady synchronously right after
       // mountWsReceiver returns).
@@ -169,7 +171,6 @@ export function startWsReceiver(opts: WsReceiverOptions): WsReceiverHandle {
   return {
     isConnected: () => connected,
     publishStateChanged(snapshot) {
-      latestSnapshot = snapshot;
       send({ type: "state-changed", snapshot });
     },
     publishPipelineReady() {

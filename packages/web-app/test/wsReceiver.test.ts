@@ -61,19 +61,22 @@ const URL = "ws://localhost:9999";
 const LABEL = "piano";
 
 let receiver: WsReceiverHandle | null = null;
+/** What the page reports as its state when the receiver asks. */
+let pageState: EngineStateSnapshot;
 
 function start(onCall: Parameters<typeof startWsReceiver>[0]["onCall"] = async () => null) {
-  receiver = startWsReceiver({ url: URL, label: LABEL, onCall, log: () => {} });
+  receiver = startWsReceiver({ url: URL, label: LABEL, onCall, getSnapshot: () => pageState, log: () => {} });
   return receiver;
 }
 
 /** The socket the receiver is currently using. */
 const current = () => FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
 
-/** Resolve once the socket has sent `count` frames (replies are async). */
-async function sentFrames(ws: FakeWebSocket, count: number): Promise<BrowserToCli[]> {
-  await vi.waitFor(() => expect(ws.sent.length).toBeGreaterThanOrEqual(count));
-  return ws.sent;
+/** Resolve with the reply to call `id` once it has been sent (replies are async). */
+async function resultFor(ws: FakeWebSocket, id: number): Promise<BrowserToCli> {
+  const find = () => ws.sent.find((m) => m.type === "result" && m.id === id);
+  await vi.waitFor(() => expect(find()).toBeDefined());
+  return find()!;
 }
 
 function snapshot(instance: string): EngineStateSnapshot {
@@ -99,6 +102,7 @@ function snapshot(instance: string): EngineStateSnapshot {
 }
 
 beforeEach(() => {
+  pageState = snapshot(LABEL);
   FakeWebSocket.instances = [];
   vi.stubGlobal("WebSocket", FakeWebSocket);
 });
@@ -134,9 +138,9 @@ describe("wsReceiver — call dispatch", () => {
     const ws = current();
     ws.open();
     ws.receive({ type: "call", id: 42, method: "setTempo", args: [140] });
-    const sent = await sentFrames(ws, 2);
+    const reply = await resultFor(ws, 42);
     expect(onCall).toHaveBeenCalledWith("setTempo", [140]);
-    expect(sent[1]).toEqual({ type: "result", id: 42, ok: true, value: { method: "setTempo", args: [140] } });
+    expect(reply).toEqual({ type: "result", id: 42, ok: true, value: { method: "setTempo", args: [140] } });
   });
 
   it("replies with ok:false and the error message when onCall throws", async () => {
@@ -146,8 +150,7 @@ describe("wsReceiver — call dispatch", () => {
     const ws = current();
     ws.open();
     ws.receive({ type: "call", id: 7, method: "setMacro", args: ["bogus", 0] });
-    const sent = await sentFrames(ws, 2);
-    expect(sent[1]).toEqual({ type: "result", id: 7, ok: false, error: { message: "no such macro" } });
+    expect(await resultFor(ws, 7)).toEqual({ type: "result", id: 7, ok: false, error: { message: "no such macro" } });
   });
 
   it("correlates replies by id when calls resolve out of order", async () => {
@@ -163,8 +166,8 @@ describe("wsReceiver — call dispatch", () => {
     await vi.waitFor(() => expect(releases.size).toBe(2));
     releases.get(2)!();
     releases.get(1)!();
-    const sent = await sentFrames(ws, 3);
-    const results = sent.filter((m) => m.type === "result");
+    await resultFor(ws, 1);
+    const results = ws.sent.filter((m) => m.type === "result");
     expect(results).toEqual([
       { type: "result", id: 2, ok: true, value: "value-2" },
       { type: "result", id: 1, ok: true, value: "value-1" },
@@ -178,9 +181,9 @@ describe("wsReceiver — call dispatch", () => {
     ws.open();
     ws.receive("{not json");
     ws.receive({ type: "call", id: 3, method: "getStateSnapshot", args: [] });
-    const sent = await sentFrames(ws, 2);
+    const reply = await resultFor(ws, 3);
     expect(onCall).toHaveBeenCalledTimes(1);
-    expect(sent[1]).toMatchObject({ type: "result", id: 3, ok: true });
+    expect(reply).toMatchObject({ type: "result", id: 3, ok: true });
   });
 });
 
@@ -200,21 +203,21 @@ describe("wsReceiver — publishing", () => {
     const ws = current();
     expect(ws.sent).toEqual([]);
     ws.open();
-    expect(ws.sent.map((m) => m.type)).toEqual(["hello", "pipeline-ready"]);
-    expect(ws.sent[1]).toEqual({ type: "pipeline-ready", label: LABEL });
+    expect(ws.sent.map((m) => m.type)).toEqual(["hello", "state-changed", "pipeline-ready"]);
+    expect(ws.sent[2]).toEqual({ type: "pipeline-ready", label: LABEL });
   });
 
-  it("state published before the socket opens reaches the CLI before pipeline-ready", () => {
-    // main.ts publishes "spawned" and signals ready synchronously at load;
-    // start_session returns on ready, so the state must already be there.
+  it("sends the page's current state after hello and before pipeline-ready", () => {
+    // main.ts publishes "spawned" and signals ready synchronously at load,
+    // before the socket opens; start_session returns on ready, so the
+    // CLI must already hold the current state by then.
     const r = start();
-    const spawned = { ...snapshot(LABEL), session: { ...snapshot(LABEL).session, phase: "spawned" as const } };
-    r.publishStateChanged(spawned);
+    pageState = { ...snapshot(LABEL), session: { ...snapshot(LABEL).session, phase: "spawned" } };
     r.publishPipelineReady();
     const ws = current();
     ws.open();
     expect(ws.sent.map((m) => m.type)).toEqual(["hello", "state-changed", "pipeline-ready"]);
-    expect(ws.sent[1]).toEqual({ type: "state-changed", snapshot: spawned });
+    expect(ws.sent[1]).toEqual({ type: "state-changed", snapshot: pageState });
   });
 
   it("publishPipelineReady is sent once per connection", () => {
@@ -243,23 +246,22 @@ describe("wsReceiver — reconnect", () => {
     expect(second.url).toBe(URL);
     second.open();
     // The CLI resets its ready flag on reconnect, so the tab must say it again.
-    expect(second.sent.map((m) => m.type)).toEqual(["hello", "pipeline-ready"]);
+    expect(second.sent.map((m) => m.type)).toEqual(["hello", "state-changed", "pipeline-ready"]);
     expect(r.isConnected()).toBe(true);
   });
 
-  it("resends the latest state on reconnect, including state published while disconnected", () => {
+  it("on reconnect, sends the state as it is then, not as it was at the drop", () => {
     vi.useFakeTimers();
-    const r = start();
+    start();
     const first = current();
     first.open();
-    r.publishStateChanged(snapshot("before-drop"));
     first.serverClose();
-    r.publishStateChanged(snapshot("while-down"));
+    pageState = snapshot("changed-while-down");
 
     vi.runOnlyPendingTimers();
     const second = current();
     second.open();
-    expect(second.sent[1]).toEqual({ type: "state-changed", snapshot: snapshot("while-down") });
+    expect(second.sent[1]).toEqual({ type: "state-changed", snapshot: snapshot("changed-while-down") });
   });
 
   it("backs off: each failed attempt waits at least as long as the last, and success resets it", () => {

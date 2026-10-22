@@ -1138,9 +1138,9 @@ void queryPermissionsAndPublish();
 // calls that actually take effect on consumers. SessionManager.start()
 // on the CLI awaits this before returning ok:true to the LLM, so a
 // subsequent set_macro doesn't race a null pipeline. The socket isn't
-// open yet at this point; wsReceiver sends the latest state snapshot
-// (from initializePipeline above) and then pipeline-ready once it opens,
-// so the CLI's cached state is current when start_session returns.
+// open yet at this point; once it opens, wsReceiver sends the page's
+// current state and then pipeline-ready, so the CLI's cached state is
+// current when start_session returns.
 wsReceiver?.publishPipelineReady();
 
 /**
@@ -1217,6 +1217,7 @@ function mountWsReceiver(): WsReceiverHandle | null {
   return startWsReceiver({
     url: `ws://${window.location.hostname}:${wsPort}`,
     label,
+    getSnapshot: snapshotCopy,
     onCall: async (method, args) => {
       if (method === "getStateSnapshot") return snapshotCopy();
       if (method === "getAvailableInputs") {
