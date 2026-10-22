@@ -101,7 +101,8 @@ export interface AudioInputAdapterConfig {
 
   /**
    * URL of the Basic Pitch model JSON (model.json). The InferenceWorker
-   * fetches this via tf.loadGraphModel.
+   * fetches this via tf.loadGraphModel. A relative URL is resolved
+   * against the page (see resolveAgainstPage).
    */
   modelUrl: string;
 
@@ -287,7 +288,7 @@ export class AudioInputAdapter implements IRawSourceAdapter {
       ring: ringHandles,
       sampleRate: SAMPLE_RATE,
       hopMs: this.config.hopMs,
-      modelUrl: this.config.modelUrl,
+      modelUrl: resolveAgainstPage(this.config.modelUrl),
       onsetThreshold: this.config.onsetThreshold,
       frameThreshold: this.config.frameThreshold,
       minNoteLengthFrames: this.config.minNoteLengthFrames,
@@ -413,4 +414,14 @@ export class AudioInputAdapter implements IRawSourceAdapter {
 
 function msToSamples(ms: number): number {
   return Math.round((ms / 1000) * SAMPLE_RATE);
+}
+
+/**
+ * Make a URL absolute against the current page before handing it to the
+ * worker. A worker resolves relative URLs against its own script URL, so
+ * "./models/…" from a page at "/" would be fetched as "/assets/models/…"
+ * once the worker is bundled under assets/.
+ */
+export function resolveAgainstPage(url: string, base: string = globalThis.location.href): string {
+  return new URL(url, base).href;
 }

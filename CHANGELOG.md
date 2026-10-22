@@ -25,6 +25,7 @@ Notable changes to Synesthetica. Format follows [Keep a Changelog](https://keepa
 - **GPU memory grew over a long session.** Text labels (chord names, note and interval names) each own a canvas texture, and removing a label disposed its material but not the texture. Every chord change left one behind.
 - **Playing E4 on the computer keyboard overwrote the clipboard.** A frame-capture debugging shortcut was bound to the bare "c" key, which is also E4 on the on-screen keyboard. It now exists only in dev builds, on Shift+C.
 - **The computer keyboard input swallowed shortcuts.** With it active, Cmd/Ctrl+C, V, Z and other shortcuts on mapped keys played a note and had their default action blocked. Keys held with Cmd, Ctrl or Alt now pass through to the browser.
+- **Audio input failed in the installed CLI.** The audio worker resolved the model's relative URL against its own location under `assets/`, so `npx synesthetica` requested `/assets/models/basic-pitch/model.json` and got a 404. The URL is now resolved against the page before it reaches the worker.
 - **A bug in one lens or analysis stage froze the whole view.** The render loop stopped on any error. Now a failing lens is skipped for that frame, a failing analysis stage is reset and bypassed, each reports a diagnostic, and the rest keeps drawing.
 - **New notes paused before scrolling.** A note strip's top edge was held still for about 75 ms after each onset, then started moving. Notes now grow out of the NOW line from their onset.
 
