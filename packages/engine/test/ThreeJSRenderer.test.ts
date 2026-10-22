@@ -87,6 +87,10 @@ vi.mock("three", () => {
   class MockLineBasicMaterial extends Material {}
 
   // Mock Geometry classes
+  class MockTexture {
+    dispose = vi.fn();
+  }
+
   class MockBufferGeometry {
     dispose = vi.fn();
     setFromPoints() { return this; }
@@ -210,6 +214,7 @@ vi.mock("three", () => {
     PlaneGeometry: MockPlaneGeometry,
     RingGeometry: MockRingGeometry,
     BufferGeometry: MockBufferGeometry,
+    Texture: MockTexture,
     Material,
     MeshBasicMaterial: MockMeshBasicMaterial,
     ShaderMaterial: MockShaderMaterial,

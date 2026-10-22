@@ -13,6 +13,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, statSync, createReadStream } from "node:fs";
 import { extname, join, normalize, sep } from "node:path";
+import { LOOPBACK_HOST } from "../loopback.js";
 
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -60,7 +61,7 @@ export async function serveStatic(opts: ServeStaticOptions): Promise<ServeStatic
   await new Promise<void>((resolve, reject) => {
     server.once("listening", () => resolve());
     server.once("error", (err) => reject(err));
-    server.listen(opts.port);
+    server.listen(opts.port, LOOPBACK_HOST);
   });
   const addr = server.address();
   const port = addr && typeof addr === "object" ? addr.port : opts.port;
@@ -92,7 +93,17 @@ function handleRequest(
   // Strip query string; static serve ignores it.
   const pathOnly = url.split("?")[0];
   // Resolve requested path against root and guard against traversal.
-  const requested = pathOnly === "/" ? "index.html" : decodeURIComponent(pathOnly.replace(/^\//, ""));
+  let requested: string;
+  try {
+    requested = pathOnly === "/" ? "index.html" : decodeURIComponent(pathOnly.replace(/^\//, ""));
+  } catch {
+    // Malformed percent-escape (e.g. "/%E0"). decodeURIComponent throws
+    // URIError, which would otherwise escape the request handler and
+    // take the CLI process down.
+    res.statusCode = 400;
+    res.end("bad request");
+    return;
+  }
   const abs = normalize(join(root, requested));
   if (!abs.startsWith(root + sep) && abs !== root && !abs.startsWith(root + "/")) {
     res.statusCode = 403;

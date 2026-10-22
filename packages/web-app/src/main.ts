@@ -1047,10 +1047,18 @@ window.addEventListener("beforeunload", () => {
 
 /* -----------------------------------------------------------------
  * Frame-capture keyboard shortcut (dev tool)
+ *
+ * Dev builds only, and behind Shift: plain "c" is E4 on the computer
+ * keyboard input, so an unmodified binding would capture a frame (and
+ * overwrite the clipboard) on every E4.
  * ----------------------------------------------------------------- */
-document.addEventListener("keydown", (e) => {
-  if (e.key === "c" && !e.ctrlKey && !e.metaKey) captureFrame();
-});
+if (import.meta.env.DEV) {
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "KeyC" && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      captureFrame();
+    }
+  });
+}
 function captureFrame(): void {
   if (!lastSceneFrame) return;
   const json = JSON.stringify(

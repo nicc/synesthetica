@@ -32,6 +32,7 @@ import type {
   Unsubscribe,
 } from "./engineHandle.js";
 import type { MacroValue } from "@synesthetica/contracts";
+import { LOOPBACK_HOST, isLoopbackOrigin } from "../loopback.js";
 
 const CALL_TIMEOUT_MS = 5_000;
 const RECONNECT_GRACE_MS = 2_000;
@@ -79,7 +80,7 @@ interface PendingCall {
 
 export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHandle> {
   const log = opts.log ?? (() => {});
-  const wss = new WebSocketServer({ port: opts.port });
+  const wss = new WebSocketServer({ port: opts.port, host: LOOPBACK_HOST });
   // With port=0, ws picks an OS-assigned free port. The actual port
   // is only known once the underlying HTTP server has bound. Await
   // the 'listening' event before returning.
@@ -97,7 +98,12 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
   const handles = new Map<string, WSBackedEngineHandle>();
   const pendingByConn = new WeakMap<WebSocket, Map<number, PendingCall>>();
 
-  wss.on("connection", (ws) => {
+  wss.on("connection", (ws, req) => {
+    if (!isLoopbackOrigin(req.headers.origin)) {
+      log(`wsBridge: rejected connection from origin '${req.headers.origin}'`);
+      ws.close(1008, "origin not allowed");
+      return;
+    }
     let helloSeen = false;
     let label: string | null = null;
 

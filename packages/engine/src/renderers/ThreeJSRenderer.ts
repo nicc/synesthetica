@@ -39,6 +39,7 @@ import {
 } from "../utils/ChordShapeBuilder";
 // Shared with HarmonyLens: the band gap also sizes the progression clock.
 import { GLYPH_STEAM_BAND_GAP } from "../lenses/layout";
+import { disposeObject } from "./disposal";
 
 // ============================================================================
 // Configuration
@@ -443,6 +444,8 @@ export class ThreeJSRenderer implements IRenderer {
   // Reusable geometries
   private circleGeometry: THREE.CircleGeometry | null = null;
   private planeGeometry: THREE.PlaneGeometry | null = null;
+  /** Geometries owned by the renderer that outlive individual entities. */
+  private readonly sharedGeometries = new Set<THREE.BufferGeometry>();
 
   // Viewport resolution for LineMaterial (thick lines)
   private resolution = new THREE.Vector2(800, 600);
@@ -512,6 +515,7 @@ export class ThreeJSRenderer implements IRenderer {
     // Create reusable geometries
     this.circleGeometry = new THREE.CircleGeometry(1, 32);
     this.planeGeometry = new THREE.PlaneGeometry(1, 1);
+    this.sharedGeometries.add(this.circleGeometry).add(this.planeGeometry);
   }
 
   /**
@@ -530,6 +534,7 @@ export class ThreeJSRenderer implements IRenderer {
     this.planeGeometry?.dispose();
     this.circleGeometry = null;
     this.planeGeometry = null;
+    this.sharedGeometries.clear();
 
     // Dispose renderer
     this.renderer?.dispose();
@@ -2608,26 +2613,6 @@ export class ThreeJSRenderer implements IRenderer {
   }
 
   private disposeObject(obj: THREE.Object3D): void {
-    if (obj instanceof THREE.Mesh) {
-      // Don't dispose shared geometries
-      if (
-        obj.geometry !== this.circleGeometry &&
-        obj.geometry !== this.planeGeometry
-      ) {
-        obj.geometry.dispose();
-      }
-      if (obj.material instanceof THREE.Material) {
-        obj.material.dispose();
-      }
-    } else if (obj instanceof THREE.Line) {
-      obj.geometry.dispose();
-      if (obj.material instanceof THREE.Material) {
-        obj.material.dispose();
-      }
-    } else if (obj instanceof THREE.Group) {
-      for (const child of obj.children) {
-        this.disposeObject(child);
-      }
-    }
+    disposeObject(obj, this.sharedGeometries);
   }
 }

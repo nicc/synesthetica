@@ -55,6 +55,32 @@ describe("wsBridge — connection lifecycle", () => {
   });
 });
 
+describe("wsBridge — origin check", () => {
+  it("closes connections from a non-loopback browser origin", async () => {
+    const ws = new WebSocket(`ws://localhost:${bridge.port}`, {
+      headers: { Origin: "https://example.com" },
+    });
+    const code = await new Promise<number>((resolve) => ws.once("close", resolve));
+    expect(code).toBe(1008);
+  });
+
+  it("does not let a foreign origin take over an existing label", async () => {
+    const handle = bridge.handleFor("default");
+    const real = await connectAs("default");
+    const foreign = new WebSocket(`ws://localhost:${bridge.port}`, {
+      headers: { Origin: "https://example.com" },
+    });
+    foreign.once("open", () => {
+      const hello: BrowserToCli = { type: "hello", label: "default", protocol: ENGINE_BRIDGE_PROTOCOL };
+      foreign.send(JSON.stringify(hello));
+    });
+    await new Promise((resolve) => foreign.once("close", resolve));
+    expect(handle.status).toBe("running");
+    expect(real.readyState).toBe(WebSocket.OPEN);
+    real.close();
+  });
+});
+
 describe("wsBridge — call round-trip", () => {
   it("engine call is delivered to the browser and result is returned", async () => {
     const handle = bridge.handleFor("default");

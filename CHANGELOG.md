@@ -4,6 +4,16 @@ Notable changes to Synesthetica. Format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+### Fixed
+
+- **GPU memory grew over a long session.** Text labels (chord names, note and interval names) each own a canvas texture, and removing a label disposed its material but not the texture. Every chord change left one behind.
+- **Playing E4 on the computer keyboard overwrote the clipboard.** A frame-capture debugging shortcut was bound to the bare "c" key, which is also E4 on the on-screen keyboard. It now exists only in dev builds, on Shift+C.
+
+### Security
+
+- **The CLI's local servers listened on every network interface.** The web-app server and the engine bridge now bind to 127.0.0.1, and the bridge rejects WebSocket connections from non-loopback browser origins. Previously another machine on the network, or any open web page, could connect to the bridge and feed state into the LLM's context.
+- **A malformed URL could crash the CLI.** A request like `GET /%E0` threw inside the static server's request handler; it now gets a 400.
+
 ## [1.0.1] — 2026/09/14
 
 ### Fixed
