@@ -1137,9 +1137,10 @@ void queryPermissionsAndPublish();
 // Signal to the CLI that we're wired up and ready to receive engine
 // calls that actually take effect on consumers. SessionManager.start()
 // on the CLI awaits this before returning ok:true to the LLM, so a
-// subsequent set_macro doesn't race a null pipeline. WS is ordered
-// per-connection, so the state-changed emitted by initializePipeline
-// above lands on the CLI's cache before this pipeline-ready.
+// subsequent set_macro doesn't race a null pipeline. The socket isn't
+// open yet at this point; wsReceiver sends the latest state snapshot
+// (from initializePipeline above) and then pipeline-ready once it opens,
+// so the CLI's cached state is current when start_session returns.
 wsReceiver?.publishPipelineReady();
 
 /**

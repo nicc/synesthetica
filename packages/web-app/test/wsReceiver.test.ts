@@ -204,6 +204,19 @@ describe("wsReceiver — publishing", () => {
     expect(ws.sent[1]).toEqual({ type: "pipeline-ready", label: LABEL });
   });
 
+  it("state published before the socket opens reaches the CLI before pipeline-ready", () => {
+    // main.ts publishes "spawned" and signals ready synchronously at load;
+    // start_session returns on ready, so the state must already be there.
+    const r = start();
+    const spawned = { ...snapshot(LABEL), session: { ...snapshot(LABEL).session, phase: "spawned" as const } };
+    r.publishStateChanged(spawned);
+    r.publishPipelineReady();
+    const ws = current();
+    ws.open();
+    expect(ws.sent.map((m) => m.type)).toEqual(["hello", "state-changed", "pipeline-ready"]);
+    expect(ws.sent[1]).toEqual({ type: "state-changed", snapshot: spawned });
+  });
+
   it("publishPipelineReady is sent once per connection", () => {
     const r = start();
     const ws = current();
@@ -232,6 +245,21 @@ describe("wsReceiver — reconnect", () => {
     // The CLI resets its ready flag on reconnect, so the tab must say it again.
     expect(second.sent.map((m) => m.type)).toEqual(["hello", "pipeline-ready"]);
     expect(r.isConnected()).toBe(true);
+  });
+
+  it("resends the latest state on reconnect, including state published while disconnected", () => {
+    vi.useFakeTimers();
+    const r = start();
+    const first = current();
+    first.open();
+    r.publishStateChanged(snapshot("before-drop"));
+    first.serverClose();
+    r.publishStateChanged(snapshot("while-down"));
+
+    vi.runOnlyPendingTimers();
+    const second = current();
+    second.open();
+    expect(second.sent[1]).toEqual({ type: "state-changed", snapshot: snapshot("while-down") });
   });
 
   it("backs off: each failed attempt waits at least as long as the last, and success resets it", () => {
