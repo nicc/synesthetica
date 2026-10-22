@@ -157,11 +157,6 @@ export interface IVisualVocabulary {
   readMacros?(): Record<string, MacroValue>;
 }
 
-/**
- * @deprecated Use IVisualVocabulary instead. Alias retained for migration.
- */
-export type IVisualRuleset = IVisualVocabulary;
-
 // ============================================================================
 // Lenses (RFC 006)
 // ============================================================================

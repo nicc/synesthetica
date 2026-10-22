@@ -833,13 +833,9 @@ export class ThreeJSRenderer implements IRenderer {
     if (
       fieldType === "beat-line" ||
       fieldType === "bar-line" ||
-      fieldType === "division-tick"
+      fieldType === "now-line"
     ) {
       this.updateLine(entity);
-    } else if (fieldType === "now-line") {
-      this.updateLine(entity);
-    } else if (fieldType === "drift-ring") {
-      this.updateRing(entity);
     } else {
       // Default field: glowing area
       this.updateGlowField(entity);
@@ -878,42 +874,6 @@ export class ThreeJSRenderer implements IRenderer {
     material.color.copy(this.hsvToThreeColor(color));
     material.opacity = entity.style.opacity ?? 0.3;
     material.linewidth = entity.style.size ?? 1;
-  }
-
-  /**
-   * Render a ring (drift indicator).
-   */
-  private updateRing(entity: Entity): void {
-    if (!this.scene) return;
-
-    let ring = this.entityObjects.get(entity.id) as THREE.Line | undefined;
-
-    if (!ring) {
-      const geometry = new THREE.RingGeometry(0.9, 1, 32);
-      const material = new THREE.MeshBasicMaterial({
-        transparent: true,
-        side: THREE.DoubleSide,
-      });
-      ring = new THREE.Mesh(geometry, material) as unknown as THREE.Line;
-      this.scene.add(ring);
-      this.entityObjects.set(entity.id, ring);
-    }
-
-    // Position
-    const x = (entity.position?.x ?? 0.5) * this.config.worldWidth;
-    const y = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
-    ring.position.set(x, y, 0);
-
-    // Scale
-    const size = entity.style.size ?? 20;
-    ring.scale.set(size / 20, size / 20, 1);
-
-    // Material
-    const material = (ring as unknown as THREE.Mesh)
-      .material as THREE.MeshBasicMaterial;
-    const color = entity.style.color ?? { h: 120, s: 0.7, v: 0.8 };
-    material.color.copy(this.hsvToThreeColor(color));
-    material.opacity = entity.style.opacity ?? 0.6;
   }
 
   /**
@@ -1545,8 +1505,6 @@ export class ThreeJSRenderer implements IRenderer {
       this.updateChordLabel(entity);
     } else if (glyphType === "tension-bar") {
       this.updateTensionBar(entity);
-    } else if (glyphType === "dynamics-contour") {
-      this.updateDynamicsContour(entity);
     } else if (glyphType === "dynamics-indicator") {
       this.updateDynamicsIndicator(entity);
     } else if (glyphType === "roman-numeral") {
@@ -2051,66 +2009,6 @@ export class ThreeJSRenderer implements IRenderer {
   // ==========================================================================
   // Dynamics Entities
   // ==========================================================================
-
-  /**
-   * Render a dynamics contour as a thick line using Line2/LineMaterial.
-   */
-  private updateDynamicsContour(entity: Entity): void {
-    if (!this.scene) return;
-
-    const points = entity.data?.points as Array<{ x: number; y: number }> | undefined;
-    if (!points || points.length < 2) {
-      const existing = this.entityObjects.get(entity.id);
-      if (existing) {
-        this.scene.remove(existing);
-        this.disposeObject(existing);
-        this.entityObjects.delete(entity.id);
-      }
-      return;
-    }
-
-    // Build flat position array for LineGeometry [x, y, z, x, y, z, ...]
-    const positions: number[] = [];
-    for (const p of points) {
-      positions.push(
-        p.x * this.config.worldWidth,
-        (1 - p.y) * this.config.worldHeight,
-        1,
-      );
-    }
-
-    const color = entity.style.color ?? { h: 200, s: 0.5, v: 0.8 };
-    const threeColor = this.hsvToThreeColor(color);
-    const linewidth = entity.style.size ?? 3;
-    const opacity = entity.style.opacity ?? 0.9;
-
-    let line = this.entityObjects.get(entity.id) as Line2 | undefined;
-    if (line) {
-      // Reuse — update geometry positions
-      const geom = line.geometry as LineGeometry;
-      geom.setPositions(positions);
-      const mat = line.material as LineMaterial;
-      mat.color.copy(threeColor);
-      mat.opacity = opacity;
-      mat.linewidth = linewidth;
-      mat.resolution.set(this.resolution.x, this.resolution.y);
-    } else {
-      const geometry = new LineGeometry();
-      geometry.setPositions(positions);
-
-      const material = new LineMaterial({
-        color: threeColor.getHex(),
-        linewidth,
-        transparent: true,
-        opacity,
-        resolution: new THREE.Vector2(this.resolution.x, this.resolution.y),
-      });
-
-      line = new Line2(geometry, material);
-      this.scene.add(line);
-      this.entityObjects.set(entity.id, line);
-    }
-  }
 
   /**
    * Render a dynamics indicator as a PlaneGeometry rectangle.

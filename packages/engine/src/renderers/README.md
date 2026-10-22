@@ -7,7 +7,6 @@ A renderer consumes a `SceneFrame` (the pipeline's final stage) and draws it. Th
 | Renderer | When | URL flag | Notes |
 |---|---|---|---|
 | `ThreeJSRenderer` | default | _(none)_ | WebGL via Three.js. The reference implementation. Has unit tests. |
-| `Canvas2DRenderer` | legacy | _(unused)_ | Older Canvas2D path, retained for reference but not wired into the web app. |
 
 ## Playful branches (experiments)
 

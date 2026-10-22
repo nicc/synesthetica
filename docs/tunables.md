@@ -161,7 +161,7 @@ Harmonic series model constants (`vocabularies/harmonicSeries.ts`):
 
 ## Vocabulary — chord shape geometry
 
-Defined in `renderChordShape.ts` and `ChordShapeBuilder.ts`:
+Defined in `ChordShapeBuilder.ts`:
 
 | Constant | Value | Controls | Impact | Pertinence | Class | Decision |
 |---|---|---|---|---|---|---|

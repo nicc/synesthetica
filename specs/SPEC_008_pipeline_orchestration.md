@@ -81,7 +81,7 @@ See SPEC_009 for detailed frame type definitions. Summary:
 |-------|-------|--------|-----------|
 | Adapters | External input | RawInputFrame | IRawSourceAdapter |
 | Stabilizers | RawInputFrame | MusicalFrame | IMusicalStabilizer |
-| Vocabularies | MusicalFrame | AnnotatedMusicalFrame | IVisualRuleset |
+| Vocabularies | MusicalFrame | AnnotatedMusicalFrame | IVisualVocabulary |
 | Lenses | AnnotatedMusicalFrame | SceneFrame | IVisualGrammar |
 
 ## Stabilizer DAG
@@ -248,10 +248,11 @@ const pipeline = new VisualPipeline({
 pipeline.addAdapter(adapter);
 pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
 pipeline.addStabilizerFactory(() => new ChordDetectionStabilizer({ partId }));
-pipeline.setRuleset(new MusicalVisualVocabulary());
+pipeline.setVocabulary(new MusicalVisualVocabulary());
 // Lenses receive AnnotatedMusicalFrame and decide how to render
-pipeline.addGrammar(new TestRhythmGrammar());
-pipeline.addGrammar(new TestChordProgressionGrammar());
+pipeline.addLens(new RhythmLens());
+pipeline.addLens(new HarmonyLens());
+pipeline.addLens(new DynamicsLens());
 pipeline.setCompositor(new IdentityCompositor());
 ```
 
@@ -266,7 +267,7 @@ pipeline.setCompositor(new IdentityCompositor());
 The pipeline uses a stabilizer factory because each part needs its own stabilizer instance with its own state:
 
 ```ts
-pipeline.setStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
 ```
 
 ## Invariants Preserved

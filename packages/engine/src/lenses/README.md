@@ -81,4 +81,3 @@ See `test/_fixtures/` for fixture format and `test/_harness/frames.ts` for share
 - `RhythmLens` — Pitch-class note strips with beat/bar grid, drift streaks, and now-line
 - `HarmonyLens` — Chord shape visualization with radial geometry and gradient fill
 - `DynamicsLens` — Vertical VU-meter bar with fading velocity indicators
-- `TestChordProgressionLens` — Legacy toy lens for chord visualization (to be retired)

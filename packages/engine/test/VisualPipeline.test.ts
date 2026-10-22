@@ -100,7 +100,7 @@ describe("VisualPipeline", () => {
 
   describe("basic operation", () => {
     it("returns empty frame when no adapters", () => {
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
 
       const frame = pipeline.requestFrame(1000);
 
@@ -110,10 +110,10 @@ describe("VisualPipeline", () => {
 
     it("returns frame with only structural elements when adapter has no data", () => {
       pipeline.addAdapter(adapter);
-      pipeline.setStabilizerFactory(
+      pipeline.addStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
       pipeline.addLens(new RhythmLens());
 
       const frame = pipeline.requestFrame(1000);
@@ -129,10 +129,10 @@ describe("VisualPipeline", () => {
       const adapter2 = new MockRawAdapter();
       pipeline.addAdapter(adapter);
       pipeline.addAdapter(adapter2);
-      pipeline.setStabilizerFactory(
+      pipeline.addStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
       pipeline.addLens(new RhythmLens());
 
       // Frame drains one raw frame per adapter's nextFrame() call and
@@ -166,10 +166,10 @@ describe("VisualPipeline", () => {
   describe("full pipeline flow", () => {
     beforeEach(() => {
       pipeline.addAdapter(adapter);
-      pipeline.setStabilizerFactory(
+      pipeline.addStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
       pipeline.addLens(new RhythmLens());
       pipeline.setCompositor(new IdentityCompositor());
     });
@@ -246,10 +246,10 @@ describe("VisualPipeline", () => {
   describe("activity tracking", () => {
     beforeEach(() => {
       pipeline.addAdapter(adapter);
-      pipeline.setStabilizerFactory(
+      pipeline.addStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
       pipeline.addLens(new RhythmLens());
     });
 
@@ -270,10 +270,10 @@ describe("VisualPipeline", () => {
   describe("lifecycle", () => {
     it("reset clears all state", () => {
       pipeline.addAdapter(adapter);
-      pipeline.setStabilizerFactory(
+      pipeline.addStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
       pipeline.addLens(new RhythmLens());
 
       adapter.addNoteOn(60, 100, 1000);
@@ -286,10 +286,10 @@ describe("VisualPipeline", () => {
 
     it("dispose clears components", () => {
       pipeline.addAdapter(adapter);
-      pipeline.setStabilizerFactory(
+      pipeline.addStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
       pipeline.addLens(new RhythmLens());
 
       pipeline.dispose();
@@ -304,10 +304,10 @@ describe("VisualPipeline", () => {
   describe("without compositor", () => {
     it("still produces scene frames", () => {
       pipeline.addAdapter(adapter);
-      pipeline.setStabilizerFactory(
+      pipeline.addStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
       pipeline.addLens(new RhythmLens());
       // No compositor set
 

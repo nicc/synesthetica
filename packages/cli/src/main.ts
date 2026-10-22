@@ -19,7 +19,6 @@ import { spawnWebApp, type WebAppHandle } from "./webApp/spawnWebApp.js";
 import { openBrowser } from "./webApp/openBrowser.js";
 import { startWsBridge, type WsBridgeHandle } from "./engine/wsBridge.js";
 import { SessionManager } from "./session/sessionManager.js";
-import { composeSystemOverview } from "./resources/promptResources.js";
 
 const SERVER_NAME = "synesthetica";
 const SERVER_VERSION = "0.1.0";
@@ -199,9 +198,6 @@ async function runNoMcpEagerPath(
   });
   return 0;
 }
-
-// Suppress unused-import warning under the split of paths above.
-void composeSystemOverview;
 
 // stdout carries the MCP protocol on stdio transport — human messages
 // must go to stderr to avoid corrupting the framing.

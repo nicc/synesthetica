@@ -261,7 +261,7 @@ Lenses do NOT know:
 
 - `IRawSourceAdapter`: `packages/contracts/pipeline/interfaces.ts`
 - `IMusicalStabilizer`: `packages/contracts/pipeline/interfaces.ts`
-- `IVisualRuleset`: `packages/contracts/pipeline/interfaces.ts`
+- `IVisualVocabulary`: `packages/contracts/pipeline/interfaces.ts`
 - `IVisualGrammar`: `packages/contracts/pipeline/interfaces.ts`
 
 ## Invariants Preserved

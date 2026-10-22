@@ -78,10 +78,10 @@ export interface IMusicalStabilizer {
 }
 ```
 
-### IVisualRuleset
+### IVisualVocabulary
 
 ```ts
-export interface IVisualRuleset {
+export interface IVisualVocabulary {
   id: string;
 
   /**
@@ -194,7 +194,7 @@ Session End
 The pipeline uses a stabilizer factory because each part needs its own instance:
 
 ```ts
-pipeline.setStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+pipeline.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
 ```
 
 ## Testing Implications
@@ -223,6 +223,6 @@ The canonical implementation is `NoteTrackingStabilizer` in `packages/engine/src
 ## Contract Location
 
 - `IMusicalStabilizer`: `packages/contracts/pipeline/interfaces.ts`
-- `IVisualRuleset`: `packages/contracts/pipeline/interfaces.ts`
+- `IVisualVocabulary`: `packages/contracts/pipeline/interfaces.ts`
 - `MusicalFrame`: `packages/contracts/musical/musical.ts`
 - `Note`: `packages/contracts/musical/musical.ts`

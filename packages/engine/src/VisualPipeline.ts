@@ -122,14 +122,6 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
   }
 
   /**
-   * Set the stabilizer factory (legacy single-stabilizer API).
-   * @deprecated Use addStabilizerFactory for multiple stabilizers
-   */
-  setStabilizerFactory(factory: () => IMusicalStabilizer): void {
-    this.stabilizerFactories = [factory];
-  }
-
-  /**
    * Add a stabilizer factory. Stabilizers are sorted by dependencies.
    * A factory is used because each part needs its own stabilizer instances.
    */
@@ -139,13 +131,6 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
 
   setVocabulary(vocabulary: IVisualVocabulary): void {
     this.vocabulary = vocabulary;
-  }
-
-  /**
-   * @deprecated Use setVocabulary instead
-   */
-  setRuleset(vocabulary: IVisualVocabulary): void {
-    this.setVocabulary(vocabulary);
   }
 
   addLens(lens: IVisualLens): void {
