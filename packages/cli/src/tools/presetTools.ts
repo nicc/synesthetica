@@ -9,19 +9,19 @@
  * multi-instance targeting (Phase 3 wires the registry lookup).
  */
 
-import type { StateSnapshot } from "../engine/engineHandle.js";
+import type { EngineStateSnapshot } from "@synesthetica/contracts";
 import type { ToolSpec } from "./sessionTools.js";
 import type { PresetStore } from "../presets/presetStore.js";
 
 type ToolResult =
-  | { ok: true; state: StateSnapshot }
+  | { ok: true; state: EngineStateSnapshot }
   | { ok: false; error: { code: string; message: string; details?: unknown } };
 
 function err(code: string, message: string, details?: unknown): ToolResult {
   return { ok: false, error: { code, message, ...(details ? { details } : {}) } };
 }
 
-async function safeCall(fn: () => Promise<StateSnapshot>): Promise<ToolResult> {
+async function safeCall(fn: () => Promise<EngineStateSnapshot>): Promise<ToolResult> {
   try {
     return { ok: true, state: await fn() };
   } catch (e) {

@@ -37,7 +37,8 @@ import {
   PRIMER_EXEMPT,
   type ToolSpec,
 } from "./tools/registry.js";
-import type { EngineHandle, StateSnapshot } from "./engine/engineHandle.js";
+import type { EngineHandle } from "./engine/engineHandle.js";
+import type { EngineStateSnapshot } from "@synesthetica/contracts";
 import {
   buildStateResources,
   type AsyncResourceEntry,
@@ -86,7 +87,9 @@ export async function startMcpServer(
       // pointed at `get_started` for the full primer, so idle
       // conversations that never touch music don't pay the full
       // token cost.
-      instructions: config.serverInstructions,
+      ...(config.serverInstructions !== undefined && {
+        instructions: config.serverInstructions,
+      }),
     },
   );
 
@@ -566,7 +569,7 @@ function buildSessionEngineProxy(session: SessionManager): EngineHandle {
   };
 }
 
-function emptyStubSnapshot(label: string): StateSnapshot {
+function emptyStubSnapshot(label: string): EngineStateSnapshot {
   return {
     instance: label,
     macros: { intents: {}, effective: {} },

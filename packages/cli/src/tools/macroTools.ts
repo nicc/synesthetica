@@ -20,7 +20,8 @@
  * system:colour-mapping:reference (and direction if needed).
  */
 
-import type { EngineHandle, StateSnapshot } from "../engine/engineHandle.js";
+import type { EngineHandle } from "../engine/engineHandle.js";
+import type { EngineStateSnapshot } from "@synesthetica/contracts";
 import type {
   MacroAnnotation,
   ContinuousMacroAnnotation,
@@ -34,7 +35,7 @@ import type { ToolSpec } from "./sessionTools.js";
 
 type ToolInput = Record<string, unknown>;
 type ToolResult =
-  | { ok: true; state: StateSnapshot }
+  | { ok: true; state: EngineStateSnapshot }
   | { ok: false; error: { code: string; message: string; details?: unknown } };
 
 function err(code: string, message: string, details?: unknown): ToolResult {
@@ -93,7 +94,7 @@ async function dispatchCompound(
   compound: CompoundMacroAnnotation,
   value: number,
   engine: EngineHandle,
-): Promise<StateSnapshot> {
+): Promise<EngineStateSnapshot> {
   // Fan out to each target with a linear map. Last write wins per
   // SPEC 013 §Resolution — no accumulation, no priority. Per-target
   // `invert` flips the compound axis so the target's range runs in
@@ -120,7 +121,7 @@ async function dispatchCompound(
 // set_macro
 // ============================================================================
 
-async function safeCall(fn: () => Promise<StateSnapshot>): Promise<ToolResult> {
+async function safeCall(fn: () => Promise<EngineStateSnapshot>): Promise<ToolResult> {
   try {
     return { ok: true, state: await fn() };
   } catch (e) {

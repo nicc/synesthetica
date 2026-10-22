@@ -216,7 +216,7 @@ describe("buildChordShape", () => {
   });
 
   describe("margin styles", () => {
-    const cases: Array<[MusicalChord["quality"], string]> = [
+    const cases: Array<[ChordQuality, string]> = [
       ["maj", "straight"],
       ["maj7", "straight"],
       ["dom7", "straight"],

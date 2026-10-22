@@ -75,7 +75,7 @@ export interface DetectedNote {
    * decide how to precompute timestamps without the kernel knowing
    * about the model's frame hop.
    */
-  readonly pitchBends?: readonly PitchBendSample[];
+  readonly pitchBends?: readonly PitchBendSample[] | undefined;
 }
 
 export interface PitchBendSample {

@@ -481,7 +481,7 @@ export interface MusicalFrame {
   chordInterpretation: ChordInterpretationMode;
 
   // Recent context (references, not copies)
-  progression?: ChordId[]; // Recent chord history
+  progression?: ChordId[] | undefined; // Recent chord history
   phrases?: Phrase[]; // Phrase boundaries
 
   // Derived signals (from derived stabilizers)
@@ -490,7 +490,7 @@ export interface MusicalFrame {
    * Produced by HarmonyStabilizer.
    * Optional — only present when that stabilizer is in the chain.
    */
-  harmonicContext?: HarmonicContext;
+  harmonicContext?: HarmonicContext | undefined;
 }
 
 /**

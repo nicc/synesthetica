@@ -34,7 +34,7 @@ export interface WebAppHandle {
 
 export interface SpawnWebAppOptions {
   /** Explicit port; when omitted, an OS-picked one is used. */
-  port?: number;
+  port?: number | undefined;
   /** Where to write Vite's stdio (defaults to process.stderr). */
   log?: NodeJS.WritableStream;
   /**

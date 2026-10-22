@@ -10,8 +10,8 @@ describe("get_recent_events", () => {
   it("returns the temporal envelope in data + current state in state", async () => {
     const engine = new StubEngineHandle();
     engine.startSession(Date.now() - 100);
-    engine.injectEvent("note-on", { pitch: 60 });
-    engine.injectEvent("chord-detected", { name: "Cmaj7" });
+    engine.injectEvent("note-on");
+    engine.injectEvent("chord-detected");
     const r = await getRecentEventsTool.handle({}, engine);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -25,7 +25,7 @@ describe("get_recent_events", () => {
 
   it("honours limit and since args", async () => {
     const engine = new StubEngineHandle();
-    for (let i = 0; i < 10; i++) engine.injectEvent("note-on", { pitch: 60 + i });
+    for (let i = 0; i < 10; i++) engine.injectEvent("note-on");
     const withLimit = await getRecentEventsTool.handle({ limit: 3 }, engine);
     expect(withLimit.ok).toBe(true);
     if (!withLimit.ok) return;
@@ -38,8 +38,8 @@ describe("clear_recent_events", () => {
   it("empties the recent-events buffer and returns current state", async () => {
     const engine = new StubEngineHandle();
     engine.startSession(Date.now() - 100);
-    engine.injectEvent("note-on", { pitch: 60 });
-    engine.injectEvent("note-on", { pitch: 62 });
+    engine.injectEvent("note-on");
+    engine.injectEvent("note-on");
     // Before: buffer has events.
     const before = await getRecentEventsTool.handle({}, engine);
     expect(before.ok).toBe(true);

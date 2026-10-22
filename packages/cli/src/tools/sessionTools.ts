@@ -17,7 +17,8 @@
  * (SPEC 013 §Invariants I24, I25).
  */
 
-import type { EngineHandle, StateSnapshot } from "../engine/engineHandle.js";
+import type { EngineHandle } from "../engine/engineHandle.js";
+import type { EngineStateSnapshot } from "@synesthetica/contracts";
 
 type ToolInput = Record<string, unknown>;
 /**
@@ -29,7 +30,7 @@ type ToolInput = Record<string, unknown>;
  * the state. Failure carries a stable `code` + human message.
  */
 type ToolResult =
-  | { ok: true; state: StateSnapshot; data?: unknown }
+  | { ok: true; state: EngineStateSnapshot; data?: unknown }
   | { ok: false; error: { code: string; message: string; details?: unknown } };
 
 export interface ToolSpec {
@@ -57,7 +58,7 @@ function err(code: string, message: string, details?: unknown): ToolResult {
 }
 
 async function safeCall(
-  fn: () => Promise<StateSnapshot>,
+  fn: () => Promise<EngineStateSnapshot>,
 ): Promise<ToolResult> {
   try {
     const state = await fn();

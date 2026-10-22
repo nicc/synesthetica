@@ -3,7 +3,9 @@ import {
   generatePanel,
   productionManifest,
   type MacroAnnotation,
+  type Panel,
   type SessionControlAnnotation,
+  type WidgetDescriptor,
 } from "@synesthetica/contracts";
 
 describe("generatePanel — sections", () => {
@@ -237,39 +239,20 @@ describe("generatePanel — pair widgets", () => {
   });
 });
 
-function findWidget(
-  panel: ReturnType<typeof generatePanel>,
-  id: string,
-): {
-  kind: "slider" | "select" | "toggle" | "number" | "pair";
-  id: string;
-  label: string;
-  tooltip?: string[];
-  aliases: string[];
-  [k: string]: unknown;
-} {
-  const search = (widgets: readonly { id: string; kind: string; [k: string]: unknown }[]): typeof widgets[number] | null => {
+function findWidget(panel: Panel, id: string): WidgetDescriptor {
+  const search = (widgets: readonly WidgetDescriptor[]): WidgetDescriptor | null => {
     for (const w of widgets) {
       if (w.id === id) return w;
       if (w.kind === "pair") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const found = search((w as any).children);
+        const found = search(w.children);
         if (found) return found;
       }
     }
     return null;
   };
   for (const section of panel.sections) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const inTop = search(section.widgets as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (inTop) return inTop as any;
-    for (const sg of section.subgroups) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const inSg = search(sg.widgets as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (inSg) return inSg as any;
-    }
+    const found = search(section.widgets) ?? search(section.subgroups.flatMap((sg) => sg.widgets));
+    if (found) return found;
   }
   throw new Error(`widget not found: ${id}`);
 }

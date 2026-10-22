@@ -44,6 +44,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Type-check
+        # Package builds type-check src for contracts / adapters /
+        # engine / cli. This covers what they don't: the web-app
+        # (vite build doesn't type-check) and every package's tests.
+        run: npm run typecheck
+
       - name: Test
         # --if-present skips workspaces without a test script
         # (packages/contracts is types-only, no runtime to test).

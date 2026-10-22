@@ -23,15 +23,11 @@ import {
   type EngineMethod,
   type EngineStateSnapshot,
   type EngineRecentEvent,
+  type EngineRecentEventsEnvelope,
+  type AvailableInput,
+  type MacroValue,
 } from "@synesthetica/contracts";
-import type {
-  EngineHandle,
-  StateSnapshot,
-  RecentEventsEnvelope,
-  AvailableInput,
-  Unsubscribe,
-} from "./engineHandle.js";
-import type { MacroValue } from "@synesthetica/contracts";
+import type { EngineHandle, Unsubscribe } from "./engineHandle.js";
 import { LOOPBACK_HOST, isLoopbackOrigin } from "../loopback.js";
 
 const CALL_TIMEOUT_MS = 5_000;
@@ -299,7 +295,7 @@ class WSBackedEngineHandle implements EngineHandle {
   readonly label: string;
 
   private nextCallId = 1;
-  private subscribers: Array<(s: StateSnapshot) => void> = [];
+  private subscribers: Array<(s: EngineStateSnapshot) => void> = [];
   private waitConnected: Promise<void>;
   private resolveConnected!: () => void;
 
@@ -330,38 +326,38 @@ class WSBackedEngineHandle implements EngineHandle {
   }
 
   // ---- calls ----
-  async setMacro(name: string, value: MacroValue): Promise<StateSnapshot> {
-    return this.call("setMacro", [name, value]) as Promise<StateSnapshot>;
+  async setMacro(name: string, value: MacroValue): Promise<EngineStateSnapshot> {
+    return this.call("setMacro", [name, value]) as Promise<EngineStateSnapshot>;
   }
-  async setKey(root: number | null, mode: string | null): Promise<StateSnapshot> {
-    return this.call("setKey", [root, mode]) as Promise<StateSnapshot>;
+  async setKey(root: number | null, mode: string | null): Promise<EngineStateSnapshot> {
+    return this.call("setKey", [root, mode]) as Promise<EngineStateSnapshot>;
   }
-  async setTempo(bpm: number | null): Promise<StateSnapshot> {
-    return this.call("setTempo", [bpm]) as Promise<StateSnapshot>;
+  async setTempo(bpm: number | null): Promise<EngineStateSnapshot> {
+    return this.call("setTempo", [bpm]) as Promise<EngineStateSnapshot>;
   }
-  async setMeter(beatsPerBar: number | null, beatValue: number | null): Promise<StateSnapshot> {
-    return this.call("setMeter", [beatsPerBar, beatValue]) as Promise<StateSnapshot>;
+  async setMeter(beatsPerBar: number | null, beatValue: number | null): Promise<EngineStateSnapshot> {
+    return this.call("setMeter", [beatsPerBar, beatValue]) as Promise<EngineStateSnapshot>;
   }
-  async setChordMode(mode: "harmonic" | "bass-led"): Promise<StateSnapshot> {
-    return this.call("setChordMode", [mode]) as Promise<StateSnapshot>;
+  async setChordMode(mode: "harmonic" | "bass-led"): Promise<EngineStateSnapshot> {
+    return this.call("setChordMode", [mode]) as Promise<EngineStateSnapshot>;
   }
-  async setMetronome(enabled: boolean): Promise<StateSnapshot> {
-    return this.call("setMetronome", [enabled]) as Promise<StateSnapshot>;
+  async setMetronome(enabled: boolean): Promise<EngineStateSnapshot> {
+    return this.call("setMetronome", [enabled]) as Promise<EngineStateSnapshot>;
   }
-  async setInput(source: string): Promise<StateSnapshot> {
-    return this.call("setInput", [source]) as Promise<StateSnapshot>;
+  async setInput(source: string): Promise<EngineStateSnapshot> {
+    return this.call("setInput", [source]) as Promise<EngineStateSnapshot>;
   }
-  async setHueForPitch(pc: number, hue: number): Promise<StateSnapshot> {
-    return this.call("setHueForPitch", [pc, hue]) as Promise<StateSnapshot>;
+  async setHueForPitch(pc: number, hue: number): Promise<EngineStateSnapshot> {
+    return this.call("setHueForPitch", [pc, hue]) as Promise<EngineStateSnapshot>;
   }
-  async switchPreset(name: string): Promise<StateSnapshot> {
-    return this.call("switchPreset", [name]) as Promise<StateSnapshot>;
+  async switchPreset(name: string): Promise<EngineStateSnapshot> {
+    return this.call("switchPreset", [name]) as Promise<EngineStateSnapshot>;
   }
-  async savePreset(name: string): Promise<StateSnapshot> {
-    return this.call("savePreset", [name]) as Promise<StateSnapshot>;
+  async savePreset(name: string): Promise<EngineStateSnapshot> {
+    return this.call("savePreset", [name]) as Promise<EngineStateSnapshot>;
   }
 
-  async getStateSnapshot(): Promise<StateSnapshot> {
+  async getStateSnapshot(): Promise<EngineStateSnapshot> {
     const conn = this.deps.getConnection();
     if (conn) {
       // The cached snapshot's `now` is from the last state-changed
@@ -369,15 +365,15 @@ class WSBackedEngineHandle implements EngineHandle {
       // the same session-ms. Recompute `now` freshly from startedAt
       // + wall-clock so temporal reasoning ("how long has this been
       // going?") anchors on current time rather than stale write time.
-      return withFreshNow(conn.state as StateSnapshot);
+      return withFreshNow(conn.state as EngineStateSnapshot);
     }
-    return this.call("getStateSnapshot", []) as Promise<StateSnapshot>;
+    return this.call("getStateSnapshot", []) as Promise<EngineStateSnapshot>;
   }
-  async getRecentEvents(limit = 100, since?: number): Promise<RecentEventsEnvelope> {
-    return this.call("getRecentEvents", [limit, since]) as Promise<RecentEventsEnvelope>;
+  async getRecentEvents(limit = 100, since?: number): Promise<EngineRecentEventsEnvelope> {
+    return this.call("getRecentEvents", [limit, since]) as Promise<EngineRecentEventsEnvelope>;
   }
-  async clearRecentEvents(): Promise<StateSnapshot> {
-    return this.call("clearRecentEvents", []) as Promise<StateSnapshot>;
+  async clearRecentEvents(): Promise<EngineStateSnapshot> {
+    return this.call("clearRecentEvents", []) as Promise<EngineStateSnapshot>;
   }
   async getAvailableInputs(): Promise<AvailableInput[]> {
     return this.call("getAvailableInputs", []) as Promise<AvailableInput[]>;
@@ -385,7 +381,7 @@ class WSBackedEngineHandle implements EngineHandle {
 
   subscribe(
     _event: "state-changed",
-    callback: (snapshot: StateSnapshot) => void,
+    callback: (snapshot: EngineStateSnapshot) => void,
   ): Unsubscribe {
     this.subscribers.push(callback);
     return () => {
@@ -425,7 +421,7 @@ class WSBackedEngineHandle implements EngineHandle {
  * shallow-cloned session with the updated field so subscribers
  * still see the shared cached `state` unchanged.
  */
-function withFreshNow(snap: StateSnapshot): StateSnapshot {
+function withFreshNow(snap: EngineStateSnapshot): EngineStateSnapshot {
   if (!snap.startedAt) return snap;
   const startedMs = Date.parse(snap.startedAt);
   if (Number.isNaN(startedMs)) return snap;

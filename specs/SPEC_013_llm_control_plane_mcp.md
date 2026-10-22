@@ -463,16 +463,13 @@ A per-instance ring buffer holds the most recent N events (default: 1000; config
 
 ### Event content
 
-Each event has: `id` (monotonic), `t` (ms since instance start), `kind`, and kind-specific payload.
+The schema is `EngineRecentEvent` in `packages/contracts/control/engineBridge.ts`, a discriminated union on `kind`. Every event has `id` (monotonic), `t` (event clock: ms since session start of the musical event itself), `frameT` (observation clock: the frame at which the buffer captured it) and `part`.
 
-Kinds emitted (reflects the actual pipeline as of 2026-08-19; add as new stabilizers ship):
+Kinds emitted, derived by diffing consecutive MusicalFrames (`packages/web-app/src/engine/recentEvents.ts`):
 
-- `note-on` — `{ pitch, velocity, noteId, source: "midi" | "audio", confidence? }`
-- `note-off` — `{ noteId, t, source }`
-- `chord-detected` — `{ root, quality, name, roman?, borrowed?, degree?, noteIds }` — from ChordDetectionStabilizer; `roman`/`borrowed`/`degree` populated when a key is prescribed
-- `chord-released` — `{ chordId, t }`
-- `functional-edge` — `{ sourceChordId, targetDegree, targetPc, targetDiatonic, weight, type }` — from HarmonyStabilizer, when a borrowed chord implies resolution to a diatonic destination
-- `dynamics-event` — `{ intensity }` — from DynamicsStabilizer, per note onset
+- `note-on` — `{ noteId, pitch, pitchClass, octave, velocity, confidence }`
+- `note-off` — `{ noteId, pitch, pitchClass, octave, velocity }`
+- `chord-detected` / `chord-changed` — `{ chordId, voicing, pitchClasses, bass, harmonic: { root, quality }, bassLed: { root, quality }, isInverted, inversion, previousChordId? }`. `chord-changed` fires when a new chord replaces a different current chord, and carries `previousChordId`.
 
 Notably NOT included (called out because earlier drafts / RFCs referenced them, wrongly):
 - ~~Active lens~~ — no lens-switching concept exists; all three lenses always run

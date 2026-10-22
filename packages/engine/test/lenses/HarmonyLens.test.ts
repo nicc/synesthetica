@@ -209,7 +209,7 @@ describe("HarmonyLens", () => {
           keyAware: false,
           currentFunction: null,
           functionalProgression: [
-            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 500 },
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 500, releaseTime: null },
           ],
         },
         // no prescribedKey
@@ -227,11 +227,11 @@ describe("HarmonyLens", () => {
         harmonicContext: {
           tension: 0,
           keyAware: true,
-          currentFunction: { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 800 },
+          currentFunction: { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 800, releaseTime: null },
           functionalProgression: [
-            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 0 },
-            { degree: 4, roman: "IV", quality: "maj", rootPc: 5 as PitchClass, borrowed: false, chordId: "test:500:Fmaj", onset: 500 },
-            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "test:800:Gmaj", onset: 800 },
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 0, releaseTime: null },
+            { degree: 4, roman: "IV", quality: "maj", rootPc: 5 as PitchClass, borrowed: false, chordId: "test:500:Fmaj", onset: 500, releaseTime: null },
+            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "test:800:Gmaj", onset: 800, releaseTime: null },
           ],
         },
       });
@@ -285,7 +285,7 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500 },
+            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             {
@@ -330,7 +330,7 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "i", onset: 500 },
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "i", onset: 500, releaseTime: null },
           ],
           functionalEdges: [],
         },
@@ -354,7 +354,7 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500 },
+            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             {
@@ -402,7 +402,7 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500 },
+            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             {
@@ -442,7 +442,7 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500 },
+            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             {
@@ -507,7 +507,7 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 6, roman: "♭VI", quality: "maj", rootPc: 8 as PitchClass, borrowed: true, chordId: "bvi", onset: 500 },
+            { degree: 6, roman: "♭VI", quality: "maj", rootPc: 8 as PitchClass, borrowed: true, chordId: "bvi", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             {
@@ -559,7 +559,7 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 2, roman: "♭II", quality: "maj", rootPc: 1 as PitchClass, borrowed: true, chordId: "bII", onset: 500 },
+            { degree: 2, roman: "♭II", quality: "maj", rootPc: 1 as PitchClass, borrowed: true, chordId: "bII", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             // Higher weight — keeps natural direction.
@@ -616,7 +616,7 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 2, roman: "♭II", quality: "maj", rootPc: 1 as PitchClass, borrowed: true, chordId: "bII", onset: 500 },
+            { degree: 2, roman: "♭II", quality: "maj", rootPc: 1 as PitchClass, borrowed: true, chordId: "bII", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             {
@@ -664,7 +664,7 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 6, roman: "♭VI", quality: "maj", rootPc: 8 as PitchClass, borrowed: true, chordId: "bvi", onset: 500 },
+            { degree: 6, roman: "♭VI", quality: "maj", rootPc: 8 as PitchClass, borrowed: true, chordId: "bvi", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             {
@@ -709,7 +709,7 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 2, roman: "V/ii", quality: "maj", rootPc: 9 as PitchClass, borrowed: true, chordId: "vofii", onset: 500 },
+            { degree: 2, roman: "V/ii", quality: "maj", rootPc: 9 as PitchClass, borrowed: true, chordId: "vofii", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             {

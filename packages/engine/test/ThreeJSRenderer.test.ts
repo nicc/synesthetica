@@ -131,11 +131,11 @@ vi.mock("three", () => {
 
   class MockMesh extends MockObject3D {
     geometry: MockBufferGeometry;
-    material: MockMaterial;
-    constructor(geometry?: MockBufferGeometry, material?: MockMaterial) {
+    material: Material;
+    constructor(geometry?: MockBufferGeometry, material?: Material) {
       super();
       this.geometry = geometry ?? new MockBufferGeometry();
-      this.material = material ?? new MockMaterial();
+      this.material = material ?? new Material();
     }
   }
 

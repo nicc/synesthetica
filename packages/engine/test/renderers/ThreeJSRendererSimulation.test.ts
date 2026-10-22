@@ -20,6 +20,7 @@ import type {
   ChordShapeElement,
   ColorHSVA,
 } from "@synesthetica/contracts";
+import { RADIUS_BY_TIER } from "@synesthetica/contracts";
 
 // Mock window for Node.js environment
 const mockWindow = {
@@ -294,6 +295,7 @@ function makeChordElement(
   return {
     interval,
     angle,
+    radius: RADIUS_BY_TIER[tier],
     tier,
     style: "wedge",
     color: makeColor(hue),

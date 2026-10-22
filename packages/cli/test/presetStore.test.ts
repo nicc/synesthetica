@@ -3,9 +3,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createPresetStore } from "../src/presets/presetStore.js";
-import type { StateSnapshot } from "../src/engine/engineHandle.js";
+import type { EngineStateSnapshot } from "@synesthetica/contracts";
 
-function fakeSnapshot(): StateSnapshot {
+function fakeSnapshot(): EngineStateSnapshot {
   const macroValues = { "harmony:linger": 5, "rhythm:quantise-resolution": "16th" };
   return {
     instance: "default",
@@ -22,6 +22,9 @@ function fakeSnapshot(): StateSnapshot {
     },
     input: "midi:test-device",
     activePreset: null,
+    permissions: { midi: "granted", audio: "prompt" },
+    startedAt: null,
+    now: null,
   };
 }
 

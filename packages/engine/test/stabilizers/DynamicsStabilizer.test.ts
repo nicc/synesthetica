@@ -16,9 +16,6 @@ function noteOn(note: number, velocity: number, t: number, channel = 0): MidiNot
   return { type: "midi_note_on", note, velocity, t, channel };
 }
 
-function _noteOff(note: number, t: number, channel = 0): MidiNoteOff {
-  return { type: "midi_note_off", note, t, channel };
-}
 
 describe("DynamicsStabilizer", () => {
   let noteTracker: NoteTrackingStabilizer;

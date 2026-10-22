@@ -28,8 +28,8 @@ import {
   DynamicsLens,
   IdentityCompositor,
 } from "../src";
-import type { IRawSourceAdapter } from "@synesthetica/engine";
 import type {
+  IRawSourceAdapter,
   RawInputFrame,
   MidiNoteOn,
   MidiNoteOff,

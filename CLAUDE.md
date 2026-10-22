@@ -106,9 +106,10 @@ This ensures documentation reflects actual project state, not assumptions.
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
 2. **Run quality gates** (if code changed):
    ```bash
-   npm run lint        # Linting
-   npm test -ws        # Tests
-   npm run build -ws   # Build
+   npm run build                # Build (type-checks src of contracts/adapters/engine/cli)
+   npm run typecheck            # Type-check web-app and every package's tests
+   npm test -ws --if-present    # Tests
+   npm run lint                 # Linting
    ```
 3. **Update issue status** - Close finished work, update in-progress items
 4. **PUSH TO REMOTE** - This is MANDATORY:
@@ -337,8 +338,8 @@ ls <affected-directory>                                   # Verify structure is 
 
 **Verification checklist template:**
 ```
-1. Code compiles: npm run build -ws
-2. Tests pass: npm test -ws
+1. Code compiles: npm run build && npm run typecheck
+2. Tests pass: npm test -ws --if-present
 3. Lint passes: npm run lint
 4. No stale references: grep -ri "<old-term>" --include="*.ts" --include="*.md"
 5. Folder structure makes sense: ls <affected-directories>

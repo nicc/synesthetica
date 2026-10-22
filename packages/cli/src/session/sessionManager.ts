@@ -36,7 +36,7 @@ const PIPELINE_READY_TIMEOUT_MS = 15_000;
 export interface SessionManagerOptions {
   instanceLabel: string;
   wsPort?: number;
-  webAppPort?: number;
+  webAppPort?: number | undefined;
   openBrowser: boolean;
   browser: "default" | "chrome";
   /**
@@ -57,9 +57,9 @@ export interface StartSessionSummary {
 
 export class SessionManager {
   private state: SessionState = "stopped";
-  private webApp?: WebAppHandle;
-  private bridge?: WsBridgeHandle;
-  private engine?: EngineHandle;
+  private webApp: WebAppHandle | undefined;
+  private bridge: WsBridgeHandle | undefined;
+  private engine: EngineHandle | undefined;
   private log: (line: string) => void;
 
   constructor(private options: SessionManagerOptions) {

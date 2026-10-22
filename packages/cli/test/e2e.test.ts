@@ -17,6 +17,7 @@ import WebSocket from "ws";
 import { startWsBridge, type WsBridgeHandle } from "../src/engine/wsBridge.js";
 import { buildToolRegistry } from "../src/tools/registry.js";
 import { createPresetStore } from "../src/presets/presetStore.js";
+import { SessionManager } from "../src/session/sessionManager.js";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -49,6 +50,8 @@ class FakeBrowser {
       },
       input: null,
       activePreset: null,
+      startedAt: null,
+      now: null,
     };
   }
 
@@ -124,6 +127,11 @@ class FakeBrowser {
   }
 }
 
+/** Lifecycle tools need a SessionManager; these tests never invoke them. */
+function makeSession(): SessionManager {
+  return new SessionManager({ instanceLabel: "default", openBrowser: false, browser: "chrome" });
+}
+
 let bridge: WsBridgeHandle;
 let browser: FakeBrowser;
 let presetDir: string;
@@ -143,7 +151,7 @@ afterEach(async () => {
 describe("E2E: MCP tool → WS bridge → fake browser → back", () => {
   it("set_tempo flows through and returns the new state", async () => {
     const engine = bridge.handleFor("default");
-    const registry = buildToolRegistry(createPresetStore(presetDir));
+    const registry = buildToolRegistry(createPresetStore(presetDir), makeSession());
     const setTempo = registry.get("set_tempo")!;
     const result = await setTempo.handle({ bpm: 120 }, engine);
     expect(result.ok).toBe(true);
@@ -154,7 +162,7 @@ describe("E2E: MCP tool → WS bridge → fake browser → back", () => {
 
   it("set_key flows through and returns the new state", async () => {
     const engine = bridge.handleFor("default");
-    const registry = buildToolRegistry(createPresetStore(presetDir));
+    const registry = buildToolRegistry(createPresetStore(presetDir), makeSession());
     const setKey = registry.get("set_key")!;
     const result = await setKey.handle({ root: 2, mode: "dorian" }, engine);
     expect(result.ok).toBe(true);
@@ -166,7 +174,7 @@ describe("E2E: MCP tool → WS bridge → fake browser → back", () => {
 
   it("set_macro flows through with the value", async () => {
     const engine = bridge.handleFor("default");
-    const registry = buildToolRegistry(createPresetStore(presetDir));
+    const registry = buildToolRegistry(createPresetStore(presetDir), makeSession());
     const setMacro = registry.get("set_macro")!;
     const result = await setMacro.handle(
       { name: "harmony:linger", value: 5 },
@@ -180,7 +188,7 @@ describe("E2E: MCP tool → WS bridge → fake browser → back", () => {
 
   it("state subscriptions fire on browser-pushed state changes", async () => {
     const engine = bridge.handleFor("default");
-    const registry = buildToolRegistry(createPresetStore(presetDir));
+    const registry = buildToolRegistry(createPresetStore(presetDir), makeSession());
     const setTempo = registry.get("set_tempo")!;
 
     const seen: number[] = [];
@@ -196,7 +204,7 @@ describe("E2E: MCP tool → WS bridge → fake browser → back", () => {
 
   it("multiple consecutive tool calls all round-trip", async () => {
     const engine = bridge.handleFor("default");
-    const registry = buildToolRegistry(createPresetStore(presetDir));
+    const registry = buildToolRegistry(createPresetStore(presetDir), makeSession());
     const setTempo = registry.get("set_tempo")!;
     const setChordMode = registry.get("set_chord_mode")!;
     const setMetronome = registry.get("set_metronome")!;

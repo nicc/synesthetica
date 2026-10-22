@@ -29,7 +29,7 @@
 
 import type { ComputerKeyboardSource } from "@synesthetica/adapters";
 import { KEY_MAP, KEY_LABEL, NATURAL_ORDER } from "@synesthetica/adapters";
-import { pcToHue } from "@synesthetica/contracts";
+import { pcToHue, type PitchClass } from "@synesthetica/contracts";
 import {
   worldToViewportFraction,
   WORLD_WIDTH,
@@ -142,7 +142,7 @@ export function mountOnScreenKeyboard(
     for (const [code, mapping] of Object.entries(KEY_MAP)) {
       const el = codeToElement.get(code);
       if (!el) continue;
-      const pc = mapping.midiNote % 12;
+      const pc = (mapping.midiNote % 12) as PitchClass;
       const hue = pcToHue(pc, { referencePc: 0, referenceHue });
       el.style.setProperty("--syn-key-hue", `${hue}`);
     }

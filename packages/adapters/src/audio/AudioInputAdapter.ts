@@ -97,7 +97,7 @@ export interface AudioInputAdapterConfig {
    * to that device via `deviceId: { exact: ... }`. When omitted, the
    * browser picks the default input.
    */
-  deviceId?: string;
+  deviceId?: string | undefined;
 
   /**
    * URL of the Basic Pitch model JSON (model.json). The InferenceWorker

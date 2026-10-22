@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "build": "npm run build -w @synesthetica/contracts -w @synesthetica/adapters -w @synesthetica/engine -w @synesthetica/web-app -w synesthetica",
+    "typecheck": "tsc -p packages/web-app && tsc -p packages/adapters/test && tsc -p packages/engine/test && tsc -p packages/cli/test && tsc -p packages/web-app/test",
     "clean": "npm run clean --if-present -ws",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",

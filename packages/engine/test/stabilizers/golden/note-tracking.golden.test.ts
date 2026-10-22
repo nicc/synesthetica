@@ -5,7 +5,7 @@
  * Verifies that MIDI events produce correct musical abstractions.
  */
 
-import { describe, it, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import {
   loadFixture,
   loadFixturesFromDir,
@@ -91,8 +91,10 @@ describe("NoteTrackingStabilizer golden tests", () => {
         const config = fixture.config as { partId: string; attackDurationMs?: number; releaseWindowMs?: number } | undefined;
         stabilizer = new NoteTrackingStabilizer({
           partId: config?.partId ?? "default",
-          attackDurationMs: config?.attackDurationMs,
-          releaseWindowMs: config?.releaseWindowMs,
+          // Omit unset keys: the stabilizer spreads config over its
+          // defaults, so an explicit `undefined` would erase them.
+          ...(config?.attackDurationMs !== undefined && { attackDurationMs: config.attackDurationMs }),
+          ...(config?.releaseWindowMs !== undefined && { releaseWindowMs: config.releaseWindowMs }),
         });
         stabilizer.init();
       });

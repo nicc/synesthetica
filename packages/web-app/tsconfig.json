@@ -1,22 +1,31 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2020",
-    "module": "ESNext",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "skipLibCheck": true,
-    "moduleResolution": "bundler",
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
     "noEmit": true,
-    "strict": true,
-    "types": ["webmidi"]
+    "types": [
+      "webmidi"
+    ]
   },
-  "include": ["src/**/*", "*.ts"],
+  "include": [
+    "src/**/*",
+    "*.ts"
+  ],
   "references": [
-    { "path": "../contracts" },
-    { "path": "../engine" },
-    { "path": "../adapters" }
+    {
+      "path": "../contracts"
+    },
+    {
+      "path": "../engine"
+    },
+    {
+      "path": "../adapters"
+    }
   ]
 }

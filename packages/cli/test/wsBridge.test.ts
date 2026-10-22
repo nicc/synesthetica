@@ -153,6 +153,9 @@ describe("wsBridge — state-changed fan-out", () => {
         },
         input: null,
         activePreset: null,
+        permissions: { midi: "granted", audio: "prompt" },
+        startedAt: null,
+        now: null,
       },
     };
     ws.send(JSON.stringify(push));

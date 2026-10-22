@@ -23,7 +23,8 @@
  * two enumerator tools.
  */
 
-import type { EngineHandle, StateSnapshot } from "../engine/engineHandle.js";
+import type { EngineHandle } from "../engine/engineHandle.js";
+import type { EngineStateSnapshot } from "@synesthetica/contracts";
 import type { PresetStore } from "../presets/presetStore.js";
 import type { ToolSpec } from "./sessionTools.js";
 import {
@@ -87,7 +88,7 @@ export const getStartedTool: ToolSpec = {
  * tool the LLM calls), return a defaulted empty snapshot. The LLM
  * should call get_state separately when it needs current state.
  */
-function emptyStateShaped(): StateSnapshot {
+function emptyStateShaped(): EngineStateSnapshot {
   return {
     instance: "default",
     macros: { intents: {}, effective: {} },

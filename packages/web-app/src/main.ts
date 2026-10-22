@@ -1122,7 +1122,7 @@ if (typeof navigator !== "undefined" && navigator.mediaDevices) {
     void refreshInputOptions();
   });
 }
-mountWsReceiver();
+wsReceiver = mountWsReceiver();
 initializePipeline();
 void queryPermissionsAndPublish();
 // Signal to the CLI that we're wired up and ready to receive engine
@@ -1196,17 +1196,17 @@ function setPermission(
   publishState();
 }
 
-function mountWsReceiver(): void {
+function mountWsReceiver(): WsReceiverHandle | null {
   const params = new URLSearchParams(window.location.search);
   const wsPort = params.get("ws-port");
   const label = params.get("instance") ?? "default";
   if (!wsPort) {
     // Standalone browser use — no CLI to connect to. Panel still
     // works locally; LLM control is unavailable.
-    return;
+    return null;
   }
   engineState.instance = label;
-  wsReceiver = startWsReceiver({
+  return startWsReceiver({
     url: `ws://${window.location.hostname}:${wsPort}`,
     label,
     onCall: async (method, args) => {

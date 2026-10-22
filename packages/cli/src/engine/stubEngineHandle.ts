@@ -8,14 +8,8 @@
  * a browser.
  */
 
-import type {
-  EngineHandle,
-  StateSnapshot,
-  RecentEvent,
-  RecentEventsEnvelope,
-  AvailableInput,
-  Unsubscribe,
-} from "./engineHandle.js";
+import type { EngineHandle, Unsubscribe } from "./engineHandle.js";
+import type { EngineStateSnapshot, EngineRecentEvent, EngineRecentEventsEnvelope, AvailableInput } from "@synesthetica/contracts";
 import { defaultMacroValues } from "./defaultMacroValues.js";
 import type { MacroValue } from "@synesthetica/contracts";
 
@@ -28,10 +22,10 @@ export class StubEngineHandle implements EngineHandle {
   readonly label: string;
   status: "starting" | "running" | "stopping" | "error" = "running";
 
-  private state: StateSnapshot;
-  private events: RecentEvent[] = [];
+  private state: EngineStateSnapshot;
+  private events: EngineRecentEvent[] = [];
   private nextEventId = 0;
-  private stateSubscribers: Array<(s: StateSnapshot) => void> = [];
+  private stateSubscribers: Array<(s: EngineStateSnapshot) => void> = [];
 
   /** Public log of every method call, for test assertions. */
   readonly opLog: Array<{ method: string; args: unknown[] }> = [];
@@ -78,7 +72,7 @@ export class StubEngineHandle implements EngineHandle {
   }
 
   // ---- macros ----
-  async setMacro(name: string, value: MacroValue): Promise<StateSnapshot> {
+  async setMacro(name: string, value: MacroValue): Promise<EngineStateSnapshot> {
     this.opLog.push({ method: "setMacro", args: [name, value] });
     this.state.macros = {
       intents: { ...this.state.macros.intents, [name]: value },
@@ -88,43 +82,43 @@ export class StubEngineHandle implements EngineHandle {
   }
 
   // ---- session ----
-  async setKey(root: number | null, mode: string | null): Promise<StateSnapshot> {
+  async setKey(root: number | null, mode: string | null): Promise<EngineStateSnapshot> {
     this.opLog.push({ method: "setKey", args: [root, mode] });
     this.state.session.tonic = root;
     this.state.session.mode = mode;
     return this.publishState();
   }
-  async setTempo(bpm: number | null): Promise<StateSnapshot> {
+  async setTempo(bpm: number | null): Promise<EngineStateSnapshot> {
     this.opLog.push({ method: "setTempo", args: [bpm] });
     this.state.session.tempo = bpm;
     return this.publishState();
   }
-  async setMeter(beatsPerBar: number | null, beatValue: number | null): Promise<StateSnapshot> {
+  async setMeter(beatsPerBar: number | null, beatValue: number | null): Promise<EngineStateSnapshot> {
     this.opLog.push({ method: "setMeter", args: [beatsPerBar, beatValue] });
     this.state.session.beatsPerBar = beatsPerBar;
     this.state.session.beatValue = beatValue;
     return this.publishState();
   }
-  async setChordMode(mode: "harmonic" | "bass-led"): Promise<StateSnapshot> {
+  async setChordMode(mode: "harmonic" | "bass-led"): Promise<EngineStateSnapshot> {
     this.opLog.push({ method: "setChordMode", args: [mode] });
     this.state.session.chordMode = mode;
     return this.publishState();
   }
-  async setMetronome(enabled: boolean): Promise<StateSnapshot> {
+  async setMetronome(enabled: boolean): Promise<EngineStateSnapshot> {
     this.opLog.push({ method: "setMetronome", args: [enabled] });
     this.state.session.metronome = enabled;
     return this.publishState();
   }
 
   // ---- input ----
-  async setInput(source: string): Promise<StateSnapshot> {
+  async setInput(source: string): Promise<EngineStateSnapshot> {
     this.opLog.push({ method: "setInput", args: [source] });
     this.state.input = source;
     return this.publishState();
   }
 
   // ---- helper ----
-  async setHueForPitch(pc: number, hue: number): Promise<StateSnapshot> {
+  async setHueForPitch(pc: number, hue: number): Promise<EngineStateSnapshot> {
     this.opLog.push({ method: "setHueForPitch", args: [pc, hue] });
     // Stub math: just record the intent; real impl adjusts
     // system:colour-mapping:reference (and direction) so the given
@@ -137,18 +131,18 @@ export class StubEngineHandle implements EngineHandle {
   }
 
   // ---- presets ----
-  async switchPreset(name: string): Promise<StateSnapshot> {
+  async switchPreset(name: string): Promise<EngineStateSnapshot> {
     this.opLog.push({ method: "switchPreset", args: [name] });
     this.state.activePreset = name;
     return this.publishState();
   }
-  async savePreset(name: string): Promise<StateSnapshot> {
+  async savePreset(name: string): Promise<EngineStateSnapshot> {
     this.opLog.push({ method: "savePreset", args: [name] });
     return this.state;
   }
 
   // ---- state ----
-  async getStateSnapshot(): Promise<StateSnapshot> {
+  async getStateSnapshot(): Promise<EngineStateSnapshot> {
     return this.state;
   }
   /** Test-only: seed the available-inputs list for getAvailableInputs. */
@@ -160,7 +154,7 @@ export class StubEngineHandle implements EngineHandle {
     return [...this.availableInputs];
   }
 
-  async getRecentEvents(limit = 100, since?: number): Promise<RecentEventsEnvelope> {
+  async getRecentEvents(limit = 100, since?: number): Promise<EngineRecentEventsEnvelope> {
     let events = this.events;
     if (since !== undefined) events = events.filter((e) => e.id > since);
     return {
@@ -170,26 +164,46 @@ export class StubEngineHandle implements EngineHandle {
     };
   }
 
-  async clearRecentEvents(): Promise<StateSnapshot> {
+  async clearRecentEvents(): Promise<EngineStateSnapshot> {
     this.events = [];
     this.opLog.push({ method: "clearRecentEvents", args: [] });
     return this.state;
   }
 
-  /** Test-only: inject a synthetic event into the recent-events buffer. */
-  injectEvent(kind: string, payload: Record<string, unknown> = {}): void {
-    this.events.push({
-      id: this.nextEventId++,
-      t: Date.now(),
-      kind,
-      ...payload,
-    });
+  /**
+   * Test-only: inject a synthetic event into the recent-events buffer.
+   * Payload fields are placeholders (middle C, a C major triad); the
+   * stub exists to exercise buffering, not musical content.
+   */
+  injectEvent(kind: EngineRecentEvent["kind"]): void {
+    const now = Date.now();
+    const base = { id: this.nextEventId++, t: now, frameT: now, part: "main" };
+    const note = { noteId: "stub-note", pitch: 60, pitchClass: 0, octave: 4, velocity: 100 } as const;
+    const chordRoot = { root: 0, quality: "maj" } as const;
+    const event: EngineRecentEvent =
+      kind === "note-on"
+        ? { ...base, kind, ...note, confidence: 1 }
+        : kind === "note-off"
+          ? { ...base, kind, ...note }
+          : {
+              ...base,
+              kind,
+              chordId: "stub-chord",
+              voicing: [60, 64, 67],
+              pitchClasses: [0, 4, 7],
+              bass: 0,
+              harmonic: chordRoot,
+              bassLed: chordRoot,
+              isInverted: false,
+              inversion: 0,
+            };
+    this.events.push(event);
   }
 
   // ---- subscriptions ----
   subscribe(
     _event: "state-changed",
-    callback: (s: StateSnapshot) => void,
+    callback: (s: EngineStateSnapshot) => void,
   ): Unsubscribe {
     this.stateSubscribers.push(callback);
     return () => {
@@ -204,13 +218,13 @@ export class StubEngineHandle implements EngineHandle {
   }
 
   // ---- internal ----
-  private publishState(): StateSnapshot {
+  private publishState(): EngineStateSnapshot {
     // Return a defensive copy; real engines shouldn't leak mutable state
     // to callers. Refresh `now` at snapshot time so subscribers see a
     // fresh session-ms reading.
     this.state.now =
       this.startedAtMs !== null ? Date.now() - this.startedAtMs : null;
-    const snapshot: StateSnapshot = JSON.parse(JSON.stringify(this.state));
+    const snapshot: EngineStateSnapshot = JSON.parse(JSON.stringify(this.state));
     for (const cb of this.stateSubscribers) cb(snapshot);
     return snapshot;
   }
