@@ -29,7 +29,6 @@ import {
   type BrowserToCli,
   type CliToBrowser,
   type EngineStateSnapshot,
-  type MacroConsumer,
   type EngineMethod,
 } from "@synesthetica/contracts";
 import {
@@ -243,7 +242,7 @@ describe("WS wiring coverage — set_macro reaches consumer through the full cha
       // transport AND was accepted by every declared consumer of this
       // macro. Consumers are in the compared object so a failure names
       // the consumer that dropped the value.
-      const consumers = (macro.consumers as MacroConsumer[]).map(
+      const consumers = (macro.consumers).map(
         (c) => `${c.kind}:${c.id}.${c.macroKey}`,
       );
       expect({

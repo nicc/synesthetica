@@ -226,13 +226,21 @@ npm run lint        # Check for issues
 npm run lint:fix    # Auto-fix where possible
 ```
 
-**Key rules enforced:**
-- **Contracts discipline**: All types come from `@synesthetica/contracts`, not internal paths
-- **Type-only imports**: Use `import type { ... }` for types (enforced by `consistent-type-imports`)
-- **No unused vars**: Except those prefixed with `_` (convention for intentionally unused)
-- **No debugger statements**: Remove before commit
+ESLint 10 flat config (`eslint.config.mjs`) with typescript-eslint's type-checked rules. Typed linting takes ~10s.
 
-**If lint fails:** Fix the issues before pushing. Most are auto-fixable with `npm run lint:fix`.
+**Principles enforced by lint** (each rule block in the config names what it encodes):
+- **Engine data flow (SPEC_008)**: stabilizers, vocabularies, lenses and renderers may not import the layers they don't consume; stabilizers and vocabularies don't import `three`; lenses and renderers don't import `tonal` (I4)
+- **I14**: lenses don't import `pcToHue`; they receive hue from the vocabulary
+- **Determinism and purity**: no `Math.random`, `Date.now`, `performance.now` or browser globals in stabilizers, vocabularies or lenses
+- **Contracts discipline**: contracts imports no other package; adapters don't depend on the engine; no imports of another package's `src/` or `dist/`
+- **No deprecated APIs or shims** (`no-deprecated`), exhaustive switches over unions, no floating promises
+- **Tests**: no `.only`/`.skip`, every test asserts something (helpers named `expect*`/`assert*` count), no `console`
+
+**Exemptions** are `eslint-disable-next-line` comments that state the reason and cite the beads issue that removes them. `reportUnusedDisableDirectives` flags any that no longer apply.
+
+**Enforced by the compiler instead** (`tsconfig.base.json`): strict mode, `exactOptionalPropertyTypes`, unused locals/parameters, `verbatimModuleSyntax` (type-only imports), `noImplicitOverride`, `noImplicitReturns`.
+
+**If lint fails:** Fix the issues before pushing. Many are auto-fixable with `npm run lint:fix`.
 
 ## Testing Conventions
 

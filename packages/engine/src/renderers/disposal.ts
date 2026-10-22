@@ -37,8 +37,10 @@ export function disposeObject(
   shared: ReadonlySet<THREE.BufferGeometry> = new Set(),
 ): void {
   if (obj instanceof THREE.Mesh || obj instanceof THREE.Line) {
-    if (!shared.has(obj.geometry)) obj.geometry.dispose();
-    disposeMaterial(obj.material);
+    // instanceof narrows to Mesh<any, any>; restore the default generics.
+    const drawable: THREE.Mesh | THREE.Line = obj;
+    if (!shared.has(drawable.geometry)) drawable.geometry.dispose();
+    disposeMaterial(drawable.material);
   } else if (obj instanceof THREE.Group) {
     for (const child of obj.children) {
       disposeObject(child, shared);

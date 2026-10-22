@@ -94,8 +94,10 @@ export function createPresetStore(overrideDir?: string): PresetStore {
       if (!existsSync(path)) return null;
       const raw = readFileSync(path, "utf8");
       const parsed = JSON.parse(raw) as PresetContent;
-      if (parsed.version !== 1) {
-        throw new Error(`unsupported preset version: ${parsed.version} (expected 1)`);
+      // Typed as the current version; a file on disk can hold anything.
+      const version: unknown = parsed.version;
+      if (version !== 1) {
+        throw new Error(`unsupported preset version: ${String(version)} (expected 1)`);
       }
       return parsed;
     },

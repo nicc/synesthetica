@@ -79,7 +79,7 @@ export function installAudioCaptureProcessor(): void {
       // call is acceptable.)
       this.monoBuffer = new Float32Array(128);
 
-      this.port.onmessage = (event: MessageEvent) => {
+      this.port.onmessage = (event: MessageEvent<{ type?: string } | undefined>) => {
         if (event.data?.type === "stop") {
           this.stopped = true;
         }

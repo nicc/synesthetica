@@ -251,7 +251,7 @@ describe("ChordDetectionStabilizer", () => {
       // "Gb" and Tonal.Chord.detect fails to find a clean D triad.
       const root = detectRoot(
         [2, 6, 9] as PitchClass[],
-        { root: 2 as PitchClass, mode: "ionian" },
+        { root: 2, mode: "ionian" },
       );
       expect(root).toBe(2); // D
     });
@@ -260,7 +260,7 @@ describe("ChordDetectionStabilizer", () => {
       // A-C#-E (pc 9, 1, 4)
       const root = detectRoot(
         [9, 1, 4] as PitchClass[],
-        { root: 9 as PitchClass, mode: "ionian" },
+        { root: 9, mode: "ionian" },
       );
       expect(root).toBe(9); // A
     });
@@ -277,12 +277,12 @@ describe("ChordDetectionStabilizer", () => {
       stabilizer.init();
       const t1 = 1000;
       const caugNotes = [
-        makeNote(0 as PitchClass, 4, t1),
-        makeNote(4 as PitchClass, 4, t1),
-        makeNote(8 as PitchClass, 4, t1),
+        makeNote(0, 4, t1),
+        makeNote(4, 4, t1),
+        makeNote(8, 4, t1),
       ];
       const ab: { root: PitchClass; mode: "ionian" | "aeolian" } = {
-        root: 8 as PitchClass,
+        root: 8,
         mode: "ionian",
       };
       stabilizer.apply(
@@ -310,7 +310,7 @@ describe("ChordDetectionStabilizer", () => {
       // Bb-D-F (pc 10, 2, 5)
       const root = detectRoot(
         [10, 2, 5] as PitchClass[],
-        { root: 3 as PitchClass, mode: "ionian" },
+        { root: 3, mode: "ionian" },
       );
       expect(root).toBe(10); // Bb
     });
@@ -341,7 +341,7 @@ describe("ChordDetectionStabilizer", () => {
       // Ab9 = Ab(8) + C(0) + Eb(3) + Gb(6) + Bb(10)
       const result = detect(
         [8, 0, 3, 6, 10] as PitchClass[],
-        { root: 8 as PitchClass, mode: "ionian" },
+        { root: 8, mode: "ionian" },
       );
       expect(result?.root).toBe(8); // Ab
     });
@@ -353,7 +353,7 @@ describe("ChordDetectionStabilizer", () => {
       // demotion lets the root-position Ab11 from subset detection win.
       const result = detect(
         [8, 0, 3, 6, 10, 1] as PitchClass[],
-        { root: 8 as PitchClass, mode: "ionian" },
+        { root: 8, mode: "ionian" },
       );
       expect(result?.root).toBe(8); // Ab
     });
@@ -362,7 +362,7 @@ describe("ChordDetectionStabilizer", () => {
       // Cmaj9 = C(0) + E(4) + G(7) + B(11) + D(2)
       const result = detect(
         [0, 4, 7, 11, 2] as PitchClass[],
-        { root: 0 as PitchClass, mode: "ionian" },
+        { root: 0, mode: "ionian" },
       );
       expect(result?.root).toBe(0); // C
     });
@@ -371,7 +371,7 @@ describe("ChordDetectionStabilizer", () => {
       // Dm9 = D(2) + F(5) + A(9) + C(0) + E(4)
       const result = detect(
         [2, 5, 9, 0, 4] as PitchClass[],
-        { root: 0 as PitchClass, mode: "ionian" },
+        { root: 0, mode: "ionian" },
       );
       expect(result?.root).toBe(2); // D
     });
@@ -382,7 +382,7 @@ describe("ChordDetectionStabilizer", () => {
       // interpretation — but Ab7 is the correct name for this voicing.
       const result = detect(
         [8, 0, 3, 6] as PitchClass[],
-        { root: 0 as PitchClass, mode: "ionian" },
+        { root: 0, mode: "ionian" },
       );
       expect(result?.root).toBe(8); // Ab, not some diatonic alternative
     });
@@ -393,7 +393,7 @@ describe("ChordDetectionStabilizer", () => {
       // the standard chord name even though it's a slash.
       const result = detect(
         [7, 10, 3] as PitchClass[],
-        { root: 3 as PitchClass, mode: "ionian" },
+        { root: 3, mode: "ionian" },
       );
       expect(result?.root).toBe(3); // Eb, not G
       expect(result?.quality).toBe("maj");
@@ -402,9 +402,9 @@ describe("ChordDetectionStabilizer", () => {
     it("harmonic and bass-led diverge for an inversion", () => {
       // G-Bb-Eb with G as bass (first pc → octave 3).
       const notes = [
-        makeNote(7 as PitchClass, 3, 1000),
-        makeNote(10 as PitchClass, 4, 1000),
-        makeNote(3 as PitchClass, 4, 1000),
+        makeNote(7, 3, 1000),
+        makeNote(10, 4, 1000),
+        makeNote(3, 4, 1000),
       ];
       const result = settle(stabilizer, notes, 1000, { root: 3 as PitchClass, mode: "ionian" });
       const chord = result.chords.find((c) => c.phase === "active");
@@ -433,10 +433,10 @@ describe("ChordDetectionStabilizer", () => {
       // hiding the C5 doubling and moving Eb5 to Eb4. Voicing should
       // preserve real octaves + duplicates, bass-first.
       const notes = [
-        makeNote(0 as PitchClass, 4, 1000), // C4 (60)
-        makeNote(8 as PitchClass, 4, 1000), // Ab4 (68)
-        makeNote(0 as PitchClass, 5, 1000), // C5 (72)
-        makeNote(3 as PitchClass, 5, 1000), // Eb5 (75)
+        makeNote(0, 4, 1000), // C4 (60)
+        makeNote(8, 4, 1000), // Ab4 (68)
+        makeNote(0, 5, 1000), // C5 (72)
+        makeNote(3, 5, 1000), // Eb5 (75)
       ];
       const result = settle(stabilizer, notes, 1000);
       const chord = result.chords.find((c) => c.phase === "active");
@@ -458,9 +458,9 @@ describe("ChordDetectionStabilizer", () => {
       // falls back to the harmonic reading (Ab), whose slash-notated
       // form "Ab/C" already communicates the bass.
       const notes = [
-        makeNote(0 as PitchClass, 3, 1000), // C3 as bass
-        makeNote(3 as PitchClass, 4, 1000), // Eb4
-        makeNote(8 as PitchClass, 4, 1000), // Ab4
+        makeNote(0, 3, 1000), // C3 as bass
+        makeNote(3, 4, 1000), // Eb4
+        makeNote(8, 4, 1000), // Ab4
       ];
       const result = settle(stabilizer, notes, 1000);
       const chord = result.chords.find((c) => c.phase === "active");
@@ -477,9 +477,9 @@ describe("ChordDetectionStabilizer", () => {
       // Nic-reported field-bug repro: {C, Eb, Ab} with C as bass — first
       // inversion of Ab major. inversion should be 1 (third-of-chord in bass).
       const notes = [
-        makeNote(0 as PitchClass, 3, 1000), // C3 as bass
-        makeNote(3 as PitchClass, 4, 1000), // Eb4
-        makeNote(8 as PitchClass, 4, 1000), // Ab4
+        makeNote(0, 3, 1000), // C3 as bass
+        makeNote(3, 4, 1000), // Eb4
+        makeNote(8, 4, 1000), // Ab4
       ];
       const result = settle(stabilizer, notes, 1000, { root: 8 as PitchClass, mode: "ionian" });
       const chord = result.chords.find((c) => c.phase === "active");
@@ -495,9 +495,9 @@ describe("ChordDetectionStabilizer", () => {
       // Ab-C-Eb with Ab as bass — harmonic.root === bass, both readings
       // produce the same interpretation.
       const notes = [
-        makeNote(8 as PitchClass, 3, 1000),
-        makeNote(0 as PitchClass, 4, 1000),
-        makeNote(3 as PitchClass, 4, 1000),
+        makeNote(8, 3, 1000),
+        makeNote(0, 4, 1000),
+        makeNote(3, 4, 1000),
       ];
       const result = settle(stabilizer, notes, 1000, { root: 8 as PitchClass, mode: "ionian" });
       const chord = result.chords.find((c) => c.phase === "active");
@@ -511,7 +511,7 @@ describe("ChordDetectionStabilizer", () => {
       // D7 is V/V and should be detected as D7, not D (triad without 7th).
       const result = detect(
         [2, 6, 9, 0] as PitchClass[],
-        { root: 0 as PitchClass, mode: "ionian" },
+        { root: 0, mode: "ionian" },
       );
       expect(result?.root).toBe(2); // D
       expect(result?.quality).toBe("dom7");
@@ -523,7 +523,7 @@ describe("ChordDetectionStabilizer", () => {
       // G13 = G(7) + B(11) + D(2) + F(5) + A(9) + E(4)
       const result = detect(
         [7, 11, 2, 5, 9, 4] as PitchClass[],
-        { root: 0 as PitchClass, mode: "ionian" },
+        { root: 0, mode: "ionian" },
       );
       expect(result?.root).toBe(7); // G
     });
@@ -532,7 +532,7 @@ describe("ChordDetectionStabilizer", () => {
       // Cadd9 = C(0) + E(4) + G(7) + D(2). Tonal recognises this.
       const result = detect(
         [0, 4, 7, 2] as PitchClass[],
-        { root: 0 as PitchClass, mode: "ionian" },
+        { root: 0, mode: "ionian" },
       );
       expect(result?.root).toBe(0); // C
     });

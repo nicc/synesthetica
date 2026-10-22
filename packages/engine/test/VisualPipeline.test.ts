@@ -10,7 +10,6 @@ import type {
   MidiNoteOn,
   MidiNoteOff,
   SceneFrame,
-  PitchClass,
 } from "@synesthetica/contracts";
 import { pcToHue } from "@synesthetica/contracts";
 import { createTestMusicalFrame } from "./_harness/frames";
@@ -209,7 +208,7 @@ describe("VisualPipeline", () => {
       const strips = noteStrips(pipeline.requestFrame(1000));
 
       expect(strips).toHaveLength(1);
-      expect(strips[0].style.color?.h).toBe(pcToHue(9 as PitchClass, hueInvariant));
+      expect(strips[0].style.color?.h).toBe(pcToHue(9, hueInvariant));
     });
 
     it("keeps the same note strip while the note is held", () => {

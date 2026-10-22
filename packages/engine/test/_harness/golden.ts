@@ -81,7 +81,8 @@ export function loadFixture<T>(relativePath: string): T {
     return JSON.parse(content) as T;
   } catch (e) {
     throw new Error(
-      `Invalid JSON in fixture: ${relativePath}\n  ${e instanceof Error ? e.message : e}`
+      `Invalid JSON in fixture: ${relativePath}\n  ${e instanceof Error ? e.message : String(e)}`,
+      { cause: e },
     );
   }
 }
@@ -183,10 +184,10 @@ export function compareDeep(
       return `${path || "root"}: expected object, got ${Array.isArray(expected) ? "array" : typeof expected}`;
     }
 
-    const actualKeys = Object.keys(actual as object).filter(
+    const actualKeys = Object.keys(actual).filter(
       (k) => !ignoreFields.includes(k)
     );
-    const expectedKeys = Object.keys(expected as object).filter(
+    const expectedKeys = Object.keys(expected).filter(
       (k) => !ignoreFields.includes(k)
     );
 

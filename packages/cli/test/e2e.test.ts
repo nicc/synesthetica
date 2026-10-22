@@ -96,6 +96,10 @@ class FakeBrowser {
       case "setMetronome":
         this.state.session.metronome = msg.args[0] as boolean;
         break;
+      default:
+        // The tests only exercise the setters above; anything else
+        // leaves the fake state unchanged.
+        break;
     }
     // Reply with the new state.
     const result: BrowserToCli = {

@@ -24,7 +24,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { productionManifest, type MacroConsumer } from "@synesthetica/contracts";
+import { productionManifest } from "@synesthetica/contracts";
 import {
   VisualPipeline,
   NoteTrackingStabilizer,
@@ -153,7 +153,7 @@ describe("Wiring coverage — pipeline.setMacro reaches consumers", () => {
       const range = macro.type === "continuous" ? macro.range : undefined;
       const enumValues = macro.type === "discrete" ? macro.enumValues : undefined;
 
-      for (const consumer of macro.consumers as MacroConsumer[]) {
+      for (const consumer of macro.consumers) {
         const instance = consumerLookup.get(consumer.id);
         if (!instance) throw new Error(`no instance for '${consumer.id}'`);
 
@@ -193,7 +193,7 @@ describe("Wiring coverage — consumers start at the manifest default", () => {
   const { consumerLookup } = buildPipeline();
   for (const macro of productionManifest.macros) {
     if (macro.type === "compound") continue;
-    for (const consumer of macro.consumers as MacroConsumer[]) {
+    for (const consumer of macro.consumers) {
       it(`${macro.id} → '${consumer.id}' defaults to ${JSON.stringify(macro.default)}`, () => {
         const instance = consumerLookup.get(consumer.id) as
           | { readMacros?: () => Record<string, number | string | boolean> }

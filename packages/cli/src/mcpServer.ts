@@ -70,6 +70,9 @@ export async function startMcpServer(
   transport: "stdio" | "tcp",
   port: number | null,
 ): Promise<{ close(): Promise<void> }> {
+  // The SDK keeps the low-level Server for advanced use; tools and resources here
+  // are registered from the manifest rather than through McpServer helpers (synesthetica-duxd).
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   const server = new Server(
     {
       name: config.serverName,
@@ -370,7 +373,7 @@ export async function startMcpServer(
         isError: true,
       };
     }
-    const args = (request.params.arguments ?? {}) as Record<string, unknown>;
+    const args = (request.params.arguments ?? {});
 
     // Primer gate: every non-get_started tool requires a valid primer
     // token. A missing or stale token is refused; the response body

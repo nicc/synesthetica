@@ -82,7 +82,6 @@ export function bindPanelToEngine(opts: BindPanelOptions): PanelDispatch {
         if (id.includes(":") || !id.startsWith("session:")) {
           void opts.onEngineOp("setMacro", [id, value ?? 0]);
         } else {
-          // eslint-disable-next-line no-console
           console.warn(`[panel] unknown widget id '${id}' = ${JSON.stringify(value)}`);
         }
         return;

@@ -155,7 +155,12 @@ async function init(message: Extract<MainToWorker, { type: "init" }>) {
     state.basicPitch = new BasicPitch(Promise.resolve(model));
     await state.basicPitch.model;
 
-    state.intervalId = setInterval(runInference, message.hopMs);
+    // Inference failures after startup can't be reported to the main
+    // thread (it only listens for ready/error during start), so log here
+    // rather than leave an unhandled rejection.
+    state.intervalId = setInterval(() => {
+      runInference().catch((err: unknown) => console.error("[inference-worker] inference failed:", err));
+    }, message.hopMs);
 
     post({ type: "ready" });
   } catch (err) {
@@ -198,7 +203,7 @@ async function runInference() {
   const windowStartSample = (headAfter - cfg.windowSamples) >>> 0;
 
   // Reshape audio to [1, windowSamples, 1] and run the model.
-  const tensor = tf.tensor(buf).reshape([1, cfg.windowSamples, 1]) as tf.Tensor3D;
+  const tensor = tf.tensor3d(buf, [1, cfg.windowSamples, 1]);
   let frames: number[][];
   let onsets: number[][];
   let contours: number[][];

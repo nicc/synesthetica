@@ -14,7 +14,7 @@
  * doesn't know or care that state lives in a browser tab.
  */
 
-import { WebSocketServer, type WebSocket } from "ws";
+import { WebSocketServer, type RawData, type WebSocket } from "ws";
 import {
   ENGINE_BRIDGE_PROTOCOL,
   type BrowserToCli,
@@ -106,7 +106,7 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
     ws.on("message", (raw) => {
       let msg: BrowserToCli;
       try {
-        msg = JSON.parse(String(raw)) as BrowserToCli;
+        msg = JSON.parse(rawToString(raw)) as BrowserToCli;
       } catch {
         log(`wsBridge: dropped malformed frame`);
         return;
@@ -118,8 +118,11 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
           ws.close(1002, "hello required");
           return;
         }
-        if (msg.protocol !== ENGINE_BRIDGE_PROTOCOL) {
-          log(`wsBridge: protocol mismatch (peer=${msg.protocol}, ours=${ENGINE_BRIDGE_PROTOCOL})`);
+        // Typed as our protocol constant, but a peer on another version
+        // sends whatever it has.
+        const peerProtocol: unknown = msg.protocol;
+        if (peerProtocol !== ENGINE_BRIDGE_PROTOCOL) {
+          log(`wsBridge: protocol mismatch (peer=${String(peerProtocol)}, ours=${ENGINE_BRIDGE_PROTOCOL})`);
           ws.close(1002, "protocol version mismatch");
           return;
         }
@@ -365,7 +368,7 @@ class WSBackedEngineHandle implements EngineHandle {
       // the same session-ms. Recompute `now` freshly from startedAt
       // + wall-clock so temporal reasoning ("how long has this been
       // going?") anchors on current time rather than stale write time.
-      return withFreshNow(conn.state as EngineStateSnapshot);
+      return withFreshNow(conn.state);
     }
     return this.call("getStateSnapshot", []) as Promise<EngineStateSnapshot>;
   }
@@ -452,3 +455,11 @@ function emptyState(label: string): EngineStateSnapshot {
 
 // Suppress lint on unused-in-source local re-export helpers.
 export type { CliToBrowser };
+
+/** A ws message as text. Text frames arrive as one Buffer; handle the
+ *  fragmented and ArrayBuffer forms ws can also deliver. */
+function rawToString(raw: RawData): string {
+  if (Array.isArray(raw)) return Buffer.concat(raw).toString("utf8");
+  if (raw instanceof ArrayBuffer) return Buffer.from(raw).toString("utf8");
+  return raw.toString("utf8");
+}

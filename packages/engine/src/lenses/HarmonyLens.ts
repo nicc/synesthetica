@@ -36,6 +36,9 @@ import type {
   ColorHSVA,
   PitchHueInvariant,
 } from "@synesthetica/contracts";
+// I14 exemption: functional-chord hues are computed here until the
+// vocabulary supplies them (synesthetica-a9mf).
+// eslint-disable-next-line no-restricted-imports
 import { pcToHue, MODE_SCALE_INTERVALS } from "@synesthetica/contracts";
 
 import { buildRomanNumeralGlyph } from "../utils/RomanNumeralGlyphBuilder";

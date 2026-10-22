@@ -153,7 +153,7 @@ export function processDetectedNotes(
       note;
 
     const existingId = activeByPitch.get(pitch);
-    let existing = existingId ? active.get(existingId) : undefined;
+    const existing = existingId ? active.get(existingId) : undefined;
 
     // Re-strike classification. A new detection at a tracked pitch is
     // a re-strike only if BOTH its onset sits meaningfully later than
@@ -189,7 +189,6 @@ export function processDetectedNotes(
       });
       active.delete(existing.noteId);
       activeByPitch.delete(pitch);
-      existing = undefined;
       // Fall through to the new-note path below.
     }
 

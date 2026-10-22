@@ -38,6 +38,8 @@ import {
   BASE_WIDTH,
 } from "../utils/ChordShapeBuilder";
 // Shared with HarmonyLens: the band gap also sizes the progression clock.
+// Layer exemption until the scene coordinate contract lands (synesthetica-r3b1).
+// eslint-disable-next-line no-restricted-imports
 import { GLYPH_STEAM_BAND_GAP } from "../lenses/layout";
 import { disposeObject } from "./disposal";
 
@@ -629,7 +631,7 @@ export class ThreeJSRenderer implements IRenderer {
     for (const obj of this.entityObjects.values()) {
       obj.traverse((child) => {
         if (child instanceof Line2) {
-          const mat = child.material as LineMaterial;
+          const mat = child.material;
           mat.resolution.copy(this.resolution);
         }
       });
@@ -866,7 +868,7 @@ export class ThreeJSRenderer implements IRenderer {
       new THREE.Vector3(xLeft, y, 0),
       new THREE.Vector3(xRight, y, 0),
     ];
-    (line.geometry as THREE.BufferGeometry).setFromPoints(points);
+    (line.geometry).setFromPoints(points);
 
     // Update material
     const material = line.material as THREE.LineBasicMaterial;
@@ -924,7 +926,7 @@ export class ThreeJSRenderer implements IRenderer {
       this.scene.add(ring);
       this.entityObjects.set(entity.id, ring);
     } else {
-      const mat = ring.material as LineMaterial;
+      const mat = ring.material;
       mat.color.copy(threeColor);
       mat.opacity = opacity;
       mat.resolution.set(this.resolution.x, this.resolution.y);
@@ -983,9 +985,9 @@ export class ThreeJSRenderer implements IRenderer {
       this.scene.add(line);
       this.entityObjects.set(entity.id, line);
     } else {
-      const geom = line.geometry as LineGeometry;
+      const geom = line.geometry;
       geom.setPositions(positions);
-      const mat = line.material as LineMaterial;
+      const mat = line.material;
       mat.color.copy(threeColor);
       mat.opacity = opacity;
       mat.resolution.set(this.resolution.x, this.resolution.y);
@@ -1246,7 +1248,7 @@ export class ThreeJSRenderer implements IRenderer {
       this.scene.add(mesh);
       this.entityObjects.set(entity.id, mesh);
     } else {
-      const geom = mesh.geometry as THREE.BufferGeometry;
+      const geom = mesh.geometry;
       const posAttr = geom.getAttribute("position") as THREE.BufferAttribute;
       posAttr.array.set(positions);
       posAttr.needsUpdate = true;
@@ -1472,7 +1474,7 @@ export class ThreeJSRenderer implements IRenderer {
       new THREE.Vector3(x1, y1, 0),
       new THREE.Vector3(x1 + vx, y1 + vy, 0),
     ];
-    (line.geometry as THREE.BufferGeometry).setFromPoints(points);
+    (line.geometry).setFromPoints(points);
 
     // Material
     const material = line.material as THREE.LineBasicMaterial;
@@ -1544,7 +1546,7 @@ export class ThreeJSRenderer implements IRenderer {
     if (!elements || elements.length === 0) {
       const cached = this.entityObjects.get(entity.id);
       if (cached) {
-        this.scene!.remove(cached);
+        this.scene.remove(cached);
         this.disposeObject(cached);
         this.entityObjects.delete(entity.id);
       }
@@ -1602,7 +1604,8 @@ export class ThreeJSRenderer implements IRenderer {
     const bodyOpacity = entityOpacity * 0.8;
     group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
-        const mat = child.material;
+        // instanceof narrows to Mesh<any, any>; restore the default generics.
+        const mat = (child as THREE.Mesh).material;
         if (mat instanceof THREE.ShaderMaterial && mat.uniforms.opacity) {
           mat.uniforms.opacity.value = bodyOpacity;
         } else if (mat instanceof THREE.MeshBasicMaterial) {
@@ -1612,7 +1615,7 @@ export class ThreeJSRenderer implements IRenderer {
       // Line2/LineSegments2 store LineMaterial here; it doesn't extend
       // MeshBasicMaterial so the branches above don't catch it.
       if (child instanceof Line2) {
-        const mat = child.material as LineMaterial;
+        const mat = child.material;
         mat.transparent = true;
         mat.opacity = entityOpacity;
       }

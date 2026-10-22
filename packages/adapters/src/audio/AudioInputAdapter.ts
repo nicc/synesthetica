@@ -207,7 +207,7 @@ export class AudioInputAdapter implements IRawSourceAdapter {
     this.config = {
       ...DEFAULT_CONFIG,
       ...config,
-    } as Required<AudioInputAdapterConfig>;
+    };
     this.source = this.config.sourceId;
     this.stream = this.config.streamId;
   }
@@ -301,7 +301,7 @@ export class AudioInputAdapter implements IRawSourceAdapter {
     // 5. Stream worker events into the pending input buffer. The
     // ready/error handler above already removed itself; this listener
     // handles per-event traffic going forward.
-    this.worker.addEventListener("message", (event) =>
+    this.worker.addEventListener("message", (event: MessageEvent<WorkerToMain>) =>
       this.onWorkerEvent(event.data),
     );
 
@@ -361,7 +361,6 @@ export class AudioInputAdapter implements IRawSourceAdapter {
       event.type !== "ready" &&
       event.type !== "error"
     ) {
-      // eslint-disable-next-line no-console
       console.debug("[audio-adapter]", event);
     }
     switch (event.type) {

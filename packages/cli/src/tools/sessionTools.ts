@@ -128,7 +128,7 @@ export const sessionTools: ToolSpec[] = [
           return err("SCHEMA_INVALID", `root must be an integer in [0, 11], got ${root}`);
         }
       }
-      return safeCall(() => engine.setKey(root as number | null, mode as string | null));
+      return safeCall(() => engine.setKey(root, mode));
     },
   },
 

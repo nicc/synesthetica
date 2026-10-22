@@ -42,7 +42,7 @@ type StabilizerSequenceFixture = SequenceFixture<RawInputFrame, ExpectedOutput>;
  * Compare actual MusicalFrame against expected output.
  * Extracts relevant fields and compares note properties we care about.
  */
-function compareOutput(actual: MusicalFrame, expected: ExpectedOutput): void {
+function expectOutputMatches(actual: MusicalFrame, expected: ExpectedOutput): void {
   // Check note count
   if (actual.notes.length !== expected.noteCount) {
     throw new Error(
@@ -105,10 +105,11 @@ describe("NoteTrackingStabilizer golden tests", () => {
           const actual = stabilizer.apply(step.input, previous);
 
           try {
-            compareOutput(actual, step.expected);
+            expectOutputMatches(actual, step.expected);
           } catch (e) {
             throw new Error(
-              `Step t=${step.t} failed: ${e instanceof Error ? e.message : e}`
+              `Step t=${step.t} failed: ${e instanceof Error ? e.message : String(e)}`,
+              { cause: e },
             );
           }
 

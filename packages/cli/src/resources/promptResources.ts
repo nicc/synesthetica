@@ -61,7 +61,8 @@ function loadPrompt(filename: string): string {
     );
   } catch (err) {
     throw new Error(
-      `prompt file not found: ${filename} (tried ${candidates.join(", ")}, then workspace contracts) — ${err instanceof Error ? err.message : err}`,
+      `prompt file not found: ${filename} (tried ${candidates.join(", ")}, then workspace contracts) — ${err instanceof Error ? err.message : String(err)}`,
+      { cause: err },
     );
   }
 }

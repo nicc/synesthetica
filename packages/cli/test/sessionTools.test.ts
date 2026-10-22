@@ -75,25 +75,25 @@ describe("session tools — validation errors never reach the engine", () => {
     engine = new StubEngineHandle();
   });
 
-  async function rejects(name: string, args: Record<string, unknown>, code: string) {
+  async function expectRejected(name: string, args: Record<string, unknown>, code: string) {
     const r = await tool(name).handle(args, engine);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe(code);
     expect(engine.opLog).toEqual([]);
   }
 
-  it("set_key rejects mismatched null/non-null", () => rejects("set_key", { root: 0, mode: null }, "KEY_INVALID_PAIR"));
-  it("set_key rejects out-of-range root", () => rejects("set_key", { root: 12, mode: "ionian" }, "SCHEMA_INVALID"));
-  it("set_key rejects a non-integer root", () => rejects("set_key", { root: 1.5, mode: "ionian" }, "SCHEMA_INVALID"));
-  it("set_key requires both arguments", () => rejects("set_key", { root: 0 }, "SCHEMA_INVALID"));
-  it("set_tempo requires bpm", () => rejects("set_tempo", {}, "SCHEMA_INVALID"));
+  it("set_key rejects mismatched null/non-null", () => expectRejected("set_key", { root: 0, mode: null }, "KEY_INVALID_PAIR"));
+  it("set_key rejects out-of-range root", () => expectRejected("set_key", { root: 12, mode: "ionian" }, "SCHEMA_INVALID"));
+  it("set_key rejects a non-integer root", () => expectRejected("set_key", { root: 1.5, mode: "ionian" }, "SCHEMA_INVALID"));
+  it("set_key requires both arguments", () => expectRejected("set_key", { root: 0 }, "SCHEMA_INVALID"));
+  it("set_tempo requires bpm", () => expectRejected("set_tempo", {}, "SCHEMA_INVALID"));
   it("set_meter rejects mismatched null/non-null", () =>
-    rejects("set_meter", { beats_per_bar: 4, beat_value: null }, "METER_INVALID_PAIR"));
+    expectRejected("set_meter", { beats_per_bar: 4, beat_value: null }, "METER_INVALID_PAIR"));
   it("set_meter rejects unsupported beat_value", () =>
-    rejects("set_meter", { beats_per_bar: 4, beat_value: 3 }, "METER_VALUE_UNSUPPORTED"));
-  it("set_chord_mode rejects unknown mode", () => rejects("set_chord_mode", { mode: "jazz" }, "CHORD_MODE_UNKNOWN"));
-  it("set_metronome rejects non-boolean", () => rejects("set_metronome", { enabled: "yes" }, "SCHEMA_INVALID"));
-  it("set_input rejects empty string", () => rejects("set_input", { source: "" }, "SCHEMA_INVALID"));
+    expectRejected("set_meter", { beats_per_bar: 4, beat_value: 3 }, "METER_VALUE_UNSUPPORTED"));
+  it("set_chord_mode rejects unknown mode", () => expectRejected("set_chord_mode", { mode: "jazz" }, "CHORD_MODE_UNKNOWN"));
+  it("set_metronome rejects non-boolean", () => expectRejected("set_metronome", { enabled: "yes" }, "SCHEMA_INVALID"));
+  it("set_input rejects empty string", () => expectRejected("set_input", { source: "" }, "SCHEMA_INVALID"));
 });
 
 describe("session tools — bounds agree with the manifest's session controls", () => {

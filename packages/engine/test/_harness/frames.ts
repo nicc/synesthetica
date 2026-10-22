@@ -19,7 +19,6 @@ import type {
   MusicalChord,
   ChordId,
   VisualAnnotation,
-  Ms,
 } from "@synesthetica/contracts";
 import {
   createEmptyMusicalFrame,
@@ -64,7 +63,7 @@ export function createTestMusicalFrame(
   overrides: MusicalFrameOverrides = {},
 ): MusicalFrame {
   return {
-    ...createEmptyMusicalFrame(t as Ms, part),
+    ...createEmptyMusicalFrame(t, part),
     ...overrides,
   };
 }

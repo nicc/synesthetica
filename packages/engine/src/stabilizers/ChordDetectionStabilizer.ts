@@ -47,7 +47,6 @@ import type {
   Ms,
   Provenance,
   PartId,
-  Confidence,
   PrescribedKey,
 } from "@synesthetica/contracts";
 import { createChordId, createEmptyMusicalFrame } from "@synesthetica/contracts";
@@ -648,7 +647,7 @@ export class ChordDetectionStabilizer implements IMusicalStabilizer {
       quality: c.quality,
       chordTones: c.chordTones,
       name: c.name,
-      confidence: Math.min(1, c.coverage / pitchClasses.size) as Confidence,
+      confidence: Math.min(1, c.coverage / pitchClasses.size),
     });
 
     const harmonic = toInterpretation(best);

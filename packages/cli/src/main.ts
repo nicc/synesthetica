@@ -89,7 +89,7 @@ async function runStart(options: StartOptions): Promise<number> {
         await task.run();
         writeErr(`  ✓ ${task.name} (${Date.now() - t0}ms)`);
       } catch (e) {
-        writeErr(`  ✗ ${task.name} (${Date.now() - t0}ms): ${e instanceof Error ? e.message : e}`);
+        writeErr(`  ✗ ${task.name} (${Date.now() - t0}ms): ${e instanceof Error ? e.message : String(e)}`);
       }
     }
     clearTimeout(forceExitTimer);

@@ -16,14 +16,13 @@ import {
   type BrowserToCli,
   type CliToBrowser,
   type EngineMethod,
-  type EngineRecentEvent,
   type EngineStateSnapshot,
 } from "@synesthetica/contracts";
 
 export type EngineCallHandler = (
   method: EngineMethod,
   args: readonly unknown[],
-) => Promise<EngineStateSnapshot | EngineRecentEvent[] | unknown>;
+) => Promise<unknown>;
 
 export interface WsReceiverOptions {
   /** WS URL — e.g. "ws://localhost:8765". */
@@ -94,7 +93,7 @@ export function startWsReceiver(opts: WsReceiverOptions): WsReceiverHandle {
     try {
       ws = new WebSocket(opts.url);
     } catch (err) {
-      log(`wsReceiver: cannot open ${opts.url}: ${err}`);
+      log(`wsReceiver: cannot open ${opts.url}: ${String(err)}`);
       scheduleReconnect();
       return;
     }

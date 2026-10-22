@@ -224,7 +224,7 @@ export class StubEngineHandle implements EngineHandle {
     // fresh session-ms reading.
     this.state.now =
       this.startedAtMs !== null ? Date.now() - this.startedAtMs : null;
-    const snapshot: EngineStateSnapshot = JSON.parse(JSON.stringify(this.state));
+    const snapshot = structuredClone(this.state);
     for (const cb of this.stateSubscribers) cb(snapshot);
     return snapshot;
   }

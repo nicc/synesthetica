@@ -101,9 +101,7 @@ export function buildPresetTools(store: PresetStore): ToolSpec[] {
           try {
             store.save(name, snapshot);
           } catch (e) {
-            throw new Error(
-              e instanceof Error ? e.message : String(e),
-            );
+            throw new Error(e instanceof Error ? e.message : String(e), { cause: e });
           }
           return engine.savePreset(name);
         });

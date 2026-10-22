@@ -13,7 +13,7 @@
  * and macros all flow through the same dispatch path.
  */
 
-import type { SceneFrame, MacroValue } from "@synesthetica/contracts";
+import type { SceneFrame, MacroValue, ModeId, PitchClass } from "@synesthetica/contracts";
 import {
   generatePanel,
   productionManifest,
@@ -224,8 +224,7 @@ async function applyEngineOp(
       engineState.session.mode = mode;
       if (pipeline) {
         if (tonic === null || mode === null) pipeline.setKey(null);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        else pipeline.setKey({ root: tonic as any, mode: mode as any });
+        else pipeline.setKey({ root: tonic as PitchClass, mode: mode as ModeId });
       }
       break;
     }
@@ -292,7 +291,9 @@ async function applyEngineOp(
     }
     case "getStateSnapshot":
     case "getRecentEvents":
-      // Read-only ops handled below.
+    case "getAvailableInputs":
+    case "clearRecentEvents":
+      // Answered by the WS dispatcher (mountWsReceiver) before reaching here.
       break;
   }
   // Refresh the panel widget for this id so LLM-driven changes appear
@@ -333,10 +334,10 @@ function collectCurrentPanelValues(): Record<string, number | string | boolean |
   // show the current running value. Fall back to intents when
   // effective is empty (compound macros don't appear in effective).
   for (const [id, v] of Object.entries(engineState.macros.effective)) {
-    values[id] = v as MacroValue;
+    values[id] = v;
   }
   for (const [id, v] of Object.entries(engineState.macros.intents)) {
-    if (!(id in values)) values[id] = v as MacroValue;
+    if (!(id in values)) values[id] = v;
   }
   return values;
 }
@@ -1078,7 +1079,6 @@ function captureFrame(): void {
     null,
     2,
   );
-  // eslint-disable-next-line no-console
   console.log("FRAME CAPTURE:\n" + json);
   navigator.clipboard.writeText(json).catch(() => {
     /* best effort */
@@ -1153,13 +1153,12 @@ async function queryPermissionsAndPublish(): Promise<void> {
     kind: "midi" | "audio",
     status: PermissionStatus,
   ): void => {
-    engineState.permissions[kind] = status.state as "granted" | "prompt" | "denied";
+    engineState.permissions[kind] = status.state;
     publishState();
   };
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const midiStatus = await perms.query({ name: "midi" as any });
+    const midiStatus = await perms.query({ name: "midi" });
     applyChange("midi", midiStatus);
     midiStatus.onchange = () => applyChange("midi", midiStatus);
   } catch {
@@ -1167,8 +1166,7 @@ async function queryPermissionsAndPublish(): Promise<void> {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const micStatus = await perms.query({ name: "microphone" as any });
+    const micStatus = await perms.query({ name: "microphone" });
     applyChange("audio", micStatus);
     micStatus.onchange = () => applyChange("audio", micStatus);
   } catch {

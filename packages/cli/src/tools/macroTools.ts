@@ -287,10 +287,10 @@ export const setHueForPitchTool: ToolSpec = {
     // each semitone rotates hue by +30° from A.
     // hue(pc) = referenceHue + (pc - HUE_ANCHOR_PC) * 30 (mod 360) in cw direction.
     // Solve: referenceHue = hue - (pc - HUE_ANCHOR_PC) * 30 (mod 360)
-    const rawAnchor = (hue as number) - ((pc as number) - HUE_ANCHOR_PC) * 30;
+    const rawAnchor = (hue) - ((pc as number) - HUE_ANCHOR_PC) * 30;
     const anchor = ((rawAnchor % 360) + 360) % 360;
     return safeCall(() =>
-      engine.setHueForPitch(pc as number, hue as number).then(() =>
+      engine.setHueForPitch(pc as number, hue).then(() =>
         engine.setMacro("system:colour-mapping:reference", anchor),
       ),
     );

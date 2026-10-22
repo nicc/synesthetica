@@ -127,7 +127,7 @@ export class SessionManager {
         );
       } catch (e) {
         this.log(
-          `pipeline-ready wait failed: ${e instanceof Error ? e.message : e}`,
+          `pipeline-ready wait failed: ${e instanceof Error ? e.message : String(e)}`,
         );
         throw e;
       }
@@ -175,7 +175,7 @@ export class SessionManager {
         this.log(`  ✓ ${name} (${Date.now() - t0}ms)`);
       } catch (e) {
         this.log(
-          `  ✗ ${name} (${Date.now() - t0}ms): ${e instanceof Error ? e.message : e}`,
+          `  ✗ ${name} (${Date.now() - t0}ms): ${e instanceof Error ? e.message : String(e)}`,
         );
       }
     }
