@@ -27,16 +27,21 @@ import {
   type AvailableInput,
   type MacroValue,
 } from "@synesthetica/contracts";
-import type { EngineHandle, Unsubscribe } from "./engineHandle.js";
+import { EngineDisconnectedError, type EngineHandle, type Unsubscribe } from "./engineHandle.js";
 import { LOOPBACK_HOST, isLoopbackOrigin } from "../loopback.js";
 
 const CALL_TIMEOUT_MS = 5_000;
+/** How long a disconnected tab gets to reconnect (e.g. a page reload)
+ *  before calls fail with EngineDisconnectedError. */
 const RECONNECT_GRACE_MS = 2_000;
+
 
 export interface WsBridgeOptions {
   port: number;
   /** Called for every stderr-worthy line. */
   log?: (line: string) => void;
+  /** Override RECONNECT_GRACE_MS (tests). */
+  reconnectGraceMs?: number;
 }
 
 export interface WsBridgeHandle {
@@ -57,6 +62,10 @@ export interface WsBridgeHandle {
 interface BridgeConnection {
   label: string;
   ws: WebSocket;
+  /** True while `ws` is open. The connection record (and its last
+   *  snapshot) outlives the socket so a reconnect can reuse it, but
+   *  nothing is served from a closed tab's state. */
+  open: boolean;
   state: EngineStateSnapshot;
   events: EngineRecentEvent[];
   eventCap: number;
@@ -134,11 +143,13 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
           // Reconnect — replace the socket, reset ready flag until
           // the browser re-signals (a fresh tab is a fresh init).
           existing.ws = ws;
+          existing.open = true;
           existing.pipelineReady = false;
         } else {
           connections.set(label, {
             label,
             ws,
+            open: true,
             state: emptyState(label),
             events: [],
             eventCap: 1000,
@@ -179,11 +190,14 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
     });
 
     ws.on("close", () => {
-      if (label !== null) {
-        log(`wsBridge: '${label}' disconnected`);
-        // Leave conn.state in place so late reads/subscribers see the
-        // last-known snapshot. Handle stays alive; reconnection reuses it.
-      }
+      if (label === null) return;
+      const conn = connections.get(label);
+      // A socket already replaced by a reconnect closing late changes nothing.
+      if (!conn || conn.ws !== ws) return;
+      conn.open = false;
+      conn.pipelineReady = false;
+      handles.get(label)?.notifyDisconnected();
+      log(`wsBridge: '${label}' disconnected`);
     });
   });
 
@@ -192,7 +206,7 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
     handleFor(label) {
       let handle = handles.get(label);
       if (!handle) {
-        handle = new WSBackedEngineHandle(label, {
+        handle = new WSBackedEngineHandle(label, opts.reconnectGraceMs ?? RECONNECT_GRACE_MS, {
           getConnection: () => connections.get(label) ?? null,
           sendCall: (ws, msg, id) => {
             const table = pendingByConn.get(ws);
@@ -299,24 +313,44 @@ class WSBackedEngineHandle implements EngineHandle {
 
   private nextCallId = 1;
   private subscribers: Array<(s: EngineStateSnapshot) => void> = [];
-  private waitConnected: Promise<void>;
-  private resolveConnected!: () => void;
+  /** Callers parked in awaitConnected, resolved on the next connect. */
+  private connectWaiters: Array<() => void> = [];
 
-  constructor(label: string, private deps: WsBridgeDeps) {
+  constructor(
+    label: string,
+    private readonly reconnectGraceMs: number,
+    private deps: WsBridgeDeps,
+  ) {
     this.label = label;
-    this.waitConnected = new Promise((resolve) => {
-      this.resolveConnected = resolve;
-    });
-    // If already connected (rare race), resolve immediately.
-    if (deps.getConnection()) {
-      this.status = "running";
-      this.resolveConnected();
-    }
+    // If already connected (rare race), mark running immediately.
+    if (deps.getConnection()?.open) this.status = "running";
   }
 
   notifyConnected(): void {
     this.status = "running";
-    this.resolveConnected();
+    const waiters = this.connectWaiters;
+    this.connectWaiters = [];
+    for (const resolve of waiters) resolve();
+  }
+
+  notifyDisconnected(): void {
+    if (this.status === "running") this.status = "starting";
+  }
+
+  /** True when a tab is connected now, or connects within `timeoutMs`. */
+  awaitConnected(timeoutMs: number = this.reconnectGraceMs): Promise<boolean> {
+    if (this.deps.getConnection()?.open) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const onConnect = () => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      const timer = setTimeout(() => {
+        this.connectWaiters = this.connectWaiters.filter((w) => w !== onConnect);
+        resolve(false);
+      }, timeoutMs);
+      this.connectWaiters.push(onConnect);
+    });
   }
 
   markClosed(): void {
@@ -361,6 +395,7 @@ class WSBackedEngineHandle implements EngineHandle {
   }
 
   async getStateSnapshot(): Promise<EngineStateSnapshot> {
+    if (!(await this.awaitConnected())) throw new EngineDisconnectedError(this.label);
     const conn = this.deps.getConnection();
     if (conn) {
       // The cached snapshot's `now` is from the last state-changed
@@ -398,19 +433,10 @@ class WSBackedEngineHandle implements EngineHandle {
 
   private async call(method: EngineMethod, args: readonly unknown[]): Promise<unknown> {
     if (this.status === "stopping") throw new Error("engine handle closed");
-    // Wait for connection, with a grace period so early calls don't
-    // immediately fail if the browser hasn't opened its socket yet.
-    await Promise.race([
-      this.waitConnected,
-      new Promise<void>((_, reject) =>
-        setTimeout(
-          () => reject(new Error(`no browser connection for '${this.label}' within ${RECONNECT_GRACE_MS}ms`)),
-          RECONNECT_GRACE_MS,
-        ),
-      ),
-    ]);
+    // A tab that is loading or reloading gets the grace period to connect.
+    if (!(await this.awaitConnected())) throw new EngineDisconnectedError(this.label);
     const conn = this.deps.getConnection();
-    if (!conn) throw new Error(`no browser connection for '${this.label}'`);
+    if (!conn?.open) throw new EngineDisconnectedError(this.label);
     const id = this.nextCallId++;
     const msg: EngineCallMessage = { type: "call", id, method, args };
     return this.deps.sendCall(conn.ws, msg, id);

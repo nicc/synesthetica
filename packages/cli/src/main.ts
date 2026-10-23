@@ -12,6 +12,7 @@
  * server — kept for standalone smoke testing without an LLM client.
  */
 
+import { createRequire } from "node:module";
 import { parseArgs, helpText, type StartOptions } from "./args.js";
 import { startMcpServer } from "./mcpServer.js";
 import { createPresetStore } from "./presets/presetStore.js";
@@ -21,7 +22,10 @@ import { startWsBridge, type WsBridgeHandle } from "./engine/wsBridge.js";
 import { SessionManager } from "./session/sessionManager.js";
 
 const SERVER_NAME = "synesthetica";
-const SERVER_VERSION = "0.1.0";
+/** Reported to MCP clients. Read from the package's own package.json
+ *  (one level above dist/, in the repo and in the published tarball)
+ *  so it can't drift from the released version. */
+const SERVER_VERSION = (createRequire(import.meta.url)("../package.json") as { version: string }).version;
 
 /**
  * Short server-level primer set as the MCP `initialize` response's

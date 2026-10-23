@@ -15,10 +15,7 @@
 
 import type { ToolSpec } from "./sessionTools.js";
 import type { SessionManager } from "../session/sessionManager.js";
-
-function err(code: string, message: string, details?: unknown) {
-  return { ok: false as const, error: { code, message, ...(details ? { details } : {}) } };
-}
+import { engineError } from "./toolResult.js";
 
 function shape<T>(session: SessionManager, data?: T) {
   // Session-lifecycle tools return a stub-shaped `state` because the
@@ -81,10 +78,7 @@ export function buildLifecycleTools(session: SessionManager): ToolSpec[] {
         }
         return shape(session, summary);
       } catch (e) {
-        return err(
-          "ENGINE_ERROR",
-          `failed to start session: ${e instanceof Error ? e.message : String(e)}`,
-        );
+        return engineError(e, "failed to start session");
       }
     },
   };
@@ -106,10 +100,7 @@ export function buildLifecycleTools(session: SessionManager): ToolSpec[] {
         await session.stop();
         return shape(session);
       } catch (e) {
-        return err(
-          "ENGINE_ERROR",
-          `failed to stop session: ${e instanceof Error ? e.message : String(e)}`,
-        );
+        return engineError(e, "failed to stop session");
       }
     },
   };

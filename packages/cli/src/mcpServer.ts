@@ -445,25 +445,18 @@ export async function startMcpServer(
     if (requiresSession) {
       const engine = config.session.getEngine();
       if (!engine) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(
-                {
-                  ok: false,
-                  error: {
-                    code: "ENGINE_NOT_STARTED",
-                    message: `no session running for '${config.session.instanceLabel}'. Call start_session first.`,
-                  },
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-          isError: true,
-        };
+        return toolError(
+          "ENGINE_NOT_STARTED",
+          `no session running for '${config.session.instanceLabel}'. Call start_session first.`,
+        );
+      }
+      // A running session whose tab is gone has no state to report;
+      // say so rather than answer from the closed tab's last snapshot.
+      if (!(await engine.awaitConnected())) {
+        return toolError(
+          "ENGINE_DISCONNECTED",
+          `the visualiser tab for '${config.session.instanceLabel}' isn't connected (closed or crashed). Call start_session to reopen it.`,
+        );
       }
       engineForTool = engine;
     } else {
@@ -503,6 +496,19 @@ export async function startMcpServer(
   };
 }
 
+/** An MCP tool result carrying a SPEC_015 error. */
+function toolError(code: string, message: string) {
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify({ ok: false, error: { code, message } }, null, 2),
+      },
+    ],
+    isError: true,
+  };
+}
+
 /**
  * A live-lookup EngineHandle that reads from SessionManager at call
  * time. When no session is running, each engine method throws with
@@ -533,6 +539,7 @@ function buildSessionEngineProxy(session: SessionManager): EngineHandle {
           return "starting" as const;
       }
     },
+    awaitConnected: async (timeoutMs) => (await session.getEngine()?.awaitConnected(timeoutMs)) ?? false,
     setMacro: async () => notStarted(),
     setKey: async () => notStarted(),
     setTempo: async () => notStarted(),

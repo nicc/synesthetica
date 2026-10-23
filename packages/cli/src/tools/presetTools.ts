@@ -12,20 +12,14 @@
 import type { EngineStateSnapshot } from "@synesthetica/contracts";
 import type { ToolSpec } from "./sessionTools.js";
 import type { PresetStore } from "../presets/presetStore.js";
-
-type ToolResult =
-  | { ok: true; state: EngineStateSnapshot }
-  | { ok: false; error: { code: string; message: string; details?: unknown } };
-
-function err(code: string, message: string, details?: unknown): ToolResult {
-  return { ok: false, error: { code, message, ...(details ? { details } : {}) } };
-}
+import { engineError, err } from "./toolResult.js";
+import type { ToolResult } from "./toolResult.js";
 
 async function safeCall(fn: () => Promise<EngineStateSnapshot>): Promise<ToolResult> {
   try {
     return { ok: true, state: await fn() };
   } catch (e) {
-    return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
+    return engineError(e);
   }
 }
 
@@ -70,10 +64,7 @@ export function buildPresetTools(store: PresetStore): ToolSpec[] {
           const finalState = await engine.switchPreset(name);
           return { ok: true, state: finalState };
         } catch (e) {
-          return err(
-            "ENGINE_ERROR",
-            e instanceof Error ? e.message : String(e),
-          );
+          return engineError(e);
         }
       },
     },
@@ -134,10 +125,7 @@ export function buildPresetTools(store: PresetStore): ToolSpec[] {
             });
           }
         } catch (e) {
-          return err(
-            "ENGINE_ERROR",
-            e instanceof Error ? e.message : String(e),
-          );
+          return engineError(e);
         }
         // Return the current engine state so the LLM has an updated
         // snapshot in the same round-trip. activePreset intentionally

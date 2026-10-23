@@ -316,3 +316,52 @@ describe("wsBridge — protocol guardrails", () => {
     expect(ws.readyState).toBe(WebSocket.CLOSED);
   });
 });
+
+describe("wsBridge — closed tab", () => {
+  const GRACE_MS = 50;
+  let graceBridge: WsBridgeHandle;
+
+  beforeEach(async () => {
+    // Replace the default bridge with one whose reconnect grace is short.
+    await bridge.close();
+    bridge = graceBridge = await startWsBridge({ port: 0, log: onLog, reconnectGraceMs: GRACE_MS });
+  });
+
+  async function disconnect(ws: WebSocket, label: string): Promise<void> {
+    const gone = logged(new RegExp(`'${label}' disconnected`));
+    ws.close();
+    await gone;
+  }
+
+  it("doesn't report a closed tab's last state as current", async () => {
+    const handle = graceBridge.handleFor("default");
+    const ws = await connectAs("default");
+    await disconnect(ws, "default");
+
+    await expect(handle.getStateSnapshot()).rejects.toMatchObject({ code: "ENGINE_DISCONNECTED" });
+    await expect(handle.setTempo(120)).rejects.toMatchObject({ code: "ENGINE_DISCONNECTED" });
+    expect(await handle.awaitConnected()).toBe(false);
+  });
+
+  it("serves state again once a tab reconnects within the grace period", async () => {
+    const handle = graceBridge.handleFor("default");
+    await disconnect(await connectAs("default"), "default");
+
+    const pending = handle.awaitConnected(1_000);
+    const ws = await connectAs("default");
+    expect(await pending).toBe(true);
+    await expect(handle.getStateSnapshot()).resolves.toMatchObject({ instance: "default" });
+    ws.close();
+  });
+
+  it("ignores a replaced socket closing after its replacement connected", async () => {
+    const handle = graceBridge.handleFor("default");
+    const oldWs = await connectAs("default");
+    const newWs = await connectAs("default");
+    oldWs.close();
+    await new Promise<void>((resolve) => oldWs.once("close", () => resolve()));
+
+    expect(await handle.awaitConnected(0)).toBe(true);
+    newWs.close();
+  });
+});

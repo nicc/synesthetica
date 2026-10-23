@@ -32,15 +32,10 @@ import type {
 } from "@synesthetica/contracts";
 import { productionManifest as manifest } from "@synesthetica/contracts";
 import type { ToolSpec } from "./sessionTools.js";
+import { engineError, err } from "./toolResult.js";
+import type { ToolResult } from "./toolResult.js";
 
 type ToolInput = Record<string, unknown>;
-type ToolResult =
-  | { ok: true; state: EngineStateSnapshot }
-  | { ok: false; error: { code: string; message: string; details?: unknown } };
-
-function err(code: string, message: string, details?: unknown): ToolResult {
-  return { ok: false, error: { code, message, ...(details ? { details } : {}) } };
-}
 
 // Build a fast lookup from macro id → annotation, at module load.
 const macroById: Map<string, MacroAnnotation> = new Map(
@@ -125,7 +120,7 @@ async function safeCall(fn: () => Promise<EngineStateSnapshot>): Promise<ToolRes
   try {
     return { ok: true, state: await fn() };
   } catch (e) {
-    return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
+    return engineError(e);
   }
 }
 

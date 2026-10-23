@@ -38,6 +38,7 @@ Stable enumeration. Adding a code = updating this spec + the tool.
 | `TOOL_UNKNOWN` | Client called a tool name the server doesn't advertise. Server-side; primarily defensive. | — |
 | `ENGINE_ERROR` | The underlying engine handle rejected (WS transport failure, browser-side throw, filesystem error for presets, etc.). Message forwards the underlying reason. | — |
 | `ENGINE_NOT_STARTED` | Tool with `requiresSession` needs a running pipeline, but no session is active. LLM should call `start_session` first. Message includes the instance label. Not emitted by `get_started`, `start_session`, or `stop_session`. | — |
+| `ENGINE_DISCONNECTED` | A session is running but no visualiser tab is connected to it (closed, crashed, or not reconnected within the 2 s reload grace). The CLI holds no current state in that case and does not report the closed tab's last snapshot. LLM should call `start_session`, which reopens the tab, then re-issue the call. Emitted by the MCP session gate and by engine calls that lose the tab mid-call. | — |
 
 ### Session control tools
 
@@ -104,7 +105,7 @@ Codes are stable across releases. Message text may vary. The LLM should:
 2. Use `details.available` (when present) as candidates to retry with — e.g. `MACRO_UNKNOWN` with `details.available` lets the LLM pick a nearest match.
 3. Fall back to reading the message when no code fits (only `ENGINE_ERROR` today).
 4. Surface `SCHEMA_INVALID` back to the user (usually indicates the LLM built a malformed call — self-correct and retry).
-5. Respond to `ENGINE_NOT_STARTED` by calling `start_session` and then re-issuing the original tool call. Do NOT ask the user for permission first unless the request was clearly non-musical.
+5. Respond to `ENGINE_NOT_STARTED` or `ENGINE_DISCONNECTED` by calling `start_session` and then re-issuing the original tool call. Do NOT ask the user for permission first unless the request was clearly non-musical.
 
 ## New codes
 

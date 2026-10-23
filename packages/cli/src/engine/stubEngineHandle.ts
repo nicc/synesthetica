@@ -21,6 +21,8 @@ export interface StubOptions {
 export class StubEngineHandle implements EngineHandle {
   readonly label: string;
   status: "starting" | "running" | "stopping" | "error" = "running";
+  /** Test control: whether a (pretend) browser tab is connected. */
+  connected = true;
 
   private state: EngineStateSnapshot;
   private events: EngineRecentEvent[] = [];
@@ -212,6 +214,10 @@ export class StubEngineHandle implements EngineHandle {
   }
 
   // ---- lifecycle ----
+  async awaitConnected(): Promise<boolean> {
+    return this.connected;
+  }
+
   async close(): Promise<void> {
     this.status = "stopping";
     this.stateSubscribers = [];

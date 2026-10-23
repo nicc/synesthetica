@@ -33,6 +33,13 @@ export interface EngineHandle {
   readonly label: string;
   readonly status: "starting" | "running" | "stopping" | "error";
 
+  /**
+   * True when a browser tab is connected to this engine now, or
+   * connects within the timeout (a reload gets a short grace period).
+   * False means the session is running but its tab is gone.
+   */
+  awaitConnected(timeoutMs?: number): Promise<boolean>;
+
   // -- Aesthetic macros --
   setMacro(name: string, value: MacroValue): Promise<EngineStateSnapshot>;
 
@@ -72,4 +79,16 @@ export interface EngineHandle {
 
   // -- Lifecycle --
   close(): Promise<void>;
+}
+
+/**
+ * The session is running but no browser tab is connected to it: the tab
+ * was closed, crashed, or never reconnected. The MCP layer reports this
+ * as ENGINE_DISCONNECTED; start_session reopens the tab.
+ */
+export class EngineDisconnectedError extends Error {
+  readonly code = "ENGINE_DISCONNECTED";
+  constructor(label: string) {
+    super(`the visualiser tab for '${label}' isn't connected (closed or crashed). Call start_session to reopen it.`);
+  }
 }

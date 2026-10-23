@@ -31,10 +31,7 @@ import {
   composeSystemOverview,
   computePrimerToken,
 } from "../resources/promptResources.js";
-
-function err(code: string, message: string, details?: unknown) {
-  return { ok: false as const, error: { code, message, ...(details ? { details } : {}) } };
-}
+import { engineError, err } from "./toolResult.js";
 
 /**
  * get_started — returns the full Synesthetica primer as text. Advertised
@@ -76,7 +73,7 @@ export const getStartedTool: ToolSpec = {
         data: { primer, token },
       };
     } catch (e) {
-      return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
+      return engineError(e);
     }
   },
 };
@@ -126,7 +123,7 @@ export const getStateTool: ToolSpec = {
       const state = await engine.getStateSnapshot();
       return { ok: true as const, state };
     } catch (e) {
-      return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
+      return engineError(e);
     }
   },
 };
@@ -150,7 +147,7 @@ export const listInputsTool: ToolSpec = {
       ]);
       return { ok: true as const, state, data: inputs };
     } catch (e) {
-      return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
+      return engineError(e);
     }
   },
 };
@@ -186,7 +183,7 @@ export const getRecentEventsTool: ToolSpec = {
       ]);
       return { ok: true as const, state, data: envelope };
     } catch (e) {
-      return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
+      return engineError(e);
     }
   },
 };
@@ -207,7 +204,7 @@ export const clearRecentEventsTool: ToolSpec = {
       const state = await engine.clearRecentEvents();
       return { ok: true as const, state };
     } catch (e) {
-      return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
+      return engineError(e);
     }
   },
 };
@@ -230,7 +227,7 @@ export function buildReadTools(presetStore: PresetStore): ToolSpec[] {
         const presets = presetStore.listWithMeta();
         return { ok: true as const, state, data: presets };
       } catch (e) {
-        return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
+        return engineError(e);
       }
     },
   };
@@ -265,7 +262,7 @@ export function buildReadTools(presetStore: PresetStore): ToolSpec[] {
         const state = await engine.getStateSnapshot();
         return { ok: true as const, state, data: content };
       } catch (e) {
-        return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
+        return engineError(e);
       }
     },
   };

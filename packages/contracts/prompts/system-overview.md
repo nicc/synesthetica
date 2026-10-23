@@ -55,7 +55,7 @@ The visualiser pipeline sits behind explicit tools:
 - **`start_session`** — spawn the visualiser. Call when the user signals musical intent (mentions playing, an instrument, tempo, rhythm, harmony). Idempotent — a no-op if a session is running.
 - **`stop_session`** — tear it down. Call when the user says they're done (thanks / that's it / stop / close). Idempotent.
 
-Every setter tool (`set_macro`, `set_key`, etc.) and every reader tool (`get_state`, `get_recent_events`) requires a running session. Calling them cold returns `ENGINE_NOT_STARTED` — the LLM's cue to call `start_session` first and re-issue the original request. Standard flow for a musical request is: call `get_started` (once per conversation) → call `start_session` → user picks an input via `set_input` → do the requested work.
+Every setter tool (`set_macro`, `set_key`, etc.) and every reader tool (`get_state`, `get_recent_events`) requires a running session. Calling them cold returns `ENGINE_NOT_STARTED` — the LLM's cue to call `start_session` first and re-issue the original request. If the user closes the visualiser tab, the session keeps running but tools return `ENGINE_DISCONNECTED`; `start_session` reopens the tab. Standard flow for a musical request is: call `get_started` (once per conversation) → call `start_session` → user picks an input via `set_input` → do the requested work.
 
 `state.session.phase` distinguishes three lifecycle states:
 - **`no-session`** — pipeline hasn't started; call `start_session`.

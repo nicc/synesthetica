@@ -19,19 +19,10 @@
 
 import type { EngineHandle } from "../engine/engineHandle.js";
 import type { EngineStateSnapshot } from "@synesthetica/contracts";
+import { engineError, err } from "./toolResult.js";
+import type { ToolResult } from "./toolResult.js";
 
 type ToolInput = Record<string, unknown>;
-/**
- * Uniform success/failure shape every tool returns.
- *
- * Setters populate `state` (the post-call snapshot). Read tools may
- * additionally populate `data` with the read payload (device list,
- * preset list, etc.). `get_state` uses `state` alone since it IS
- * the state. Failure carries a stable `code` + human message.
- */
-type ToolResult =
-  | { ok: true; state: EngineStateSnapshot; data?: unknown }
-  | { ok: false; error: { code: string; message: string; details?: unknown } };
 
 export interface ToolSpec {
   name: string;
@@ -53,10 +44,6 @@ export interface ToolSpec {
 // Validation helpers
 // ============================================================================
 
-function err(code: string, message: string, details?: unknown): ToolResult {
-  return { ok: false, error: { code, message, ...(details ? { details } : {}) } };
-}
-
 async function safeCall(
   fn: () => Promise<EngineStateSnapshot>,
 ): Promise<ToolResult> {
@@ -64,10 +51,7 @@ async function safeCall(
     const state = await fn();
     return { ok: true, state };
   } catch (e) {
-    return err(
-      "ENGINE_ERROR",
-      e instanceof Error ? e.message : String(e),
-    );
+    return engineError(e);
   }
 }
 
