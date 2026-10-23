@@ -106,9 +106,10 @@ This ensures documentation reflects actual project state, not assumptions.
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
 2. **Run quality gates** (if code changed):
    ```bash
-   npm run lint        # Linting
-   npm test -ws        # Tests
-   npm run build -ws   # Build
+   npm run build                # Build (type-checks src of contracts/adapters/engine/cli)
+   npm run typecheck            # Type-check web-app and every package's tests
+   npm test                     # Tests (all packages, one vitest run)
+   npm run lint                 # Linting
    ```
 3. **Update issue status** - Close finished work, update in-progress items
 4. **PUSH TO REMOTE** - This is MANDATORY:
@@ -225,13 +226,21 @@ npm run lint        # Check for issues
 npm run lint:fix    # Auto-fix where possible
 ```
 
-**Key rules enforced:**
-- **Contracts discipline**: All types come from `@synesthetica/contracts`, not internal paths
-- **Type-only imports**: Use `import type { ... }` for types (enforced by `consistent-type-imports`)
-- **No unused vars**: Except those prefixed with `_` (convention for intentionally unused)
-- **No debugger statements**: Remove before commit
+ESLint 10 flat config (`eslint.config.mjs`) with typescript-eslint's type-checked rules. Typed linting takes ~10s.
 
-**If lint fails:** Fix the issues before pushing. Most are auto-fixable with `npm run lint:fix`.
+**Principles enforced by lint** (each rule block in the config names what it encodes):
+- **Engine data flow (SPEC_008)**: stabilizers, vocabularies, lenses and renderers may not import the layers they don't consume; stabilizers and vocabularies don't import `three`; lenses and renderers don't import `tonal` (I4)
+- **I14**: lenses don't import `pcToHue`; they receive hue from the vocabulary
+- **Determinism and purity**: no `Math.random`, `Date.now`, `performance.now` or browser globals in stabilizers, vocabularies or lenses
+- **Contracts discipline**: contracts imports no other package; adapters don't depend on the engine; no imports of another package's `src/` or `dist/`
+- **No deprecated APIs or shims** (`no-deprecated`), exhaustive switches over unions, no floating promises
+- **Tests**: no `.only`/`.skip`, every test asserts something (helpers named `expect*`/`assert*` count), no `console`
+
+**Exemptions** are `eslint-disable-next-line` comments that state the reason and cite the beads issue that removes them. `reportUnusedDisableDirectives` flags any that no longer apply.
+
+**Enforced by the compiler instead** (`tsconfig.base.json`): strict mode, `exactOptionalPropertyTypes`, unused locals/parameters, `verbatimModuleSyntax` (type-only imports), `noImplicitOverride`, `noImplicitReturns`.
+
+**If lint fails:** Fix the issues before pushing. Many are auto-fixable with `npm run lint:fix`.
 
 ## Testing Conventions
 
@@ -242,10 +251,24 @@ npm run lint:fix    # Auto-fix where possible
 - Test transformation logic with mocks, not browser environments
 - Keep tests fast — if it needs a browser, it's probably an integration test
 
+**Rules.** A test protects a behaviour; it should survive a retune of a default and fail when the behaviour breaks.
+1. **Import tunables; never retype them.** If a test needs `NOW_LINE_Y`, export it and assert the relationship (`NOW_LINE_Y - age / HISTORY_MS * NOW_LINE_Y`), not `0.85`. A retyped literal fails on every retune and checks nothing the constant doesn't already say.
+2. **Assert properties over values.** Orderings, monotonicity, bounds and ratios (louder is higher; maj < dom7 < dim7 tension) encode the perceptual claim. Today's number does not.
+3. **When a property needs a specific value, set it in the test.** Pass explicit config rather than relying on a default.
+4. **Derive timing from config.** `t + cfg.hysteresisMs + 1`, not `t + 100`; a fixed offset only works while it exceeds the current default.
+5. **Defaults are checked in one place.** `wiringCoverage.test.ts` checks every manifest default against its consumer. Don't pin defaults elsewhere.
+6. **Every test must be able to fail.** No `expect(true)`, no `toBeDefined` as the only assertion, no counts that always-present entities (the now-line, labels) satisfy on their own.
+7. **Mocked renderer tests assert observable state** — objects created, reused and removed; values derived from the entity. "Doesn't throw" is not a test.
+8. **Goldens are for contract and protocol shapes**, compared on the fields that matter (not provenance or versions). A missing fixture directory is an error.
+9. **SVG snapshots are review artefacts, not tests.** They live in `test/**/*.snapshot.ts`, run with `npm run snapshots`, and are not part of `npm test`. Prototypes are scripts, not test files.
+10. **Socket tests wait on events, not sleeps.**
+11. **No `console.log` in tests.** Write diagnostics to a snapshot or a script.
+
 **Current patterns:**
 - `MidiSource` interface allows testing `MidiAdapter` without Web MIDI API
 - Tests live in `packages/<pkg>/test/` mirroring `src/` structure
-- Run with `npm test` (per-package) or `npm test -ws` (all packages)
+- `npm test` at the root runs every package in one vitest process (`vitest.workspace.ts`); `npm test` inside a package runs just that package
+- `AudioDetectionTracker.test.ts` is the model for timing tests: every timestamp is derived from the config under test
 
 **What we don't have yet:**
 - Golden tests for visual output (planned: synesthetica-901)
@@ -274,6 +297,8 @@ RFCs are for discovery and exploration. Specs are the source of truth. When you 
 - Does this change implement something a spec describes differently? → Update the spec
 - Does this introduce a new pattern or concept? → Consider a new spec
 - Does this remove functionality a spec describes? → Update or retire the spec
+
+**Mechanical check:** `npm run check:specs` (part of `npm run lint`) fails if a spec names a `packages/...` path or a pipeline type that doesn't exist, or uses a retired term (grammar, ruleset). It can't tell whether a spec's prose matches behaviour; that is still on you.
 
 **Spec locations:**
 - `specs/SPEC_*.md` — Approved architectural decisions
@@ -337,8 +362,8 @@ ls <affected-directory>                                   # Verify structure is 
 
 **Verification checklist template:**
 ```
-1. Code compiles: npm run build -ws
-2. Tests pass: npm test -ws
+1. Code compiles: npm run build && npm run typecheck
+2. Tests pass: npm test
 3. Lint passes: npm run lint
 4. No stale references: grep -ri "<old-term>" --include="*.ts" --include="*.md"
 5. Folder structure makes sense: ls <affected-directories>

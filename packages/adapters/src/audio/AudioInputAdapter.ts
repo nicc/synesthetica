@@ -97,11 +97,12 @@ export interface AudioInputAdapterConfig {
    * to that device via `deviceId: { exact: ... }`. When omitted, the
    * browser picks the default input.
    */
-  deviceId?: string;
+  deviceId?: string | undefined;
 
   /**
    * URL of the Basic Pitch model JSON (model.json). The InferenceWorker
-   * fetches this via tf.loadGraphModel.
+   * fetches this via tf.loadGraphModel. A relative URL is resolved
+   * against the page (see resolveAgainstPage).
    */
   modelUrl: string;
 
@@ -207,7 +208,7 @@ export class AudioInputAdapter implements IRawSourceAdapter {
     this.config = {
       ...DEFAULT_CONFIG,
       ...config,
-    } as Required<AudioInputAdapterConfig>;
+    };
     this.source = this.config.sourceId;
     this.stream = this.config.streamId;
   }
@@ -287,7 +288,7 @@ export class AudioInputAdapter implements IRawSourceAdapter {
       ring: ringHandles,
       sampleRate: SAMPLE_RATE,
       hopMs: this.config.hopMs,
-      modelUrl: this.config.modelUrl,
+      modelUrl: resolveAgainstPage(this.config.modelUrl),
       onsetThreshold: this.config.onsetThreshold,
       frameThreshold: this.config.frameThreshold,
       minNoteLengthFrames: this.config.minNoteLengthFrames,
@@ -301,7 +302,7 @@ export class AudioInputAdapter implements IRawSourceAdapter {
     // 5. Stream worker events into the pending input buffer. The
     // ready/error handler above already removed itself; this listener
     // handles per-event traffic going forward.
-    this.worker.addEventListener("message", (event) =>
+    this.worker.addEventListener("message", (event: MessageEvent<WorkerToMain>) =>
       this.onWorkerEvent(event.data),
     );
 
@@ -361,7 +362,6 @@ export class AudioInputAdapter implements IRawSourceAdapter {
       event.type !== "ready" &&
       event.type !== "error"
     ) {
-      // eslint-disable-next-line no-console
       console.debug("[audio-adapter]", event);
     }
     switch (event.type) {
@@ -414,4 +414,14 @@ export class AudioInputAdapter implements IRawSourceAdapter {
 
 function msToSamples(ms: number): number {
   return Math.round((ms / 1000) * SAMPLE_RATE);
+}
+
+/**
+ * Make a URL absolute against the current page before handing it to the
+ * worker. A worker resolves relative URLs against its own script URL, so
+ * "./models/…" from a page at "/" would be fetched as "/assets/models/…"
+ * once the worker is bundled under assets/.
+ */
+export function resolveAgainstPage(url: string, base: string = globalThis.location.href): string {
+  return new URL(url, base).href;
 }

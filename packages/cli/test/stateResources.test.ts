@@ -36,7 +36,7 @@ describe("state://<label>/current — reads live state", () => {
 describe("state://<label>/recent-events — envelope + pull-only query", () => {
   it("returns events up to limit (default 100) wrapped in temporal envelope", async () => {
     const engine = new StubEngineHandle();
-    for (let i = 0; i < 5; i++) engine.injectEvent("note-on", { pitch: 60 + i });
+    for (let i = 0; i < 5; i++) engine.injectEvent("note-on");
     const recent = buildStateResources(engine)[1];
     const envelope = JSON.parse(await recent.read());
     expect(envelope.events).toHaveLength(5);
@@ -75,7 +75,7 @@ describe("state://<label>/recent-events — envelope + pull-only query", () => {
   it("envelope populates startedAt + now once a session is marked started", async () => {
     const engine = new StubEngineHandle();
     engine.startSession(1_700_000_000_000);
-    engine.injectEvent("note-on", { pitch: 60 });
+    engine.injectEvent("note-on");
     const recent = buildStateResources(engine)[1];
     const envelope = JSON.parse(await recent.read());
     expect(envelope.startedAt).toBe(new Date(1_700_000_000_000).toISOString());

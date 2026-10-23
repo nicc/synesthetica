@@ -26,8 +26,8 @@ Invariants ensure:
 |----|-----------|---------|
 | I1 | **Same vocabulary consumes MusicalFrame regardless of source** | Whether input comes from MIDI or audio, the same vocabulary processes the same MusicalFrame structure. Only confidence differs, not structure. |
 | I2 | **Pitch-class → hue mapping is deterministic** | Given a named `PitchHueInvariant`, the same pitch always produces the same hue. See [SPEC_002](SPEC_002_pitch_class_hue_mapping.md). |
-| I3 | **Meaning lives in vocabularies, not lenses** | Vocabularies interpret musical events into intents. Lenses only determine visual form. |
-| I4 | **Lenses may not compute musical semantics** | Lenses cannot infer pitch, chords, beats, or any musical meaning. They consume pre-computed intents. |
+| I3 | **Meaning lives in vocabularies, not lenses** | Vocabularies annotate musical elements with visual meaning. Lenses consume stabilizer-derived analysis and vocabulary annotations through the AnnotatedMusicalFrame and determine visual form; they do not compute analysis themselves (I4). |
+| I4 | **Lenses may not compute musical semantics** | Lenses cannot infer pitch, chords, beats, or any musical meaning. They consume analysis pre-computed by stabilizers (e.g. `harmonicContext`) and annotations from the vocabulary. |
 | I5 | **Confidence/entropy affects stability, not meaning** | Low confidence produces visual noise/jitter, but the underlying musical interpretation is unchanged. |
 
 ### Parts and Routing (RFC 003)
@@ -81,10 +81,10 @@ Define mandatory visual mappings that encode musical meaning for ear training.
 
 ## What Lenses MAY Do
 
-- Emit and evolve entities (respond to palette intents, fade trails, apply decay)
-- Interpret intents and event timing (beat/chord spans)
+- Emit and evolve entities (respond to palette annotations, fade trails, apply decay)
+- Interpret annotations and event timing (beat/chord spans)
 - React to uncertainty (more jitter/blur/fuzz)
-- Adjust saturation, brightness, opacity based on intents
+- Adjust saturation, brightness, opacity based on annotations
 - Use per-lens parameters within their schema
 
 ## What Lenses MUST NOT Do
@@ -100,7 +100,7 @@ Define mandatory visual mappings that encode musical meaning for ear training.
 
 Invariants are enforced through:
 1. **Type system** — interfaces constrain what data flows where
-2. **API design** — lenses receive VisualIntentFrame, not MusicalFrame
+2. **API design** — lenses receive AnnotatedMusicalFrame, not RawInputFrame
 3. **Code review** — new lenses are validated against this spec
 4. **Testing** — golden tests verify invariant preservation
 
@@ -108,7 +108,8 @@ Invariants are enforced through:
 
 - Raw input types: `packages/contracts/raw/raw.ts`
 - Musical abstractions: `packages/contracts/musical/musical.ts`
-- Visual intent types: `packages/contracts/intents/intents.ts`
+- Visual annotations: `packages/contracts/annotated/annotated.ts`
+- Colour types and pitch-hue mapping: `packages/contracts/intents/colors.ts`
 - Pipeline interfaces: `packages/contracts/pipeline/interfaces.ts`
 - Part types: `packages/contracts/parts/parts.ts`
 

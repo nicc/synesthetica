@@ -16,14 +16,13 @@ import {
   type BrowserToCli,
   type CliToBrowser,
   type EngineMethod,
-  type EngineRecentEvent,
   type EngineStateSnapshot,
 } from "@synesthetica/contracts";
 
 export type EngineCallHandler = (
   method: EngineMethod,
   args: readonly unknown[],
-) => Promise<EngineStateSnapshot | EngineRecentEvent[] | unknown>;
+) => Promise<unknown>;
 
 export interface WsReceiverOptions {
   /** WS URL — e.g. "ws://localhost:8765". */
@@ -35,6 +34,13 @@ export interface WsReceiverOptions {
    * expects back; throw to send an error result.
    */
   onCall: EngineCallHandler;
+  /**
+   * The page's current state, read each time the connection opens and
+   * sent ahead of pipeline-ready. The page owns this state; the CLI
+   * caches it, and must not be left holding a stale or empty copy
+   * because a push happened while the socket was closed.
+   */
+  getSnapshot: () => EngineStateSnapshot;
   /** Optional; log to console.error when omitted. */
   log?: (line: string) => void;
 }
@@ -94,7 +100,7 @@ export function startWsReceiver(opts: WsReceiverOptions): WsReceiverHandle {
     try {
       ws = new WebSocket(opts.url);
     } catch (err) {
-      log(`wsReceiver: cannot open ${opts.url}: ${err}`);
+      log(`wsReceiver: cannot open ${opts.url}: ${String(err)}`);
       scheduleReconnect();
       return;
     }
@@ -107,6 +113,11 @@ export function startWsReceiver(opts: WsReceiverOptions): WsReceiverHandle {
       // pipeline-ready flag on reconnect too; re-signal once ready.
       pipelineReadySent = false;
       log(`wsReceiver: connected to ${opts.url} as '${opts.label}'`);
+      // Current state before ready: the CLI's start_session returns as
+      // soon as pipeline-ready arrives, and its cached state must be
+      // current by then. Pushes made while the socket was closed were
+      // dropped, so read the state now rather than replaying any of them.
+      send({ type: "state-changed", snapshot: opts.getSnapshot() });
       // Flush any pipeline-ready intent that arrived before we opened
       // (main.ts calls publishPipelineReady synchronously right after
       // mountWsReceiver returns).

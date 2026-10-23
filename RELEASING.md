@@ -30,7 +30,7 @@ Cutting a new version of `synesthetica` on npm.
    ```
 
    The tag push fires `.github/workflows/publish.yml`, which:
-   - Re-runs the full quality gate (build + test -ws + lint)
+   - Re-runs the full quality gate (build + typecheck + test + lint)
    - Confirms the tag version matches `packages/cli/package.json`
    - Runs `npm publish --dry-run` for a tarball sanity print
    - Publishes with `--provenance` via npm's trusted-publisher OIDC flow (no NPM_TOKEN secret)

@@ -80,7 +80,7 @@ export class RawMidiAdapter implements IRawSourceAdapter {
       Pick<RawMidiAdapterConfig, "sessionStart">
   ) {
     this.midiSource = midiSource;
-    this.config = { ...DEFAULT_CONFIG, ...config } as RawMidiAdapterConfig;
+    this.config = { ...DEFAULT_CONFIG, ...config };
     this.source = this.config.sourceId!;
     this.stream = this.config.streamId!;
   }

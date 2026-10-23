@@ -326,6 +326,6 @@ function scopeTitle(scope: string): string {
 type WidgetBase = {
   id: string;
   label: string;
-  tooltip?: string[];
+  tooltip?: string[] | undefined;
   aliases: string[];
 };

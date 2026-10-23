@@ -37,7 +37,8 @@ import {
   PRIMER_EXEMPT,
   type ToolSpec,
 } from "./tools/registry.js";
-import type { EngineHandle, StateSnapshot } from "./engine/engineHandle.js";
+import type { EngineHandle } from "./engine/engineHandle.js";
+import type { EngineStateSnapshot } from "@synesthetica/contracts";
 import {
   buildStateResources,
   type AsyncResourceEntry,
@@ -69,6 +70,9 @@ export async function startMcpServer(
   transport: "stdio" | "tcp",
   port: number | null,
 ): Promise<{ close(): Promise<void> }> {
+  // The SDK keeps the low-level Server for advanced use; tools and resources here
+  // are registered from the manifest rather than through McpServer helpers (synesthetica-duxd).
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   const server = new Server(
     {
       name: config.serverName,
@@ -86,7 +90,9 @@ export async function startMcpServer(
       // pointed at `get_started` for the full primer, so idle
       // conversations that never touch music don't pay the full
       // token cost.
-      instructions: config.serverInstructions,
+      ...(config.serverInstructions !== undefined && {
+        instructions: config.serverInstructions,
+      }),
     },
   );
 
@@ -367,7 +373,7 @@ export async function startMcpServer(
         isError: true,
       };
     }
-    const args = (request.params.arguments ?? {}) as Record<string, unknown>;
+    const args = (request.params.arguments ?? {});
 
     // Primer gate: every non-get_started tool requires a valid primer
     // token. A missing or stale token is refused; the response body
@@ -439,25 +445,18 @@ export async function startMcpServer(
     if (requiresSession) {
       const engine = config.session.getEngine();
       if (!engine) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify(
-                {
-                  ok: false,
-                  error: {
-                    code: "ENGINE_NOT_STARTED",
-                    message: `no session running for '${config.session.instanceLabel}'. Call start_session first.`,
-                  },
-                },
-                null,
-                2,
-              ),
-            },
-          ],
-          isError: true,
-        };
+        return toolError(
+          "ENGINE_NOT_STARTED",
+          `no session running for '${config.session.instanceLabel}'. Call start_session first.`,
+        );
+      }
+      // A running session whose tab is gone has no state to report;
+      // say so rather than answer from the closed tab's last snapshot.
+      if (!(await engine.awaitConnected())) {
+        return toolError(
+          "ENGINE_DISCONNECTED",
+          `the visualiser tab for '${config.session.instanceLabel}' isn't connected (closed or crashed). Call start_session to reopen it.`,
+        );
       }
       engineForTool = engine;
     } else {
@@ -497,6 +496,19 @@ export async function startMcpServer(
   };
 }
 
+/** An MCP tool result carrying a SPEC_015 error. */
+function toolError(code: string, message: string) {
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify({ ok: false, error: { code, message } }, null, 2),
+      },
+    ],
+    isError: true,
+  };
+}
+
 /**
  * A live-lookup EngineHandle that reads from SessionManager at call
  * time. When no session is running, each engine method throws with
@@ -527,6 +539,7 @@ function buildSessionEngineProxy(session: SessionManager): EngineHandle {
           return "starting" as const;
       }
     },
+    awaitConnected: async (timeoutMs) => (await session.getEngine()?.awaitConnected(timeoutMs)) ?? false,
     setMacro: async () => notStarted(),
     setKey: async () => notStarted(),
     setTempo: async () => notStarted(),
@@ -566,7 +579,7 @@ function buildSessionEngineProxy(session: SessionManager): EngineHandle {
   };
 }
 
-function emptyStubSnapshot(label: string): StateSnapshot {
+function emptyStubSnapshot(label: string): EngineStateSnapshot {
   return {
     instance: label,
     macros: { intents: {}, effective: {} },

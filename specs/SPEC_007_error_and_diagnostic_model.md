@@ -166,15 +166,15 @@ Display category-specific icons in a consistent location (e.g., top-right corner
 
 ```ts
 // Adapters return null on failure, emit diagnostic
-interface ISourceAdapter {
-  nextFrame(): CMSFrame | null;  // null = no data this frame
+interface IRawSourceAdapter {
+  nextFrame(): RawInputFrame | null;  // null = no data this frame
 }
 ```
 
 When an adapter encounters a parse error:
 1. Log the error
 2. Emit a diagnostic (category: "input", persistence: "transient")
-3. Return null or partial CMSFrame
+3. Return null or a partial RawInputFrame
 4. Pipeline continues with available data
 
 ### Stabilizers
@@ -183,7 +183,9 @@ When a stabilizer encounters an error:
 1. Log the error
 2. Emit a diagnostic (category: "stabilizer")
 3. Call `reset()` to clear corrupted state
-4. Return input frame unchanged (pass-through)
+4. Return input frame unchanged (pass-through): the merged upstream frame, or an empty frame for a stabilizer with no dependencies
+
+A stabilizer that declares a dependency on an id no registered stabilizer has is a configuration error: the pipeline throws when it builds the part's stabilizer list.
 
 ### Lenses
 
@@ -193,12 +195,20 @@ When a lens throws during `update()`:
 3. Skip this lens for the current frame
 4. Continue with other lenses
 
+Implemented in `VisualPipeline.requestFrame`. A component that keeps failing emits its diagnostic on every frame but is logged once per run of failures; the next successful frame ends the run.
+
 ### Vocabularies
 
 Vocabularies are pure functions and should not throw. If they do:
 1. This indicates a bug
 2. Log the error
 3. Fail the frame (do not attempt graceful degradation)
+
+"Fail the frame" means that frame only: `requestFrame` throws, and the web app's render loop, which schedules the next frame before rendering the current one, logs the error and carries on.
+
+### Renderer
+
+The renderer catches errors per entity: an entity whose update throws is skipped and logged once per entity id; the rest of the frame draws.
 
 ### Control Surface
 

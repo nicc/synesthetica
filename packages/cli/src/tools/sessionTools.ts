@@ -17,20 +17,12 @@
  * (SPEC 013 §Invariants I24, I25).
  */
 
-import type { EngineHandle, StateSnapshot } from "../engine/engineHandle.js";
+import type { EngineHandle } from "../engine/engineHandle.js";
+import type { EngineStateSnapshot } from "@synesthetica/contracts";
+import { engineError, err } from "./toolResult.js";
+import type { ToolResult } from "./toolResult.js";
 
 type ToolInput = Record<string, unknown>;
-/**
- * Uniform success/failure shape every tool returns.
- *
- * Setters populate `state` (the post-call snapshot). Read tools may
- * additionally populate `data` with the read payload (device list,
- * preset list, etc.). `get_state` uses `state` alone since it IS
- * the state. Failure carries a stable `code` + human message.
- */
-type ToolResult =
-  | { ok: true; state: StateSnapshot; data?: unknown }
-  | { ok: false; error: { code: string; message: string; details?: unknown } };
 
 export interface ToolSpec {
   name: string;
@@ -52,21 +44,14 @@ export interface ToolSpec {
 // Validation helpers
 // ============================================================================
 
-function err(code: string, message: string, details?: unknown): ToolResult {
-  return { ok: false, error: { code, message, ...(details ? { details } : {}) } };
-}
-
 async function safeCall(
-  fn: () => Promise<StateSnapshot>,
+  fn: () => Promise<EngineStateSnapshot>,
 ): Promise<ToolResult> {
   try {
     const state = await fn();
     return { ok: true, state };
   } catch (e) {
-    return err(
-      "ENGINE_ERROR",
-      e instanceof Error ? e.message : String(e),
-    );
+    return engineError(e);
   }
 }
 
@@ -127,7 +112,7 @@ export const sessionTools: ToolSpec[] = [
           return err("SCHEMA_INVALID", `root must be an integer in [0, 11], got ${root}`);
         }
       }
-      return safeCall(() => engine.setKey(root as number | null, mode as string | null));
+      return safeCall(() => engine.setKey(root, mode));
     },
   },
 

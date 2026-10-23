@@ -35,6 +35,9 @@ A Roman numeral rendered as geometric line segments and arcs (not text). Carries
 **Chord symbol**
 The radial wedge/line shape in the top-right cell showing a chord's interval structure. Distinct from chord numerals on the harmony clock.
 
+**Interval-name dial**
+Simple-interval names (R m2 M2 m3 M3 P4 d5 P5 m6 M6 m7 M7) around the chord glyph at the spoke angles, baselines on the steam ring's inner edge, rotated to their angle. NOW-line grey; toggled by `harmony:interval-names` (on by default).
+
 **Connection strip**
 A short gradient arc sitting on the outward radial edge of a target chord's slot on the harmony clock. The strip carries the full source ↔ target hue gradient (no synthetic midpoint colour): source hue sits at the guide-ring-anchored edge at full opacity, target hue at the chord-side edge fading to zero. Strips indicate a functional relationship between chords without drawing lines across the clock face — only one strip per edge, at the target slot; the source numeral itself signals the originating chord. Strip intensity scales with the connection's conventional weight.
 
@@ -64,7 +67,7 @@ Controls visibility of beat lines and bar lines. Scales linearly with the horizo
 Controls visibility of note strips. At min horizon, shows approximately 1 beat of history; at max horizon, shows full history.
 
 **Reference window**
-Controls visibility of reference lines and drift streaks. Lingers longer than the note window (controlled by `referenceLinger` macro, default 1.0x), allowing these elements to remain visible after note strips have faded. This creates a trailing effect where timing feedback persists after the note itself.
+Controls visibility of reference lines and drift streaks. Can linger longer than the note window (controlled by the `rhythm:reference-linger` macro, default 1.0x), allowing these elements to remain visible after note strips have faded. This creates a trailing effect where timing feedback persists after the note itself.
 
 ## Visual Elements
 
@@ -76,9 +79,6 @@ The rhythm-lens rendering of one partial with n ≥ 3. Partials 1, 2, 4 and 8 sh
 
 **Note-name legend**
 A fixed row of pitch names under the NOW line, one centred under each pitch-class column, in the NOW line's grey and the on-screen keyboard's monospace font. Spelling comes from the frame (key-aware; default sharps). Toggled by `rhythm:note-names` (on by default).
-
-**Interval-name dial**
-Simple-interval names (R m2 M2 m3 M3 P4 d5 P5 m6 M6 m7 M7) around the chord glyph at the spoke angles, baselines on the steam ring's inner edge, rotated to their angle. NOW-line grey; toggled by `harmony:interval-names` (on by default).
 
 **Overtone halo** (proposed name, RFC 012)
 The chord glyph's rendering of its tones' partials: a ring of steam just outside the longest spoke, beyond a gap of negative space, at each partial's angle; one set per distinct pitch class of the chord. Fixed shape, with density as the partial level. Same steam rules as overtone strips; fades with the glyph.
@@ -93,7 +93,7 @@ Emphasized horizontal line marking measure boundaries. Tier 3 only (requires tem
 Short horizontal mark showing where the nearest subdivision was relative to a note's actual onset. Appears through the note at the subdivision position. Part of the reference window.
 
 **Drift streak**
-Set of short, gestural lines fanning from a note toward where the beat was. Comic book-style motion lines indicating timing drift. Only shown when drift exceeds tight tolerance (30ms). Part of the reference window.
+Set of short, gestural lines fanning from a note toward where the beat was. Comic book-style motion lines indicating timing drift. Only shown when drift exceeds the tightness tolerance (default 30ms). Part of the reference window.
 
 - Late notes (positive drift): streaks point down (toward past beat)
 - Early notes (negative drift): streaks point up (toward future beat)
@@ -108,11 +108,14 @@ Set of short, gestural lines fanning from a note toward where the beat was. Comi
 
 ## Macros
 
-**Horizon** (0-1)
+**Horizon** (`rhythm:horizon`, 0-1, default 1)
 Controls field of vision. At 0, minimal history shown (tight focus on present). At 1, full history visible.
 
-**Subdivision depth** (quarter | 8th | 16th | 32nd)
+**Quantise resolution** (`rhythm:quantise-resolution`: quarter | 8th | 16th | 32nd, default 16th)
 Which subdivision to use for drift calculation. Finer subdivisions catch smaller timing deviations.
 
-**Reference linger** (default 1.3)
-Multiplier controlling how long reference lines and streaks remain visible after note strips fade. At 1.3, reference elements persist 30% longer than notes.
+**Tightness tolerance** (`rhythm:tightness-tolerance`, default 30ms)
+Drift below this threshold draws no drift streaks.
+
+**Reference linger** (`rhythm:reference-linger`, default 1.0)
+Multiplier on the note window controlling how long reference lines and streaks remain visible. At 1.3, reference elements would persist 30% longer than notes.

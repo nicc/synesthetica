@@ -6,7 +6,7 @@
 export interface MidiInputInfo {
   id: string;
   name: string;
-  manufacturer?: string;
+  manufacturer?: string | undefined;
 }
 
 export interface MidiMessage {

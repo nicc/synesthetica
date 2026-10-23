@@ -29,7 +29,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { homedir, platform } from "node:os";
-import type { StateSnapshot } from "../engine/engineHandle.js";
+import type { EngineStateSnapshot } from "@synesthetica/contracts";
 import type { MacroValue } from "@synesthetica/contracts";
 
 const NAME_RE = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -37,7 +37,7 @@ const NAME_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 export interface PresetContent {
   version: 1;
   macros: Record<string, MacroValue>;
-  session: StateSnapshot["session"];
+  session: EngineStateSnapshot["session"];
   savedAt: string; // ISO
 }
 
@@ -50,7 +50,7 @@ export interface PresetSummary {
 }
 
 export interface PresetStore {
-  save(name: string, snapshot: StateSnapshot): void;
+  save(name: string, snapshot: EngineStateSnapshot): void;
   load(name: string): PresetContent | null;
   /** Remove a preset from disk. Returns true if a file was deleted,
    *  false if no preset by that name existed. Throws on invalid name
@@ -94,8 +94,10 @@ export function createPresetStore(overrideDir?: string): PresetStore {
       if (!existsSync(path)) return null;
       const raw = readFileSync(path, "utf8");
       const parsed = JSON.parse(raw) as PresetContent;
-      if (parsed.version !== 1) {
-        throw new Error(`unsupported preset version: ${parsed.version} (expected 1)`);
+      // Typed as the current version; a file on disk can hold anything.
+      const version: unknown = parsed.version;
+      if (version !== 1) {
+        throw new Error(`unsupported preset version: ${String(version)} (expected 1)`);
       }
       return parsed;
     },

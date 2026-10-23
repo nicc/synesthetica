@@ -1,62 +1,71 @@
 # SPEC 001: Preset Storage
 
-Status: Approved
+Status: Approved (revised 2026-10-22 to match the implementation)
 Date: 2026-01-14
 
 ## Summary
 
 Defines how presets (user configurations) are stored and managed.
 
+The original decisions (bundled builtin presets, browser `localStorage`, `builtin:`/`user:` id prefixes, an `IPresetCatalog` abstraction) were replaced when presets moved behind the CLI and MCP control plane (SPEC_013 §Presets are shared, not per-instance). This spec now describes that implementation.
+
 ## Decisions
 
 ### Storage Location
 
-- **Builtin presets**: Bundled with app code in `packages/presets/builtin/`
-- **User presets**: Browser `localStorage` for v0
+- **User presets**: one JSON file per preset in a per-user directory, `$XDG_DATA_HOME/synesthetica/presets/<name>.json`. Without `XDG_DATA_HOME` it falls back to `~/Library/Application Support/synesthetica/presets/` on macOS, `%APPDATA%\synesthetica\presets\` on Windows, and `~/.local/share/synesthetica/presets/` elsewhere.
+- **Builtin presets**: none ship. Presets are user-managed at runtime.
 
-### ID Namespace
+The store is shared by every instance the user runs.
 
-Presets use prefixed IDs to distinguish source:
-- `builtin:starfield` — shipped with the app
-- `user:practice-mode` — created by user
+### Names
+
+A preset's name is its filename without `.json`. Names are 1–64 characters of letters, digits, hyphens and underscores. There is no id namespace or prefix.
 
 ### Collision Handling
 
-Name collisions in user presets result in **overwrites** (last write wins). This avoids recall ambiguity — saying "use practice mode" always resolves to exactly one preset.
+Saving under an existing name **overwrites** it (last write wins). This avoids recall ambiguity — saying "use practice mode" always resolves to exactly one preset.
 
 ### No Inheritance
 
-User presets are standalone copies, not derivatives. When a user loads a builtin preset, modifies it, and saves:
-- A complete copy is stored under a new user ID
-- No reference to the original builtin is retained
-- Changes to builtins (e.g. app updates) do not affect saved user presets
+Presets are standalone snapshots. Saving captures the current state in full; there is no reference to any preset that was loaded before, so later changes to one preset never affect another.
 
-### Storage Interface
+### Content
 
-The `IPresetCatalog` interface abstracts storage:
 ```ts
-interface IPresetCatalog {
-  list(): PresetMeta[];
-  get(id: string): Preset | null;
-  save(preset: Preset): ValidationResult;
-  delete(id: string): boolean;
-  exportUser(): string;
-  importUser(json: string): ValidationResult;
+interface PresetContent {
+  version: 1;
+  macros: Record<string, MacroValue>;      // user-facing macro intents, not effective values
+  session: EngineStateSnapshot["session"]; // prescribed key/tempo/meter, chord mode, etc.
+  savedAt: string;                         // ISO timestamp
 }
 ```
 
-v0 uses localStorage; the interface allows future migration to IndexedDB or file-based storage.
+Input source, `activePreset` and instance label are excluded: a preset may be loaded against a different physical setup, and loading one must not switch the active input device.
+
+### Storage Interface
+
+```ts
+interface PresetStore {
+  save(name: string, snapshot: EngineStateSnapshot): void;
+  load(name: string): PresetContent | null;
+  delete(name: string): boolean;
+  list(): string[];
+  listWithMeta(): PresetSummary[];
+  storePath(): string;
+}
+```
+
+MCP tools (`list_presets`, `get_preset`, `switch_preset`, `save_preset`, `delete_preset`) and the `presets://` resources are the only callers; see SPEC_013.
+
+`IPresetCatalog`, `PresetMeta`, `PresetSource` and `ValidationResult` in `packages/contracts/config/preset.ts` are from the original design and have no implementation.
 
 ### Validation
 
-- Presets validated at load time
-- Invalid presets are skipped with warnings, not fatal errors
-- Presets referencing unknown styles are loaded but flagged
+- `save` and `delete` throw on an invalid name.
+- `load` returns `null` for an unknown or invalid name and throws on an unsupported `version`.
+- `listWithMeta` skips unreadable, malformed or wrong-version files silently.
 
-## Contract Location
+## Implementation
 
-Types defined in `packages/contracts/config/preset.ts`:
-- `PresetSource`
-- `PresetMeta`
-- `ValidationResult`
-- `IPresetCatalog`
+`createPresetStore` in `packages/cli/src/presets/presetStore.ts`.

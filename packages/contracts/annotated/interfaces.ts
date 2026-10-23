@@ -9,7 +9,7 @@
 
 // Re-export the canonical interfaces
 export type {
-  IVisualRuleset,
+  IVisualVocabulary,
   IVisualLens,
   LensContext,
 } from "../pipeline/interfaces";

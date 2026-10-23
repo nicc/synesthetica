@@ -1,143 +1,55 @@
 # Synesthetica Web App
 
-Web application shell for the Synesthetica pipeline.
+The browser app: the visualiser canvas, the input session, and the control panel generated from the manifest. It is not published on its own; the CLI (`packages/cli`) bundles its build and serves it.
 
-## Purpose
+## Running locally
 
-This app provides:
-- A working end-to-end demo: MIDI in → visuals out
-- A test harness for vocabulary and lens iteration
-- Proof that the contract-based architecture works
-
-## What It Does
-
-1. Requests Web MIDI access on page load
-2. Displays available MIDI devices in a dropdown
-3. Auto-starts a session when you select a device
-4. Shows colored particles on canvas in response to MIDI note events
-
-## Running Locally
-
-### Prerequisites
-
-- Node.js 18+ and npm
-- A USB MIDI device (keyboard, controller, etc.)
-- Chrome or Edge browser (for Web MIDI API support)
-
-### Dev Server
+Requires Node.js 20+ and a Chromium-based browser (Web MIDI, and `SharedArrayBuffer` for the audio path; `vite.config.ts` sets the COOP/COEP headers that enable it).
 
 ```bash
-# From project root
+# From the repo root
 npm install
-npm run build -ws  # Build dependencies first
-
-# Start dev server (opens in Chrome - required for Web MIDI API)
-cd packages/web-app
-npm run dev:chrome
+npm run dev        # builds contracts, adapters and engine, then starts Vite on localhost:3000 in Chrome
 ```
 
-The app will open at `http://localhost:3000` in Chrome.
+Changes under `packages/web-app/src` hot-reload. The app imports the engine, adapters and contracts from their built `dist/`, so changes there need a rebuild of that package (e.g. `npm run build -w @synesthetica/engine`).
 
-**Note:** Use `npm run dev:chrome` instead of `npm run dev` to ensure Chrome is used (Safari/Firefox don't support Web MIDI API).
+Other scripts in this package: `npm run build` (production bundle to `dist/`), `npm run preview`, `npm test`.
 
-### Production Build
-
-```bash
-npm run build
-npm run preview
-```
-
-## How to Use
-
-1. **Connect your MIDI device** to your computer via USB
-2. **Open the app** in Chrome/Edge
-3. **Grant MIDI permission** when prompted
-4. **Select your device** from the dropdown
-5. **Play notes** on your MIDI keyboard
-6. **See colored particles** appear on the black canvas
-
-### What You Should See
-
-- Notes trigger visual markers and particles with colors based on pitch class
-- Beat pulses appear on downbeats when a tempo is prescribed
-- Chords produce expanding glows with history trails
-- Different pitches = different hues (deterministic mapping per SPEC 002)
+Opened directly, the app runs standalone with the panel only. When the CLI opens it, the URL carries `ws-port` and `instance`, and the app connects to the CLI's WebSocket bridge so the MCP server can drive it.
 
 ## Architecture
 
-The app wires together the full pipeline (RFC 005 / RFC 006):
+`src/main.ts` wires the pipeline and owns the session:
 
 ```
-WebMidiSource → RawMidiAdapter → VisualPipeline
-                                      ↓
-                         NoteTrackingStabilizer (RawInputFrame → MusicalFrame)
-                         ChordDetectionStabilizer (MusicalFrame → MusicalFrame + chords)
-                                      ↓
-                         MusicalVisualRuleset (MusicalFrame → AnnotatedMusicalFrame)
-                                      ↓
-                         TestRhythmLens + TestChordProgressionLens
-                         (AnnotatedMusicalFrame → SceneFrame)
-                                      ↓
-                              IdentityCompositor
-                                      ↓
-                              Canvas2DRenderer → <canvas>
+Input (one active at a time)
+  ComputerKeyboardSource ──┐  boot default, with the on-screen keyboard
+  WebMidiSource ───────────┴─→ RawMidiAdapter ─┐
+  Microphone → AudioInputAdapter (Basic Pitch) ─┴─→ VisualPipeline
+
+VisualPipeline
+  Stabilizers   NoteTracking → Dynamics
+                NoteTracking → ChordDetection → Harmony
+  Vocabulary    MusicalVisualVocabulary
+  Lenses        RhythmLens, HarmonyLens, DynamicsLens
+  Compositor    IdentityCompositor
+  Renderer      ThreeJSRenderer → <canvas>
 ```
 
-### Components Used
+- **Session.** A computer-keyboard session starts on load. Switching input swaps the adapter without tearing the session down; a full stop happens only on the LLM's `stop_session` or page unload.
+- **One dispatch path.** Panel widgets and LLM tool calls both go through `applyEngineOp` in `main.ts`, which applies the change and publishes a state snapshot to the CLI.
+- **`src/panel/`** — the Basics / Advanced / About shell, rendered from `generatePanel(productionManifest)` (`@synesthetica/contracts`).
+- **`src/engine/wsReceiver.ts`** — WebSocket client for the CLI's bridge; reconnects with backoff.
+- **`src/engine/recentEvents.ts`** — ring buffer behind the LLM's `get_recent_events` (10,000 events standalone; the CLI sets the size with `buffer-size`).
+- **`src/engine/enumerateInputs.ts`** — MIDI and audio input list for the input selector.
+- **`src/keyboard/OnScreenKeyboard.ts`** — on-screen keyboard overlay for the computer-keyboard input.
+- **`src/audio/inference-worker-entry.ts`** — Basic Pitch inference worker; the capture worklet and model are in `public/`.
 
-- **WebMidiSource**: Wraps Web MIDI API for testability
-- **RawMidiAdapter**: Converts MIDI messages to RawInputFrame
-- **NoteTrackingStabilizer**: Tracks note lifecycle (attack → sustain → release)
-- **ChordDetectionStabilizer**: Detects chords from active notes
-- **MusicalVisualRuleset**: Annotates musical elements with visual properties (palette, texture, motion)
-- **TestRhythmLens**: Renders beats and notes as timing markers (ignores chords)
-- **TestChordProgressionLens**: Renders chords as glows with history trail (ignores beats)
-- **IdentityCompositor**: Simple pass-through (multi-part composition comes later)
-- **Canvas2DRenderer**: Draws entities as shapes on canvas
+## Known limitations
 
-## Session Lifecycle
-
-- **Session start**: Automatically when device is selected
-- **Session running**: Render loop at ~60fps via `requestAnimationFrame`
-- **Session stop**: Automatically on page unload
-- **Reset**: Switching devices stops the old session and starts a new one
-
-## Known Limitations
-
-- No audio input (MIDI only)
-- Single part (no multi-instrument support)
-- No tempo/BPM inference (decision 2026-08-20 — prescribed only)
-- No LLM integration
-- No presets or macro controls
-- Minimal visual polish
-
-## Troubleshooting
-
-### No MIDI devices found
-
-- Check that your device is plugged in via USB
-- Try unplugging and replugging the device
-- Refresh the page
-- Check browser console for errors
-
-### MIDI access denied
-
-- The browser requires HTTPS or localhost for MIDI access
-- Grant permission when prompted
-- Check browser settings (chrome://settings/content/midi)
-
-### No particles appearing
-
-- Check browser console for errors
-- Verify the device is sending MIDI (test with another MIDI app)
-- Try a different MIDI channel
-- Check that you're using Chrome or Edge (Safari/Firefox don't support Web MIDI)
-
-## Next Steps
-
-- Better vocabularies (harmonic tension, phrase awareness, richer palette system)
-- More expressive lenses (trails, fields, glyphs)
-- Enhanced stabilizers (phrase detection, progression tracking)
-- Multi-part support
-- Preset system
-- LLM integration for control
+- Chromium-based browsers only.
+- Single part (no multi-instrument support).
+- Tempo, meter and key are prescribed by the user, not inferred. Swing is not supported.
+- Presets can be saved and loaded through the MCP tools only; the panel has no preset UI.
+- Not built for small screens.

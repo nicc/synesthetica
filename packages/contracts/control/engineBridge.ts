@@ -14,6 +14,10 @@
  */
 
 import type { MacroValue } from "../annotations/annotations";
+import type { Confidence } from "../core/time";
+import type { PartId } from "../parts/parts";
+import type { PitchClass, Velocity } from "../primitives/primitives";
+import type { ChordId, ChordInterpretation, NoteId } from "../musical/musical";
 
 // Methods the CLI can call on the engine. Names match EngineHandle.
 export type EngineMethod =
@@ -170,14 +174,49 @@ export interface EngineStateSnapshot {
  * - `note-off` → { noteId, pitch, pitchClass, octave, velocity, part }
  * - `chord-detected` / `chord-changed` → { chordId, voicing, pitchClasses, bass, harmonic, bassLed, isInverted, inversion, part, previousChordId? }
  */
-export interface EngineRecentEvent {
+export type EngineRecentEvent = NoteOnEvent | NoteOffEvent | ChordEvent;
+
+interface RecentEventBase {
+  /** Monotonic buffer id; poll with `since:` for new events. */
   id: number;
   /** Event clock — the raw ms timestamp of the underlying musical event. */
   t: number;
   /** Observation clock — the animation-frame boundary at which the buffer captured it. */
   frameT: number;
-  kind: "note-on" | "note-off" | "chord-detected" | "chord-changed" | string;
-  [key: string]: unknown;
+  part: PartId;
+}
+
+interface NoteEventPayload {
+  noteId: NoteId;
+  /** MIDI note number. */
+  pitch: number;
+  pitchClass: PitchClass;
+  octave: number;
+  velocity: Velocity;
+}
+
+export interface NoteOnEvent extends RecentEventBase, NoteEventPayload {
+  kind: "note-on";
+  confidence: Confidence;
+}
+
+export interface NoteOffEvent extends RecentEventBase, NoteEventPayload {
+  kind: "note-off";
+}
+
+export interface ChordEvent extends RecentEventBase {
+  kind: "chord-detected" | "chord-changed";
+  chordId: ChordId;
+  /** MIDI note numbers, low to high. */
+  voicing: number[];
+  pitchClasses: PitchClass[];
+  bass: PitchClass;
+  harmonic: Pick<ChordInterpretation, "root" | "quality">;
+  bassLed: Pick<ChordInterpretation, "root" | "quality">;
+  isInverted: boolean;
+  inversion: number;
+  /** Set on `chord-changed`: the chord this one replaced. */
+  previousChordId?: ChordId | null | undefined;
 }
 
 /**

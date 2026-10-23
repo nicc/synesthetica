@@ -67,7 +67,7 @@ interface PartState {
  * Visual Pipeline orchestrator.
  *
  * Implements the RFC 005 data flow:
- * Adapters → Router → Stabilizers → Ruleset → Lenses → Compositor
+ * Adapters → Stabilizers → Vocabulary → Lenses → Compositor
  *
  * For Phase 0, we simplify:
  * - No router (single adapter, single part)
@@ -101,6 +101,10 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
    *  diffing consecutive frames. */
   private musicalFrameListeners: Array<(frame: MusicalFrame) => void> = [];
 
+  /** Stabilizers and lenses currently failing, so a component that
+   *  throws every frame is logged once per failure run, not 60×/s. */
+  private failingComponents = new Set<string>();
+
   constructor(config: VisualPipelineConfig) {
     this.config = config;
   }
@@ -122,14 +126,6 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
   }
 
   /**
-   * Set the stabilizer factory (legacy single-stabilizer API).
-   * @deprecated Use addStabilizerFactory for multiple stabilizers
-   */
-  setStabilizerFactory(factory: () => IMusicalStabilizer): void {
-    this.stabilizerFactories = [factory];
-  }
-
-  /**
    * Add a stabilizer factory. Stabilizers are sorted by dependencies.
    * A factory is used because each part needs its own stabilizer instances.
    */
@@ -139,13 +135,6 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
 
   setVocabulary(vocabulary: IVisualVocabulary): void {
     this.vocabulary = vocabulary;
-  }
-
-  /**
-   * @deprecated Use setVocabulary instead
-   */
-  setRuleset(vocabulary: IVisualVocabulary): void {
-    this.setVocabulary(vocabulary);
   }
 
   addLens(lens: IVisualLens): void {
@@ -344,7 +333,7 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     // Apply stabilizers in dependency order
     let musicalFrame: MusicalFrame;
     if (partState.stabilizers.length > 0) {
-      musicalFrame = this.applyStabilizers(partState, mergedRaw, targetTime, partId);
+      musicalFrame = this.applyStabilizers(partState, mergedRaw, targetTime, partId, diagnostics);
     } else {
       // No stabilizers - create empty musical frame
       musicalFrame = this.createEmptyMusicalFrameWithPrescribed(targetTime, partId);
@@ -391,10 +380,17 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
         partState.previousScenes.set(lens.id, null);
       }
 
-      const previous = partState.previousScenes.get(lens.id) ?? null;
-      const scene = lens.update(annotatedFrame, previous);
-      partState.previousScenes.set(lens.id, scene);
-      partScenes.push(scene);
+      // SPEC_007: a lens that throws is skipped for this frame; the
+      // other lenses still draw.
+      try {
+        const previous = partState.previousScenes.get(lens.id) ?? null;
+        const scene = lens.update(annotatedFrame, previous);
+        partState.previousScenes.set(lens.id, scene);
+        partScenes.push(scene);
+        this.failingComponents.delete(lens.id);
+      } catch (err) {
+        diagnostics.push(this.componentFailure("lens", lens.id, err, targetTime, partId));
+      }
     }
 
     // 5. Composite
@@ -537,7 +533,8 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     partState: PartState,
     raw: RawInputFrame,
     t: SessionMs,
-    partId: PartId
+    partId: PartId,
+    diagnostics: Diagnostic[],
   ): MusicalFrame {
     // Start with empty frame
     let mergedFrame: MusicalFrame = this.createEmptyMusicalFrameWithPrescribed(t, partId);
@@ -563,8 +560,17 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       // Get previous frame for this stabilizer
       const previous = partState.previousMusicalFrames.get(stabilizer.id) ?? null;
 
-      // Apply stabilizer
-      const output = stabilizer.apply(raw, upstream ?? previous);
+      // Apply stabilizer. SPEC_007: on a throw, reset its state and pass
+      // the upstream frame through so dependants and lenses still run.
+      let output: MusicalFrame;
+      try {
+        output = stabilizer.apply(raw, upstream ?? previous);
+        this.failingComponents.delete(stabilizer.id);
+      } catch (err) {
+        diagnostics.push(this.componentFailure("stabilizer", stabilizer.id, err, t, partId));
+        stabilizer.reset();
+        output = upstream ?? this.createEmptyMusicalFrameWithPrescribed(t, partId);
+      }
 
       // Store output for dependent stabilizers
       outputs.set(stabilizer.id, output);
@@ -575,6 +581,34 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
     }
 
     return mergedFrame;
+  }
+
+  /**
+   * Record a stabilizer or lens failure: a diagnostic every frame it
+   * persists, a console error only on the first frame of each run.
+   */
+  private componentFailure(
+    category: "stabilizer" | "lens",
+    componentId: string,
+    err: unknown,
+    t: SessionMs,
+    partId: PartId,
+  ): Diagnostic {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!this.failingComponents.has(componentId)) {
+      this.failingComponents.add(componentId);
+      console.error(`[${t}] [${category}] ${componentId} failed; continuing without it:`, err);
+    }
+    return {
+      id: `${category}-failure-${componentId}`,
+      category,
+      severity: "error",
+      message: `${componentId} failed: ${message}`,
+      timestamp: t,
+      source: componentId,
+      partId,
+      persistence: "transient",
+    };
   }
 
   /**
@@ -600,10 +634,14 @@ export class VisualPipeline implements IPipeline, IActivityTracker {
       if (stabilizer.dependencies) {
         for (const depId of stabilizer.dependencies) {
           const dep = stabilizerMap.get(depId);
-          if (dep) {
-            visit(dep);
+          // SPEC_007: configuration errors fail fast. A missing dependency
+          // would otherwise feed the stabilizer its own previous output.
+          if (!dep) {
+            throw new Error(
+              `Stabilizer '${stabilizer.id}' depends on '${depId}', which is not registered`,
+            );
           }
-          // If dependency not found, it might be external - ignore
+          visit(dep);
         }
       }
 

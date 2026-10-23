@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { DynamicsStabilizer } from "../../src/stabilizers/DynamicsStabilizer";
 import { NoteTrackingStabilizer } from "../../src/stabilizers/NoteTrackingStabilizer";
-import type { RawInputFrame, MidiNoteOn, MidiNoteOff, MusicalFrame } from "@synesthetica/contracts";
+import type { RawInputFrame, MidiNoteOn, MidiNoteOff, MusicalFrame, Note, PitchClass } from "@synesthetica/contracts";
+import { createTestMusicalFrame } from "../_harness/frames";
 
 function makeFrame(t: number, inputs: (MidiNoteOn | MidiNoteOff)[]): RawInputFrame {
   return {
@@ -16,9 +17,6 @@ function noteOn(note: number, velocity: number, t: number, channel = 0): MidiNot
   return { type: "midi_note_on", note, velocity, t, channel };
 }
 
-function _noteOff(note: number, t: number, channel = 0): MidiNoteOff {
-  return { type: "midi_note_off", note, t, channel };
-}
 
 describe("DynamicsStabilizer", () => {
   let noteTracker: NoteTrackingStabilizer;
@@ -68,6 +66,29 @@ describe("DynamicsStabilizer", () => {
       ]));
 
       expect(result.dynamics.events).toHaveLength(2);
+    });
+
+    it("counts each onset once, however many notes are in attack at once", () => {
+      // Driven with hand-built upstream frames: more attack-phase notes
+      // than any fixed-size dedupe set would hold, still in attack on
+      // the next frame.
+      const attacking: Note[] = Array.from({ length: 250 }, (_, i) => ({
+        id: `burst-${i}`,
+        pitch: { pc: (i % 12) as PitchClass, octave: 4 },
+        velocity: 80,
+        onset: 100,
+        duration: 0,
+        release: null,
+        phase: "attack",
+        confidence: 1,
+        provenance: { source: "test", stream: "test", version: "test" },
+      }));
+      const upstream = (t: number) => createTestMusicalFrame(t, "test-part", { notes: attacking });
+
+      dynamics.apply(makeFrame(100, []), upstream(100));
+      const result = dynamics.apply(makeFrame(110, []), upstream(110));
+
+      expect(result.dynamics.events).toHaveLength(attacking.length);
     });
 
     it("does not duplicate events for sustained notes", () => {

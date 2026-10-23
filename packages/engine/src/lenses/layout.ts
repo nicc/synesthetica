@@ -114,10 +114,6 @@ export const HARMONY_CHORD_CELL_HEIGHT = 0.21;
  *  width so the cell is square and the clock can fill it as a circle. */
 export const HARMONY_PROGRESSION_CELL_HEIGHT = HARMONY_COLUMN_WIDTH;
 
-/** Backwards-compatible alias used by HarmonyLens for clock-radius
- *  math. Refers to the progression cell, which is square. */
-export const HARMONY_CELL_SIZE = HARMONY_PROGRESSION_CELL_HEIGHT;
-
 // ----------------------------------------------------------------------------
 // Chord glyph overtone ring (RFC 012), shared by HarmonyLens and the renderer
 // ----------------------------------------------------------------------------
@@ -127,7 +123,7 @@ export const HARMONY_CELL_SIZE = HARMONY_PROGRESSION_CELL_HEIGHT;
 export const CHORD_GLYPH_RADIUS = 0.1;
 
 /** Hub radius and triadic spoke length as fractions of the glyph base
- *  radius (mirrors ChordShapeBuilder / renderChordShape). */
+ *  radius (mirrors ChordShapeBuilder). */
 const GLYPH_HUB_FRACTION = 0.3;
 const GLYPH_TRIADIC_ARM_FRACTION = 0.7;
 

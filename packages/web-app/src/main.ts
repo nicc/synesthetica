@@ -13,7 +13,7 @@
  * and macros all flow through the same dispatch path.
  */
 
-import type { SceneFrame, MacroValue } from "@synesthetica/contracts";
+import type { SceneFrame, MacroValue, ModeId, PitchClass } from "@synesthetica/contracts";
 import {
   generatePanel,
   productionManifest,
@@ -224,8 +224,7 @@ async function applyEngineOp(
       engineState.session.mode = mode;
       if (pipeline) {
         if (tonic === null || mode === null) pipeline.setKey(null);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        else pipeline.setKey({ root: tonic as any, mode: mode as any });
+        else pipeline.setKey({ root: tonic as PitchClass, mode: mode as ModeId });
       }
       break;
     }
@@ -292,7 +291,9 @@ async function applyEngineOp(
     }
     case "getStateSnapshot":
     case "getRecentEvents":
-      // Read-only ops handled below.
+    case "getAvailableInputs":
+    case "clearRecentEvents":
+      // Answered by the WS dispatcher (mountWsReceiver) before reaching here.
       break;
   }
   // Refresh the panel widget for this id so LLM-driven changes appear
@@ -333,10 +334,10 @@ function collectCurrentPanelValues(): Record<string, number | string | boolean |
   // show the current running value. Fall back to intents when
   // effective is empty (compound macros don't appear in effective).
   for (const [id, v] of Object.entries(engineState.macros.effective)) {
-    values[id] = v as MacroValue;
+    values[id] = v;
   }
   for (const [id, v] of Object.entries(engineState.macros.intents)) {
-    if (!(id in values)) values[id] = v as MacroValue;
+    if (!(id in values)) values[id] = v;
   }
   return values;
 }
@@ -553,13 +554,22 @@ async function detachCurrentAdapter(): Promise<void> {
 }
 
 function startRenderLoop(): void {
+  let failing = false;
   function render() {
     if (!pipeline || !renderer) return;
-    const sessionMs = performance.now() - sessionStartTime;
-    const sceneFrame = pipeline.requestFrame(sessionMs);
-    lastSceneFrame = sceneFrame;
-    renderer.render(sceneFrame);
+    // Schedule first: a frame that throws (SPEC_007 — e.g. a vocabulary
+    // bug) drops that frame only, instead of stopping the loop for good.
     animationFrameId = requestAnimationFrame(render);
+    try {
+      const sessionMs = performance.now() - sessionStartTime;
+      const sceneFrame = pipeline.requestFrame(sessionMs);
+      lastSceneFrame = sceneFrame;
+      renderer.render(sceneFrame);
+      failing = false;
+    } catch (err) {
+      if (!failing) console.error("Frame failed; continuing with the next one:", err);
+      failing = true;
+    }
   }
   render();
 }
@@ -1047,10 +1057,18 @@ window.addEventListener("beforeunload", () => {
 
 /* -----------------------------------------------------------------
  * Frame-capture keyboard shortcut (dev tool)
+ *
+ * Dev builds only, and behind Shift: plain "c" is E4 on the computer
+ * keyboard input, so an unmodified binding would capture a frame (and
+ * overwrite the clipboard) on every E4.
  * ----------------------------------------------------------------- */
-document.addEventListener("keydown", (e) => {
-  if (e.key === "c" && !e.ctrlKey && !e.metaKey) captureFrame();
-});
+if (import.meta.env.DEV) {
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "KeyC" && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      captureFrame();
+    }
+  });
+}
 function captureFrame(): void {
   if (!lastSceneFrame) return;
   const json = JSON.stringify(
@@ -1070,7 +1088,6 @@ function captureFrame(): void {
     null,
     2,
   );
-  // eslint-disable-next-line no-console
   console.log("FRAME CAPTURE:\n" + json);
   navigator.clipboard.writeText(json).catch(() => {
     /* best effort */
@@ -1114,15 +1131,16 @@ if (typeof navigator !== "undefined" && navigator.mediaDevices) {
     void refreshInputOptions();
   });
 }
-mountWsReceiver();
+wsReceiver = mountWsReceiver();
 initializePipeline();
 void queryPermissionsAndPublish();
 // Signal to the CLI that we're wired up and ready to receive engine
 // calls that actually take effect on consumers. SessionManager.start()
 // on the CLI awaits this before returning ok:true to the LLM, so a
-// subsequent set_macro doesn't race a null pipeline. WS is ordered
-// per-connection, so the state-changed emitted by initializePipeline
-// above lands on the CLI's cache before this pipeline-ready.
+// subsequent set_macro doesn't race a null pipeline. The socket isn't
+// open yet at this point; once it opens, wsReceiver sends the page's
+// current state and then pipeline-ready, so the CLI's cached state is
+// current when start_session returns.
 wsReceiver?.publishPipelineReady();
 
 /**
@@ -1145,13 +1163,12 @@ async function queryPermissionsAndPublish(): Promise<void> {
     kind: "midi" | "audio",
     status: PermissionStatus,
   ): void => {
-    engineState.permissions[kind] = status.state as "granted" | "prompt" | "denied";
+    engineState.permissions[kind] = status.state;
     publishState();
   };
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const midiStatus = await perms.query({ name: "midi" as any });
+    const midiStatus = await perms.query({ name: "midi" });
     applyChange("midi", midiStatus);
     midiStatus.onchange = () => applyChange("midi", midiStatus);
   } catch {
@@ -1159,8 +1176,7 @@ async function queryPermissionsAndPublish(): Promise<void> {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const micStatus = await perms.query({ name: "microphone" as any });
+    const micStatus = await perms.query({ name: "microphone" });
     applyChange("audio", micStatus);
     micStatus.onchange = () => applyChange("audio", micStatus);
   } catch {
@@ -1188,19 +1204,20 @@ function setPermission(
   publishState();
 }
 
-function mountWsReceiver(): void {
+function mountWsReceiver(): WsReceiverHandle | null {
   const params = new URLSearchParams(window.location.search);
   const wsPort = params.get("ws-port");
   const label = params.get("instance") ?? "default";
   if (!wsPort) {
     // Standalone browser use — no CLI to connect to. Panel still
     // works locally; LLM control is unavailable.
-    return;
+    return null;
   }
   engineState.instance = label;
-  wsReceiver = startWsReceiver({
+  return startWsReceiver({
     url: `ws://${window.location.hostname}:${wsPort}`,
     label,
+    getSnapshot: snapshotCopy,
     onCall: async (method, args) => {
       if (method === "getStateSnapshot") return snapshotCopy();
       if (method === "getAvailableInputs") {

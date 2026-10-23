@@ -1,11 +1,11 @@
 # CI — runs the full quality gate on every pull request and every
-# push to main. Same commands used locally (npm run build / test -ws
-# / lint), so a green CI run means "this is what a fresh clone
-# looks like".
+# push to main. Same commands used locally (npm run build /
+# typecheck / test / lint), so a green CI run means "this is what a
+# fresh clone looks like".
 #
-# Kept lean: one job, one Node version (matching the CLI's engines
-# floor). If we ever need to add a Windows / macOS check or a Node
-# 22 forward-compat lane, matrix it here.
+# Kept lean: one job, one Node version (see Setup Node below). If we
+# ever need to add a Windows / macOS check, a Node 20 lane for the
+# CLI's engines floor, or a newer-Node lane, matrix it here.
 name: CI
 
 on:
@@ -44,10 +44,15 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Type-check
+        # Package builds type-check src for contracts / adapters /
+        # engine / cli. This covers what they don't: the web-app
+        # (vite build doesn't type-check) and every package's tests.
+        run: npm run typecheck
+
       - name: Test
-        # --if-present skips workspaces without a test script
-        # (packages/contracts is types-only, no runtime to test).
-        run: npm test -ws --if-present
+        # One vitest run across every package (vitest.workspace.ts).
+        run: npm test
 
       - name: Lint
         run: npm run lint

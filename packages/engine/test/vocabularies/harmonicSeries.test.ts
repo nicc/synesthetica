@@ -32,10 +32,10 @@ describe("modelPartialLevels", () => {
     expect(modelPartialLevels(0, 1)).toEqual([]);
   });
 
-  it("models partials 3, 5, 7, 9 at the default cap, skipping powers of two", () => {
-    const levels = modelPartialLevels(1, 1);
-    expect(levels.map((p) => p.n)).toEqual([3, 5, 7, 9]);
-    expect(PARTIAL_CAP).toBe(9);
+  it("models odd partials up to the cap, skipping powers of two", () => {
+    expect(modelPartialLevels(1, 1, 9).map((p) => p.n)).toEqual([3, 5, 7, 9]);
+    expect(modelPartialLevels(1, 1, 12).map((p) => p.n)).toEqual([3, 5, 7, 9, 11]);
+    expect(modelPartialLevels(1, 1).every((p) => p.n <= PARTIAL_CAP)).toBe(true);
   });
 
   it("folds octave duplicates into their odd partial (6 into 3)", () => {

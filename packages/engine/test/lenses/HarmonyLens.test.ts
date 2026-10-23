@@ -2,27 +2,20 @@
  * HarmonyLens Tests
  *
  * Tests the harmony lens with chord shape visualization.
- * Run with GENERATE_SNAPSHOTS=1 to generate SVG files for visual review.
+ * SVG snapshots live in HarmonyLens.snapshot.ts (`npm run snapshots`).
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { HarmonyLens } from "../../src/lenses/HarmonyLens";
-import { buildChordShape } from "../../src/vocabularies/utils";
-import type {
-  LensContext,
-  AnnotatedChord,
-  PitchClass,
-  MusicalChord,
-  ChordQuality,
-  PitchHueInvariant,
-} from "@synesthetica/contracts";
+import {
+  HarmonyLens,
+  CONNECTOR_ANIMATION_MS,
+  STRUCTURE_OPACITY,
+} from "../../src/lenses/HarmonyLens";
+import { HARMONY_LEFT } from "../../src/lenses/layout";
+import { NOW_LINE_Y } from "../../src/lenses/timeMapping";
+import type { LensContext, PitchClass } from "@synesthetica/contracts";
 import { createTestAnnotatedFrame } from "../_harness/frames";
-import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { resolve } from "path";
-
-// ============================================================================
-// Test Fixtures
-// ============================================================================
+import { createTestChord, createChordFrame as createTestFrame } from "../_harness/harmonyFixtures";
 
 const ctx: LensContext = {
   canvasSize: { width: 800, height: 600 },
@@ -30,101 +23,9 @@ const ctx: LensContext = {
   part: "main",
 };
 
-const defaultInvariant: PitchHueInvariant = {
-  referencePc: 9, // A
-  referenceHue: 0, // Red
-  direction: "cw",
-};
-
-/**
- * Create a test chord with proper shape geometry.
- */
-function createTestChord(
-  root: PitchClass,
-  quality: ChordQuality,
-  intervals: number[],
-): AnnotatedChord {
-  const voicing = intervals.map((semitones) => ({
-    pc: ((root + semitones) % 12) as PitchClass,
-    octave: 4,
-  }));
-
-  const interp = {
-    root,
-    quality,
-    chordTones: intervals,
-    name: "",
-    confidence: 1.0 as const,
-  };
-
-  const chord: MusicalChord = {
-    id: `test:0:${root}${quality}`,
-    bass: voicing[0].pc,
-    inversion: 0,
-    isInverted: voicing[0].pc !== root,
-    voicing,
-    noteIds: [],
-    harmonic: interp,
-    bassLed: interp,
-    onset: 0,
-    duration: 1000,
-    phase: "active",
-    provenance: { source: "test", stream: "test", version: "1.0" },
-  };
-
-  const shape = buildChordShape(chord.harmonic, chord.voicing, defaultInvariant);
-
-  return {
-    chord,
-    visual: {
-      palette: {
-        id: `chord-${chord.id}`,
-        primary: { h: 0, s: 0.7, v: 0.85, a: 1 },
-      },
-      texture: { id: "chord", grain: 0.2, smoothness: 0.8, density: 0.5 },
-      motion: { jitter: 0.05, pulse: 0.6 },
-      uncertainty: 0,
-    },
-    noteIds: chord.noteIds,
-    shape,
-  };
-}
-
-/**
- * Create a test frame with specified chord and tension.
- */
-function createTestFrame(
-  t: number,
-  chord: AnnotatedChord | null,
-  tension: number
-) {
-  return createTestAnnotatedFrame(t, "main", {
-    chords: chord ? [chord] : [],
-    harmonicContext: {
-      tension,
-      keyAware: false,
-      currentFunction: null,
-      functionalProgression: [],
-    },
-  });
-}
-
-// ============================================================================
-// Snapshot Helper
-// ============================================================================
-
-const SNAPSHOTS_DIR = resolve(__dirname, "../_snapshots/harmony");
-
-function maybeWriteSnapshot(name: string, svg: string): void {
-  if (process.env.GENERATE_SNAPSHOTS === "1") {
-    if (!existsSync(SNAPSHOTS_DIR)) {
-      mkdirSync(SNAPSHOTS_DIR, { recursive: true });
-    }
-    const path = resolve(SNAPSHOTS_DIR, `${name}.svg`);
-    writeFileSync(path, svg, "utf-8");
-    console.log(`Wrote snapshot: harmony/${name}.svg`);
-  }
-}
+/** Fade fixtures below are stated against this linger (seconds). */
+const LINGER_S = 3;
+const FADE_MS = LINGER_S * 1000;
 
 // ============================================================================
 // Tests
@@ -136,19 +37,7 @@ describe("HarmonyLens", () => {
   beforeEach(() => {
     lens = new HarmonyLens();
     lens.init(ctx);
-  });
-
-  describe("interface compliance", () => {
-    it("has correct id", () => {
-      expect(lens.id).toBe("harmony-lens");
-    });
-
-    it("implements init and dispose", () => {
-      const g = new HarmonyLens();
-      g.init(ctx);
-      g.dispose();
-      // Should not throw
-    });
+    lens.setMacros({ linger: LINGER_S });
   });
 
   describe("update method", () => {
@@ -171,8 +60,7 @@ describe("HarmonyLens", () => {
         (e) => e.data?.type === "chord-shape"
       );
       expect(chordEntity).toBeDefined();
-      // Chord shape is in the right column (harmony column starts at 0.58 in new layout)
-      expect(chordEntity?.position?.x).toBeGreaterThan(0.7);
+      expect(chordEntity?.position?.x).toBeGreaterThan(HARMONY_LEFT);
       expect(chordEntity?.data?.quality).toBe("maj");
     });
 
@@ -194,8 +82,7 @@ describe("HarmonyLens", () => {
       const frame = createTestFrame(1000, null, 0);
       const scene = lens.update(frame, null);
 
-      // No chord shape, no tension bar (disabled by default); only the
-      // interval-name dial, which is structural and on by default
+      // Nothing chord-dependent: at most the structural interval-name dial.
       expect(scene.entities.some((e) => e.data?.type === "chord-shape")).toBe(false);
       expect(scene.entities.every((e) => e.id.includes(":interval-name-"))).toBe(true);
     });
@@ -209,7 +96,7 @@ describe("HarmonyLens", () => {
           keyAware: false,
           currentFunction: null,
           functionalProgression: [
-            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 500 },
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0, borrowed: false, chordId: "test:0:Cmaj", onset: 500, releaseTime: null },
           ],
         },
         // no prescribedKey
@@ -227,11 +114,11 @@ describe("HarmonyLens", () => {
         harmonicContext: {
           tension: 0,
           keyAware: true,
-          currentFunction: { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 800 },
+          currentFunction: { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 800, releaseTime: null },
           functionalProgression: [
-            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 0 },
-            { degree: 4, roman: "IV", quality: "maj", rootPc: 5 as PitchClass, borrowed: false, chordId: "test:500:Fmaj", onset: 500 },
-            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "test:800:Gmaj", onset: 800 },
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0, borrowed: false, chordId: "test:0:Cmaj", onset: 0, releaseTime: null },
+            { degree: 4, roman: "IV", quality: "maj", rootPc: 5, borrowed: false, chordId: "test:500:Fmaj", onset: 500, releaseTime: null },
+            { degree: 5, roman: "V", quality: "maj", rootPc: 7, borrowed: false, chordId: "test:800:Gmaj", onset: 800, releaseTime: null },
           ],
         },
       });
@@ -244,7 +131,7 @@ describe("HarmonyLens", () => {
       // Each should have glyph geometry
       for (const e of progEntities) {
         expect(e.data?.polylines).toBeDefined();
-        expect(e.position?.x).toBeGreaterThan(0.7); // in harmony column
+        expect(e.position?.x).toBeGreaterThan(HARMONY_LEFT); // in harmony column
       }
     });
 
@@ -256,10 +143,10 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            // Released 2000ms ago — well into 3000ms fade
-            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 0, releaseTime: 3000 },
-            // Released 500ms ago — barely faded
-            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "test:4000:Gmaj", onset: 4000, releaseTime: 4500 },
+            // Released 2/3 of the fade window ago
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0, borrowed: false, chordId: "test:0:Cmaj", onset: 0, releaseTime: 5000 - (FADE_MS * 2) / 3 },
+            // Released 1/6 of the fade window ago
+            { degree: 5, roman: "V", quality: "maj", rootPc: 7, borrowed: false, chordId: "test:4000:Gmaj", onset: 4000, releaseTime: 5000 - FADE_MS / 6 },
           ],
         },
       });
@@ -268,8 +155,7 @@ describe("HarmonyLens", () => {
         (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
       );
 
-      // I (onset=0, age=5000) is past the 6000ms fade window? No, 5000 < 6000 so still visible
-      // V (onset=4000, age=1000) should be brighter
+      // Both inside the fade window; the more recently released is brighter
       expect(progEntities).toHaveLength(2);
       const olderOpacity = progEntities[0].style.opacity ?? 1;
       const newerOpacity = progEntities[1].style.opacity ?? 1;
@@ -285,13 +171,13 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500 },
+            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10, borrowed: true, chordId: "bvii", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             {
               sourceChordId: "bvii",
               targetDegree: 4,
-              targetPc: 5 as PitchClass,
+              targetPc: 5,
               targetDiatonic: true,
               weight: 0.85,
               type: "subdominant-borrowing",
@@ -315,11 +201,35 @@ describe("HarmonyLens", () => {
       expect(strip.data?.targetArcWidth).toBeDefined();
       expect(strip.data?.sourceHue).toBeDefined();
       expect(strip.data?.targetHue).toBeDefined();
-      // Opacity scaled by edge weight × MAX_STRIP_OPACITY × MULTIPLIER
-      // (both arc and strip share the same base opacity now, so their
-      // colours meet at the same intensity where the arc joins the
-      // strip's inner edge).
-      expect(strip.style.opacity).toBeCloseTo(0.85 * 1.0 * 0.8, 2);
+      // Arc and strip share one base opacity, so their colours meet at
+      // the same intensity where the arc joins the strip's inner edge.
+      const arc = scene.entities.find((e) => e.data?.type === "connector-arc")!;
+      expect(strip.style.opacity).toBeCloseTo(arc.style.opacity!, 9);
+    });
+
+    it("scales connector opacity linearly with edge weight", () => {
+      const stripOpacity = (weight: number) => {
+        const frame = createTestAnnotatedFrame(1000, "main", {
+          prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+          harmonicContext: {
+            tension: 0,
+            keyAware: true,
+            currentFunction: null,
+            functionalProgression: [
+              { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10, borrowed: true, chordId: "bvii", onset: 500, releaseTime: null },
+            ],
+            functionalEdges: [
+              { sourceChordId: "bvii", targetDegree: 4, targetPc: 5, targetDiatonic: true, weight, type: "subdominant-borrowing" },
+            ],
+          },
+        });
+        return lens.update(frame, null).entities.find((e) => e.data?.type === "connector-strip")!
+          .style.opacity!;
+      };
+      const strong = stripOpacity(0.8);
+      const weak = stripOpacity(0.4);
+      expect(strong).toBeLessThanOrEqual(0.8);
+      expect(strong / weak).toBeCloseTo(2, 9);
     });
 
     it("emits no strip entities when no edges exist", () => {
@@ -330,7 +240,7 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "i", onset: 500 },
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0, borrowed: false, chordId: "i", onset: 500, releaseTime: null },
           ],
           functionalEdges: [],
         },
@@ -354,13 +264,13 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500 },
+            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10, borrowed: true, chordId: "bvii", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             {
               sourceChordId: "bvii",
               targetDegree: 4,
-              targetPc: 5 as PitchClass,
+              targetPc: 5,
               targetDiatonic: true,
               weight: 0.85,
               type: "subdominant-borrowing",
@@ -402,13 +312,13 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500 },
+            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10, borrowed: true, chordId: "bvii", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             {
               sourceChordId: "bvii",
               targetDegree: 4,
-              targetPc: 5 as PitchClass,
+              targetPc: 5,
               targetDiatonic: true,
               weight: 0.85,
               type: "subdominant-borrowing",
@@ -433,22 +343,21 @@ describe("HarmonyLens", () => {
       expect(Math.sign(emittedSweep)).toBe(-1); // natural direction preserved
     });
 
-    it("strip appears once the connector animation completes", () => {
-      // t=1000, onset=500 → age=500 = CONNECTOR_ANIMATION_MS → progress=1.
-      const frame = createTestAnnotatedFrame(1000, "main", {
+    const bviiToIV = (t: number, onset: number, releaseTime: number | null) =>
+      createTestAnnotatedFrame(t, "main", {
         prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
         harmonicContext: {
           tension: 0,
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 500 },
+            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10, borrowed: true, chordId: "bvii", onset, releaseTime },
           ],
           functionalEdges: [
             {
               sourceChordId: "bvii",
               targetDegree: 4,
-              targetPc: 5 as PitchClass,
+              targetPc: 5,
               targetDiatonic: true,
               weight: 0.85,
               type: "subdominant-borrowing",
@@ -456,40 +365,24 @@ describe("HarmonyLens", () => {
           ],
         },
       });
-      const scene = lens.update(frame, null);
-      expect(scene.entities.filter((e) => e.data?.type === "connector-arc")).toHaveLength(1);
-      expect(scene.entities.filter((e) => e.data?.type === "connector-strip")).toHaveLength(1);
+    const countOf = (frame: ReturnType<typeof bviiToIV>, type: string) =>
+      lens.update(frame, null).entities.filter((e) => e.data?.type === type).length;
+
+    it("strip appears once the connector animation completes", () => {
+      const onset = 1000;
+      expect(countOf(bviiToIV(onset + CONNECTOR_ANIMATION_MS / 2, onset, null), "connector-strip")).toBe(0);
+      expect(countOf(bviiToIV(onset + CONNECTOR_ANIMATION_MS, onset, null), "connector-arc")).toBe(1);
+      expect(countOf(bviiToIV(onset + CONNECTOR_ANIMATION_MS, onset, null), "connector-strip")).toBe(1);
     });
 
     it("released chord snaps connector progress to 1 (strip visible during fade)", () => {
-      // Chord onset=1000, released at t=1050 (only 50ms into the 500ms
-      // connector animation). Rendered at t=1100 — still within fade
-      // window. The connector should have snapped to complete, so the
-      // strip should be visible even though only 100ms of real time
-      // has elapsed since onset.
-      const frame = createTestAnnotatedFrame(1100, "main", {
-        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
-        harmonicContext: {
-          tension: 0,
-          keyAware: true,
-          currentFunction: null,
-          functionalProgression: [
-            { degree: 7, roman: "♭VII", quality: "maj", rootPc: 10 as PitchClass, borrowed: true, chordId: "bvii", onset: 1000, releaseTime: 1050 },
-          ],
-          functionalEdges: [
-            {
-              sourceChordId: "bvii",
-              targetDegree: 4,
-              targetPc: 5 as PitchClass,
-              targetDiatonic: true,
-              weight: 0.85,
-              type: "subdominant-borrowing",
-            },
-          ],
-        },
-      });
-      const scene = lens.update(frame, null);
-      expect(scene.entities.filter((e) => e.data?.type === "connector-strip")).toHaveLength(1);
+      // Released a quarter of the way into the animation and sampled
+      // halfway through it: a held chord would still be drawing its
+      // arc (no strip), but the released one has snapped to complete.
+      const onset = 1000;
+      const t = onset + CONNECTOR_ANIMATION_MS / 2;
+      expect(countOf(bviiToIV(t, onset, null), "connector-strip")).toBe(0);
+      expect(countOf(bviiToIV(t, onset, onset + CONNECTOR_ANIMATION_MS / 4), "connector-strip")).toBe(1);
     });
 
     it("preserves natural direction when two edges on the same ring don't collide", () => {
@@ -507,13 +400,13 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 6, roman: "♭VI", quality: "maj", rootPc: 8 as PitchClass, borrowed: true, chordId: "bvi", onset: 500 },
+            { degree: 6, roman: "♭VI", quality: "maj", rootPc: 8, borrowed: true, chordId: "bvi", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             {
               sourceChordId: "bvi",
               targetDegree: 2,
-              targetPc: 2 as PitchClass,
+              targetPc: 2,
               targetDiatonic: true,
               weight: 0.55,
               type: "subdominant-borrowing",
@@ -521,7 +414,7 @@ describe("HarmonyLens", () => {
             {
               sourceChordId: "bvi",
               targetDegree: 4,
-              targetPc: 5 as PitchClass,
+              targetPc: 5,
               targetDiatonic: true,
               weight: 0.50,
               type: "subdominant-borrowing",
@@ -559,14 +452,14 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 2, roman: "♭II", quality: "maj", rootPc: 1 as PitchClass, borrowed: true, chordId: "bII", onset: 500 },
+            { degree: 2, roman: "♭II", quality: "maj", rootPc: 1, borrowed: true, chordId: "bII", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             // Higher weight — keeps natural direction.
             {
               sourceChordId: "bII",
               targetDegree: 2,
-              targetPc: 2 as PitchClass,
+              targetPc: 2,
               targetDiatonic: true,
               weight: 0.80,
               type: "modal-interchange",
@@ -575,7 +468,7 @@ describe("HarmonyLens", () => {
             {
               sourceChordId: "bII",
               targetDegree: 3,
-              targetPc: 4 as PitchClass,
+              targetPc: 4,
               targetDiatonic: true,
               weight: 0.50,
               type: "modal-interchange",
@@ -616,13 +509,13 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 2, roman: "♭II", quality: "maj", rootPc: 1 as PitchClass, borrowed: true, chordId: "bII", onset: 500 },
+            { degree: 2, roman: "♭II", quality: "maj", rootPc: 1, borrowed: true, chordId: "bII", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             {
               sourceChordId: "bII",
               targetDegree: 5,
-              targetPc: 7 as PitchClass,
+              targetPc: 7,
               targetDiatonic: true,
               weight: 0.80,
               type: "modal-interchange",
@@ -630,7 +523,7 @@ describe("HarmonyLens", () => {
             {
               sourceChordId: "bII",
               targetDegree: 5,
-              targetPc: 7 as PitchClass,
+              targetPc: 7,
               targetDiatonic: false,
               weight: 0.50,
               type: "modal-interchange",
@@ -664,13 +557,13 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 6, roman: "♭VI", quality: "maj", rootPc: 8 as PitchClass, borrowed: true, chordId: "bvi", onset: 500 },
+            { degree: 6, roman: "♭VI", quality: "maj", rootPc: 8, borrowed: true, chordId: "bvi", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             {
               sourceChordId: "bvi",
               targetDegree: 2,
-              targetPc: 2 as PitchClass,
+              targetPc: 2,
               targetDiatonic: true,
               weight: 0.55,
               type: "subdominant-borrowing",
@@ -678,7 +571,7 @@ describe("HarmonyLens", () => {
             {
               sourceChordId: "bvi",
               targetDegree: 4,
-              targetPc: 5 as PitchClass,
+              targetPc: 5,
               targetDiatonic: true,
               weight: 0.50,
               type: "subdominant-borrowing",
@@ -709,13 +602,13 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 2, roman: "V/ii", quality: "maj", rootPc: 9 as PitchClass, borrowed: true, chordId: "vofii", onset: 500 },
+            { degree: 2, roman: "V/ii", quality: "maj", rootPc: 9, borrowed: true, chordId: "vofii", onset: 500, releaseTime: null },
           ],
           functionalEdges: [
             {
               sourceChordId: "vofii",
               targetDegree: 2,
-              targetPc: 2 as PitchClass,
+              targetPc: 2,
               targetDiatonic: true,
               weight: 0.88,
               type: "secondary-dominant",
@@ -723,7 +616,7 @@ describe("HarmonyLens", () => {
             {
               sourceChordId: "vofii",
               targetDegree: 2,
-              targetPc: 2 as PitchClass,
+              targetPc: 2,
               targetDiatonic: false,
               weight: 0.70,
               type: "secondary-dominant",
@@ -752,10 +645,10 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            // Released at t=1000, age=9000 → past 3000ms fade → omitted
-            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 0, releaseTime: 1000 },
-            // Released at t=9500, age=500 → still visible
-            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "test:9000:Gmaj", onset: 9000, releaseTime: 9500 },
+            // Released just over the fade window ago → omitted
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0, borrowed: false, chordId: "test:0:Cmaj", onset: 0, releaseTime: 10000 - FADE_MS - 1 },
+            // Released 500ms ago → still visible
+            { degree: 5, roman: "V", quality: "maj", rootPc: 7, borrowed: false, chordId: "test:9000:Gmaj", onset: 9000, releaseTime: 9500 },
           ],
         },
       });
@@ -777,8 +670,8 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "cid-a", onset: 500, releaseTime: 1500 },
-            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "cid-b", onset: 1500, releaseTime: null },
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0, borrowed: false, chordId: "cid-a", onset: 500, releaseTime: 1500 },
+            { degree: 5, roman: "V", quality: "maj", rootPc: 7, borrowed: false, chordId: "cid-b", onset: 1500, releaseTime: null },
           ],
         },
       });
@@ -800,8 +693,8 @@ describe("HarmonyLens", () => {
           keyAware: true,
           currentFunction: null,
           functionalProgression: [
-            { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "cid-old", onset: 0, releaseTime: 500 },
-            { degree: 5, roman: "V", quality: "maj", rootPc: 7 as PitchClass, borrowed: false, chordId: "cid-now", onset: 1000, releaseTime: null },
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0, borrowed: false, chordId: "cid-old", onset: 0, releaseTime: 500 },
+            { degree: 5, roman: "V", quality: "maj", rootPc: 7, borrowed: false, chordId: "cid-now", onset: 1000, releaseTime: null },
           ],
         },
       });
@@ -812,163 +705,43 @@ describe("HarmonyLens", () => {
 
       // Older chord (onset=0) should be higher up the screen (smaller y)
       expect(glyphs[0].id).toContain("cid-old");
-      // Newest chord (onset=1000) should be at the now-line (~0.85)
+      // Newest chord (onset=1000) should be at the now-line
       expect(glyphs[1].id).toContain("cid-now");
-      expect(glyphs[1].position?.y).toBeCloseTo(0.85, 1);
-    });
-  });
-
-  describe("SVG rendering", () => {
-    it("renders major triad", () => {
-      const chord = createTestChord(0, "maj", [0, 4, 7]);
-      const frame = createTestFrame(1000, chord, 0.1);
-      const svg = lens.renderToSVG(frame);
-
-      expect(svg).toContain("<svg");
-      expect(svg).toContain("</svg>");
-      expect(svg).toContain('fill-opacity="0.8"');
-      expect(svg).toContain("<path");
-
-      maybeWriteSnapshot("major-triad", svg);
-    });
-
-    it("renders minor triad with wavy margin", () => {
-      const chord = createTestChord(0, "min", [0, 3, 7]);
-      const frame = createTestFrame(1000, chord, 0.15);
-      const svg = lens.renderToSVG(frame);
-
-      expect(svg).toContain("<svg");
-      maybeWriteSnapshot("minor-triad", svg);
-    });
-
-    it("renders dominant 7th with medium tension", () => {
-      const chord = createTestChord(7, "dom7", [0, 4, 7, 10]);
-      const frame = createTestFrame(1000, chord, 0.45);
-      const svg = lens.renderToSVG(frame);
-
-      expect(svg).toContain("<svg");
-      maybeWriteSnapshot("dominant-7th", svg);
-    });
-
-    it("renders diminished 7th with high tension", () => {
-      const chord = createTestChord(0, "dim7", [0, 3, 6, 9]);
-      const frame = createTestFrame(1000, chord, 0.75);
-      const svg = lens.renderToSVG(frame);
-
-      expect(svg).toContain("<svg");
-      maybeWriteSnapshot("diminished-7th", svg);
-    });
-
-    it("renders augmented triad", () => {
-      const chord = createTestChord(0, "aug", [0, 4, 8]);
-      const frame = createTestFrame(1000, chord, 0.35);
-      const svg = lens.renderToSVG(frame);
-
-      expect(svg).toContain("<svg");
-      maybeWriteSnapshot("augmented-triad", svg);
-    });
-
-    it("renders sus4 chord with long dash margin", () => {
-      const chord = createTestChord(0, "sus4", [0, 5, 7]);
-      const frame = createTestFrame(1000, chord, 0.25);
-      const svg = lens.renderToSVG(frame);
-
-      expect(svg).toContain("<svg");
-      expect(svg).toContain('stroke-dasharray="6,3"');
-      maybeWriteSnapshot("sus4-chord", svg);
-    });
-
-    it("renders sus2 chord with short dash margin", () => {
-      const chord = createTestChord(0, "sus2", [0, 2, 7]);
-      const frame = createTestFrame(1000, chord, 0.2);
-      const svg = lens.renderToSVG(frame);
-
-      expect(svg).toContain("<svg");
-      expect(svg).toContain('stroke-dasharray="3,3"');
-      maybeWriteSnapshot("sus2-chord", svg);
-    });
-
-    it("does not include stroke-dasharray for non-sus chords", () => {
-      const chords = [
-        createTestChord(0, "maj", [0, 4, 7]),
-        createTestChord(0, "min", [0, 3, 7]),
-        createTestChord(0, "dim", [0, 3, 6]),
-        createTestChord(0, "aug", [0, 4, 8]),
-      ];
-
-      for (const chord of chords) {
-        const frame = createTestFrame(1000, chord, 0.3);
-        const svg = lens.renderToSVG(frame);
-        expect(svg).not.toContain("stroke-dasharray");
-      }
-    });
-
-    it("renders major 9th with extensions", () => {
-      const chord = createTestChord(0, "maj7", [0, 4, 7, 11, 2]);
-      const frame = createTestFrame(1000, chord, 0.3);
-      const svg = lens.renderToSVG(frame);
-
-      expect(svg).toContain("<svg");
-      maybeWriteSnapshot("major-9th", svg);
-    });
-
-    it("renders empty frame (no chord)", () => {
-      const frame = createTestFrame(1000, null, 0);
-      const svg = lens.renderToSVG(frame);
-
-      expect(svg).toContain("<svg");
-      expect(svg).not.toContain("linearGradient");
-      maybeWriteSnapshot("no-chord", svg);
+      expect(glyphs[1].position?.y).toBeCloseTo(NOW_LINE_Y, 9);
     });
   });
 
   describe("macros", () => {
-    it("setMacros({ linger }) shortens the progression fade window", () => {
-      // Chord released at t=1000, sampled at t=5000 (age = 4000ms).
-      // Default linger=3 seconds → fade window = 3000ms → past fade,
-      // numeral culled. With linger=6 seconds → fade window = 6000ms →
-      // still within fade, numeral rendered.
-      const buildFrame = (t: number) =>
-        createTestAnnotatedFrame(t, "main", {
-          prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
-          harmonicContext: {
-            tension: 0,
-            keyAware: true,
-            currentFunction: null,
-            functionalProgression: [
-              { degree: 1, roman: "I", quality: "maj", rootPc: 0 as PitchClass, borrowed: false, chordId: "test:0:Cmaj", onset: 0, releaseTime: 1000 },
-            ],
-          },
-        });
+    it("setMacros({ linger }) sets the progression fade window in seconds", () => {
+      const releasedAgoMs = 4000;
+      const t = 5000;
+      const frame = createTestAnnotatedFrame(t, "main", {
+        prescribedKey: { root: 0 as PitchClass, mode: "ionian" },
+        harmonicContext: {
+          tension: 0,
+          keyAware: true,
+          currentFunction: null,
+          functionalProgression: [
+            { degree: 1, roman: "I", quality: "maj", rootPc: 0, borrowed: false, chordId: "test:0:Cmaj", onset: 0, releaseTime: t - releasedAgoMs },
+          ],
+        },
+      });
+      const numerals = () =>
+        lens.update(frame, null).entities.filter(
+          (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
+        );
 
-      const lens2 = new HarmonyLens();
-      lens2.init(ctx);
-
-      // Default: 3 seconds fade, age 4000 ms → past fade → 0 numerals
-      const defaultScene = lens2.update(buildFrame(5000), null);
-      const defaultProg = defaultScene.entities.filter(
-        (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
-      );
-      expect(defaultProg).toHaveLength(0);
-
-      // Extended: 6 seconds fade → still visible
-      lens2.setMacros({ linger: 6 });
-      const longScene = lens2.update(buildFrame(5000), null);
-      const longProg = longScene.entities.filter(
-        (e) => e.data?.type === "roman-numeral" && e.id.includes(":prog:"),
-      );
-      expect(longProg).toHaveLength(1);
+      lens.setMacros({ linger: releasedAgoMs / 1000 / 2 }); // window shorter than the age
+      expect(numerals()).toHaveLength(0);
+      lens.setMacros({ linger: (releasedAgoMs / 1000) * 2 }); // window longer than the age
+      expect(numerals()).toHaveLength(1);
     });
 
     it("getMacros returns current values; setMacros is partial", () => {
-      const lens2 = new HarmonyLens();
-      const before = lens2.getMacros();
-      lens2.setMacros({ linger: 8 });
-      expect(lens2.getMacros().linger).toBe(8);
-      lens2.setMacros({});
-      expect(lens2.getMacros().linger).toBe(8);
-      // Verify default matched PROGRESSION_FADE_VALUE (3).
-      expect(before.linger).toBe(3);
+      lens.setMacros({ linger: 8 });
+      expect(lens.getMacros().linger).toBe(8);
+      lens.setMacros({});
+      expect(lens.getMacros().linger).toBe(8);
     });
   });
 
@@ -977,7 +750,7 @@ describe("HarmonyLens", () => {
 describe("HarmonyLens glyph overtones (RFC 012)", () => {
   it("passes chord partials and fade-driven dissipation to the chord-shape entity", () => {
     const lens = new HarmonyLens();
-    const c = createTestChord(0 as PitchClass, "maj", [0, 4, 7]);
+    const c = createTestChord(0, "maj", [0, 4, 7]);
     const partials = [
       { n: 3, pc: 7 as PitchClass, cents: 2, level: 0.3, color: { h: 210, s: 0.8, v: 0.8, a: 1 }, sourcePc: 0 as PitchClass, angle: 210.6 },
     ];
@@ -996,11 +769,10 @@ describe("HarmonyLens glyph overtones (RFC 012)", () => {
     expect(fading.data!.overtoneDissipation as number).toBeCloseTo(1 - (fading.style.opacity ?? 1), 9);
   });
 
-  it("withholds partials when the glyph toggle is off; on by default", () => {
+  it("withholds partials when the glyph toggle is off", () => {
     const lens = new HarmonyLens();
-    expect(lens.readMacros().overtones).toBe(true);
     lens.setMacros({ overtones: false });
-    const c = createTestChord(0 as PitchClass, "maj", [0, 4, 7]);
+    const c = createTestChord(0, "maj", [0, 4, 7]);
     const partials = [
       { n: 3, pc: 7 as PitchClass, cents: 2, level: 0.3, color: { h: 210, s: 0.8, v: 0.8, a: 1 }, sourcePc: 0 as PitchClass, angle: 210.6 },
     ];
@@ -1034,7 +806,7 @@ describe("HarmonyLens guide numerals", () => {
   it("draws the key's diatonic numerals greyed when a key is set", () => {
     const g = guides(new HarmonyLens().update(frameWith([]), null));
     expect(g).toHaveLength(7);
-    for (const e of g) expect(e.style.opacity).toBe(0.25);
+    for (const e of g) expect(e.style.opacity).toBe(STRUCTURE_OPACITY);
   });
 
   it("draws none without a key (the chord name stands alone)", () => {
@@ -1042,14 +814,17 @@ describe("HarmonyLens guide numerals", () => {
   });
 
   it("fades the guide back in as a released numeral fades out (handover)", () => {
-    const lens = new HarmonyLens(); // linger 3 s → 3000 ms fade
+    const lens = new HarmonyLens();
+    lens.setMacros({ linger: LINGER_S });
     const at = (released: number) => {
       const ii = { degree: 2, roman: "ii", quality: "min", rootPc: 2 as PitchClass, borrowed: false, chordId: "x", onset: 0, releaseTime: released };
       return guides(lens.update(frameWith([ii]), null)).find((e) => e.id.endsWith("d:2"));
     };
-    // frame t = 1000: released 250 ms ago → guide at 1/12 of full; 2500 ms ago → 5/6
-    expect(at(750)!.style.opacity).toBeCloseTo(0.25 * (250 / 3000), 5);
-    expect(at(-1500)!.style.opacity).toBeCloseTo(0.25 * (2500 / 3000), 5);
+    // The guide returns in proportion to how far the numeral has faded
+    for (const fraction of [1 / 12, 5 / 6]) {
+      const releasedAt = 1000 - fraction * FADE_MS; // frame t = 1000
+      expect(at(releasedAt)!.style.opacity).toBeCloseTo(STRUCTURE_OPACITY * fraction, 9);
+    }
   });
 
   it("hides the guide in a slot a played numeral occupies", () => {
@@ -1100,9 +875,10 @@ describe("HarmonyLens interval-name dial", () => {
   const dial = (lens: HarmonyLens) =>
     lens.update(createTestFrame(1000, null, 0), null).entities.filter((e) => e.id.includes(":interval-name-"));
 
-  it("is on by default, and can be turned off", () => {
-    expect(dial(new HarmonyLens())).toHaveLength(12);
+  it("can be turned on and off", () => {
     const lens = new HarmonyLens();
+    lens.setMacros({ intervalNames: true });
+    expect(dial(lens)).toHaveLength(12);
     lens.setMacros({ intervalNames: false });
     expect(dial(lens)).toHaveLength(0);
   });

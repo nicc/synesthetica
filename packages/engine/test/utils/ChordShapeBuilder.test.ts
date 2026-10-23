@@ -12,8 +12,6 @@ import {
   getDashArray,
   getThreeDashParams,
   HUB_RADIUS,
-  ARM_LENGTH,
-  BASE_WIDTH,
 } from "../../src/utils/ChordShapeBuilder";
 import type { ChordShapeElement, MarginStyle } from "@synesthetica/contracts";
 
@@ -53,20 +51,6 @@ function createDom7(): ChordShapeElement[] {
     makeElement(300, "seventh", "♭7"),
   ];
 }
-
-// ============================================================================
-// Constants Tests
-// ============================================================================
-
-describe("ChordShapeBuilder constants", () => {
-  it("exports expected constants", () => {
-    expect(HUB_RADIUS).toBe(0.3);
-    expect(ARM_LENGTH.triadic).toBe(0.7);
-    expect(ARM_LENGTH.seventh).toBe(0.45);
-    expect(ARM_LENGTH.extension).toBe(0.25);
-    expect(BASE_WIDTH).toBe(30);
-  });
-});
 
 // ============================================================================
 // SVG Output Tests

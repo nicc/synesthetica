@@ -7,10 +7,10 @@ Lenses transform `AnnotatedMusicalFrame` into `SceneFrame`. Each lens interprets
 Lenses share a three-column layout defined in `layout.ts`:
 
 - **Left column** — `DynamicsLens` (VU-meter bar with fading velocity indicators)
-- **Center column** — `RhythmLens` (pitch-class note strips, beat grid, now-line)
-- **Right column** — `HarmonyLens` (chord shape top cell, progression placeholder bottom cell)
+- **Center column** — `RhythmLens` (pitch-class note strips, beat grid, NOW line)
+- **Right column** — `HarmonyLens` (chord glyph in the top cell, progression clock in the bottom cell)
 
-See `layout.ts` for exact coordinates and proportions.
+See `layout.ts` for exact coordinates and proportions, and `timeMapping.ts` for the NOW line position and time-to-Y mapping.
 
 ## Development Approach
 
@@ -28,17 +28,19 @@ Where the design is quantitative (positions, levels, thresholds), generate the A
 
 ### 2. SVG Snapshots for Visual Feedback
 
-Tests generate SVG snapshots of SceneFrame output. These provide visual feedback without running the full application:
+SVG snapshots of SceneFrame output give visual feedback without running the full application. They are review artefacts, not tests: generators live next to the tests as `test/**/<Name>.snapshot.ts` (e.g. `test/lenses/RhythmLens.snapshot.ts`) and are excluded from `npm test`.
 
 ```bash
-GENERATE_SNAPSHOTS=1 npm test -w packages/engine
+npm run snapshots -w packages/engine
 ```
 
-Snapshots live in `test/_snapshots/` (gitignored) and can be opened in a browser for review.
+This runs `vitest.snapshots.config.ts`, which sets `GENERATE_SNAPSHOTS=1` and writes SVGs to `test/_snapshots/<lens>/` (gitignored) for opening in a browser. A snapshot file asserts no more than that an SVG was produced. When a scene shows a behaviour worth protecting, assert that behaviour in the sibling `.test.ts` instead.
+
+Rendering helpers live in `test/_harness/`: `svg-snapshot.ts` renders a SceneFrame, `harmonySvg.ts` renders the harmony lens's chord shape, and `rhythmFixtures.ts` / `harmonyFixtures.ts` build the frames shared by tests and snapshots.
 
 ### 3. Simulation Metrics for Properties
 
-Tests emit quantitative metrics (entity counts, position distributions, color clustering) that can be analyzed without visual inspection. This supports Principle 8 (Experiential Feedback Through Simulation).
+`extractMetrics` summarises a scene quantitatively (entity counts, position distributions, colour clustering). Each scene SVG carries these metrics in a header comment, so they can be read without visual inspection. This supports Principle 8 (Experiential Feedback Through Simulation). Properties drawn from the metrics belong in the `.test.ts` as assertions; diagnostics never go to the console.
 
 ### 4. Parameter Exploration
 
@@ -72,13 +74,14 @@ Lens tests should cover a wide range of inputs:
 - Silence (no active notes)
 - Tempo changes
 - Subdivision variety
-- Tier transitions (1 → 2 → 3)
+- Rhythm tier transitions (1 free time → 2 tempo → 3 tempo and meter)
 
-See `test/_fixtures/` for fixture format and `test/_harness/frames.ts` for shared frame factories.
+Shared frame factories are in `test/_harness/frames.ts`, `rhythmFixtures.ts` and `harmonyFixtures.ts`. `test/_fixtures/` holds stabilizer fixtures only.
 
 ## Current Lenses
 
-- `RhythmLens` — Pitch-class note strips with beat/bar grid, drift streaks, and now-line
-- `HarmonyLens` — Chord shape visualization with radial geometry and gradient fill
+- `RhythmLens` — Pitch-class note strips with beat/bar grid, drift streaks, NOW line, note-name legend, and optional overtone strips
+- `HarmonyLens` — Chord glyph (with overtone halo and interval-name dial) and the functional-harmony progression clock, plus a scrolling Roman-numeral strip beside the rhythm lens, on its time axis
 - `DynamicsLens` — Vertical VU-meter bar with fading velocity indicators
-- `TestChordProgressionLens` — Legacy toy lens for chord visualization (to be retired)
+
+Visual element terms are defined in [GLOSSARY.md](GLOSSARY.md).

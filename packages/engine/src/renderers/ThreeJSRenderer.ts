@@ -38,7 +38,10 @@ import {
   BASE_WIDTH,
 } from "../utils/ChordShapeBuilder";
 // Shared with HarmonyLens: the band gap also sizes the progression clock.
+// Layer exemption until the scene coordinate contract lands (synesthetica-r3b1).
+// eslint-disable-next-line no-restricted-imports
 import { GLYPH_STEAM_BAND_GAP } from "../lenses/layout";
+import { disposeObject } from "./disposal";
 
 // ============================================================================
 // Configuration
@@ -443,6 +446,8 @@ export class ThreeJSRenderer implements IRenderer {
   // Reusable geometries
   private circleGeometry: THREE.CircleGeometry | null = null;
   private planeGeometry: THREE.PlaneGeometry | null = null;
+  /** Geometries owned by the renderer that outlive individual entities. */
+  private readonly sharedGeometries = new Set<THREE.BufferGeometry>();
 
   // Viewport resolution for LineMaterial (thick lines)
   private resolution = new THREE.Vector2(800, 600);
@@ -512,6 +517,7 @@ export class ThreeJSRenderer implements IRenderer {
     // Create reusable geometries
     this.circleGeometry = new THREE.CircleGeometry(1, 32);
     this.planeGeometry = new THREE.PlaneGeometry(1, 1);
+    this.sharedGeometries.add(this.circleGeometry).add(this.planeGeometry);
   }
 
   /**
@@ -530,6 +536,7 @@ export class ThreeJSRenderer implements IRenderer {
     this.planeGeometry?.dispose();
     this.circleGeometry = null;
     this.planeGeometry = null;
+    this.sharedGeometries.clear();
 
     // Dispose renderer
     this.renderer?.dispose();
@@ -624,7 +631,7 @@ export class ThreeJSRenderer implements IRenderer {
     for (const obj of this.entityObjects.values()) {
       obj.traverse((child) => {
         if (child instanceof Line2) {
-          const mat = child.material as LineMaterial;
+          const mat = child.material;
           mat.resolution.copy(this.resolution);
         }
       });
@@ -828,13 +835,9 @@ export class ThreeJSRenderer implements IRenderer {
     if (
       fieldType === "beat-line" ||
       fieldType === "bar-line" ||
-      fieldType === "division-tick"
+      fieldType === "now-line"
     ) {
       this.updateLine(entity);
-    } else if (fieldType === "now-line") {
-      this.updateLine(entity);
-    } else if (fieldType === "drift-ring") {
-      this.updateRing(entity);
     } else {
       // Default field: glowing area
       this.updateGlowField(entity);
@@ -865,7 +868,7 @@ export class ThreeJSRenderer implements IRenderer {
       new THREE.Vector3(xLeft, y, 0),
       new THREE.Vector3(xRight, y, 0),
     ];
-    (line.geometry as THREE.BufferGeometry).setFromPoints(points);
+    (line.geometry).setFromPoints(points);
 
     // Update material
     const material = line.material as THREE.LineBasicMaterial;
@@ -873,42 +876,6 @@ export class ThreeJSRenderer implements IRenderer {
     material.color.copy(this.hsvToThreeColor(color));
     material.opacity = entity.style.opacity ?? 0.3;
     material.linewidth = entity.style.size ?? 1;
-  }
-
-  /**
-   * Render a ring (drift indicator).
-   */
-  private updateRing(entity: Entity): void {
-    if (!this.scene) return;
-
-    let ring = this.entityObjects.get(entity.id) as THREE.Line | undefined;
-
-    if (!ring) {
-      const geometry = new THREE.RingGeometry(0.9, 1, 32);
-      const material = new THREE.MeshBasicMaterial({
-        transparent: true,
-        side: THREE.DoubleSide,
-      });
-      ring = new THREE.Mesh(geometry, material) as unknown as THREE.Line;
-      this.scene.add(ring);
-      this.entityObjects.set(entity.id, ring);
-    }
-
-    // Position
-    const x = (entity.position?.x ?? 0.5) * this.config.worldWidth;
-    const y = (1 - (entity.position?.y ?? 0.5)) * this.config.worldHeight;
-    ring.position.set(x, y, 0);
-
-    // Scale
-    const size = entity.style.size ?? 20;
-    ring.scale.set(size / 20, size / 20, 1);
-
-    // Material
-    const material = (ring as unknown as THREE.Mesh)
-      .material as THREE.MeshBasicMaterial;
-    const color = entity.style.color ?? { h: 120, s: 0.7, v: 0.8 };
-    material.color.copy(this.hsvToThreeColor(color));
-    material.opacity = entity.style.opacity ?? 0.6;
   }
 
   /**
@@ -959,7 +926,7 @@ export class ThreeJSRenderer implements IRenderer {
       this.scene.add(ring);
       this.entityObjects.set(entity.id, ring);
     } else {
-      const mat = ring.material as LineMaterial;
+      const mat = ring.material;
       mat.color.copy(threeColor);
       mat.opacity = opacity;
       mat.resolution.set(this.resolution.x, this.resolution.y);
@@ -1018,9 +985,9 @@ export class ThreeJSRenderer implements IRenderer {
       this.scene.add(line);
       this.entityObjects.set(entity.id, line);
     } else {
-      const geom = line.geometry as LineGeometry;
+      const geom = line.geometry;
       geom.setPositions(positions);
-      const mat = line.material as LineMaterial;
+      const mat = line.material;
       mat.color.copy(threeColor);
       mat.opacity = opacity;
       mat.resolution.set(this.resolution.x, this.resolution.y);
@@ -1281,7 +1248,7 @@ export class ThreeJSRenderer implements IRenderer {
       this.scene.add(mesh);
       this.entityObjects.set(entity.id, mesh);
     } else {
-      const geom = mesh.geometry as THREE.BufferGeometry;
+      const geom = mesh.geometry;
       const posAttr = geom.getAttribute("position") as THREE.BufferAttribute;
       posAttr.array.set(positions);
       posAttr.needsUpdate = true;
@@ -1507,7 +1474,7 @@ export class ThreeJSRenderer implements IRenderer {
       new THREE.Vector3(x1, y1, 0),
       new THREE.Vector3(x1 + vx, y1 + vy, 0),
     ];
-    (line.geometry as THREE.BufferGeometry).setFromPoints(points);
+    (line.geometry).setFromPoints(points);
 
     // Material
     const material = line.material as THREE.LineBasicMaterial;
@@ -1540,8 +1507,6 @@ export class ThreeJSRenderer implements IRenderer {
       this.updateChordLabel(entity);
     } else if (glyphType === "tension-bar") {
       this.updateTensionBar(entity);
-    } else if (glyphType === "dynamics-contour") {
-      this.updateDynamicsContour(entity);
     } else if (glyphType === "dynamics-indicator") {
       this.updateDynamicsIndicator(entity);
     } else if (glyphType === "roman-numeral") {
@@ -1581,7 +1546,7 @@ export class ThreeJSRenderer implements IRenderer {
     if (!elements || elements.length === 0) {
       const cached = this.entityObjects.get(entity.id);
       if (cached) {
-        this.scene!.remove(cached);
+        this.scene.remove(cached);
         this.disposeObject(cached);
         this.entityObjects.delete(entity.id);
       }
@@ -1639,7 +1604,8 @@ export class ThreeJSRenderer implements IRenderer {
     const bodyOpacity = entityOpacity * 0.8;
     group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
-        const mat = child.material;
+        // instanceof narrows to Mesh<any, any>; restore the default generics.
+        const mat = (child as THREE.Mesh).material;
         if (mat instanceof THREE.ShaderMaterial && mat.uniforms.opacity) {
           mat.uniforms.opacity.value = bodyOpacity;
         } else if (mat instanceof THREE.MeshBasicMaterial) {
@@ -1649,7 +1615,7 @@ export class ThreeJSRenderer implements IRenderer {
       // Line2/LineSegments2 store LineMaterial here; it doesn't extend
       // MeshBasicMaterial so the branches above don't catch it.
       if (child instanceof Line2) {
-        const mat = child.material as LineMaterial;
+        const mat = child.material;
         mat.transparent = true;
         mat.opacity = entityOpacity;
       }
@@ -2046,66 +2012,6 @@ export class ThreeJSRenderer implements IRenderer {
   // ==========================================================================
   // Dynamics Entities
   // ==========================================================================
-
-  /**
-   * Render a dynamics contour as a thick line using Line2/LineMaterial.
-   */
-  private updateDynamicsContour(entity: Entity): void {
-    if (!this.scene) return;
-
-    const points = entity.data?.points as Array<{ x: number; y: number }> | undefined;
-    if (!points || points.length < 2) {
-      const existing = this.entityObjects.get(entity.id);
-      if (existing) {
-        this.scene.remove(existing);
-        this.disposeObject(existing);
-        this.entityObjects.delete(entity.id);
-      }
-      return;
-    }
-
-    // Build flat position array for LineGeometry [x, y, z, x, y, z, ...]
-    const positions: number[] = [];
-    for (const p of points) {
-      positions.push(
-        p.x * this.config.worldWidth,
-        (1 - p.y) * this.config.worldHeight,
-        1,
-      );
-    }
-
-    const color = entity.style.color ?? { h: 200, s: 0.5, v: 0.8 };
-    const threeColor = this.hsvToThreeColor(color);
-    const linewidth = entity.style.size ?? 3;
-    const opacity = entity.style.opacity ?? 0.9;
-
-    let line = this.entityObjects.get(entity.id) as Line2 | undefined;
-    if (line) {
-      // Reuse — update geometry positions
-      const geom = line.geometry as LineGeometry;
-      geom.setPositions(positions);
-      const mat = line.material as LineMaterial;
-      mat.color.copy(threeColor);
-      mat.opacity = opacity;
-      mat.linewidth = linewidth;
-      mat.resolution.set(this.resolution.x, this.resolution.y);
-    } else {
-      const geometry = new LineGeometry();
-      geometry.setPositions(positions);
-
-      const material = new LineMaterial({
-        color: threeColor.getHex(),
-        linewidth,
-        transparent: true,
-        opacity,
-        resolution: new THREE.Vector2(this.resolution.x, this.resolution.y),
-      });
-
-      line = new Line2(geometry, material);
-      this.scene.add(line);
-      this.entityObjects.set(entity.id, line);
-    }
-  }
 
   /**
    * Render a dynamics indicator as a PlaneGeometry rectangle.
@@ -2608,26 +2514,6 @@ export class ThreeJSRenderer implements IRenderer {
   }
 
   private disposeObject(obj: THREE.Object3D): void {
-    if (obj instanceof THREE.Mesh) {
-      // Don't dispose shared geometries
-      if (
-        obj.geometry !== this.circleGeometry &&
-        obj.geometry !== this.planeGeometry
-      ) {
-        obj.geometry.dispose();
-      }
-      if (obj.material instanceof THREE.Material) {
-        obj.material.dispose();
-      }
-    } else if (obj instanceof THREE.Line) {
-      obj.geometry.dispose();
-      if (obj.material instanceof THREE.Material) {
-        obj.material.dispose();
-      }
-    } else if (obj instanceof THREE.Group) {
-      for (const child of obj.children) {
-        this.disposeObject(child);
-      }
-    }
+    disposeObject(obj, this.sharedGeometries);
   }
 }

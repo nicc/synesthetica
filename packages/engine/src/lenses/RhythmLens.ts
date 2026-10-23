@@ -95,7 +95,7 @@ const NOTE_STRIP_WIDTH = NOTE_STRIP_BASE_WIDTH;
 const REFERENCE_LINE_HALF_WIDTH = NOTE_STRIP_WIDTH * 1.5 * 0.75;
 
 /** Minimum note strip height in normalized coordinates */
-const MIN_NOTE_STRIP_HEIGHT = 0.008;
+export const MIN_NOTE_STRIP_HEIGHT = 0.008;
 
 /** Overtone strip width as a multiple of note-strip width (RFC 012).
  *  Must exceed 1: a coincident partial (C's 3rd under a played G, +2¢)

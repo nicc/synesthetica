@@ -28,8 +28,6 @@ import type {
   AnnotatedChord,
   SceneFrame,
   Entity,
-  ChordShapeElement,
-  MarginStyle,
   FunctionalChord,
   KeyChord,
   FunctionalEdge,
@@ -38,13 +36,11 @@ import type {
   ColorHSVA,
   PitchHueInvariant,
 } from "@synesthetica/contracts";
+// I14 exemption: functional-chord hues are computed here until the
+// vocabulary supplies them (synesthetica-a9mf).
+// eslint-disable-next-line no-restricted-imports
 import { pcToHue, MODE_SCALE_INTERVALS } from "@synesthetica/contracts";
 
-import {
-  ChordShapeBuilder,
-  colorToCSS,
-  getDashArray,
-} from "../utils/ChordShapeBuilder";
 import { buildRomanNumeralGlyph } from "../utils/RomanNumeralGlyphBuilder";
 import {
   HARMONY_CHORD_CENTER_X,
@@ -64,10 +60,10 @@ import { NOW_LINE_Y, timeToY } from "./timeMapping";
 // ============================================================================
 
 /**
- * Fade control value. Unit depends on context:
- * - Without tempo: seconds
- * - With tempo: bars
- * Default: 6 (6 seconds or 6 bars)
+ * Default fade window for the progression clock, in seconds. Default
+ * for the `linger` macro (harmony:linger). Always seconds, whether or
+ * not a tempo is set: the LLM and panel convert bars to seconds at
+ * input time (SPEC 014 §Harmony linger).
  */
 const PROGRESSION_FADE_VALUE = 3;
 
@@ -181,7 +177,7 @@ const VIEWPORT_ASPECT = 100 / 75;
 /** Opacity for the always-on structural elements of the harmony clock
  *  (guide rings + slot ticks). Matches DynamicsLens's OUTLINE_OPACITY
  *  so the structural cues across lenses share a consistent weight. */
-const STRUCTURE_OPACITY = 0.25;
+export const STRUCTURE_OPACITY = 0.25;
 
 /** Colour for the always-on structural elements of the harmony clock.
  *  Matches DynamicsLens's OUTLINE_COLOR (cool muted grey) so the
@@ -213,7 +209,7 @@ const MAX_STRIP_OPACITY = 1.0;
  *  source chord's angular position along its target ring toward the
  *  target strip. Short enough to feel snappy, long enough to read as
  *  a drawn line rather than a snap. Tune to taste. */
-const CONNECTOR_ANIMATION_MS = 60;
+export const CONNECTOR_ANIMATION_MS = 60;
 
 /** Connector arc radial half-thickness as a normalized fraction of
  *  worldWidth. The renderer draws the arc as a thin annular segment
@@ -326,43 +322,6 @@ function longerSignedArc(shorterSweep: number): number {
 }
 
 // ============================================================================
-// Configuration
-// ============================================================================
-
-export interface HarmonyLensConfig {
-  /**
-   * Viewport width in pixels.
-   * @default 800
-   */
-  width?: number;
-
-  /**
-   * Viewport height in pixels.
-   * @default 600
-   */
-  height?: number;
-
-  /**
-   * Background color.
-   * @default "#1a1a2e"
-   */
-  backgroundColor?: string;
-
-  /**
-   * Stroke width for chord shape outline.
-   * @default 2
-   */
-  strokeWidth?: number;
-}
-
-const DEFAULT_CONFIG: Required<HarmonyLensConfig> = {
-  width: 800,
-  height: 600,
-  backgroundColor: "#1a1a2e",
-  strokeWidth: 2,
-};
-
-// ============================================================================
 // Lens Implementation
 // ============================================================================
 
@@ -375,10 +334,8 @@ const CHORD_FADE_OUT_MS = 120;
  *  IDs (e.g. `harmony:linger`) to these fields happens at the
  *  dispatcher layer. */
 interface HarmonyLensMacros {
-  /** Fade window value. Interpretation depends on prescribed tempo:
-   *  - With tempo set: value is in bars (default 3 bars)
-   *  - Without tempo: value is in seconds (default 3 s)
-   *  Matches PROGRESSION_FADE_VALUE's semantic. */
+  /** Progression-clock fade window in seconds, regardless of tempo.
+   *  Default PROGRESSION_FADE_VALUE. */
   linger: number;
   /** Draw the chord glyph's overtone halo (harmonic series overlay,
    *  RFC 012). Lens-level so the glyph and the rhythm lens can be
@@ -394,9 +351,6 @@ interface HarmonyLensMacros {
 export class HarmonyLens implements IVisualLens {
   readonly id = "harmony-lens";
 
-  private config: Required<HarmonyLensConfig>;
-  private ctx: LensContext | null = null;
-
   private macros: HarmonyLensMacros = {
     linger: PROGRESSION_FADE_VALUE,
     overtones: true,
@@ -409,16 +363,9 @@ export class HarmonyLens implements IVisualLens {
   private fadingChord: AnnotatedChord | null = null;
   private fadingChordEndTime: number | null = null;
 
-  constructor(config: HarmonyLensConfig = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
-  }
-
-  init(ctx: LensContext): void {
-    this.ctx = ctx;
-  }
+  init(_ctx: LensContext): void {}
 
   dispose(): void {
-    this.ctx = null;
     this.fadingChord = null;
     this.fadingChordEndTime = null;
   }
@@ -440,8 +387,11 @@ export class HarmonyLens implements IVisualLens {
   }
 
   /**
-   * Update the scene with chord shape and tension bar entities.
-   * For full gradient rendering in tests, use renderToSVG() method.
+   * Build the frame's entities: the chord glyph (with its overtone halo
+   * and centre label) and interval-name dial, plus, when a key is
+   * prescribed, the progression clock (guide rings, guide numerals,
+   * played numerals, connector strips and arcs) and the scrolling
+   * Roman numerals.
    */
   update(input: AnnotatedMusicalFrame, _previous: SceneFrame | null): SceneFrame {
     const entities: Entity[] = [];
@@ -645,11 +595,6 @@ export class HarmonyLens implements IVisualLens {
   // ==========================================================================
 
   /**
-   * Create entities for the progression clock.
-   * Each functional chord in the progression becomes a Roman numeral glyph
-   * positioned at its pitch-class angle, coloured by root hue, fading with age.
-   */
-  /**
    * Always-on structural elements of the harmony clock — three guide
    * rings + seven slot tick marks at the diatonic ring. Renders
    * whenever a key is prescribed, regardless of whether any chord is
@@ -721,6 +666,11 @@ export class HarmonyLens implements IVisualLens {
     return entities;
   }
 
+  /**
+   * Played numerals on the progression clock. Each functional chord in
+   * the progression becomes a Roman numeral at its scale-degree slot,
+   * coloured by its root's hue, fading over `fadeMs` after release.
+   */
   private createProgressionClock(
     progression: FunctionalChord[],
     t: number,
@@ -1336,85 +1286,6 @@ export class HarmonyLens implements IVisualLens {
     }
 
     return entities;
-  }
-
-  // ==========================================================================
-  // SVG Rendering (for snapshot testing)
-  // ==========================================================================
-
-  /**
-   * Render the current frame to SVG for snapshot testing.
-   * This provides full gradient rendering that entities can't express.
-   */
-  renderToSVG(frame: AnnotatedMusicalFrame): string {
-    const width = this.ctx?.canvasSize.width ?? this.config.width;
-    const height = this.ctx?.canvasSize.height ?? this.config.height;
-    const backgroundColor = this.config.backgroundColor;
-
-    // Get the active chord (if any)
-    const activeChord = frame.chords.find((c) => c.chord.phase === "active");
-    const chord = activeChord ?? frame.chords[0];
-
-    // Start SVG
-    let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">\n`;
-
-    // Background
-    svg += `  <rect width="${width}" height="${height}" fill="${backgroundColor}"/>\n`;
-
-    // Render chord shape if we have one
-    if (chord) {
-      svg += this.renderChordShapeSVG(chord.shape.elements, chord.shape.margin, width, height);
-    }
-
-    svg += "</svg>";
-    return svg;
-  }
-
-  /**
-   * Render chord shape using ChordShapeBuilder.
-   */
-  private renderChordShapeSVG(
-    elements: ChordShapeElement[],
-    margin: MarginStyle,
-    width: number,
-    height: number
-  ): string {
-    // Chord shape is 25% of width, centered
-    const scale = (width * 0.25) / 2;
-    const cx = width / 2;
-    const cy = height / 2;
-
-    // Build shape geometry
-    const builder = new ChordShapeBuilder(elements, margin, {
-      scale,
-      center: { x: cx, y: cy },
-      strokeWidth: this.config.strokeWidth,
-    });
-
-    const fillPath = builder.toSVGPath();
-    if (!fillPath) {
-      return "";
-    }
-
-    // Find root element for fill color
-    const arms = builder.getArms();
-    const rootArm = arms.find((a) => a.interval === "1") ?? arms[0];
-    const fillColor = rootArm ? colorToCSS(rootArm.color) : "#888";
-
-    let svg = "";
-
-    // Render chromatic lines first (behind shape)
-    for (const line of builder.toSVGLines()) {
-      svg += `  <path d="${line.path}" fill="none" stroke="${colorToCSS(line.color)}" stroke-width="${this.config.strokeWidth}" stroke-linecap="round"/>\n`;
-    }
-
-    // Render the main shape
-    const dashArray = getDashArray(margin);
-    const dashAttr = dashArray ? ` stroke-dasharray="${dashArray}"` : "";
-
-    svg += `  <path d="${fillPath}" fill="${fillColor}" fill-opacity="0.8" stroke="${fillColor}" stroke-width="${this.config.strokeWidth}" stroke-linejoin="round"${dashAttr}/>\n`;
-
-    return svg;
   }
 
 }

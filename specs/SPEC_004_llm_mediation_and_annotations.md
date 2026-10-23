@@ -64,7 +64,7 @@ Three annotation types exist:
 ### Purpose
 
 Enable the LLM to:
-1. Map user-facing names ("starfield style") to lens IDs
+1. Map user-facing names ("rhythm view") to lens IDs
 2. Select lenses based on musical intent ("make rhythm more visible")
 3. Understand lens limitations and combinations
 
@@ -72,7 +72,7 @@ Enable the LLM to:
 
 ```ts
 interface LensAnnotation {
-  id: string;                   // lens id (e.g. "starfield")
+  id: string;                   // lens id (e.g. "rhythm-lens")
   name?: string;                // human-readable name
   aliases?: string[];           // user-facing synonyms
   illustrates?: MusicalConcept[];
@@ -277,7 +277,7 @@ notes:
 
 ### The Problem
 
-When the user says "emphasise rhythm", the LLM adjusts macros. But different lenses respond differently to macros — the Starfield lens might respond strongly to `articulation`, while Rain lens might be more affected by `persistence`.
+When the user says "emphasise rhythm", the LLM adjusts macros. But different lenses respond differently to macros — RhythmLens responds strongly to `rhythm:horizon`, while HarmonyLens is affected by `harmony:linger` and not at all by the rhythm macros.
 
 ### Solution: Lens Response Hints
 
@@ -297,22 +297,24 @@ interface LensAnnotation {
 
 ### Example
 
+Abridged from `rhythm-lens` in `packages/contracts/annotations/manifest.ts`:
+
 ```yaml
-id: starfield
+id: rhythm-lens
 # ... other fields ...
 macroResponses:
-  articulation:
+  rhythm:horizon:
     responsiveness: strong
-    notes: "high articulation sharpens star bursts"
-  persistence:
+    notes: "the scrolling window's history + lookahead extent"
+  rhythm:pulse-intensity:
+    responsiveness: strong
+    notes: "brightness + duration of the NOW-line beat pulse"
+  system:note-names:spelling:
     responsiveness: moderate
-    notes: "affects trail decay"
-  emphasis.rhythm:
-    responsiveness: strong
-    notes: "directly controls onset response intensity"
+    notes: "legend spelling when no key is set"
 ```
 
-This tells the LLM: "If you want to emphasise rhythm using Starfield, increase `articulation` and `emphasis.rhythm` — those have strong effects."
+This tells the LLM: "If you want to emphasise rhythm, `rhythm:horizon` and `rhythm:pulse-intensity` have strong effects on the rhythm lens."
 
 ## LLM Interaction Flow
 
@@ -335,28 +337,29 @@ Example: User says "Let's emphasise rhythm"
    - Lenses with `illustrates: [rhythm]`
    - Macros that affect rhythm
 4. **Consider options**:
-   - Switch to rhythm-forward preset?
-   - Adjust `emphasis.rhythm` macro?
-   - Enable a rhythm-illustrating lens?
+   - Switch to a saved preset?
+   - Adjust `rhythm:emphasis` or `rhythm:horizon`?
 5. **Select actions**: Balance impact vs. disruption
-6. **Emit control ops**: e.g., `setMacro`, `enableGrammar`
+6. **Call MCP tools**: e.g., `set_macro`, `switch_preset`
 
-### Output: Control Operations
+### Output: MCP Tool Calls
 
-The LLM produces `ControlOp` messages (see `packages/contracts/control/control_ops.ts`):
+The LLM acts through the MCP tools defined in SPEC_013 §Tools:
 
 ```ts
-{ op: "setMacro", target: { kind: "all" }, patch: { emphasis: { rhythm: 0.8 } } }
-{ op: "setMacro", target: { kind: "all" }, patch: { articulation: 0.7 } }
+set_macro({ name: "rhythm:emphasis", value: 0.8 })
+set_macro({ name: "rhythm:horizon", value: 0.5 })
 ```
 
 The engine executes these deterministically.
+
+The `ControlOp` union in `packages/contracts/control/control_ops.ts` (`applyPreset`, `setMacro`, `enableLens`, `setLensParams`, `setLayout`, `setCompositing`, `labelPart`) predates the MCP surface and has no consumer. There is no lens enabling or switching: all three lenses always run.
 
 ## Bounded Execution
 
 Although interpretation is flexible, execution remains bounded (I12):
 
-- Macro values are clamped to 0–1
+- Macro values outside their declared range are rejected (`MACRO_VALUE_OUT_OF_RANGE`, SPEC_015)
 - Lens parameters are schema-validated
 - Layout/compositing options are enumerated
 - Invalid operations return errors, not exceptions

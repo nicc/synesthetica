@@ -77,7 +77,7 @@ Both steps are unconditional — the manifest state resource is always truthful 
 
 **Lenses.** Parse `<scope>:<param>` from the macro id. Any lens whose `id` equals `${scope}-lens` (or `${scope}`) receives `setMacros({[paramCamel]: value})`, where `paramCamel` is `paramKebab` kebab→camelCase. Lenses implement `setMacros` with a `Partial<Config>` shape and ignore keys they don't own.
 
-Example: `set_macro("rhythm:pulse-intensity", 0.8)` reaches `RhythmGrammar.setMacros({pulseIntensity: 0.8})`.
+Example: `set_macro("rhythm:pulse-intensity", 0.8)` reaches `RhythmLens.setMacros({pulseIntensity: 0.8})`.
 
 **Stabilizers.** Every stabilizer in every `partState` receives `setMacro(name, value)`. Stabilizers translate qualified macro ids to their internal config fields directly (no kebab→camel rule — the mapping is explicit because macro names are user-facing and stabilizer fields are implementation-honest).
 
@@ -165,12 +165,12 @@ A change to a macro's `directionality` or `notes` in the manifest flows to widge
 
 On MCP handshake, the client fetches (typically eagerly, without any read of the specific resources):
 
-- `tools/list` — 10 tools with names + descriptions + JSON schemas.
+- `tools/list` — 20 tools with names + descriptions + JSON schemas (SPEC_013 §Tools).
 - `resources/list` — every annotation URI + state URI + presets URI.
 - `resources/templates/list` — templated URIs (`annotations://macros/{id}`, `presets://{name}`, etc.).
-- `prompts/list` — 3 prompts (`guide://system-overview`, `posture://quiet`, `posture://conversational`).
+- `prompts/list` — empty. `guide://system-overview` moved to the `get_started` tool and the `posture://*` prompts were dropped (SPEC_013 §Prompts).
 
-When the user attaches `guide://system-overview` (or the client auto-attaches — see synesthetica-ure), the LLM receives:
+When the LLM calls `get_started` (the MCP `initialize.instructions` field points it there), it receives:
 
 - Authored pipeline narrative.
 - Every macro with type, range, default, directionality, notes.
@@ -199,7 +199,7 @@ Per-item `annotations://` reads remain available for on-demand precision (e.g. w
 
 ### 3.3 Coverage matrix
 
-| Manifest entry | `tools/list` | `resources/list` | `guide://system-overview` prompt | UI widgets | UI About |
+| Manifest entry | `tools/list` | `resources/list` | `get_started` primer | UI widgets | UI About |
 |---|---|---|---|---|---|
 | Macros | — | ✓ per-item | ✓ ## Macros | ✓ | (via widget help) |
 | Session controls | — | ✓ per-item | ✓ ## Session controls | ✓ | (via widget help) |

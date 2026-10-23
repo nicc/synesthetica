@@ -28,7 +28,7 @@ interface WidgetDescriptorBase {
   label: string;
   /** Hover-help paragraphs from annotation.humanNotes (all of them,
    *  concatenated by the renderer as separate <p> blocks). */
-  tooltip?: string[];
+  tooltip?: string[] | undefined;
   /** Non-primary names from annotation.aliases, for the filter input. */
   aliases: string[];
 }
@@ -44,7 +44,7 @@ export interface SliderWidgetDescriptor extends WidgetDescriptorBase {
   defaultValue: number;
   /** Optional step for the widget's <input type="range">. Omit for
    *  "any" (default). `1` renders as an integer stepper. */
-  step?: number;
+  step?: number | undefined;
   /** Directionality prose for the low/high extremes; render as endpoints. */
   low: string;
   high: string;
@@ -85,8 +85,8 @@ export interface NumberWidgetDescriptor extends WidgetDescriptorBase {
   kind: "number";
   range: [number, number];
   /** Optional step for <input type="number">. Omit for "any". */
-  step?: number;
-  unit?: string;
+  step?: number | undefined;
+  unit?: string | undefined;
   clearable: boolean;
 }
 

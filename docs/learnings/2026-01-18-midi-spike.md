@@ -92,4 +92,4 @@ Proceed with Phase 0 implementation. The browser APIs support our architectural 
 
 ## Code Disposition
 
-The spike code in `spike/w9j-midi-canvas.html` should be deleted after this document is committed, per the spike's exit criteria. It has served its purpose.
+The spike code in `spike/w9j-midi-canvas.html` should be deleted after this document is committed, per the spike's exit criteria. It has served its purpose. (Deleted October 2026; available in git history at commit `2d1b0f7`.)

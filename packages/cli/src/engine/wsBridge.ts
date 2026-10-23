@@ -14,7 +14,7 @@
  * doesn't know or care that state lives in a browser tab.
  */
 
-import { WebSocketServer, type WebSocket } from "ws";
+import { WebSocketServer, type RawData, type WebSocket } from "ws";
 import {
   ENGINE_BRIDGE_PROTOCOL,
   type BrowserToCli,
@@ -23,23 +23,25 @@ import {
   type EngineMethod,
   type EngineStateSnapshot,
   type EngineRecentEvent,
+  type EngineRecentEventsEnvelope,
+  type AvailableInput,
+  type MacroValue,
 } from "@synesthetica/contracts";
-import type {
-  EngineHandle,
-  StateSnapshot,
-  RecentEventsEnvelope,
-  AvailableInput,
-  Unsubscribe,
-} from "./engineHandle.js";
-import type { MacroValue } from "@synesthetica/contracts";
+import { EngineDisconnectedError, type EngineHandle, type Unsubscribe } from "./engineHandle.js";
+import { LOOPBACK_HOST, isLoopbackOrigin } from "../loopback.js";
 
 const CALL_TIMEOUT_MS = 5_000;
+/** How long a disconnected tab gets to reconnect (e.g. a page reload)
+ *  before calls fail with EngineDisconnectedError. */
 const RECONNECT_GRACE_MS = 2_000;
+
 
 export interface WsBridgeOptions {
   port: number;
   /** Called for every stderr-worthy line. */
   log?: (line: string) => void;
+  /** Override RECONNECT_GRACE_MS (tests). */
+  reconnectGraceMs?: number;
 }
 
 export interface WsBridgeHandle {
@@ -60,6 +62,10 @@ export interface WsBridgeHandle {
 interface BridgeConnection {
   label: string;
   ws: WebSocket;
+  /** True while `ws` is open. The connection record (and its last
+   *  snapshot) outlives the socket so a reconnect can reuse it, but
+   *  nothing is served from a closed tab's state. */
+  open: boolean;
   state: EngineStateSnapshot;
   events: EngineRecentEvent[];
   eventCap: number;
@@ -79,7 +85,7 @@ interface PendingCall {
 
 export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHandle> {
   const log = opts.log ?? (() => {});
-  const wss = new WebSocketServer({ port: opts.port });
+  const wss = new WebSocketServer({ port: opts.port, host: LOOPBACK_HOST });
   // With port=0, ws picks an OS-assigned free port. The actual port
   // is only known once the underlying HTTP server has bound. Await
   // the 'listening' event before returning.
@@ -97,14 +103,19 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
   const handles = new Map<string, WSBackedEngineHandle>();
   const pendingByConn = new WeakMap<WebSocket, Map<number, PendingCall>>();
 
-  wss.on("connection", (ws) => {
+  wss.on("connection", (ws, req) => {
+    if (!isLoopbackOrigin(req.headers.origin)) {
+      log(`wsBridge: rejected connection from origin '${req.headers.origin}'`);
+      ws.close(1008, "origin not allowed");
+      return;
+    }
     let helloSeen = false;
     let label: string | null = null;
 
     ws.on("message", (raw) => {
       let msg: BrowserToCli;
       try {
-        msg = JSON.parse(String(raw)) as BrowserToCli;
+        msg = JSON.parse(rawToString(raw)) as BrowserToCli;
       } catch {
         log(`wsBridge: dropped malformed frame`);
         return;
@@ -116,8 +127,11 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
           ws.close(1002, "hello required");
           return;
         }
-        if (msg.protocol !== ENGINE_BRIDGE_PROTOCOL) {
-          log(`wsBridge: protocol mismatch (peer=${msg.protocol}, ours=${ENGINE_BRIDGE_PROTOCOL})`);
+        // Typed as our protocol constant, but a peer on another version
+        // sends whatever it has.
+        const peerProtocol: unknown = msg.protocol;
+        if (peerProtocol !== ENGINE_BRIDGE_PROTOCOL) {
+          log(`wsBridge: protocol mismatch (peer=${String(peerProtocol)}, ours=${ENGINE_BRIDGE_PROTOCOL})`);
           ws.close(1002, "protocol version mismatch");
           return;
         }
@@ -129,11 +143,13 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
           // Reconnect — replace the socket, reset ready flag until
           // the browser re-signals (a fresh tab is a fresh init).
           existing.ws = ws;
+          existing.open = true;
           existing.pipelineReady = false;
         } else {
           connections.set(label, {
             label,
             ws,
+            open: true,
             state: emptyState(label),
             events: [],
             eventCap: 1000,
@@ -174,11 +190,14 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
     });
 
     ws.on("close", () => {
-      if (label !== null) {
-        log(`wsBridge: '${label}' disconnected`);
-        // Leave conn.state in place so late reads/subscribers see the
-        // last-known snapshot. Handle stays alive; reconnection reuses it.
-      }
+      if (label === null) return;
+      const conn = connections.get(label);
+      // A socket already replaced by a reconnect closing late changes nothing.
+      if (!conn || conn.ws !== ws) return;
+      conn.open = false;
+      conn.pipelineReady = false;
+      handles.get(label)?.notifyDisconnected();
+      log(`wsBridge: '${label}' disconnected`);
     });
   });
 
@@ -187,7 +206,7 @@ export async function startWsBridge(opts: WsBridgeOptions): Promise<WsBridgeHand
     handleFor(label) {
       let handle = handles.get(label);
       if (!handle) {
-        handle = new WSBackedEngineHandle(label, {
+        handle = new WSBackedEngineHandle(label, opts.reconnectGraceMs ?? RECONNECT_GRACE_MS, {
           getConnection: () => connections.get(label) ?? null,
           sendCall: (ws, msg, id) => {
             const table = pendingByConn.get(ws);
@@ -293,25 +312,45 @@ class WSBackedEngineHandle implements EngineHandle {
   readonly label: string;
 
   private nextCallId = 1;
-  private subscribers: Array<(s: StateSnapshot) => void> = [];
-  private waitConnected: Promise<void>;
-  private resolveConnected!: () => void;
+  private subscribers: Array<(s: EngineStateSnapshot) => void> = [];
+  /** Callers parked in awaitConnected, resolved on the next connect. */
+  private connectWaiters: Array<() => void> = [];
 
-  constructor(label: string, private deps: WsBridgeDeps) {
+  constructor(
+    label: string,
+    private readonly reconnectGraceMs: number,
+    private deps: WsBridgeDeps,
+  ) {
     this.label = label;
-    this.waitConnected = new Promise((resolve) => {
-      this.resolveConnected = resolve;
-    });
-    // If already connected (rare race), resolve immediately.
-    if (deps.getConnection()) {
-      this.status = "running";
-      this.resolveConnected();
-    }
+    // If already connected (rare race), mark running immediately.
+    if (deps.getConnection()?.open) this.status = "running";
   }
 
   notifyConnected(): void {
     this.status = "running";
-    this.resolveConnected();
+    const waiters = this.connectWaiters;
+    this.connectWaiters = [];
+    for (const resolve of waiters) resolve();
+  }
+
+  notifyDisconnected(): void {
+    if (this.status === "running") this.status = "starting";
+  }
+
+  /** True when a tab is connected now, or connects within `timeoutMs`. */
+  awaitConnected(timeoutMs: number = this.reconnectGraceMs): Promise<boolean> {
+    if (this.deps.getConnection()?.open) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const onConnect = () => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      const timer = setTimeout(() => {
+        this.connectWaiters = this.connectWaiters.filter((w) => w !== onConnect);
+        resolve(false);
+      }, timeoutMs);
+      this.connectWaiters.push(onConnect);
+    });
   }
 
   markClosed(): void {
@@ -324,38 +363,39 @@ class WSBackedEngineHandle implements EngineHandle {
   }
 
   // ---- calls ----
-  async setMacro(name: string, value: MacroValue): Promise<StateSnapshot> {
-    return this.call("setMacro", [name, value]) as Promise<StateSnapshot>;
+  async setMacro(name: string, value: MacroValue): Promise<EngineStateSnapshot> {
+    return this.call("setMacro", [name, value]) as Promise<EngineStateSnapshot>;
   }
-  async setKey(root: number | null, mode: string | null): Promise<StateSnapshot> {
-    return this.call("setKey", [root, mode]) as Promise<StateSnapshot>;
+  async setKey(root: number | null, mode: string | null): Promise<EngineStateSnapshot> {
+    return this.call("setKey", [root, mode]) as Promise<EngineStateSnapshot>;
   }
-  async setTempo(bpm: number | null): Promise<StateSnapshot> {
-    return this.call("setTempo", [bpm]) as Promise<StateSnapshot>;
+  async setTempo(bpm: number | null): Promise<EngineStateSnapshot> {
+    return this.call("setTempo", [bpm]) as Promise<EngineStateSnapshot>;
   }
-  async setMeter(beatsPerBar: number | null, beatValue: number | null): Promise<StateSnapshot> {
-    return this.call("setMeter", [beatsPerBar, beatValue]) as Promise<StateSnapshot>;
+  async setMeter(beatsPerBar: number | null, beatValue: number | null): Promise<EngineStateSnapshot> {
+    return this.call("setMeter", [beatsPerBar, beatValue]) as Promise<EngineStateSnapshot>;
   }
-  async setChordMode(mode: "harmonic" | "bass-led"): Promise<StateSnapshot> {
-    return this.call("setChordMode", [mode]) as Promise<StateSnapshot>;
+  async setChordMode(mode: "harmonic" | "bass-led"): Promise<EngineStateSnapshot> {
+    return this.call("setChordMode", [mode]) as Promise<EngineStateSnapshot>;
   }
-  async setMetronome(enabled: boolean): Promise<StateSnapshot> {
-    return this.call("setMetronome", [enabled]) as Promise<StateSnapshot>;
+  async setMetronome(enabled: boolean): Promise<EngineStateSnapshot> {
+    return this.call("setMetronome", [enabled]) as Promise<EngineStateSnapshot>;
   }
-  async setInput(source: string): Promise<StateSnapshot> {
-    return this.call("setInput", [source]) as Promise<StateSnapshot>;
+  async setInput(source: string): Promise<EngineStateSnapshot> {
+    return this.call("setInput", [source]) as Promise<EngineStateSnapshot>;
   }
-  async setHueForPitch(pc: number, hue: number): Promise<StateSnapshot> {
-    return this.call("setHueForPitch", [pc, hue]) as Promise<StateSnapshot>;
+  async setHueForPitch(pc: number, hue: number): Promise<EngineStateSnapshot> {
+    return this.call("setHueForPitch", [pc, hue]) as Promise<EngineStateSnapshot>;
   }
-  async switchPreset(name: string): Promise<StateSnapshot> {
-    return this.call("switchPreset", [name]) as Promise<StateSnapshot>;
+  async switchPreset(name: string): Promise<EngineStateSnapshot> {
+    return this.call("switchPreset", [name]) as Promise<EngineStateSnapshot>;
   }
-  async savePreset(name: string): Promise<StateSnapshot> {
-    return this.call("savePreset", [name]) as Promise<StateSnapshot>;
+  async savePreset(name: string): Promise<EngineStateSnapshot> {
+    return this.call("savePreset", [name]) as Promise<EngineStateSnapshot>;
   }
 
-  async getStateSnapshot(): Promise<StateSnapshot> {
+  async getStateSnapshot(): Promise<EngineStateSnapshot> {
+    if (!(await this.awaitConnected())) throw new EngineDisconnectedError(this.label);
     const conn = this.deps.getConnection();
     if (conn) {
       // The cached snapshot's `now` is from the last state-changed
@@ -363,15 +403,15 @@ class WSBackedEngineHandle implements EngineHandle {
       // the same session-ms. Recompute `now` freshly from startedAt
       // + wall-clock so temporal reasoning ("how long has this been
       // going?") anchors on current time rather than stale write time.
-      return withFreshNow(conn.state as StateSnapshot);
+      return withFreshNow(conn.state);
     }
-    return this.call("getStateSnapshot", []) as Promise<StateSnapshot>;
+    return this.call("getStateSnapshot", []) as Promise<EngineStateSnapshot>;
   }
-  async getRecentEvents(limit = 100, since?: number): Promise<RecentEventsEnvelope> {
-    return this.call("getRecentEvents", [limit, since]) as Promise<RecentEventsEnvelope>;
+  async getRecentEvents(limit = 100, since?: number): Promise<EngineRecentEventsEnvelope> {
+    return this.call("getRecentEvents", [limit, since]) as Promise<EngineRecentEventsEnvelope>;
   }
-  async clearRecentEvents(): Promise<StateSnapshot> {
-    return this.call("clearRecentEvents", []) as Promise<StateSnapshot>;
+  async clearRecentEvents(): Promise<EngineStateSnapshot> {
+    return this.call("clearRecentEvents", []) as Promise<EngineStateSnapshot>;
   }
   async getAvailableInputs(): Promise<AvailableInput[]> {
     return this.call("getAvailableInputs", []) as Promise<AvailableInput[]>;
@@ -379,7 +419,7 @@ class WSBackedEngineHandle implements EngineHandle {
 
   subscribe(
     _event: "state-changed",
-    callback: (snapshot: StateSnapshot) => void,
+    callback: (snapshot: EngineStateSnapshot) => void,
   ): Unsubscribe {
     this.subscribers.push(callback);
     return () => {
@@ -393,19 +433,10 @@ class WSBackedEngineHandle implements EngineHandle {
 
   private async call(method: EngineMethod, args: readonly unknown[]): Promise<unknown> {
     if (this.status === "stopping") throw new Error("engine handle closed");
-    // Wait for connection, with a grace period so early calls don't
-    // immediately fail if the browser hasn't opened its socket yet.
-    await Promise.race([
-      this.waitConnected,
-      new Promise<void>((_, reject) =>
-        setTimeout(
-          () => reject(new Error(`no browser connection for '${this.label}' within ${RECONNECT_GRACE_MS}ms`)),
-          RECONNECT_GRACE_MS,
-        ),
-      ),
-    ]);
+    // A tab that is loading or reloading gets the grace period to connect.
+    if (!(await this.awaitConnected())) throw new EngineDisconnectedError(this.label);
     const conn = this.deps.getConnection();
-    if (!conn) throw new Error(`no browser connection for '${this.label}'`);
+    if (!conn?.open) throw new EngineDisconnectedError(this.label);
     const id = this.nextCallId++;
     const msg: EngineCallMessage = { type: "call", id, method, args };
     return this.deps.sendCall(conn.ws, msg, id);
@@ -419,7 +450,7 @@ class WSBackedEngineHandle implements EngineHandle {
  * shallow-cloned session with the updated field so subscribers
  * still see the shared cached `state` unchanged.
  */
-function withFreshNow(snap: StateSnapshot): StateSnapshot {
+function withFreshNow(snap: EngineStateSnapshot): EngineStateSnapshot {
   if (!snap.startedAt) return snap;
   const startedMs = Date.parse(snap.startedAt);
   if (Number.isNaN(startedMs)) return snap;
@@ -450,3 +481,11 @@ function emptyState(label: string): EngineStateSnapshot {
 
 // Suppress lint on unused-in-source local re-export helpers.
 export type { CliToBrowser };
+
+/** A ws message as text. Text frames arrive as one Buffer; handle the
+ *  fragmented and ArrayBuffer forms ws can also deliver. */
+function rawToString(raw: RawData): string {
+  if (Array.isArray(raw)) return Buffer.concat(raw).toString("utf8");
+  if (raw instanceof ArrayBuffer) return Buffer.from(raw).toString("utf8");
+  return raw.toString("utf8");
+}

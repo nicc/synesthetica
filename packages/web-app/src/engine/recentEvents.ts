@@ -7,13 +7,16 @@
  * the scene layer, because the LLM reasons about music, not visuals
  * — see synesthetica-lnc for the trade-off analysis.
  *
- * Ring-buffer sized by --recent-events-buffer (CLI, default 1000).
+ * Ring-buffer sized by --recent-events-buffer (CLI, default 10000).
  * Pull-only per SPEC 013 §I30 — the buffer is queried on demand,
  * never pushed to the LLM.
  */
 
 import type { VisualPipeline } from "@synesthetica/engine";
 import type { MusicalFrame, Note, EngineRecentEvent as RecentEvent } from "@synesthetica/contracts";
+
+/** A recent event before the buffer stamps its id. Distributes over the union. */
+type UnstampedEvent = RecentEvent extends infer E ? (E extends unknown ? Omit<E, "id"> : never) : never;
 
 export interface RecentEventsBufferOptions {
   /** Max events to retain — oldest evicted first. */
@@ -57,7 +60,7 @@ export function attachRecentEventsBuffer(
   let prevChordIds = new Set<string>();
   let lastChordId: string | null = null;
 
-  const flush = (batch: Array<Omit<RecentEvent, "id">>): void => {
+  const flush = (batch: UnstampedEvent[]): void => {
     // Sort within-frame by event clock (t), then assign monotonic
     // ids and push. Ordering guarantee: ids are monotonic (poll-safe
     // via `since:`), and within a single frame batch `t` and `id`
@@ -77,7 +80,7 @@ export function attachRecentEventsBuffer(
 
   const unsubscribe = pipeline.onMusicalFrame((frame: MusicalFrame) => {
     const currentNotes = new Map(frame.notes.map((n) => [n.id, n]));
-    const batch: Array<Omit<RecentEvent, "id">> = [];
+    const batch: UnstampedEvent[] = [];
 
     // Note-on: notes present now, absent before. `t` is the raw event
     // onset (MIDI event timestamp), `frameT` is the frame boundary

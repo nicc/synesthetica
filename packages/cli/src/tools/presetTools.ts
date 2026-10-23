@@ -9,23 +9,17 @@
  * multi-instance targeting (Phase 3 wires the registry lookup).
  */
 
-import type { StateSnapshot } from "../engine/engineHandle.js";
+import type { EngineStateSnapshot } from "@synesthetica/contracts";
 import type { ToolSpec } from "./sessionTools.js";
 import type { PresetStore } from "../presets/presetStore.js";
+import { engineError, err } from "./toolResult.js";
+import type { ToolResult } from "./toolResult.js";
 
-type ToolResult =
-  | { ok: true; state: StateSnapshot }
-  | { ok: false; error: { code: string; message: string; details?: unknown } };
-
-function err(code: string, message: string, details?: unknown): ToolResult {
-  return { ok: false, error: { code, message, ...(details ? { details } : {}) } };
-}
-
-async function safeCall(fn: () => Promise<StateSnapshot>): Promise<ToolResult> {
+async function safeCall(fn: () => Promise<EngineStateSnapshot>): Promise<ToolResult> {
   try {
     return { ok: true, state: await fn() };
   } catch (e) {
-    return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
+    return engineError(e);
   }
 }
 
@@ -70,10 +64,7 @@ export function buildPresetTools(store: PresetStore): ToolSpec[] {
           const finalState = await engine.switchPreset(name);
           return { ok: true, state: finalState };
         } catch (e) {
-          return err(
-            "ENGINE_ERROR",
-            e instanceof Error ? e.message : String(e),
-          );
+          return engineError(e);
         }
       },
     },
@@ -101,9 +92,7 @@ export function buildPresetTools(store: PresetStore): ToolSpec[] {
           try {
             store.save(name, snapshot);
           } catch (e) {
-            throw new Error(
-              e instanceof Error ? e.message : String(e),
-            );
+            throw new Error(e instanceof Error ? e.message : String(e), { cause: e });
           }
           return engine.savePreset(name);
         });
@@ -136,10 +125,7 @@ export function buildPresetTools(store: PresetStore): ToolSpec[] {
             });
           }
         } catch (e) {
-          return err(
-            "ENGINE_ERROR",
-            e instanceof Error ? e.message : String(e),
-          );
+          return engineError(e);
         }
         // Return the current engine state so the LLM has an updated
         // snapshot in the same round-trip. activePreset intentionally

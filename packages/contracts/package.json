@@ -1,7 +1,7 @@
 {
   "name": "@synesthetica/contracts",
   "version": "0.1.0",
-  "description": "Type and interface contracts for the Synesthetica system — annotations, panel descriptors, engine-bridge protocol, control ops.",
+  "description": "Shared contract for the Synesthetica packages: types and interfaces, plus the annotation manifest and the small pure functions every package must agree on (pitch-to-colour mapping, panel generation, primer composition).",
   "license": "BUSL-1.1",
   "author": "Nic Young",
   "repository": {

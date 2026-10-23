@@ -170,7 +170,7 @@ describe("guarantee 2: re-strikes produce fresh off/on pairs above restrikeGap",
     const restrikeOn = events.find((e) => e.type === "note_on");
     expect(restrikeOff).toBeDefined();
     expect(restrikeOn).toBeDefined();
-    expect(restrikeOn!.type === "note_on" && restrikeOn.sampleIndex).toBe(onset2);
+    expect(restrikeOn?.type === "note_on" && restrikeOn.sampleIndex).toBe(onset2);
     expect(next.active.size).toBe(1);
     // New noteId is distinct from the original.
     const origId = [...state.active.keys()][0];

@@ -252,7 +252,7 @@ function buildHelpBody(w: WidgetDescriptor): HTMLElement | null {
   const notes = w.tooltip ?? [];
   const hasNotes = notes.length > 0;
   const hasEndpoints =
-    w.kind === "slider" && Boolean((w as SliderWidgetDescriptor).low || (w as SliderWidgetDescriptor).high);
+    w.kind === "slider" && Boolean((w).low || (w).high);
   if (!hasNotes && !hasEndpoints) return null;
 
   const body = document.createElement("div");
@@ -265,7 +265,7 @@ function buildHelpBody(w: WidgetDescriptor): HTMLElement | null {
     body.appendChild(p);
   }
   if (hasEndpoints) {
-    const s = w as SliderWidgetDescriptor;
+    const s = w;
     const list = document.createElement("dl");
     list.className = "syn-panel-widget-help-endpoints";
     if (s.low) {

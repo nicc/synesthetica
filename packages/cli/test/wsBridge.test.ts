@@ -5,18 +5,48 @@ import {
   ENGINE_BRIDGE_PROTOCOL,
   type BrowserToCli,
   type CliToBrowser,
+  type EngineStateSnapshot,
 } from "@synesthetica/contracts";
 
 let bridge: WsBridgeHandle;
 
+// The bridge reports each lifecycle step through its `log` option
+// after the state change it describes. Tests wait on those lines
+// rather than sleeping for the bridge to catch up.
+let logLines: string[];
+let logWaiters: Array<{ re: RegExp; from: number; resolve: () => void }>;
+
+function onLog(line: string): void {
+  logLines.push(line);
+  logWaiters = logWaiters.filter((w) => {
+    if (!matchesFrom(w.re, w.from)) return true;
+    w.resolve();
+    return false;
+  });
+}
+
+function matchesFrom(re: RegExp, from: number): boolean {
+  return logLines.slice(from).some((l) => re.test(l));
+}
+
+/** Resolve when a log line matching `re` arrives at or after index `from`. */
+function logged(re: RegExp, from = logLines.length): Promise<void> {
+  if (matchesFrom(re, from)) return Promise.resolve();
+  return new Promise((resolve) => logWaiters.push({ re, from, resolve }));
+}
+
 beforeEach(async () => {
-  bridge = await startWsBridge({ port: 0, log: () => {} });
+  logLines = [];
+  logWaiters = [];
+  bridge = await startWsBridge({ port: 0, log: onLog });
 });
 afterEach(async () => {
   await bridge.close();
 });
 
+/** Open a socket, say hello, and resolve once the bridge has registered it. */
 function connectAs(label: string): Promise<WebSocket> {
+  const registered = logged(new RegExp(`'${label}' connected`));
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://localhost:${bridge.port}`);
     ws.once("open", () => {
@@ -26,12 +56,24 @@ function connectAs(label: string): Promise<WebSocket> {
         protocol: ENGINE_BRIDGE_PROTOCOL,
       };
       ws.send(JSON.stringify(hello));
-      // Give the CLI a tick to record the connection.
-      setTimeout(() => resolve(ws), 20);
+      void registered.then(() => resolve(ws));
     });
     ws.once("error", reject);
   });
 }
+
+/** Resolve with the next state-changed snapshot the handle publishes. */
+function nextStateChange(handle: ReturnType<WsBridgeHandle["handleFor"]>): Promise<EngineStateSnapshot> {
+  return new Promise((resolve) => {
+    const unsubscribe = handle.subscribe("state-changed", (snap) => {
+      unsubscribe();
+      resolve(snap);
+    });
+  });
+}
+
+/** One turn of the event loop, so already-queued settlements run. */
+const flush = () => new Promise<void>((r) => setImmediate(r));
 
 describe("wsBridge — connection lifecycle", () => {
   it("assigns an OS-picked port when port=0", () => {
@@ -48,10 +90,34 @@ describe("wsBridge — connection lifecycle", () => {
     const handle = bridge.handleFor("default");
     expect(handle.status).toBe("starting");
     const ws = await connectAs("default");
-    // The CLI processes the hello asynchronously.
-    await new Promise((r) => setTimeout(r, 20));
     expect(handle.status).toBe("running");
     ws.close();
+  });
+});
+
+describe("wsBridge — origin check", () => {
+  it("closes connections from a non-loopback browser origin", async () => {
+    const ws = new WebSocket(`ws://localhost:${bridge.port}`, {
+      headers: { Origin: "https://example.com" },
+    });
+    const code = await new Promise<number>((resolve) => ws.once("close", resolve));
+    expect(code).toBe(1008);
+  });
+
+  it("does not let a foreign origin take over an existing label", async () => {
+    const handle = bridge.handleFor("default");
+    const real = await connectAs("default");
+    const foreign = new WebSocket(`ws://localhost:${bridge.port}`, {
+      headers: { Origin: "https://example.com" },
+    });
+    foreign.once("open", () => {
+      const hello: BrowserToCli = { type: "hello", label: "default", protocol: ENGINE_BRIDGE_PROTOCOL };
+      foreign.send(JSON.stringify(hello));
+    });
+    await new Promise((resolve) => foreign.once("close", resolve));
+    expect(handle.status).toBe("running");
+    expect(real.readyState).toBe(WebSocket.OPEN);
+    real.close();
   });
 });
 
@@ -106,6 +172,7 @@ describe("wsBridge — state-changed fan-out", () => {
 
     const seen: Array<unknown> = [];
     handle.subscribe("state-changed", (snap) => seen.push(snap));
+    const received = nextStateChange(handle);
 
     const push: BrowserToCli = {
       type: "state-changed",
@@ -127,10 +194,13 @@ describe("wsBridge — state-changed fan-out", () => {
         },
         input: null,
         activePreset: null,
+        permissions: { midi: "granted", audio: "prompt" },
+        startedAt: null,
+        now: null,
       },
     };
     ws.send(JSON.stringify(push));
-    await new Promise((r) => setTimeout(r, 20));
+    await received;
     expect(seen).toHaveLength(1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((seen[0] as any).session.tempo).toBe(120);
@@ -159,8 +229,9 @@ describe("wsBridge — state-changed fan-out", () => {
       input: null,
       activePreset: null,
     };
+    const received = nextStateChange(handle);
     ws.send(JSON.stringify({ type: "state-changed", snapshot }));
-    await new Promise((r) => setTimeout(r, 20));
+    await received;
     const got = await handle.getStateSnapshot();
     expect(got.session.tempo).toBe(100);
     expect(got.macros.intents["harmony:linger"]).toBe(4);
@@ -172,9 +243,8 @@ describe("wsBridge — state-changed fan-out", () => {
 describe("wsBridge — pipeline-ready gating", () => {
   it("awaitPipelineReady resolves after the browser sends pipeline-ready", async () => {
     const ws = await connectAs("default");
+    // The connection is registered, so the waiter parks synchronously.
     const readyPromise = bridge.awaitPipelineReady("default", 2_000);
-    // Give the promise a tick to arm.
-    await new Promise((r) => setTimeout(r, 20));
     // Simulate the browser signalling ready.
     ws.send(JSON.stringify({ type: "pipeline-ready", label: "default" }));
     await expect(readyPromise).resolves.toBeUndefined();
@@ -183,10 +253,15 @@ describe("wsBridge — pipeline-ready gating", () => {
 
   it("awaitPipelineReady resolves immediately if already ready", async () => {
     const ws = await connectAs("default");
+    const ready = logged(/'default' pipeline ready/);
     ws.send(JSON.stringify({ type: "pipeline-ready", label: "default" }));
-    await new Promise((r) => setTimeout(r, 20));
-    // Second await returns without waiting.
-    await expect(bridge.awaitPipelineReady("default", 500)).resolves.toBeUndefined();
+    await ready;
+    // Resolves synchronously from the ready flag: a single event-loop
+    // turn is enough, no message has to arrive.
+    let resolved = false;
+    void bridge.awaitPipelineReady("default", 500).then(() => (resolved = true));
+    await flush();
+    expect(resolved).toBe(true);
     ws.close();
   });
 
@@ -200,17 +275,19 @@ describe("wsBridge — pipeline-ready gating", () => {
   it("reconnecting resets the ready flag (fresh tab is a fresh init)", async () => {
     const ws1 = await connectAs("default");
     ws1.send(JSON.stringify({ type: "pipeline-ready", label: "default" }));
-    await new Promise((r) => setTimeout(r, 20));
     await bridge.awaitPipelineReady("default", 500);
     // Reconnect — same label.
+    const disconnected = logged(/'default' disconnected/);
     ws1.close();
-    await new Promise((r) => setTimeout(r, 20));
+    await disconnected;
     const ws2 = await connectAs("default");
     // Should NOT be ready yet — the fresh tab hasn't re-signalled.
+    // Readiness only changes on an inbound pipeline-ready, and none is
+    // in flight, so one event-loop turn shows whether the flag reset.
     const pending = bridge.awaitPipelineReady("default", 500);
     let resolved = false;
     void pending.then(() => (resolved = true));
-    await new Promise((r) => setTimeout(r, 100));
+    await flush();
     expect(resolved).toBe(false);
     ws2.send(JSON.stringify({ type: "pipeline-ready", label: "default" }));
     await pending;
@@ -237,5 +314,54 @@ describe("wsBridge — protocol guardrails", () => {
     ws.send(JSON.stringify({ type: "hello", label: "x", protocol: 999 }));
     await closed;
     expect(ws.readyState).toBe(WebSocket.CLOSED);
+  });
+});
+
+describe("wsBridge — closed tab", () => {
+  const GRACE_MS = 50;
+  let graceBridge: WsBridgeHandle;
+
+  beforeEach(async () => {
+    // Replace the default bridge with one whose reconnect grace is short.
+    await bridge.close();
+    bridge = graceBridge = await startWsBridge({ port: 0, log: onLog, reconnectGraceMs: GRACE_MS });
+  });
+
+  async function disconnect(ws: WebSocket, label: string): Promise<void> {
+    const gone = logged(new RegExp(`'${label}' disconnected`));
+    ws.close();
+    await gone;
+  }
+
+  it("doesn't report a closed tab's last state as current", async () => {
+    const handle = graceBridge.handleFor("default");
+    const ws = await connectAs("default");
+    await disconnect(ws, "default");
+
+    await expect(handle.getStateSnapshot()).rejects.toMatchObject({ code: "ENGINE_DISCONNECTED" });
+    await expect(handle.setTempo(120)).rejects.toMatchObject({ code: "ENGINE_DISCONNECTED" });
+    expect(await handle.awaitConnected()).toBe(false);
+  });
+
+  it("serves state again once a tab reconnects within the grace period", async () => {
+    const handle = graceBridge.handleFor("default");
+    await disconnect(await connectAs("default"), "default");
+
+    const pending = handle.awaitConnected(1_000);
+    const ws = await connectAs("default");
+    expect(await pending).toBe(true);
+    await expect(handle.getStateSnapshot()).resolves.toMatchObject({ instance: "default" });
+    ws.close();
+  });
+
+  it("ignores a replaced socket closing after its replacement connected", async () => {
+    const handle = graceBridge.handleFor("default");
+    const oldWs = await connectAs("default");
+    const newWs = await connectAs("default");
+    oldWs.close();
+    await new Promise<void>((resolve) => oldWs.once("close", () => resolve()));
+
+    expect(await handle.awaitConnected(0)).toBe(true);
+    newWs.close();
   });
 });

@@ -4,12 +4,14 @@
  * Renders SceneFrame entities to SVG for visual review during lens development.
  * SVG files can be opened in a browser to see the visual output without running the app.
  *
- * Usage:
- *   const svg = renderSceneToSVG(scene, { width: 800, height: 600 });
- *   writeSnapshot('my-test', svg);
+ * Usage (from a .snapshot.ts file under test/):
+ *   maybeWriteSnapshot("my-scene", scene);
  *
- * To generate snapshots:
- *   GENERATE_SNAPSHOTS=1 npm test
+ * Each SVG carries the scene's metrics (see formatMetrics) in a header
+ * comment, so diagnostics live with the image rather than the console.
+ *
+ * To generate snapshots (writes to test/_snapshots/, gitignored):
+ *   npm run snapshots -w packages/engine
  */
 
 import { writeFileSync, mkdirSync, existsSync } from "fs";
@@ -59,7 +61,7 @@ function hsvaToCSS(color: ColorHSVA): string {
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
   const m = v - c;
 
-  let r = 0, g = 0, b = 0;
+  let r: number, g: number, b: number;
   if (h < 60) { r = c; g = x; b = 0; }
   else if (h < 120) { r = x; g = c; b = 0; }
   else if (h < 180) { r = 0; g = c; b = x; }
@@ -385,6 +387,7 @@ export function renderSceneToSVG(scene: SceneFrame, options: SVGOptions = {}): s
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
     `  <rect width="100%" height="100%" fill="${background}" />`,
     `  <!-- Frame t=${scene.t}ms, ${scene.entities.length} entities -->`,
+    `  <!--\n${escapeXMLComment(formatMetrics(extractMetrics(scene)))}\n  -->`,
   ];
 
   // Grid layer
@@ -456,7 +459,6 @@ export function writeSnapshot(name: string, svg: string, subdir = "rhythm"): voi
   const fullPath = resolve(dir, filename);
 
   writeFileSync(fullPath, svg, "utf-8");
-  console.log(`Wrote snapshot: ${subdir}/${filename}`);
 }
 
 /**

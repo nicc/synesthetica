@@ -6,13 +6,12 @@ import {
   NoteTrackingStabilizer,
 } from "@synesthetica/engine";
 import { attachRecentEventsBuffer } from "../src/engine/recentEvents.js";
-import type { IRawSourceAdapter } from "@synesthetica/engine";
-import type { RawInputFrame, RawInput } from "@synesthetica/contracts";
+import type { IRawSourceAdapter, RawInputFrame, RawInput } from "@synesthetica/contracts";
 
 /** Minimal fake adapter that emits pre-queued raw frames on nextFrame(). */
 class FakeAdapter implements IRawSourceAdapter {
   private queue: RawInputFrame[] = [];
-  constructor(private source: string, private stream: string) {}
+  constructor(readonly source: string, readonly stream: string) {}
   nextFrame(): RawInputFrame | null {
     return this.queue.shift() ?? null;
   }

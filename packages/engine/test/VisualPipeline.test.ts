@@ -1,15 +1,32 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { VisualPipeline } from "../src/VisualPipeline";
 import { NoteTrackingStabilizer } from "../src/stabilizers/NoteTrackingStabilizer";
 import { MusicalVisualVocabulary } from "../src/vocabularies/MusicalVisualVocabulary";
 import { RhythmLens } from "../src/lenses/RhythmLens";
 import { IdentityCompositor } from "../src/stubs/IdentityCompositor";
 import type {
+  IMusicalStabilizer,
   IRawSourceAdapter,
+  IVisualLens,
   RawInputFrame,
   MidiNoteOn,
   MidiNoteOff,
+  SceneFrame,
 } from "@synesthetica/contracts";
+import { pcToHue } from "@synesthetica/contracts";
+import { createTestMusicalFrame } from "./_harness/frames";
+
+/** Note-strip entities only. The now-line and note-name labels are
+ *  always present, so counts over all entities prove nothing. */
+function noteStrips(frame: SceneFrame) {
+  return frame.entities.filter((e) => e.data?.type === "note-strip");
+}
+
+function stripPitchClasses(frame: SceneFrame): number[] {
+  return noteStrips(frame)
+    .map((e) => e.data?.pitchClass as number)
+    .sort((a, b) => a - b);
+}
 
 /**
  * Mock adapter that returns pre-configured frames.
@@ -100,7 +117,7 @@ describe("VisualPipeline", () => {
 
   describe("basic operation", () => {
     it("returns empty frame when no adapters", () => {
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
 
       const frame = pipeline.requestFrame(1000);
 
@@ -110,10 +127,10 @@ describe("VisualPipeline", () => {
 
     it("returns frame with only structural elements when adapter has no data", () => {
       pipeline.addAdapter(adapter);
-      pipeline.setStabilizerFactory(
+      pipeline.addStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
       pipeline.addLens(new RhythmLens());
 
       const frame = pipeline.requestFrame(1000);
@@ -125,31 +142,28 @@ describe("VisualPipeline", () => {
       expect(noteEntities).toHaveLength(0);
     });
 
-    it("removeAdapter drops the specified adapter without touching consumers", () => {
+    it("removeAdapter stops the removed adapter's input without touching consumers", () => {
       const adapter2 = new MockRawAdapter();
       pipeline.addAdapter(adapter);
       pipeline.addAdapter(adapter2);
-      pipeline.setStabilizerFactory(
+      pipeline.addStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
       pipeline.addLens(new RhythmLens());
 
-      // Frame drains one raw frame per adapter's nextFrame() call and
-      // creates partStates as a side effect. Establish that partStates
-      // exist by requesting a frame.
-      pipeline.requestFrame(0);
+      adapter.addNoteOn(60, 100, 0); // C, via the adapter we will remove
+      adapter2.addNoteOn(64, 100, 0); // E
+      adapter.addNoteOn(62, 100, 100); // D — must never arrive
+      adapter2.addNoteOn(65, 100, 100); // F
 
-      // Drop the first adapter — lenses, vocab, stabilizer, and
-      // partStates all persist (no dispose was called).
+      expect(stripPitchClasses(pipeline.requestFrame(0))).toEqual([0, 4]);
+
       pipeline.removeAdapter(adapter);
 
-      // Second adapter still delivers frames through the surviving
-      // pipeline; lenses still emit entities.
-      const frame = pipeline.requestFrame(100);
-      expect(frame.t).toBe(100);
-      // Rhythm lens always emits its now-line entity when active.
-      expect(frame.entities.length).toBeGreaterThan(0);
+      // D from the removed adapter is absent; F from the survivor
+      // arrives; the held C survives because stabilizer state does.
+      expect(stripPitchClasses(pipeline.requestFrame(100))).toEqual([0, 4, 5]);
     });
 
     it("emits warning when no vocabulary configured", () => {
@@ -166,10 +180,10 @@ describe("VisualPipeline", () => {
   describe("full pipeline flow", () => {
     beforeEach(() => {
       pipeline.addAdapter(adapter);
-      pipeline.setStabilizerFactory(
+      pipeline.addStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
       pipeline.addLens(new RhythmLens());
       pipeline.setCompositor(new IdentityCompositor());
     });
@@ -179,77 +193,56 @@ describe("VisualPipeline", () => {
 
       const frame = pipeline.requestFrame(1000);
 
-      // RhythmLens creates note-strip entities for notes
-      expect(frame.entities.length).toBeGreaterThan(0);
-      expect(frame.entities[0].part).toBe("test-part");
+      const strips = noteStrips(frame);
+      expect(strips).toHaveLength(1);
+      expect(strips[0].part).toBe("test-part");
+      expect(strips[0].data?.pitchClass).toBe(0);
     });
 
-    it("creates entity with color from pitch", () => {
-      // Note A (midi 69) should map to red (hue=0)
-      adapter.addNoteOn(69, 100, 1000);
+    it("colours a note strip by its pitch class through the vocabulary's hue invariant", () => {
+      // The invariant comes from the vocabulary itself, so retuning the
+      // colour anchor cannot break this test.
+      const { hueInvariant } = new MusicalVisualVocabulary().annotate(
+        createTestMusicalFrame(0, "test-part"),
+      );
+      adapter.addNoteOn(69, 100, 1000); // A, pitch class 9
 
-      const frame = pipeline.requestFrame(1000);
+      const strips = noteStrips(pipeline.requestFrame(1000));
 
-      expect(frame.entities[0].style.color).toBeDefined();
-      expect(frame.entities[0].style.color!.h).toBe(0); // Red
+      expect(strips).toHaveLength(1);
+      expect(strips[0].style.color?.h).toBe(pcToHue(9, hueInvariant));
     });
 
-    it("maintains entities while note is held", () => {
+    it("keeps the same note strip while the note is held", () => {
       adapter.addNoteOn(60, 100, 1000);
 
-      // First frame
       const frame1 = pipeline.requestFrame(1000);
-      const initialCount = frame1.entities.length;
-      expect(initialCount).toBeGreaterThan(0);
-
-      // Second frame - note still held
       adapter.addEmptyFrame(1500);
       const frame2 = pipeline.requestFrame(1500);
-      expect(frame2.entities.length).toBeGreaterThan(0);
+
+      expect(noteStrips(frame1)).toHaveLength(1);
+      expect(noteStrips(frame2)).toHaveLength(1);
+      expect(noteStrips(frame2)[0].id).toBe(noteStrips(frame1)[0].id);
     });
 
-    it("handles multiple simultaneous notes", () => {
-      adapter.addNoteOn(60, 100, 1000); // C
-      adapter.addNoteOn(64, 100, 1000); // E
-      adapter.addNoteOn(67, 100, 1000); // G
+    it("produces one note strip per simultaneous note, whatever the velocity", () => {
+      // Velocity does not modulate RhythmLens strips (uniform width by
+      // design); pitch class differentiates them via hue (SPEC 004 I15).
+      adapter.addNoteOn(60, 127, 1000); // C, loud
+      adapter.addNoteOn(64, 64, 1000); // E, medium
+      adapter.addNoteOn(67, 32, 1000); // G, soft
 
-      const frame = pipeline.requestFrame(1000);
-
-      // Should have at least 3 entities (one per note)
-      expect(frame.entities.length).toBeGreaterThanOrEqual(3);
-    });
-
-    it("handles chord with different velocities", () => {
-      adapter.addNoteOn(60, 127, 1000); // C4, loud
-      adapter.addNoteOn(64, 64, 1000); // E4, medium
-      adapter.addNoteOn(67, 32, 1000); // G4, soft
-
-      const frame = pipeline.requestFrame(1000);
-
-      // The pipeline processes all three notes through the stabilizer
-      // and into distinct note-strip entities. Velocity does not
-      // currently modulate visual output in RhythmLens (strips are
-      // uniform-width by design); pitch class differentiates the three
-      // via hue (see Invariant I15 in SPEC 004 for the hue vs
-      // brightness roles).
-      const noteStrips = frame.entities.filter(
-        (e) => e.data?.type === "note-strip",
-      );
-      expect(noteStrips).toHaveLength(3);
-
-      // Each strip carries a distinct pitch class in its data payload.
-      const pitchClasses = noteStrips.map((e) => e.data?.pitchClass);
-      expect(new Set(pitchClasses).size).toBe(3);
+      expect(stripPitchClasses(pipeline.requestFrame(1000))).toEqual([0, 4, 7]);
     });
   });
 
   describe("activity tracking", () => {
     beforeEach(() => {
       pipeline.addAdapter(adapter);
-      pipeline.setStabilizerFactory(
+      pipeline.addStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
       pipeline.addLens(new RhythmLens());
     });
 
@@ -270,10 +263,10 @@ describe("VisualPipeline", () => {
   describe("lifecycle", () => {
     it("reset clears all state", () => {
       pipeline.addAdapter(adapter);
-      pipeline.setStabilizerFactory(
+      pipeline.addStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
       pipeline.addLens(new RhythmLens());
 
       adapter.addNoteOn(60, 100, 1000);
@@ -286,10 +279,10 @@ describe("VisualPipeline", () => {
 
     it("dispose clears components", () => {
       pipeline.addAdapter(adapter);
-      pipeline.setStabilizerFactory(
+      pipeline.addStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
       pipeline.addLens(new RhythmLens());
 
       pipeline.dispose();
@@ -304,92 +297,152 @@ describe("VisualPipeline", () => {
   describe("without compositor", () => {
     it("still produces scene frames", () => {
       pipeline.addAdapter(adapter);
-      pipeline.setStabilizerFactory(
+      pipeline.addStabilizerFactory(
         () => new NoteTrackingStabilizer({ partId: "test-part" })
       );
-      pipeline.setRuleset(new MusicalVisualVocabulary());
+      pipeline.setVocabulary(new MusicalVisualVocabulary());
       pipeline.addLens(new RhythmLens());
       // No compositor set
 
       adapter.addNoteOn(60, 100, 1000);
       const frame = pipeline.requestFrame(1000);
 
-      // Should still produce entities
-      expect(frame.entities.length).toBeGreaterThan(0);
+      expect(stripPitchClasses(frame)).toEqual([0]);
       expect(frame.t).toBe(1000);
     });
   });
 
+  // Positive routing (every manifest macro reaches its consumer) lives
+  // in wiringCoverage.test.ts. These cover names that must NOT land.
   describe("setMacro routing", () => {
-    it("routes rhythm:* macros to the RhythmLens via setMacros", () => {
+    it("drops unscoped names without touching the lens", () => {
       const rhythm = new RhythmLens();
       pipeline.addLens(rhythm);
-      pipeline.setMacro("rhythm:horizon", 0.4);
-      expect(rhythm.getMacros().horizon).toBe(0.4);
+      const before = { ...rhythm.getMacros() };
+      pipeline.setMacro("time-horizon", 0.5);
+      expect(rhythm.getMacros()).toEqual(before);
     });
 
-    it("kebab-case → camelCase param mapping", () => {
+    it("drops names whose scope matches no lens", () => {
       const rhythm = new RhythmLens();
       pipeline.addLens(rhythm);
-      pipeline.setMacro("rhythm:pulse-intensity", 0.8);
-      expect(rhythm.getMacros().pulseIntensity).toBe(0.8);
-      pipeline.setMacro("rhythm:reference-linger", 2.1);
-      expect(rhythm.getMacros().referenceLinger).toBe(2.1);
-      pipeline.setMacro("rhythm:tightness-tolerance", 50);
-      expect(rhythm.getMacros().tightnessTolerance).toBe(50);
+      const before = { ...rhythm.getMacros() };
+      pipeline.setMacro("system:colour-mapping:reference", 90);
+      expect(rhythm.getMacros()).toEqual(before);
     });
 
-    it("silently drops unscoped names — no crash", () => {
-      pipeline.addLens(new RhythmLens());
-      expect(() => pipeline.setMacro("time-horizon", 0.5)).not.toThrow();
-    });
-
-    it("silently drops names whose scope matches no lens", () => {
-      pipeline.addLens(new RhythmLens());
-      expect(() => pipeline.setMacro("system:colour-mapping:reference", 90)).not.toThrow();
-    });
-
-    it("does not deliver a rhythm:* name to a non-rhythm lens", () => {
+    it("does not deliver a harmony:* name to the rhythm lens", () => {
       const rhythm = new RhythmLens();
       pipeline.addLens(rhythm);
-      // Confirms only the scope-matching lens receives the write.
       const before = { ...rhythm.getMacros() };
       pipeline.setMacro("harmony:linger", 4);
       expect(rhythm.getMacros()).toEqual(before);
     });
+  });
+});
 
-    it("routes harmony:* stabilizer macros to ChordDetectionStabilizer.setConfig", async () => {
-      // Import + wire the stabilizer via addStabilizerFactory so the
-      // pipeline instantiates it into a partState we can then hit
-      // with setMacro.
-      const { ChordDetectionStabilizer } = await import(
-        "../src/stabilizers/ChordDetectionStabilizer"
-      );
-      pipeline.addAdapter(adapter);
-      pipeline.addStabilizerFactory(
-        () => new ChordDetectionStabilizer({ partId: "test-part" }),
-      );
-      // Force part-state creation by requesting a frame.
-      pipeline.requestFrame(0);
+describe("VisualPipeline — graceful degradation (SPEC_007)", () => {
+  const partId = "main";
+  let adapter: MockRawAdapter;
+  let pipeline: VisualPipeline;
 
-      pipeline.setMacro("harmony:arpeggio-tolerance", 1200);
-      pipeline.setMacro("harmony:note-threshold", 4);
-      pipeline.setMacro("harmony:detection-stability", 150);
+  function build(extra: (p: VisualPipeline) => void): void {
+    pipeline = new VisualPipeline({ canvasSize: { width: 100, height: 100 }, rngSeed: 1, partId });
+    adapter = new MockRawAdapter();
+    pipeline.addAdapter(adapter);
+    pipeline.setVocabulary(new MusicalVisualVocabulary());
+    pipeline.setCompositor(new IdentityCompositor());
+    extra(pipeline);
+  }
 
-      // Reach into the pipeline's part state to inspect the
-      // stabilizer's config directly.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const partStates = (pipeline as any).partStates as Map<string, { stabilizers: Array<{ id: string; getConfig?: () => Record<string, unknown> }> }>;
-      const state = partStates.get("test-part");
-      const chord = state?.stabilizers.find((s) => s.id === "chord-detection");
-      const cfg = chord?.getConfig?.() as {
-        pitchDecayMs: number;
-        minPitchClasses: number;
-        hysteresisMs: number;
-      };
-      expect(cfg.pitchDecayMs).toBe(1200);
-      expect(cfg.minPitchClasses).toBe(4);
-      expect(cfg.hysteresisMs).toBe(150);
+  let consoleError: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    consoleError.mockRestore();
+  });
+
+  const throwingLens: IVisualLens = {
+    id: "broken-lens",
+    init: () => {},
+    dispose: () => {},
+    update: () => {
+      throw new Error("lens bug");
+    },
+  };
+
+  it("skips a lens that throws, keeps drawing the others, and reports it", () => {
+    build((p) => {
+      p.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+      p.addLens(throwingLens);
+      p.addLens(new RhythmLens());
     });
+    adapter.addNoteOn(60, 100, 0);
+
+    const frame = pipeline.requestFrame(0);
+
+    expect(stripPitchClasses(frame)).toEqual([0]);
+    expect(frame.diagnostics).toContainEqual(
+      expect.objectContaining({ category: "lens", source: "broken-lens", severity: "error" }),
+    );
+  });
+
+  it("reports a persistent failure every frame but logs it once", () => {
+    build((p) => {
+      p.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+      p.addLens(throwingLens);
+    });
+
+    const frames = [0, 16, 32].map((t) => pipeline.requestFrame(t));
+
+    for (const frame of frames) {
+      expect(frame.diagnostics.some((d) => d.source === "broken-lens")).toBe(true);
+    }
+    expect(consoleError).toHaveBeenCalledTimes(1);
+  });
+
+  it("resets a stabilizer that throws and passes its upstream through", () => {
+    let resets = 0;
+    const throwingStabilizer: IMusicalStabilizer = {
+      id: "broken-stabilizer",
+      dependencies: ["note-tracking"],
+      init: () => {},
+      dispose: () => {},
+      reset: () => {
+        resets++;
+      },
+      apply: () => {
+        throw new Error("stabilizer bug");
+      },
+    };
+    build((p) => {
+      p.addStabilizerFactory(() => new NoteTrackingStabilizer({ partId }));
+      p.addStabilizerFactory(() => throwingStabilizer);
+      p.addLens(new RhythmLens());
+    });
+    adapter.addNoteOn(64, 100, 0);
+
+    const frame = pipeline.requestFrame(0);
+
+    expect(resets).toBe(1);
+    expect(stripPitchClasses(frame)).toEqual([4]);
+    expect(frame.diagnostics).toContainEqual(
+      expect.objectContaining({ category: "stabilizer", source: "broken-stabilizer" }),
+    );
+  });
+
+  it("fails fast when a stabilizer depends on one that isn't registered", () => {
+    const orphan: IMusicalStabilizer = {
+      id: "orphan",
+      dependencies: ["not-registered"],
+      init: () => {},
+      dispose: () => {},
+      reset: () => {},
+      apply: (_raw, upstream) => upstream ?? createTestMusicalFrame(0, partId),
+    };
+    build((p) => p.addStabilizerFactory(() => orphan));
+
+    expect(() => pipeline.requestFrame(0)).toThrow(/depends on 'not-registered'/);
   });
 });

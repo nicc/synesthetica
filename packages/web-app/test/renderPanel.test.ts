@@ -3,6 +3,19 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { generatePanel, productionManifest } from "@synesthetica/contracts";
 import { renderPanel } from "../src/panel/renderPanel.js";
 
+// Values set in these tests are derived from the manifest so a retune
+// of a range or default can't push them out of bounds or pin a default.
+function macro(id: string) {
+  const m = productionManifest.macros.find((x) => x.id === id);
+  if (!m) throw new Error(`macro not in manifest: ${id}`);
+  return m;
+}
+const lingerAnn = macro("harmony:linger");
+if (lingerAnn.type !== "continuous") throw new Error("harmony:linger should be continuous");
+const [lingerMin, lingerMax] = lingerAnn.range;
+/** A value strictly inside harmony:linger's range at fraction f. */
+const lingerAt = (f: number) => lingerMin + f * (lingerMax - lingerMin);
+
 // Popups are appended to document.body (fixed-positioned so ancestor
 // overflow doesn't clip them). Clear between tests so accumulation
 // doesn't confuse assertions that query the body.
@@ -42,17 +55,19 @@ describe("renderPanel — structure", () => {
     }
   });
 
-  it("toggle macros dispatch booleans", () => {
+  it("toggle macros start at their default and dispatch booleans", () => {
+    const overtones = macro("rhythm:overtones");
+    if (overtones.type !== "toggle") throw new Error("rhythm:overtones should be a toggle");
     const dispatch = vi.fn();
     const panel = generatePanel(productionManifest);
     const rendered = renderPanel({ panel, dispatch });
     const input = rendered.root.querySelector(
       '[data-widget-id="rhythm:overtones"] input[type="checkbox"]',
     ) as HTMLInputElement;
-    expect(input.checked).toBe(false);
-    input.checked = true;
+    expect(input.checked).toBe(overtones.default);
+    input.checked = !overtones.default;
     input.dispatchEvent(new Event("change"));
-    expect(dispatch).toHaveBeenCalledWith("rhythm:overtones", true);
+    expect(dispatch).toHaveBeenCalledWith("rhythm:overtones", !overtones.default);
   });
 });
 
@@ -65,9 +80,11 @@ describe("renderPanel — widget interactions", () => {
       '[data-widget-id="harmony:linger"] input[type="range"]',
     ) as HTMLInputElement;
     expect(linger).toBeTruthy();
-    linger.value = "5";
+    const value = lingerAt(0.25);
+    linger.value = String(value);
     linger.dispatchEvent(new Event("input"));
-    expect(dispatch).toHaveBeenCalledWith("harmony:linger", 5);
+    expect(dispatch).toHaveBeenCalledWith("harmony:linger", Number(linger.value));
+    expect(Number(linger.value)).toBeCloseTo(value, 0);
   });
 
   it("select dispatches typed value on change (string enum)", () => {
@@ -78,9 +95,12 @@ describe("renderPanel — widget interactions", () => {
       '[data-widget-id="rhythm:quantise-resolution"] select',
     ) as HTMLSelectElement;
     expect(quantise).toBeTruthy();
-    quantise.value = "32nd";
+    const ann = macro("rhythm:quantise-resolution");
+    if (ann.type !== "discrete") throw new Error("rhythm:quantise-resolution should be discrete");
+    const value = ann.enumValues.map((v) => v.value).find((v) => v !== ann.default)!;
+    quantise.value = String(value);
     quantise.dispatchEvent(new Event("change"));
-    expect(dispatch).toHaveBeenCalledWith("rhythm:quantise-resolution", "32nd");
+    expect(dispatch).toHaveBeenCalledWith("rhythm:quantise-resolution", value);
   });
 
   it("nullable number widget dispatches null when cleared", () => {
@@ -298,12 +318,13 @@ describe("renderPanel — initial values + update()", () => {
     const rendered = renderPanel({
       panel,
       dispatch: () => {},
-      initialValues: { "harmony:linger": 7 },
+      initialValues: { "harmony:linger": lingerMax },
     });
     const linger = rendered.root.querySelector(
       '[data-widget-id="harmony:linger"] input[type="range"]',
     ) as HTMLInputElement;
-    expect(linger.value).toBe("7");
+    expect(lingerMax).not.toBe(lingerAnn.default);
+    expect(Number(linger.value)).toBe(lingerMax);
   });
 
   it("update() refreshes widget values without re-rendering", () => {
@@ -312,7 +333,9 @@ describe("renderPanel — initial values + update()", () => {
     const linger = rendered.root.querySelector(
       '[data-widget-id="harmony:linger"] input[type="range"]',
     ) as HTMLInputElement;
-    rendered.update({ "harmony:linger": 6 });
-    expect(linger.value).toBe("6");
+    const before = linger.value;
+    rendered.update({ "harmony:linger": lingerMin });
+    expect(linger.value).not.toBe(before);
+    expect(Number(linger.value)).toBe(lingerMin);
   });
 });

@@ -86,15 +86,22 @@ export function mountPanelShell(opts: PanelShellOptions): PanelShellHandle {
         placeholder.textContent = "Loading…";
         cache.set(id, placeholder);
         content = placeholder;
-        built.then((resolved) => {
-          cache.set(id, resolved);
-          if (openId === id) {
-            panelHost.innerHTML = "";
-            panelHost.appendChild(
-              wrapWithHeader(id, opts.labels?.[id] ?? cap(id), resolved, close),
-            );
-          }
-        });
+        built
+          .then((resolved) => {
+            cache.set(id, resolved);
+            if (openId === id) {
+              panelHost.innerHTML = "";
+              panelHost.appendChild(
+                wrapWithHeader(id, opts.labels?.[id] ?? cap(id), resolved, close),
+              );
+            }
+          })
+          .catch((err: unknown) => {
+            // Leave the cache empty so the next open retries the build.
+            cache.delete(id);
+            placeholder.textContent = "Couldn't load this panel.";
+            console.error(`panel '${id}' failed to build:`, err);
+          });
       }
     }
     panelHost.innerHTML = "";

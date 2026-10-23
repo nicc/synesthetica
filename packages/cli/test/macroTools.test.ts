@@ -1,31 +1,89 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import {
+  productionManifest,
+  type CompoundMacroAnnotation,
+  type ContinuousMacroAnnotation,
+  type DiscreteMacroAnnotation,
+  type MacroAnnotation,
+  type ToggleMacroAnnotation,
+} from "@synesthetica/contracts";
 import { setMacroTool, setHueForPitchTool } from "../src/tools/macroTools.js";
 import { StubEngineHandle } from "../src/engine/stubEngineHandle.js";
+
+// Ranges, enum values and defaults come from the manifest; these tests
+// check the tool's validation and fan-out against whatever it says.
+function annotation<T extends MacroAnnotation["type"]>(
+  id: string,
+  type: T,
+): Extract<MacroAnnotation, { type: T }> {
+  const ann = productionManifest.macros.find((m) => m.id === id);
+  if (!ann) throw new Error(`macro not in manifest: ${id}`);
+  if (ann.type !== type) throw new Error(`${id} is ${ann.type}, expected ${type}`);
+  return ann as Extract<MacroAnnotation, { type: T }>;
+}
+
+const linger: ContinuousMacroAnnotation = annotation("harmony:linger", "continuous");
+const quantise: DiscreteMacroAnnotation = annotation("rhythm:quantise-resolution", "discrete");
+const overtones: ToggleMacroAnnotation = annotation("rhythm:overtones", "toggle");
+const compounds = productionManifest.macros.filter(
+  (m): m is CompoundMacroAnnotation => m.type === "compound",
+);
+
+function targetsOf(c: CompoundMacroAnnotation): Array<{ id: string; invert: boolean }> {
+  return c.targets.map((t) =>
+    typeof t === "string" ? { id: t, invert: false } : { id: t.id, invert: t.invert === true },
+  );
+}
+
+/** Map each target id to what `pick` says it should be, for one toEqual. */
+function perTarget(
+  c: CompoundMacroAnnotation,
+  pick: (t: { id: string; invert: boolean }, range: [number, number]) => unknown,
+): Record<string, unknown> {
+  return Object.fromEntries(targetsOf(c).map((t) => [t.id, pick(t, rangeOf(t.id))]));
+}
+
+function rangeOf(id: string): [number, number] {
+  const ann = productionManifest.macros.find((m) => m.id === id);
+  if (ann?.type !== "continuous" && ann?.type !== "compound") {
+    throw new Error(`${id} has no numeric range`);
+  }
+  return ann.range;
+}
 
 describe("set_macro — continuous", () => {
   let engine: StubEngineHandle;
   beforeEach(() => { engine = new StubEngineHandle(); });
+  const [min, max] = linger.range;
 
   it("accepts a value inside the range", async () => {
-    const r = await setMacroTool.handle({ name: "harmony:linger", value: 5 }, engine);
+    const value = (min + max) / 2;
+    const r = await setMacroTool.handle({ name: linger.id, value }, engine);
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.state.macros.intents["harmony:linger"]).toBe(5);
+    if (r.ok) expect(r.state.macros.intents[linger.id]).toBe(value);
+  });
+
+  it("accepts both range endpoints", async () => {
+    for (const value of [min, max]) {
+      const r = await setMacroTool.handle({ name: linger.id, value }, engine);
+      expect(r.ok).toBe(true);
+    }
   });
 
   it("rejects a value below range", async () => {
-    const r = await setMacroTool.handle({ name: "harmony:linger", value: 0.1 }, engine);
+    const r = await setMacroTool.handle({ name: linger.id, value: min - 0.1 }, engine);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe("MACRO_VALUE_OUT_OF_RANGE");
   });
 
   it("rejects a value above range", async () => {
-    const r = await setMacroTool.handle({ name: "harmony:linger", value: 100 }, engine);
+    const r = await setMacroTool.handle({ name: linger.id, value: max + 0.1 }, engine);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe("MACRO_VALUE_OUT_OF_RANGE");
   });
 
   it("rejects wrong type", async () => {
-    const r = await setMacroTool.handle({ name: "harmony:linger", value: "loud" }, engine);
+    const r = await setMacroTool.handle({ name: linger.id, value: "loud" }, engine);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe("MACRO_VALUE_WRONG_TYPE");
   });
@@ -33,25 +91,21 @@ describe("set_macro — continuous", () => {
 
 describe("set_macro — discrete", () => {
   const engine = new StubEngineHandle();
+  const allowed = quantise.enumValues.map((v) => v.value);
 
   it("accepts a valid enum value", async () => {
-    const r = await setMacroTool.handle(
-      { name: "rhythm:quantise-resolution", value: "32nd" },
-      engine,
-    );
+    const value = allowed.find((v) => v !== quantise.default)!;
+    const r = await setMacroTool.handle({ name: quantise.id, value }, engine);
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.state.macros.intents["rhythm:quantise-resolution"]).toBe("32nd");
+    if (r.ok) expect(r.state.macros.intents[quantise.id]).toBe(value);
   });
 
-  it("rejects an unknown enum value", async () => {
-    const r = await setMacroTool.handle(
-      { name: "rhythm:quantise-resolution", value: "64th" },
-      engine,
-    );
+  it("rejects an unknown enum value and lists the allowed ones", async () => {
+    const r = await setMacroTool.handle({ name: quantise.id, value: "not-a-resolution" }, engine);
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.error.code).toBe("MACRO_VALUE_WRONG_TYPE");
-      expect(r.error.details).toEqual({ allowed: ["quarter", "8th", "16th", "32nd"] });
+      expect(r.error.details).toEqual({ allowed });
     }
   });
 });
@@ -59,22 +113,16 @@ describe("set_macro — discrete", () => {
 describe("set_macro — toggle", () => {
   const engine = new StubEngineHandle();
 
-  it("defaults to the manifest value and accepts a boolean", async () => {
-    expect((await engine.getStateSnapshot()).macros.intents["rhythm:overtones"]).toBe(false);
-    const r = await setMacroTool.handle(
-      { name: "rhythm:overtones", value: true },
-      engine,
-    );
+  it("accepts a boolean", async () => {
+    const value = !overtones.default;
+    const r = await setMacroTool.handle({ name: overtones.id, value }, engine);
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.state.macros.intents["rhythm:overtones"]).toBe(true);
+    if (r.ok) expect(r.state.macros.intents[overtones.id]).toBe(value);
   });
 
   it("rejects non-boolean values", async () => {
     for (const value of ["on", 1]) {
-      const r = await setMacroTool.handle(
-        { name: "rhythm:overtones", value },
-        engine,
-      );
+      const r = await setMacroTool.handle({ name: overtones.id, value }, engine);
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.error.code).toBe("MACRO_VALUE_WRONG_TYPE");
     }
@@ -82,78 +130,73 @@ describe("set_macro — toggle", () => {
 });
 
 describe("set_macro — compound (linear fan-out)", () => {
-  it("time-horizon fans to leaf macros with linear map", async () => {
-    const engine = new StubEngineHandle();
-    // time-horizon range is [0, 1]; targets are rhythm:horizon,
-    // harmony:linger, dynamics:linger.
-    const r = await setMacroTool.handle({ name: "time-horizon", value: 1.0 }, engine);
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    // At value=1.0, each target gets its range's max under the
-    // linear default curve.
-    expect(r.state.macros.intents["rhythm:horizon"]).toBe(1); // [0, 1] max
-    expect(r.state.macros.intents["harmony:linger"]).toBe(30); // [0.5, 30] max
-    expect(r.state.macros.intents["dynamics:linger"]).toBe(8000); // [500, 8000] max
-    expect(r.state.macros.intents["time-horizon"]).toBe(1);
+  it("the manifest has compound macros to exercise", () => {
+    expect(compounds.length).toBeGreaterThan(0);
   });
 
-  it("time-horizon at min value maps to each target's min", async () => {
-    const engine = new StubEngineHandle();
-    const r = await setMacroTool.handle({ name: "time-horizon", value: 0 }, engine);
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.state.macros.intents["rhythm:horizon"]).toBe(0);
-    expect(r.state.macros.intents["harmony:linger"]).toBe(0.5);
-    expect(r.state.macros.intents["dynamics:linger"]).toBe(500);
-  });
+  // At the compound's max, a forward target gets its range max and an
+  // inverted target its range min; at the compound's min, the reverse.
+  for (const c of compounds) {
+    const [cMin, cMax] = c.range;
 
-  it("compound value out of range → error", async () => {
-    const r = await setMacroTool.handle(
-      { name: "time-horizon", value: 2 },
-      new StubEngineHandle(),
-    );
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error.code).toBe("MACRO_VALUE_OUT_OF_RANGE");
-  });
+    it(`${c.id} at max sends forward targets to max, inverted to min`, async () => {
+      const r = await setMacroTool.handle({ name: c.id, value: cMax }, new StubEngineHandle());
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      const intents = r.state.macros.intents;
+      expect(perTarget(c, (t) => intents[t.id])).toEqual(
+        perTarget(c, (t, [tMin, tMax]) => (t.invert ? tMin : tMax)),
+      );
+      expect(r.state.macros.intents[c.id]).toBe(cMax);
+    });
 
-  it("rhythm:difficulty inverts targets — HIGH difficulty → LOW leaf values", async () => {
-    const engine = new StubEngineHandle();
-    // Max difficulty = 1.0 (strict). Both targets are marked invert:true,
-    // so each leaf gets its RANGE MINIMUM (tight view, tight tolerance).
-    const r = await setMacroTool.handle(
-      { name: "rhythm:difficulty", value: 1.0 },
-      engine,
-    );
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.state.macros.intents["rhythm:horizon"]).toBe(0); // [0, 1] inverted → 0
-    expect(r.state.macros.intents["rhythm:tightness-tolerance"]).toBe(10); // [10, 100] inverted → 10
-    expect(r.state.macros.intents["rhythm:difficulty"]).toBe(1);
-  });
+    it(`${c.id} at min sends forward targets to min, inverted to max`, async () => {
+      const r = await setMacroTool.handle({ name: c.id, value: cMin }, new StubEngineHandle());
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      const intents = r.state.macros.intents;
+      expect(perTarget(c, (t) => intents[t.id])).toEqual(
+        perTarget(c, (t, [tMin, tMax]) => (t.invert ? tMax : tMin)),
+      );
+    });
 
-  it("rhythm:difficulty at 0 gives leaves their max (loose/wide)", async () => {
-    const engine = new StubEngineHandle();
-    const r = await setMacroTool.handle(
-      { name: "rhythm:difficulty", value: 0 },
-      engine,
-    );
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    expect(r.state.macros.intents["rhythm:horizon"]).toBe(1);
-    expect(r.state.macros.intents["rhythm:tightness-tolerance"]).toBe(100);
-  });
+    it(`${c.id} maps linearly: the midpoint lands mid-range on every target`, async () => {
+      const r = await setMacroTool.handle(
+        { name: c.id, value: (cMin + cMax) / 2 },
+        new StubEngineHandle(),
+      );
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      const intents = r.state.macros.intents;
+      expect(perTarget(c, (t) => intents[t.id])).toEqual(
+        perTarget(c, (_t, [tMin, tMax]) => expect.closeTo((tMin + tMax) / 2)),
+      );
+    });
 
-  it("rhythm:emphasis fans forward to pulse-intensity + reference-linger", async () => {
-    const engine = new StubEngineHandle();
-    const r = await setMacroTool.handle(
-      { name: "rhythm:emphasis", value: 1.0 },
-      engine,
-    );
-    expect(r.ok).toBe(true);
-    if (!r.ok) return;
-    // Non-inverted targets: max compound → max leaf.
-    expect(r.state.macros.intents["rhythm:pulse-intensity"]).toBe(1); // [0, 1] max
-    expect(r.state.macros.intents["rhythm:reference-linger"]).toBe(3); // [1.0, 3.0] max
+    it(`${c.id} out of range → error`, async () => {
+      const r = await setMacroTool.handle(
+        { name: c.id, value: cMax + (cMax - cMin) },
+        new StubEngineHandle(),
+      );
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.error.code).toBe("MACRO_VALUE_OUT_OF_RANGE");
+    });
+  }
+
+  it("rhythm:difficulty inverts its targets — higher difficulty narrows the view", async () => {
+    // The perceptual claim behind the manifest's invert flags: harder
+    // means less horizon and less drift tolerance, not more.
+    const difficulty = annotation("rhythm:difficulty", "compound");
+    const [dMin, dMax] = difficulty.range;
+    const easy = await setMacroTool.handle({ name: difficulty.id, value: dMin }, new StubEngineHandle());
+    const hard = await setMacroTool.handle({ name: difficulty.id, value: dMax }, new StubEngineHandle());
+    if (!easy.ok || !hard.ok) throw new Error("difficulty dispatch failed");
+    const narrower = (id: string) =>
+      (hard.state.macros.intents[id] as number) < (easy.state.macros.intents[id] as number);
+    expect({
+      horizon: narrower("rhythm:horizon"),
+      tolerance: narrower("rhythm:tightness-tolerance"),
+    }).toEqual({ horizon: true, tolerance: true });
   });
 });
 
@@ -161,22 +204,20 @@ describe("time-horizon — leaf outputs are unit-invariant across tempo", () => 
   it("compound dispatch produces the same harmony:linger regardless of tempo", async () => {
     // harmony:linger is always seconds; no tempo-aware normalisation.
     // A single compound value should produce the same leaf value in
-    // free time and with a prescribed tempo — that's the point.
+    // free time and with a prescribed tempo.
+    const value = annotation("time-horizon", "compound").range[1];
     const freeTime = new StubEngineHandle();
-    await setMacroTool.handle({ name: "time-horizon", value: 1.0 }, freeTime);
-    const freeState = await freeTime.getStateSnapshot();
-    const freeLinger = freeState.macros.intents["harmony:linger"];
+    await setMacroTool.handle({ name: "time-horizon", value }, freeTime);
+    const freeLinger = (await freeTime.getStateSnapshot()).macros.intents[linger.id];
 
     const withTempo = new StubEngineHandle();
     await withTempo.setTempo(120);
     await withTempo.setMeter(4, 4);
-    await setMacroTool.handle({ name: "time-horizon", value: 1.0 }, withTempo);
-    const tempoState = await withTempo.getStateSnapshot();
-    const tempoLinger = tempoState.macros.intents["harmony:linger"];
+    await setMacroTool.handle({ name: "time-horizon", value }, withTempo);
+    const tempoLinger = (await withTempo.getStateSnapshot()).macros.intents[linger.id];
 
     expect(freeLinger).toBe(tempoLinger);
-    // Also at max compound value, linger should be at leaf max (30s).
-    expect(freeLinger).toBe(30);
+    expect(freeLinger).toBe(linger.range[1]);
   });
 });
 

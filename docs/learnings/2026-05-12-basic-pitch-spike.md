@@ -136,10 +136,11 @@ These belong in implementation testing, not pre-implementation validation. The s
 
 ## Reproducibility
 
-The spike harness is in [`spikes/audio-latency/run.cjs`](../../spikes/audio-latency/run.cjs). Run with:
+The spike harness was removed from the tree in October 2026; it lives in git history at commit `2d1b0f7`. To run it:
 
 ```bash
-cd spikes/audio-latency
+git worktree add /tmp/audio-spike 2d1b0f7
+cd /tmp/audio-spike/spikes/audio-latency
 npm install
 npm run spike
 ```

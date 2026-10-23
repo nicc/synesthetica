@@ -142,6 +142,7 @@ function renderToolResultShape(): string {
     "- `INSTANCE_NOT_FOUND` — the `instance` arg doesn't match any running engine.",
     "- `ENGINE_ERROR` — underlying engine / transport / filesystem failure. Read the message.",
     "- `ENGINE_NOT_STARTED` — the pipeline isn't running. Call `start_session` and then re-issue the original call.",
+    "- `ENGINE_DISCONNECTED` — the session is running but its visualiser tab is gone (closed, crashed or never reconnected), so there is no current state to report. Call `start_session` (it opens a new tab) and then re-issue the original call. The new tab starts fresh: clock, recent events and every setting are reset, so re-apply what the user had set if they want it. Don't describe the earlier session as if it were current.",
     "- `PRIMER_INVALID` — the `primer` argument was missing or stale. Every tool except `get_started` requires the token returned by `get_started` as its `primer` argument. `details.primer` + `details.token` carry the fresh values — read the primer and retry with the new token in one round-trip (no need to call `get_started` again manually).",
     "",
     "Handling guidance:",

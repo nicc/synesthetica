@@ -3,7 +3,9 @@ import {
   generatePanel,
   productionManifest,
   type MacroAnnotation,
+  type Panel,
   type SessionControlAnnotation,
+  type WidgetDescriptor,
 } from "@synesthetica/contracts";
 
 describe("generatePanel — sections", () => {
@@ -93,58 +95,65 @@ describe("generatePanel — sections", () => {
 });
 
 describe("generatePanel — widget kinds", () => {
-  it("continuous macro → slider with range and directionality", () => {
-    const panel = generatePanel(productionManifest);
-    const linger = findWidget(panel, "harmony:linger");
+  // Widgets carry the annotation's shape through unchanged. Compare
+  // against the manifest entry rather than retyping its range/default.
+  it("continuous macro → slider with the annotation's range, default and directionality", () => {
+    const ann = macroAnnotation("harmony:linger");
+    if (ann.type !== "continuous") throw new Error("harmony:linger should be continuous");
+    const linger = findWidget(generatePanel(productionManifest), ann.id);
     expect(linger.kind).toBe("slider");
     if (linger.kind === "slider") {
-      expect(linger.range).toEqual([0.5, 30]);
-      expect(linger.defaultValue).toBe(3);
-      expect(linger.low).toMatch(/quickly/);
-      expect(linger.high).toMatch(/linger/);
+      expect(linger.range).toEqual(ann.range);
+      expect(linger.defaultValue).toBe(ann.default);
+      expect(linger.low).toBe(ann.directionality.low.description);
+      expect(linger.high).toBe(ann.directionality.high.description);
     }
   });
 
   it("compound macro → slider (dispatch handled at engine, not renderer)", () => {
-    const panel = generatePanel(productionManifest);
-    const horizon = findWidget(panel, "time-horizon");
+    const ann = macroAnnotation("time-horizon");
+    if (ann.type !== "compound") throw new Error("time-horizon should be compound");
+    const horizon = findWidget(generatePanel(productionManifest), ann.id);
     expect(horizon.kind).toBe("slider");
     if (horizon.kind === "slider") {
-      expect(horizon.range).toEqual([0, 1]);
-      expect(horizon.defaultValue).toBe(1);
+      expect(horizon.range).toEqual(ann.range);
+      expect(horizon.defaultValue).toBe(ann.default);
     }
   });
 
-  it("discrete macro → select with enum options", () => {
-    const panel = generatePanel(productionManifest);
-    const quantise = findWidget(panel, "rhythm:quantise-resolution");
+  it("discrete macro → non-clearable select with the annotation's enum options", () => {
+    const ann = macroAnnotation("rhythm:quantise-resolution");
+    if (ann.type !== "discrete") throw new Error("rhythm:quantise-resolution should be discrete");
+    const quantise = findWidget(generatePanel(productionManifest), ann.id);
     expect(quantise.kind).toBe("select");
     if (quantise.kind === "select") {
-      expect(quantise.options.map((o) => o.value)).toContain("16th");
-      expect(quantise.options.map((o) => o.value)).toContain("32nd");
-      expect(quantise.defaultValue).toBe("16th");
+      expect(quantise.options.map((o) => o.value)).toEqual(ann.enumValues.map((v) => v.value));
+      expect(quantise.defaultValue).toBe(ann.default);
       expect(quantise.clearable).toBe(false);
     }
   });
 
   it("nullable number session → number widget with clearable=true", () => {
-    const panel = generatePanel(productionManifest);
-    const tempo = findWidget(panel, "session:tempo");
+    const ann = productionManifest.sessionControls.find((s) => s.id === "session:tempo");
+    if (ann?.type !== "number") throw new Error("session:tempo should be a number control");
+    expect(ann.nullable).toBe(true);
+    const tempo = findWidget(generatePanel(productionManifest), ann.id);
     expect(tempo.kind).toBe("number");
     if (tempo.kind === "number") {
-      expect(tempo.range).toEqual([30, 240]);
-      expect(tempo.unit).toBe("BPM");
+      expect(tempo.range).toEqual(ann.range);
+      expect(tempo.unit).toBe(ann.unit);
       expect(tempo.clearable).toBe(true);
     }
   });
 
   it("enum session with nullable=true → select with clearable=true", () => {
-    const panel = generatePanel(productionManifest);
-    const mode = findWidget(panel, "session:mode");
+    const ann = productionManifest.sessionControls.find((s) => s.id === "session:mode");
+    if (ann?.type !== "enum") throw new Error("session:mode should be an enum control");
+    const mode = findWidget(generatePanel(productionManifest), ann.id);
     expect(mode.kind).toBe("select");
     if (mode.kind === "select") {
       expect(mode.clearable).toBe(true);
-      expect(mode.options.map((o) => o.value)).toContain("ionian");
+      expect(mode.options.map((o) => o.value)).toEqual(ann.enumValues.map((v) => v.value));
     }
   });
 
@@ -165,12 +174,11 @@ describe("generatePanel — widget kinds", () => {
     expect(input.label).toBe("input:source");
   });
 
-  it("tooltip carries every entry from notes[]", () => {
-    const panel = generatePanel(productionManifest);
-    const tempo = findWidget(panel, "session:tempo");
-    expect(Array.isArray(tempo.tooltip)).toBe(true);
-    // Should include the "grid" note verbatim as one of the paragraphs.
-    expect((tempo.tooltip as string[]).some((n) => n.includes("grid"))).toBe(true);
+  it("tooltip carries every entry from humanNotes[]", () => {
+    const ann = productionManifest.sessionControls.find((s) => s.id === "session:tempo")!;
+    expect(ann.humanNotes?.length).toBeGreaterThan(0);
+    const tempo = findWidget(generatePanel(productionManifest), ann.id);
+    expect(tempo.tooltip).toEqual(ann.humanNotes);
   });
 });
 
@@ -237,39 +245,26 @@ describe("generatePanel — pair widgets", () => {
   });
 });
 
-function findWidget(
-  panel: ReturnType<typeof generatePanel>,
-  id: string,
-): {
-  kind: "slider" | "select" | "toggle" | "number" | "pair";
-  id: string;
-  label: string;
-  tooltip?: string[];
-  aliases: string[];
-  [k: string]: unknown;
-} {
-  const search = (widgets: readonly { id: string; kind: string; [k: string]: unknown }[]): typeof widgets[number] | null => {
+function macroAnnotation(id: string): MacroAnnotation {
+  const ann = productionManifest.macros.find((m) => m.id === id);
+  if (!ann) throw new Error(`macro not in manifest: ${id}`);
+  return ann;
+}
+
+function findWidget(panel: Panel, id: string): WidgetDescriptor {
+  const search = (widgets: readonly WidgetDescriptor[]): WidgetDescriptor | null => {
     for (const w of widgets) {
       if (w.id === id) return w;
       if (w.kind === "pair") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const found = search((w as any).children);
+        const found = search(w.children);
         if (found) return found;
       }
     }
     return null;
   };
   for (const section of panel.sections) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const inTop = search(section.widgets as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if (inTop) return inTop as any;
-    for (const sg of section.subgroups) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const inSg = search(sg.widgets as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (inSg) return inSg as any;
-    }
+    const found = search(section.widgets) ?? search(section.subgroups.flatMap((sg) => sg.widgets));
+    if (found) return found;
   }
   throw new Error(`widget not found: ${id}`);
 }

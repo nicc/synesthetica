@@ -1,280 +1,61 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import type { Mock } from "vitest";
 import type { SceneFrame, Entity } from "@synesthetica/contracts";
 
-// Mock window for Node.js environment
-const mockWindow = {
-  devicePixelRatio: 1,
+const DEVICE_PIXEL_RATIO = 2;
+const mockWindow: { devicePixelRatio: number; matchMedia?: (q: string) => { matches: boolean } } = {
+  devicePixelRatio: DEVICE_PIXEL_RATIO,
 };
 vi.stubGlobal("window", mockWindow);
 
-// Mock Three.js module before importing the renderer
-vi.mock("three", () => {
-  // Mock Color class
-  class MockColor {
-    r = 0;
-    g = 0;
-    b = 0;
-    constructor(_color?: number) {}
-    setHSL(_h: number, _s: number, _l: number) {
-      return this;
-    }
-    copy(other: MockColor) {
-      this.r = other.r; this.g = other.g; this.b = other.b;
-      return this;
-    }
-    getHex() { return 0; }
-  }
+// Three.js mocks: see test/_harness/threeMocks.ts.
+vi.mock("three", async () => (await import("./_harness/threeMocks")).mockThree());
+vi.mock("three/examples/jsm/lines/Line2.js", async () => (await import("./_harness/threeMocks")).mockLine2(await import("three")));
+vi.mock("three/examples/jsm/lines/LineMaterial.js", async () => (await import("./_harness/threeMocks")).mockLineMaterial(await import("three")));
+vi.mock("three/examples/jsm/lines/LineGeometry.js", async () => (await import("./_harness/threeMocks")).mockLineGeometry());
 
-  // Mock Vector3 class
-  class MockVector3 {
-    x = 0;
-    y = 0;
-    z = 0;
-    constructor(x = 0, y = 0, z = 0) {
-      this.x = x;
-      this.y = y;
-      this.z = z;
-    }
-    set(x: number, y: number, z: number) {
-      this.x = x;
-      this.y = y;
-      this.z = z;
-      return this;
-    }
-  }
-
-  // Mock Material base class
-  class Material {
-    transparent = false;
-    opacity = 1;
-    side = 0;
-    color = new MockColor();
-    linewidth = 1;
-    dispose = vi.fn();
-  }
-
-  class MockVector2 {
-    x = 0; y = 0;
-    constructor(x = 0, y = 0) {
-      this.x = x; this.y = y;
-    }
-    set(x: number, y: number) {
-      this.x = x; this.y = y;
-      return this;
-    }
-  }
-
-  class MockShaderMaterial extends Material {
-    uniforms: Record<string, { value: unknown }> = {};
-    blending = 1;
-    depthWrite = true;
-    vertexShader = "";
-    fragmentShader = "";
-    constructor(params?: Record<string, unknown>) {
-      super();
-      if (params) {
-        if (params.uniforms) this.uniforms = params.uniforms as Record<string, { value: unknown }>;
-        if (params.vertexShader) this.vertexShader = params.vertexShader as string;
-        if (params.fragmentShader) this.fragmentShader = params.fragmentShader as string;
-        if (params.transparent !== undefined) this.transparent = params.transparent as boolean;
-        if (params.side !== undefined) this.side = params.side as number;
-        if (params.blending !== undefined) this.blending = params.blending as number;
-        if (params.depthWrite !== undefined) this.depthWrite = params.depthWrite as boolean;
-      }
-    }
-  }
-  class MockMeshBasicMaterial extends Material {}
-  class MockLineBasicMaterial extends Material {}
-
-  // Mock Geometry classes
-  class MockBufferGeometry {
-    dispose = vi.fn();
-    setFromPoints() { return this; }
-    computeLineDistances() { return this; }
-  }
-
-  class MockShapeGeometry extends MockBufferGeometry {}
-
-  class MockShape {
-    moveTo = vi.fn();
-    lineTo = vi.fn();
-    quadraticCurveTo = vi.fn();
-    bezierCurveTo = vi.fn();
-    closePath = vi.fn();
-    curves: unknown[] = [];
-    getPoints = vi.fn(() => []);
-  }
-
-  class MockCircleGeometry extends MockBufferGeometry {}
-  class MockPlaneGeometry extends MockBufferGeometry {}
-  class MockRingGeometry extends MockBufferGeometry {}
-
-  // Mock Object3D classes
-  class MockObject3D {
-    name = "";
-    position = new MockVector3();
-    scale = new MockVector3(1, 1, 1);
-    children: MockObject3D[] = [];
-    userData: Record<string, unknown> = {};
-    getObjectByName(name: string): MockObject3D | undefined {
-      return this.children.find((c) => c.name === name);
-    }
-    traverse(callback: (obj: MockObject3D) => void) {
-      callback(this);
-      this.children.forEach((c) => c.traverse(callback));
-    }
-  }
-
-  class MockMesh extends MockObject3D {
-    geometry: MockBufferGeometry;
-    material: MockMaterial;
-    constructor(geometry?: MockBufferGeometry, material?: MockMaterial) {
-      super();
-      this.geometry = geometry ?? new MockBufferGeometry();
-      this.material = material ?? new MockMaterial();
-    }
-  }
-
-  class MockLine extends MockObject3D {
-    geometry: MockBufferGeometry;
-    material: Material;
-    constructor(geometry?: MockBufferGeometry, material?: Material) {
-      super();
-      this.geometry = geometry ?? new MockBufferGeometry();
-      this.material = material ?? new MockLineBasicMaterial();
-    }
-    computeLineDistances() { return this; }
-  }
-
-  class MockGroup extends MockObject3D {
-    add(obj: MockObject3D) {
-      this.children.push(obj);
-    }
-  }
-
-  // Mock Scene
-  class MockScene {
-    background: MockColor | null = null;
-    children: MockObject3D[] = [];
-    add = vi.fn((obj: MockObject3D) => {
-      this.children.push(obj);
-    });
-    remove = vi.fn((obj: MockObject3D) => {
-      const idx = this.children.indexOf(obj);
-      if (idx >= 0) this.children.splice(idx, 1);
-    });
-  }
-
-  // Mock Camera
-  class MockPerspectiveCamera {
-    fov: number;
-    aspect: number;
-    near: number;
-    far: number;
-    position = new MockVector3();
-    constructor(fov: number, aspect: number, near: number, far: number) {
-      this.fov = fov;
-      this.aspect = aspect;
-      this.near = near;
-      this.far = far;
-    }
-    lookAt = vi.fn();
-    updateProjectionMatrix = vi.fn();
-  }
-
-  // Mock WebGLRenderer
-  class MockWebGLRenderer {
-    domElement: HTMLCanvasElement | null = null;
-    constructor(_config: { canvas?: HTMLCanvasElement; antialias?: boolean; alpha?: boolean }) {
-      this.domElement = _config.canvas ?? null;
-    }
-    setPixelRatio = vi.fn();
-    setSize = vi.fn();
-    render = vi.fn();
-    dispose = vi.fn();
-  }
-
-  return {
-    WebGLRenderer: MockWebGLRenderer,
-    Scene: MockScene,
-    PerspectiveCamera: MockPerspectiveCamera,
-    Color: MockColor,
-    Vector2: MockVector2,
-    Vector3: MockVector3,
-    Mesh: MockMesh,
-    Line: MockLine,
-    Group: MockGroup,
-    Shape: MockShape,
-    ShapeGeometry: MockShapeGeometry,
-    CircleGeometry: MockCircleGeometry,
-    PlaneGeometry: MockPlaneGeometry,
-    RingGeometry: MockRingGeometry,
-    BufferGeometry: MockBufferGeometry,
-    Material,
-    MeshBasicMaterial: MockMeshBasicMaterial,
-    ShaderMaterial: MockShaderMaterial,
-    LineBasicMaterial: MockLineBasicMaterial,
-    DoubleSide: 2,
-    NormalBlending: 1,
-    AdditiveBlending: 2,
-  };
-});
-
-// Mock Three.js line addons
-vi.mock("three/examples/jsm/lines/Line2.js", () => {
-  class MockLine2 {
-    name = "";
-    position = { x: 0, y: 0, z: 0, set() { return this; } };
-    scale = { x: 1, y: 1, z: 1, set() { return this; } };
-    children: unknown[] = [];
-    userData: Record<string, unknown> = {};
-    geometry: unknown;
-    material: unknown;
-    constructor(geometry?: unknown, material?: unknown) {
-      this.geometry = geometry;
-      this.material = material;
-    }
-    computeLineDistances() { return this; }
-    traverse(cb: (obj: unknown) => void) { cb(this); }
-  }
-  return { Line2: MockLine2 };
-});
-
-vi.mock("three/examples/jsm/lines/LineMaterial.js", () => {
-  class MockLineMaterial {
-    color = 0;
-    linewidth = 1;
-    transparent = false;
-    opacity = 1;
-    dashed = false;
-    dashSize = 1;
-    gapSize = 1;
-    resolution = { x: 800, y: 600 };
-    dispose = vi.fn();
-    constructor(params?: Record<string, unknown>) {
-      if (params) Object.assign(this, params);
-    }
-  }
-  return { LineMaterial: MockLineMaterial };
-});
-
-vi.mock("three/examples/jsm/lines/LineGeometry.js", () => {
-  class MockLineGeometry {
-    dispose = vi.fn();
-    setPositions() { return this; }
-  }
-  return { LineGeometry: MockLineGeometry };
-});
-
-// Import after mocking
+import * as THREE from "three";
 import { ThreeJSRenderer } from "../src/renderers/ThreeJSRenderer";
+import type { ThreeJSRendererConfig } from "../src/renderers/ThreeJSRenderer";
+
+// ============================================================================
+// Mock-state views
+// ============================================================================
+
+interface Vec3 { x: number; y: number; z: number }
+interface MockMaterial {
+  opacity: number;
+  blending: number;
+  depthWrite: boolean;
+  color: { r: number; g: number; b: number };
+  dispose: Mock;
+  uniforms: Record<string, { value: unknown }>;
+  fragmentShader: string;
+  resolution: { x: number; y: number };
+}
+interface MockObject {
+  position: Vec3;
+  scale: Vec3;
+  renderOrder: number;
+  geometry: { dispose: Mock; points: Vec3[] };
+  material: MockMaterial;
+}
+interface Internals {
+  scene: { children: MockObject[]; add: Mock };
+  camera: { fov: number; aspect: number; position: Vec3 };
+  renderer: { render: Mock };
+  entityObjects: Map<string, MockObject>;
+}
+
+const internals = (r: ThreeJSRenderer) => r as unknown as Internals;
+const objectFor = (r: ThreeJSRenderer, id: string) => internals(r).entityObjects.get(id)!;
+
+// ============================================================================
+// Fixtures
+// ============================================================================
 
 function createMockCanvas(): HTMLCanvasElement {
-  return {
-    width: 800,
-    height: 600,
-    style: {},
-  } as unknown as HTMLCanvasElement;
+  return { width: 800, height: 600, style: {} } as unknown as HTMLCanvasElement;
 }
 
 function createEntity(overrides: Partial<Entity> = {}): Entity {
@@ -285,333 +66,305 @@ function createEntity(overrides: Partial<Entity> = {}): Entity {
     createdAt: 1000,
     updatedAt: 1000,
     position: { x: 0.5, y: 0.5 },
-    style: {
-      color: { h: 0, s: 1, v: 1 },
-      size: 20,
-      opacity: 1,
-    },
+    style: { color: { h: 0, s: 1, v: 1 }, size: 20, opacity: 1 },
     ...overrides,
   };
 }
 
-function createSceneFrame(entities: Entity[] = []): SceneFrame {
-  return {
-    t: 1000,
-    entities,
-    diagnostics: [],
-  };
+function frameAt(t: number, entities: Entity[]): SceneFrame {
+  return { t, entities, diagnostics: [] };
 }
 
+function createSceneFrame(entities: Entity[] = []): SceneFrame {
+  return frameAt(1000, entities);
+}
+
+const strip = (id: string, type: string, extra: Record<string, unknown> = {}) =>
+  createEntity({
+    id,
+    kind: "particle",
+    data: { type, barHeight: 0.2, topOpacity: 0.3, bottomOpacity: 0.5, ...extra },
+  });
+
+/** World-space y for a normalised y (y = 0 is the top of the screen). */
+const worldY = (cfg: Required<Pick<ThreeJSRendererConfig, "worldHeight">>, y: number) =>
+  (1 - y) * cfg.worldHeight;
+
+// ============================================================================
+// Tests
+// ============================================================================
+
 describe("ThreeJSRenderer", () => {
+  const world = { worldWidth: 200, worldHeight: 120 };
   let renderer: ThreeJSRenderer;
-  let mockCanvas: HTMLCanvasElement;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    renderer = new ThreeJSRenderer();
-    mockCanvas = createMockCanvas();
+    renderer = new ThreeJSRenderer(world);
+    renderer.attach(createMockCanvas());
   });
 
-  describe("attachment", () => {
-    it("attaches to canvas and initializes Three.js components", () => {
-      renderer.attach(mockCanvas);
+  afterEach(() => {
+    delete mockWindow.matchMedia;
+  });
 
-      // Should have created renderer, scene, camera
-      // Access via render call
-      const frame = createSceneFrame([]);
-      renderer.render(frame);
+  describe("placement", () => {
+    it("maps normalised position into the configured world, y flipped", () => {
+      const points = [
+        { id: "tl", x: 0, y: 0 },
+        { id: "br", x: 1, y: 1 },
+        { id: "mid", x: 0.25, y: 0.75 },
+      ];
+      renderer.render(createSceneFrame(
+        points.map(({ id, x, y }) => createEntity({ id, position: { x, y } })),
+      ));
 
-      // If render was called without throwing, attachment succeeded
-      expect(true).toBe(true);
+      for (const { id, x, y } of points) {
+        const pos = objectFor(renderer, id).position;
+        expect(pos.x).toBeCloseTo(x * world.worldWidth);
+        expect(pos.y).toBeCloseTo(worldY(world, y));
+      }
     });
 
-    it("does nothing when rendering without attachment", () => {
-      const frame = createSceneFrame([createEntity()]);
-
-      // Should not throw
-      renderer.render(frame);
-      expect(true).toBe(true);
+    it("scales particles in proportion to style.size", () => {
+      renderer.render(createSceneFrame([
+        createEntity({ id: "small", style: { size: 10 } }),
+        createEntity({ id: "large", style: { size: 40 } }),
+      ]));
+      const small = objectFor(renderer, "small").scale;
+      const large = objectFor(renderer, "large").scale;
+      expect(large.x / small.x).toBeCloseTo(4);
+      expect(large.y).toBeCloseTo(large.x);
     });
 
-    it("detaches cleanly", () => {
-      renderer.attach(mockCanvas);
+    it("hangs a note strip below its onset: top edge at the position, height from barHeight", () => {
+      const onsetY = 0.3;
+      const barHeight = 0.2;
+      renderer.render(createSceneFrame([
+        { ...strip("ns", "note-strip", { barHeight }), position: { x: 0.4, y: onsetY } },
+      ]));
+      const mesh = objectFor(renderer, "ns");
+      expect(mesh.scale.y).toBeCloseTo(barHeight * world.worldHeight);
+      expect(mesh.position.y + mesh.scale.y / 2).toBeCloseTo(worldY(world, onsetY));
+      expect(mesh.position.x).toBeCloseTo(0.4 * world.worldWidth);
+      expect(mesh.material.uniforms.topOpacity.value).toBe(0.3);
+      expect(mesh.material.uniforms.bottomOpacity.value).toBe(0.5);
+    });
+
+    it("draws a trail from the position along the velocity", () => {
+      const position = { x: 0.2, y: 0.4 };
+      const velocity = { x: 0.1, y: 0.25 };
+      renderer.render(createSceneFrame([
+        createEntity({ id: "t", kind: "trail", position, velocity }),
+      ]));
+      const [start, end] = objectFor(renderer, "t").geometry.points;
+      expect(start.x).toBeCloseTo(position.x * world.worldWidth);
+      expect(start.y).toBeCloseTo(worldY(world, position.y));
+      expect(end.x).toBeCloseTo((position.x + velocity.x) * world.worldWidth);
+      expect(end.y).toBeCloseTo(worldY(world, position.y + velocity.y));
+    });
+  });
+
+  describe("style", () => {
+    it("particle opacity is style.opacity × remaining life × colour alpha", () => {
+      const life = { ttlMs: 1000, ageMs: 250 };
+      renderer.render(createSceneFrame([
+        createEntity({ id: "p", life, style: { opacity: 0.8, color: { h: 0, s: 1, v: 1, a: 0.5 } } }),
+      ]));
+      const expected = 0.8 * (1 - life.ageMs / life.ttlMs) * 0.5;
+      expect(objectFor(renderer, "p").material.opacity).toBeCloseTo(expected);
+    });
+
+    it("clamps opacity at zero past the end of life", () => {
+      renderer.render(createSceneFrame([
+        createEntity({ id: "p", life: { ttlMs: 1000, ageMs: 1500 }, style: { opacity: 1 } }),
+      ]));
+      expect(objectFor(renderer, "p").material.opacity).toBe(0);
+    });
+
+    it("colours every render path through hsvToThreeColor", () => {
+      // The documented single point subclasses override to reskin the image.
+      class HueAsRed extends ThreeJSRenderer {
+        protected override hsvToThreeColor(hsv: { h: number }) {
+          return new THREE.Color(hsv.h / 360, 0, 0);
+        }
+      }
+      const tinted = new HueAsRed(world);
+      tinted.attach(createMockCanvas());
+      const hue = (h: number) => ({ color: { h, s: 1, v: 1 } });
+      tinted.render(createSceneFrame([
+        createEntity({ id: "p", style: hue(90) }),
+        createEntity({ id: "beat", kind: "field", data: { type: "beat-line" }, style: hue(180) }),
+        { ...strip("ns", "note-strip"), style: hue(270) },
+      ]));
+      expect(objectFor(tinted, "p").material.color.r).toBeCloseTo(90 / 360);
+      expect(objectFor(tinted, "beat").material.color.r).toBeCloseTo(180 / 360);
+      const stripColor = objectFor(tinted, "ns").material.uniforms.color.value as { r: number };
+      expect(stripColor.r).toBeCloseTo(270 / 360);
+    });
+  });
+
+  describe("entity lifecycle", () => {
+    it("creates one scene object per entity and reuses it across frames", () => {
+      const { scene } = internals(renderer);
+      renderer.render(createSceneFrame([createEntity({ id: "e", position: { x: 0.1, y: 0.1 } })]));
+      const first = objectFor(renderer, "e");
+      expect(scene.children).toEqual([first]);
+
+      renderer.render(createSceneFrame([createEntity({ id: "e", position: { x: 0.8, y: 0.2 } })]));
+      expect(objectFor(renderer, "e")).toBe(first);
+      expect(scene.children).toEqual([first]);
+      expect(scene.add).toHaveBeenCalledTimes(1);
+      expect(first.position.x).toBeCloseTo(0.8 * world.worldWidth);
+    });
+
+    it("removes and disposes objects whose entity left the frame, sparing shared geometries", () => {
+      const kept = createEntity({ id: "kept" });
+      renderer.render(createSceneFrame([
+        kept,
+        createEntity({ id: "particle" }),
+        strip("note", "note-strip"),
+        createEntity({ id: "trail", kind: "trail", velocity: { x: 0.1, y: 0.1 } }),
+      ]));
+      const particle = objectFor(renderer, "particle");
+      const note = objectFor(renderer, "note");
+      const trail = objectFor(renderer, "trail");
+
+      renderer.render(createSceneFrame([kept]));
+
+      expect(internals(renderer).scene.children).toEqual([objectFor(renderer, "kept")]);
+      for (const gone of [particle, note, trail]) {
+        expect(gone.material.dispose).toHaveBeenCalled();
+      }
+      expect(trail.geometry.dispose).toHaveBeenCalled();
+      // Particles share the circle and note strips the plane; both outlive the entity.
+      expect(particle.geometry.dispose).not.toHaveBeenCalled();
+      expect(note.geometry.dispose).not.toHaveBeenCalled();
+      expect(objectFor(renderer, "kept").material.dispose).not.toHaveBeenCalled();
+    });
+
+    it("keeps rendering the rest of the frame when one entity throws, logging once per id", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      // connector-strip requires plateauFraction and throws without it.
+      const broken = createEntity({ id: "broken", kind: "glyph", data: { type: "connector-strip" } });
+      const healthy = createEntity({ id: "healthy", position: { x: 0.25, y: 0.5 } });
+
+      renderer.render(createSceneFrame([broken, healthy]));
+      renderer.render(createSceneFrame([broken, healthy]));
+
+      expect(objectFor(renderer, "healthy").position.x).toBeCloseTo(0.25 * world.worldWidth);
+      expect(internals(renderer).renderer.render).toHaveBeenCalledTimes(2);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain("broken");
+      warn.mockRestore();
+    });
+
+    it("detach disposes entity resources and shared geometries; later renders draw nothing", () => {
+      renderer.render(createSceneFrame([
+        createEntity({ id: "p" }),
+        createEntity({ id: "t", kind: "trail" }),
+      ]));
+      const { scene, renderer: gl } = internals(renderer);
+      const particle = objectFor(renderer, "p");
+      const trail = objectFor(renderer, "t");
+
       renderer.detach();
 
-      const frame = createSceneFrame([createEntity()]);
-      renderer.render(frame);
+      expect(particle.material.dispose).toHaveBeenCalled();
+      expect(trail.material.dispose).toHaveBeenCalled();
+      expect(trail.geometry.dispose).toHaveBeenCalled();
+      expect(particle.geometry.dispose).toHaveBeenCalled(); // shared circle, freed with the renderer
 
-      // Should not throw after detach
-      expect(true).toBe(true);
+      const adds = scene.add.mock.calls.length;
+      const draws = gl.render.mock.calls.length;
+      renderer.render(createSceneFrame([createEntity({ id: "after" })]));
+      expect(scene.add).toHaveBeenCalledTimes(adds);
+      expect(gl.render).toHaveBeenCalledTimes(draws);
     });
   });
 
-  describe("entity rendering", () => {
-    beforeEach(() => {
-      renderer.attach(mockCanvas);
-    });
+  describe("overtone strips (RFC 012)", () => {
+    it("render as additive steam beneath clean note strips", () => {
+      renderer.render(createSceneFrame([
+        strip("ot", "overtone-strip", { edgeSoftness: 1, dissipationTop: 0.6, dissipationBottom: 0.1 }),
+        strip("ns", "note-strip"),
+      ]));
+      const overtone = objectFor(renderer, "ot");
+      const note = objectFor(renderer, "ns");
 
-    it("renders empty frame without errors", () => {
-      const frame = createSceneFrame();
-      renderer.render(frame);
-      expect(true).toBe(true);
-    });
-
-    it("creates mesh for particle entity", () => {
-      const entity = createEntity({ id: "p1", kind: "particle" });
-      const frame = createSceneFrame([entity]);
-
-      renderer.render(frame);
-
-      // Render again to verify reuse
-      renderer.render(frame);
-      expect(true).toBe(true);
-    });
-
-    it("creates line for trail entity", () => {
-      const entity = createEntity({
-        id: "t1",
-        kind: "trail",
-        velocity: { x: 0.1, y: -0.1 },
-      });
-      const frame = createSceneFrame([entity]);
-
-      renderer.render(frame);
-      expect(true).toBe(true);
-    });
-
-    it("handles field entities with different types", () => {
-      const beatLine = createEntity({
-        id: "f1",
-        kind: "field",
-        data: { type: "beat-line" },
-      });
-      const driftRing = createEntity({
-        id: "f2",
-        kind: "field",
-        data: { type: "drift-ring" },
-      });
-      const glowField = createEntity({
-        id: "f3",
-        kind: "field",
-        data: { type: "glow" },
-      });
-
-      const frame = createSceneFrame([beatLine, driftRing, glowField]);
-      renderer.render(frame);
-      expect(true).toBe(true);
-    });
-
-    it("handles glyph entities with different types", () => {
-      const chordShape = createEntity({
-        id: "g1",
-        kind: "glyph",
-        data: { type: "chord-shape" },
-      });
-      const tensionBar = createEntity({
-        id: "g2",
-        kind: "glyph",
-        data: { type: "tension-bar", tension: 0.7 },
-      });
-
-      const frame = createSceneFrame([chordShape, tensionBar]);
-      renderer.render(frame);
-      expect(true).toBe(true);
-    });
-
-    it("renders overtone strips as additive steam beneath clean note strips", () => {
-      const strip = (id: string, type: string, extra: Record<string, unknown> = {}) =>
-        createEntity({
-          id,
-          kind: "particle",
-          data: { type, barHeight: 0.2, topOpacity: 0.3, bottomOpacity: 0.5, ...extra },
-        });
-      renderer.render(
-        createSceneFrame([
-          strip("ot", "overtone-strip", {
-            edgeSoftness: 1,
-            dissipationTop: 0.6,
-            dissipationBottom: 0.1,
-            fieldOffsetY: 0.2,
-          }),
-          strip("ns", "note-strip"),
-        ]),
-      );
-
-      type StripMesh = {
-        renderOrder?: number;
-        material: {
-          blending: number;
-          depthWrite: boolean;
-          fragmentShader: string;
-          uniforms: Record<string, { value: unknown }>;
-        };
-      };
-      const objects = (renderer as unknown as { entityObjects: Map<string, StripMesh> })
-        .entityObjects;
-      const overtone = objects.get("ot")!;
-      const note = objects.get("ns")!;
-
-      expect(overtone.material.blending).toBe(2); // AdditiveBlending
+      expect(overtone.material.blending).toBe(THREE.AdditiveBlending);
       expect(overtone.material.depthWrite).toBe(false);
-      expect(overtone.renderOrder).toBe(-1);
+      expect(overtone.renderOrder).toBeLessThan(note.renderOrder);
       expect(overtone.material.fragmentShader).toContain("fbm");
       const u = overtone.material.uniforms;
       expect(u.edgeSoftness.value).toBe(1);
       expect(u.dissipationTop.value).toBe(0.6);
       expect(u.dissipationBottom.value).toBe(0.1);
-      // fieldOffsetY 0.2 × worldHeight 75 / worldWidth 100 × scale-y 6 = 0.9,
-      // plus rise 0.012/s × 6 × 1 s (frame.t = 1000 ms) = 0.072
-      expect(u.fieldShift.value).toBeCloseTo(0.972);
-      expect(u.swirlPhase.value).toBeCloseTo(0.25);
 
-      expect(note.material.blending).toBe(1); // NormalBlending
+      expect(note.material.blending).toBe(THREE.NormalBlending);
       expect(note.material.fragmentShader).not.toContain("fbm");
-      expect(note.renderOrder ?? 0).toBe(0);
-    });
-  });
-
-  describe("entity lifecycle", () => {
-    beforeEach(() => {
-      renderer.attach(mockCanvas);
     });
 
-    it("reuses objects for same entity id", () => {
-      const entity = createEntity({ id: "reuse-test" });
+    const steamAt = (r: ThreeJSRenderer, t: number, fieldOffsetY: number) => {
+      r.render(frameAt(t, [strip("ot", "overtone-strip", { fieldOffsetY })]));
+      const u = objectFor(r, "ot").material.uniforms;
+      return { shift: u.fieldShift.value as number, swirl: u.swirlPhase.value as number };
+    };
 
-      // Render twice with same entity
-      renderer.render(createSceneFrame([entity]));
-      renderer.render(createSceneFrame([entity]));
+    it("scrolls the steam field with fieldOffsetY and evolves it with session time", () => {
+      expect(steamAt(renderer, 0, 0)).toEqual({ shift: 0, swirl: 0 });
+      const offset = steamAt(renderer, 0, 0.05).shift;
+      expect(offset).toBeGreaterThan(0);
+      expect(steamAt(renderer, 0, 0.1).shift).toBeCloseTo(2 * offset);
 
-      expect(true).toBe(true);
+      const later = steamAt(renderer, 1000, 0);
+      expect(later.shift).toBeGreaterThan(0);
+      expect(later.swirl).toBeGreaterThan(0);
     });
 
-    it("removes objects when entity leaves frame", () => {
-      const entity1 = createEntity({ id: "e1" });
-      const entity2 = createEntity({ id: "e2" });
-
-      // Render with both
-      renderer.render(createSceneFrame([entity1, entity2]));
-
-      // Render with only one
-      renderer.render(createSceneFrame([entity1]));
-
-      // entity2's object should be removed
-      expect(true).toBe(true);
-    });
-
-    it("handles entity replacement", () => {
-      const entity = createEntity({ id: "replace-test" });
-
-      renderer.render(createSceneFrame([entity]));
-
-      // Update entity position
-      const updated = { ...entity, position: { x: 0.8, y: 0.2 } };
-      renderer.render(createSceneFrame([updated]));
-
-      expect(true).toBe(true);
-    });
-  });
-
-  describe("coordinate transformation", () => {
-    beforeEach(() => {
-      renderer.attach(mockCanvas);
-    });
-
-    it("transforms normalized coordinates to world space", () => {
-      // Default world is 100x75
-      const entity = createEntity({
-        id: "coord-test",
-        position: { x: 0.5, y: 0.5 }, // Center
-      });
-
-      renderer.render(createSceneFrame([entity]));
-
-      // World coords should be (50, 37.5) with Y flipped
-      expect(true).toBe(true);
-    });
-
-    it("handles edge positions correctly", () => {
-      const corners = [
-        createEntity({ id: "tl", position: { x: 0, y: 0 } }),
-        createEntity({ id: "tr", position: { x: 1, y: 0 } }),
-        createEntity({ id: "bl", position: { x: 0, y: 1 } }),
-        createEntity({ id: "br", position: { x: 1, y: 1 } }),
-      ];
-
-      renderer.render(createSceneFrame(corners));
-      expect(true).toBe(true);
-    });
-  });
-
-  describe("life decay", () => {
-    beforeEach(() => {
-      renderer.attach(mockCanvas);
-    });
-
-    it("applies life decay to opacity", () => {
-      const entity = createEntity({
-        id: "life-test",
-        life: { ttlMs: 1000, ageMs: 500 }, // 50% life remaining
-        style: { opacity: 1 },
-      });
-
-      renderer.render(createSceneFrame([entity]));
-
-      // Opacity should be 0.5 after life decay
-      expect(true).toBe(true);
-    });
-
-    it("handles entity at end of life", () => {
-      const entity = createEntity({
-        id: "dying",
-        life: { ttlMs: 1000, ageMs: 1000 }, // 0% life remaining
-      });
-
-      renderer.render(createSceneFrame([entity]));
-      expect(true).toBe(true);
-    });
-  });
-
-  describe("configuration", () => {
-    it("uses custom background color", () => {
-      const customRenderer = new ThreeJSRenderer({
-        backgroundColor: 0xff0000,
-      });
-      customRenderer.attach(mockCanvas);
-
-      const frame = createSceneFrame();
-      customRenderer.render(frame);
-
-      expect(true).toBe(true);
-    });
-
-    it("uses custom world dimensions", () => {
-      const customRenderer = new ThreeJSRenderer({
-        worldWidth: 200,
-        worldHeight: 150,
-      });
-      customRenderer.attach(mockCanvas);
-
-      const entity = createEntity({ position: { x: 0.5, y: 0.5 } });
-      customRenderer.render(createSceneFrame([entity]));
-
-      // Position should be (100, 75) in world coords
-      expect(true).toBe(true);
+    it("holds steam still when the viewer prefers reduced motion", () => {
+      mockWindow.matchMedia = () => ({ matches: true });
+      const still = new ThreeJSRenderer(world);
+      still.attach(createMockCanvas());
+      const atStart = steamAt(still, 0, 0.05);
+      expect(steamAt(still, 5000, 0.05)).toEqual(atStart);
     });
   });
 
   describe("resize", () => {
-    it("updates renderer and camera on resize", () => {
-      renderer.attach(mockCanvas);
-      renderer.resize(1920, 1080);
+    const cfg = { fov: 40, worldWidth: 120, worldHeight: 60 };
 
-      // Should update without error
-      expect(true).toBe(true);
+    /** Ratio of world to visible extent on each axis at the camera's distance. */
+    const coverage = (r: ThreeJSRenderer) => {
+      const { camera } = internals(r);
+      const visibleH = 2 * camera.position.z * Math.tan((cfg.fov * Math.PI) / 360);
+      const visibleW = visibleH * camera.aspect;
+      return { w: cfg.worldWidth / visibleW, h: cfg.worldHeight / visibleH };
+    };
+
+    it("contains the whole world, tight on the limiting axis", () => {
+      const r = new ThreeJSRenderer(cfg);
+      r.attach(createMockCanvas());
+
+      r.resize(1600, 400); // wider than the world: height limits
+      expect(internals(r).camera.aspect).toBeCloseTo(4);
+      expect(coverage(r).h).toBeCloseTo(1);
+      expect(coverage(r).w).toBeLessThan(1);
+
+      r.resize(400, 800); // narrower than the world: width limits
+      expect(coverage(r).w).toBeCloseTo(1);
+      expect(coverage(r).h).toBeLessThan(1);
     });
 
-    it("handles resize before attach gracefully", () => {
-      renderer.resize(1920, 1080);
-      expect(true).toBe(true);
+    it("updates the resolution of existing line materials", () => {
+      renderer.render(createSceneFrame([
+        createEntity({ id: "ring", kind: "glyph", data: { type: "progression-guide-ring" } }),
+      ]));
+      renderer.resize(1000, 500);
+      expect(objectFor(renderer, "ring").material.resolution).toEqual({
+        x: 1000 * DEVICE_PIXEL_RATIO,
+        y: 500 * DEVICE_PIXEL_RATIO,
+      });
     });
   });
 });

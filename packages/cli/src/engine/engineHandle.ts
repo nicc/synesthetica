@@ -8,89 +8,16 @@
  * testing.
  */
 
-import type { MacroValue } from "@synesthetica/contracts";
+import type {
+  AvailableInput,
+  EngineRecentEventsEnvelope,
+  EngineStateSnapshot,
+  MacroValue,
+} from "@synesthetica/contracts";
 
-// -----------------------------------------------------------------
-// State snapshot returned after every successful control op.
-// Shape follows SPEC 013 §Resources — the same object served under
-// state://<label>/current.
-// -----------------------------------------------------------------
-
-/**
- * Macro state, split into user intents and consumer-observed effective
- * values. See EngineStateSnapshot in contracts/control/engineBridge.ts
- * for the full contract; kept in sync here.
- */
-export interface MacroState {
-  intents: Record<string, MacroValue>;
-  effective: Record<string, MacroValue>;
-}
-
-export interface StateSnapshot {
-  instance: string;
-  /** Current macro values, split by intent vs consumer-observed effect. */
-  macros: MacroState;
-  /** Browser permission states; see EngineStateSnapshot in contracts. */
-  permissions: {
-    midi: "granted" | "prompt" | "denied";
-    audio: "granted" | "prompt" | "denied";
-  };
-  /** Prescribed musical frame. Nulls = not prescribed. */
-  session: {
-    tonic: number | null;
-    mode: string | null;
-    tempo: number | null;
-    beatsPerBar: number | null;
-    beatValue: number | null;
-    chordMode: "harmonic" | "bass-led";
-    metronome: boolean;
-    /** Session lifecycle phase; see SessionPhase in contracts. */
-    phase: "no-session" | "spawned" | "input-active";
-  };
-  /** Input source (e.g. "midi:Yamaha P-125", "audio:built-in-mic"). */
-  input: string | null;
-  /** Active preset name, if any. */
-  activePreset: string | null;
-  /** Wall-clock time (ISO 8601) at session start; null when no
-   *  session is active. Anchors all `t` timestamps. */
-  startedAt: string | null;
-  /** Session-time (ms since startedAt) at snapshot construction.
-   *  Roughly-current for cached snapshots; recent-events reads
-   *  carry a fresher value via their envelope. */
-  now: number | null;
-}
-
-// -----------------------------------------------------------------
-// Recent-events buffer entry (Chunk E; declared here for the
-// interface). SPEC 013 §Recent Events.
-// -----------------------------------------------------------------
-
-export interface RecentEvent {
-  id: number;
-  t: number;
-  kind: string;
-  [key: string]: unknown;
-}
-
-/** One available input device (mirror of contracts/AvailableInput). */
-export interface AvailableInput {
-  kind: "midi" | "audio";
-  name: string;
-  id: string;
-  sourceString: string;
-}
-
-/**
- * Envelope returned from getRecentEvents / state://<label>/recent-events.
- * Wraps events with the temporal frame of reference the LLM needs to
- * reason about "when" — startedAt as absolute anchor, now as the
- * fresh session-ms at read time.
- */
-export interface RecentEventsEnvelope {
-  startedAt: string | null;
-  now: number | null;
-  events: RecentEvent[];
-}
+// State, recent-event and input shapes are defined in contracts
+// (control/engineBridge.ts) and shared with the browser side of the
+// bridge; SPEC 013 §Resources and §Recent Events.
 
 // -----------------------------------------------------------------
 // Unsubscribe handle
@@ -106,32 +33,39 @@ export interface EngineHandle {
   readonly label: string;
   readonly status: "starting" | "running" | "stopping" | "error";
 
+  /**
+   * True when a browser tab is connected to this engine now, or
+   * connects within the timeout (a reload gets a short grace period).
+   * False means the session is running but its tab is gone.
+   */
+  awaitConnected(timeoutMs?: number): Promise<boolean>;
+
   // -- Aesthetic macros --
-  setMacro(name: string, value: MacroValue): Promise<StateSnapshot>;
+  setMacro(name: string, value: MacroValue): Promise<EngineStateSnapshot>;
 
   // -- Session controls --
-  setKey(root: number | null, mode: string | null): Promise<StateSnapshot>;
-  setTempo(bpm: number | null): Promise<StateSnapshot>;
-  setMeter(beatsPerBar: number | null, beatValue: number | null): Promise<StateSnapshot>;
-  setChordMode(mode: "harmonic" | "bass-led"): Promise<StateSnapshot>;
-  setMetronome(enabled: boolean): Promise<StateSnapshot>;
+  setKey(root: number | null, mode: string | null): Promise<EngineStateSnapshot>;
+  setTempo(bpm: number | null): Promise<EngineStateSnapshot>;
+  setMeter(beatsPerBar: number | null, beatValue: number | null): Promise<EngineStateSnapshot>;
+  setChordMode(mode: "harmonic" | "bass-led"): Promise<EngineStateSnapshot>;
+  setMetronome(enabled: boolean): Promise<EngineStateSnapshot>;
 
   // -- Input source --
-  setInput(source: string): Promise<StateSnapshot>;
+  setInput(source: string): Promise<EngineStateSnapshot>;
 
   // -- Helper --
-  setHueForPitch(pc: number, hue: number): Promise<StateSnapshot>;
+  setHueForPitch(pc: number, hue: number): Promise<EngineStateSnapshot>;
 
   // -- Presets --
-  switchPreset(name: string): Promise<StateSnapshot>;
-  savePreset(name: string): Promise<StateSnapshot>;
+  switchPreset(name: string): Promise<EngineStateSnapshot>;
+  savePreset(name: string): Promise<EngineStateSnapshot>;
 
   // -- State --
-  getStateSnapshot(): Promise<StateSnapshot>;
-  getRecentEvents(limit?: number, since?: number): Promise<RecentEventsEnvelope>;
+  getStateSnapshot(): Promise<EngineStateSnapshot>;
+  getRecentEvents(limit?: number, since?: number): Promise<EngineRecentEventsEnvelope>;
   /** Drop the recent-events buffer contents + diff state. Keeps the
    *  pipeline subscription alive so subsequent frames repopulate. */
-  clearRecentEvents(): Promise<StateSnapshot>;
+  clearRecentEvents(): Promise<EngineStateSnapshot>;
 
   // -- Discovery --
   /** Enumerate connected MIDI + audio inputs. Powers inputs://. */
@@ -140,9 +74,21 @@ export interface EngineHandle {
   // -- Subscriptions (Chunk E wires these up) --
   subscribe(
     event: "state-changed",
-    callback: (snapshot: StateSnapshot) => void,
+    callback: (snapshot: EngineStateSnapshot) => void,
   ): Unsubscribe;
 
   // -- Lifecycle --
   close(): Promise<void>;
+}
+
+/**
+ * The session is running but no browser tab is connected to it: the tab
+ * was closed, crashed, or never reconnected. The MCP layer reports this
+ * as ENGINE_DISCONNECTED; start_session reopens the tab.
+ */
+export class EngineDisconnectedError extends Error {
+  readonly code = "ENGINE_DISCONNECTED";
+  constructor(label: string) {
+    super(`the visualiser tab for '${label}' isn't connected (closed or crashed). Call start_session to reopen it.`);
+  }
 }

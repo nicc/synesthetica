@@ -4,7 +4,7 @@
 id: GLOSSARY.core-v1
 status: draft
 owner: user
-last_updated: 2026-01-19
+last_updated: 2026-10-22
 ---
 
 ## Purpose
@@ -38,15 +38,14 @@ Defined in **RFC 0001**.
 ---
 
 ### Interaction Posture  
-A high-level mode describing how reactive, stable, or expressive the system should feel.
+A behavioural stance the LLM adopts in conversation, inferred from context (SPEC_004).
 
 Examples:
-- **Quiet** – stable, smoothed, restrained
-- **Conversational** – reactive, expressive, visibly responsive
+- **Quiet** – short commands only; no clarifying questions; failures are silent no-ops
+- **Conversational** – tolerates ambiguity; may ask clarifying questions; explains changes
 
 Interaction postures:
-- influence macro controls
-- affect smoothing, gating, and compositor constraints
+- are LLM behaviour only — the engine has no posture setting, enum, or prompt for them
 - do **not** change musical meaning or synesthetic mappings
 
 ---
@@ -54,46 +53,43 @@ Interaction postures:
 ### Preset
 The primary **user-facing unit of configuration**.
 
-A preset bundles:
-- selected grammars
-- grammar parameters
-- macro control values (articulation, persistence, emphasis)
-- layout and compositing settings
+A preset stores (SPEC_001):
+- macro values (the user-facing intents, e.g. `harmony:linger`)
+- session controls (prescribed key, tempo, meter, chord mode)
+
+It does not store the input source, so loading a preset never switches devices.
 
 Presets are:
-- created by selecting grammars and adjusting macros
-- saved with user-chosen names
+- created by adjusting macros and session controls, then saving
+- saved with user-chosen names (overwriting on collision)
 - recallable via speech
 - incapable of redefining synesthetic meaning
 
-### Grammar
-A built-in visual grammar that produces visual entities from annotated musical elements.
+### Lens
+*(Formerly: Grammar. The rename is complete in code; "grammar" should not be used.)*
 
-Grammars:
-- are the building blocks users select and combine
-- define *form*, not *meaning*
-- know musical element categories (note, chord, beat) but not analysis details
-- decide which elements to render (can filter)
-- **own entity lifecycle** (TTL, decay, removal)
-- may react to uncertainty with visual noise
-- may not infer musical semantics
+A built-in visual interpretation that turns the annotated musical frame into scene entities. See [Lens](#lens-1) under Visual Form & Rendering for the architectural definition.
 
-Examples:
-- TestRhythmGrammar (timing markers for beats and notes)
-- TestChordProgressionGrammar (chord glows with history trail)
+Three lenses exist, sharing a three-column layout (`packages/engine/src/lenses/layout.ts`):
+- **DynamicsLens** (left) — vertical VU-meter bar with fading velocity indicators
+- **RhythmLens** (centre) — pitch-class note strips scrolling up through a NOW line; beat/bar grid and drift streaks when a tempo is prescribed
+- **HarmonyLens** (right) — chord symbol above, harmony clock (chord numerals and connection strips) below
+
+All three always run. Users shape them through macros (e.g. `rhythm:horizon`, `harmony:linger`); there is no lens selection or switching today.
 
 ---
 
 ### Macro Controls  
 High-level, bounded parameters exposed to users.
 
-Typical macros:
-- **Articulation** (tight ↔ loose)
-- **Persistence** (ephemeral ↔ lingering)
-- **Emphasis** (melody / harmony / rhythm / timbre weighting)
+Examples (the full list is in `packages/contracts/annotations/manifest.ts`):
+- **`harmony:linger`** — how long chord numerals linger on the harmony clock
+- **`rhythm:horizon`** — how much history and lookahead the rhythm lens shows
+- **`rhythm:difficulty`** — compound; tightens horizon and timing tolerance together
+- **`harmony:arpeggio-tolerance`** — how long chord detection holds released pitches
 
 Macros:
-- adjust stabilizers, grammars, and compositor policies
+- adjust stabilizers, the vocabulary, and lenses (each macro declares its consumers; SPEC_014)
 - never alter instrument invariants
 
 ---
@@ -102,12 +98,11 @@ Macros:
 A default user role.
 
 Players:
-- select and combine grammars
-- adjust macro controls
+- adjust macro controls and session controls
 - save configurations as presets
 - describe desired outcomes in natural language
 
-Players do **not** author new grammars or visual vocabularies.
+Players do **not** author new lenses or visual vocabularies.
 
 ---
 
@@ -115,9 +110,8 @@ Players do **not** author new grammars or visual vocabularies.
 An advanced contributor role.
 
 Builders:
-- author grammars against a strict API
-- test grammars independently
-- publish grammars packaged inside presets
+- author lenses against a strict API (`IVisualLens`)
+- test lenses independently
 
 Builders do **not** redefine synesthetic invariants.
 
@@ -148,7 +142,7 @@ Includes:
 - source adapters
 - stabilizers
 - visual vocabularies (instrument definitions)
-- reference grammars
+- reference lenses
 
 Layer 2 modules:
 - are testable in isolation
@@ -161,7 +155,7 @@ The orchestration and extension layer.
 
 Includes:
 - presets
-- grammar composition
+- lens composition
 - draw effects and mutators
 - constraint policies
 - higher-level scene strategies
@@ -187,7 +181,7 @@ Sources do not determine meaning; they provide evidence.
 A source-specific module that converts raw input into RawInputFrame.
 
 Adapters:
-- emit protocol-level events (MIDI note_on/off, audio features)
+- emit protocol-level events (MIDI note_on/off/CC, audio onset/pitch/loudness/note events)
 - annotate timing and provenance
 - are source-specific but output a common format (RawInputFrame)
 
@@ -240,11 +234,12 @@ RawInputFrame is the adapter's output and stabilizer's input.
 A time-indexed **snapshot with context** of musical state produced by stabilizers.
 
 MusicalFrame includes:
-- **Current state**: Notes, chords, beat, dynamics (what's sounding now)
-- **Recent context**: Progression, phrases via references (what led here)
+- **Current state**: Notes, chords, dynamics (what's sounding now)
+- **Recent context**: Progression via references (what led here); harmonic context (tension, functional analysis)
+- **Prescribed context**: User-set tempo, meter, key, and chord interpretation (never inferred)
 - No raw events (those stay in RawInputFrame)
 
-This design allows visual vocabularies to remain pure functions while accessing temporal context like harmonic tension or phrase position.
+This design allows visual vocabularies to remain pure functions while accessing temporal context like harmonic tension.
 
 Context uses **references, not copies** — a chord in `progression` references `chords[]` by ID.
 
@@ -258,7 +253,7 @@ A musical abstraction representing a sounding pitch.
 Notes have:
 - pitch (pitch class + octave)
 - velocity
-- duration (time since onset)
+- duration (time since onset; frozen at release)
 - phase (attack → sustain → release)
 - confidence
 
@@ -269,19 +264,22 @@ Notes are not pairs of on/off messages - they are proper musical entities with l
 ### Stabilizer
 A stateful musical analyzer that transforms transient events into stable, temporal abstractions.
 
-The name "stabilizer" (rather than "analyzer") reflects the core function: these components don't just observe — they **stabilize** fleeting signals into persistent musical state. A note-on/note-off pair becomes a Note with duration. Scattered onsets become a coherent Beat with tempo. This temporal stabilization, with hysteresis and state tracking, is the defining characteristic.
+The name "stabilizer" (rather than "analyzer") reflects the core function: these components don't just observe — they **stabilize** fleeting signals into persistent musical state. A note-on/note-off pair becomes a Note with duration. A cloud of held and decaying pitches becomes a Chord, held steady by hysteresis. This temporal stabilization, with hysteresis and state tracking, is the defining characteristic.
 
-Stabilizers form a **DAG (directed acyclic graph)** based on dependencies:
-- **Independent stabilizers** (note tracking, beat detection) process raw input directly
-- **Derived stabilizers** (chord detection, phrase detection) depend on upstream stabilizers
+Stabilizers form a **DAG (directed acyclic graph)** based on dependencies (SPEC_008):
+- **Independent stabilizers** (`NoteTrackingStabilizer`) process raw input directly
+- **Derived stabilizers** (`DynamicsStabilizer`, `ChordDetectionStabilizer`, `HarmonyStabilizer`) depend on upstream stabilizers
 
 Stabilizers handle:
 - Note duration tracking (correlating note_on/note_off)
 - Note phase transitions (attack → sustain → release)
-- Chord detection
-- Beat tracking
+- Chord detection and progression history
 - Dynamics analysis
-- Context windowing (progression history, phrase boundaries)
+- Harmonic tension and functional analysis (when a key is prescribed)
+
+Stabilizers do not infer tempo, meter, or key; those are prescribed by the user. Phrase detection is not implemented (synesthetica-nob).
+
+Musical state — anything more than one consumer must agree on — lives in stabilizers, not lenses (SPEC_006).
 
 Stabilizers accumulate temporal context to produce proper musical abstractions.
 
@@ -313,7 +311,7 @@ Invariants ensure internal coherence.
 ---
 
 ### Visual Vocabulary
-*(Also known as: Vocabulary, Ruleset)*
+*(Also known as: Vocabulary. Formerly: Ruleset.)*
 
 A pure function mapping MusicalFrame → AnnotatedMusicalFrame (RFC 006).
 
@@ -324,7 +322,7 @@ Visual Vocabularies:
 - are source-agnostic
 - do NOT decide what shapes to use or which elements to render
 
-> Analogy: defining what colors mean. Grammars decide how to paint with them.
+> Analogy: defining what colors mean. Lenses decide how to paint with them.
 
 The interface is `IVisualVocabulary` in contracts.
 
@@ -343,7 +341,7 @@ Includes:
 Visual annotations:
 - carry semantic meaning (e.g., warm colors = major, cool colors = minor)
 - are attached to musical elements, not separate intents
-- allow grammars to style their chosen representations
+- allow lenses to style their chosen representations
 - do NOT dictate what shapes to use
 
 ---
@@ -352,10 +350,10 @@ Visual annotations:
 Musical elements with visual annotations attached (RFC 006).
 
 AnnotatedMusicalFrame:
-- is the ruleset's output and grammar's input
-- contains annotated notes, chords, beats, dynamics
-- preserves musical element identity (grammars know "this is a note")
-- carries visual properties without exposing musical analysis
+- is the vocabulary's output and the lenses' input
+- contains annotated notes, chords, bars, dynamics, plus the progression, harmonic context, pitch-hue invariant and pitch-class names
+- preserves musical element identity (lenses know "this is a note")
+- carries stabilizer analysis through to lenses, so lenses never need to compute it
 
 ---
 
@@ -364,8 +362,9 @@ A Note with its visual annotation.
 
 Contains:
 - The underlying musical Note
-- Visual properties (palette, texture, motion)
-- Optional label for display
+- Visual properties (palette, texture, motion; optional debug label)
+- Velocity and phase annotations (I16, I17)
+- Modelled partials for the harmonic series overlay
 
 ---
 
@@ -374,9 +373,9 @@ A Chord with its visual annotation.
 
 Contains:
 - The underlying MusicalChord
-- Visual properties (palette, texture, motion)
+- Visual properties (palette, texture, motion; optional debug label)
 - List of constituent note IDs
-- Optional label (e.g., "Cmaj", "Am")
+- Chord shape geometry (I18)
 
 ---
 
@@ -392,23 +391,21 @@ One component of a note's harmonic series, identified by harmonic number n (n = 
 
 ## Visual Form & Rendering
 
-### Grammar
-A visual grammar that consumes AnnotatedMusicalFrame and produces SceneFrame (RFC 006).
+### Lens
+A module that consumes AnnotatedMusicalFrame and produces SceneFrame (RFC 006). Interface: `IVisualLens` in `packages/contracts/pipeline/interfaces.ts`. *(Formerly: Grammar.)*
 
-Grammars:
+Lenses:
 - decide *form*, not *meaning*
-- know musical element *categories* (note, chord, beat) but not analysis details
+- consume stabilizer-derived analysis on the frame (chord quality, `harmonicContext`) but never compute musical analysis themselves (I3, I4)
 - use visual annotations to style their representations
-- decide which elements to render (can filter, e.g., rhythm grammar ignores chords)
+- decide which elements to render (can filter, e.g., RhythmLens ignores chords)
 - **own entity lifecycle** (TTL, decay, removal)
 - may spawn, group, and evolve entities
-- may not infer musical semantics
+- may hold bounded, pruned presentation caches (e.g. HarmonyLens's chord fade-out, RhythmLens's per-note drift); musical state belongs in stabilizers (SPEC_006)
 
-**Key insight (RFC 006):** Grammars have creative agency. They decide which musical elements to render, what shapes to use, and how to animate. Different grammars can render the same annotated content completely differently.
+**Key insight (RFC 006):** Lenses have creative agency. They decide which musical elements to render, what shapes to use, and how to animate. Different lenses can render the same annotated content completely differently.
 
-Examples:
-- TestRhythmGrammar (beats and notes as timing markers)
-- TestChordProgressionGrammar (chords as glows with history trail)
+Current lenses: `RhythmLens`, `HarmonyLens`, `DynamicsLens` (see [Lens](#lens) above and `packages/engine/src/lenses/README.md`). Per-lens visual terms are in `packages/engine/src/lenses/GLOSSARY.md`.
 
 ---
 
@@ -433,19 +430,21 @@ Examples:
 
 Entities have:
 - lifecycle
-- grammar
+- an owning lens (entity ids are prefixed with the lens id)
 - optional motion
 
 ---
 
 ### Compositor  
-A module that merges multiple grammar-produced scenes into one.
+A module that merges multiple lens-produced scenes into one.
 
-Responsibilities:
+Intended responsibilities:
 - resolve collisions
 - enforce constraints
 - apply global effects
 - maintain legibility
+
+The only implementation, `IdentityCompositor`, concatenates entities; none of the above is implemented (SPEC_008).
 
 ---
 
@@ -498,9 +497,9 @@ The system should feel like an acoustic instrument:
 ---
 
 ### Separation of Meaning and Form
-Musical meaning is encoded in visual vocabularies; visual form is encoded in grammars (rendering choices).
+Musical meaning is encoded in visual vocabularies; visual form is encoded in lenses (rendering choices).
 
-Visual vocabularies define what colors mean. Grammars decide how to paint with them.
+Visual vocabularies define what colors mean. Lenses decide how to paint with them.
 
 Violating this boundary is considered an architectural error.
 

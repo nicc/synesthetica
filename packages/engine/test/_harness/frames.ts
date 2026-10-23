@@ -19,7 +19,6 @@ import type {
   MusicalChord,
   ChordId,
   VisualAnnotation,
-  Ms,
 } from "@synesthetica/contracts";
 import {
   createEmptyMusicalFrame,
@@ -64,7 +63,7 @@ export function createTestMusicalFrame(
   overrides: MusicalFrameOverrides = {},
 ): MusicalFrame {
   return {
-    ...createEmptyMusicalFrame(t as Ms, part),
+    ...createEmptyMusicalFrame(t, part),
     ...overrides,
   };
 }
@@ -84,7 +83,8 @@ export interface AnnotatedFrameOverrides {
   notes?: AnnotatedNote[];
   chords?: AnnotatedChord[];
   progression?: ChordId[];
-  harmonicContext?: HarmonicContext;
+  /** Merged over EMPTY_HARMONIC_CONTEXT, so tests name only the fields they exercise. */
+  harmonicContext?: Partial<HarmonicContext>;
   dynamics?: DynamicsState;
   prescribedTempo?: number | null;
   prescribedMeter?: TimeSignature | null;
@@ -113,7 +113,7 @@ export function createTestAnnotatedFrame(
       direction: "cw",
     },
     pitchClassNames: ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"],
-    harmonicContext: overrides.harmonicContext ?? { ...EMPTY_HARMONIC_CONTEXT },
+    harmonicContext: { ...EMPTY_HARMONIC_CONTEXT, ...overrides.harmonicContext },
     bars: [],
     phrases: [],
     dynamics: {

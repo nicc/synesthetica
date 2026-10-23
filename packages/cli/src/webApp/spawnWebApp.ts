@@ -34,7 +34,7 @@ export interface WebAppHandle {
 
 export interface SpawnWebAppOptions {
   /** Explicit port; when omitted, an OS-picked one is used. */
-  port?: number;
+  port?: number | undefined;
   /** Where to write Vite's stdio (defaults to process.stderr). */
   log?: NodeJS.WritableStream;
   /**
@@ -157,7 +157,9 @@ async function startStatic(opts: SpawnWebAppOptions): Promise<WebAppHandle> {
       throw err;
     }
   }
-  throw lastErr ?? new Error("serveStatic: could not bind any port");
+  throw lastErr instanceof Error
+    ? lastErr
+    : new Error("serveStatic: could not bind any port", { cause: lastErr });
 }
 
 function isPortInUse(err: unknown): boolean {

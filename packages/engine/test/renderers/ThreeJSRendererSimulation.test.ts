@@ -1,279 +1,85 @@
 /**
- * ThreeJSRenderer Simulation Tests (Principle 8: Experiential Feedback Through Simulation)
+ * ThreeJSRenderer simulation tests (Principle 8: Experiential Feedback Through Simulation)
  *
- * These tests exercise the ThreeJSRenderer with realistic frame sequences
- * that simulate actual lens output. By simulating various visual scenarios,
- * we expose edge cases and lifecycle issues that unit tests would miss.
- *
- * Categories tested:
- * 1. Chord shape transitions (chord changes, arm count variations)
- * 2. Beat grid dynamics (lines appearing/disappearing)
- * 3. Entity lifecycle (creation, update, removal)
- * 4. Mixed content (multiple entity types in same frame)
- * 5. Performance scenarios (many entities, rapid updates)
+ * Frame sequences shaped like real lens output, asserting what the scene
+ * graph holds after each frame: which objects exist, which are reused,
+ * and which were removed and disposed.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type {
-  SceneFrame,
-  Entity,
-  ChordShapeElement,
-  ColorHSVA,
-} from "@synesthetica/contracts";
+import type { Mock } from "vitest";
+import type { SceneFrame, Entity, ChordShapeElement, ColorHSVA } from "@synesthetica/contracts";
+import { RADIUS_BY_TIER } from "@synesthetica/contracts";
 
-// Mock window for Node.js environment
-const mockWindow = {
-  devicePixelRatio: 1,
-};
-vi.stubGlobal("window", mockWindow);
+vi.stubGlobal("window", { devicePixelRatio: 1 });
 
-// Mock Three.js line addons
-vi.mock("three/examples/jsm/lines/Line2.js", () => {
-  class MockLine2 {
-    name = "";
-    position = { x: 0, y: 0, z: 0, set() { return this; } };
-    scale = { x: 1, y: 1, z: 1, set() { return this; } };
-    children: unknown[] = [];
-    userData: Record<string, unknown> = {};
-    geometry: unknown;
-    material: unknown;
-    constructor(geometry?: unknown, material?: unknown) {
-      this.geometry = geometry;
-      this.material = material;
-    }
-    computeLineDistances() { return this; }
-    traverse(cb: (obj: unknown) => void) { cb(this); }
-  }
-  return { Line2: MockLine2 };
-});
+// Three.js mocks: see test/_harness/threeMocks.ts.
+vi.mock("three", async () => (await import("../_harness/threeMocks")).mockThree());
+vi.mock("three/examples/jsm/lines/Line2.js", async () => (await import("../_harness/threeMocks")).mockLine2(await import("three")));
+vi.mock("three/examples/jsm/lines/LineMaterial.js", async () => (await import("../_harness/threeMocks")).mockLineMaterial(await import("three")));
+vi.mock("three/examples/jsm/lines/LineGeometry.js", async () => (await import("../_harness/threeMocks")).mockLineGeometry());
 
-vi.mock("three/examples/jsm/lines/LineMaterial.js", () => {
-  class MockLineMaterial {
-    color = 0;
-    linewidth = 1;
-    transparent = false;
-    opacity = 1;
-    dashed = false;
-    dashSize = 1;
-    gapSize = 1;
-    resolution = { x: 800, y: 600 };
-    dispose = vi.fn();
-    constructor(params?: Record<string, unknown>) {
-      if (params) Object.assign(this, params);
-    }
-  }
-  return { LineMaterial: MockLineMaterial };
-});
-
-vi.mock("three/examples/jsm/lines/LineGeometry.js", () => {
-  class MockLineGeometry {
-    dispose = vi.fn();
-    setPositions() { return this; }
-    setColors() { return this; }
-  }
-  return { LineGeometry: MockLineGeometry };
-});
-
-// Mock Three.js module
-vi.mock("three", () => {
-  class MockColor {
-    r = 0; g = 0; b = 0;
-    setHSL() { return this; }
-    getHex() { return 0; }
-    copy() { return this; }
-  }
-
-  class MockVector3 {
-    x = 0; y = 0; z = 0;
-    constructor(x = 0, y = 0, z = 0) {
-      this.x = x; this.y = y; this.z = z;
-    }
-    set(x: number, y: number, z: number) {
-      this.x = x; this.y = y; this.z = z;
-      return this;
-    }
-  }
-
-  class Material {
-    transparent = false;
-    opacity = 1;
-    side = 0;
-    color = new MockColor();
-    linewidth = 1;
-    dispose = vi.fn();
-  }
-
-  class MockShaderMaterial extends Material {
-    uniforms: Record<string, { value: unknown }> = {};
-    blending = 1;
-    depthWrite = true;
-    vertexShader = "";
-    fragmentShader = "";
-    constructor(params?: Record<string, unknown>) {
-      super();
-      if (params) {
-        if (params.uniforms) this.uniforms = params.uniforms as Record<string, { value: unknown }>;
-        if (params.vertexShader) this.vertexShader = params.vertexShader as string;
-        if (params.fragmentShader) this.fragmentShader = params.fragmentShader as string;
-        if (params.transparent !== undefined) this.transparent = params.transparent as boolean;
-        if (params.side !== undefined) this.side = params.side as number;
-        if (params.blending !== undefined) this.blending = params.blending as number;
-        if (params.depthWrite !== undefined) this.depthWrite = params.depthWrite as boolean;
-      }
-    }
-  }
-  class MockMeshBasicMaterial extends Material {}
-  class MockLineBasicMaterial extends Material {}
-  class MockLineDashedMaterial extends Material {
-    dashSize = 1;
-    gapSize = 1;
-    constructor(params?: Record<string, unknown>) {
-      super();
-      if (params) {
-        Object.assign(this, params);
-      }
-    }
-  }
-
-  class MockVector2 {
-    x = 0; y = 0;
-    constructor(x = 0, y = 0) {
-      this.x = x; this.y = y;
-    }
-    set(x: number, y: number) {
-      this.x = x; this.y = y;
-      return this;
-    }
-  }
-
-  class MockBufferGeometry {
-    dispose = vi.fn();
-    setFromPoints() { return this; }
-    computeLineDistances() { return this; }
-  }
-
-  class MockShapeGeometry extends MockBufferGeometry {}
-  class MockCircleGeometry extends MockBufferGeometry {}
-  class MockPlaneGeometry extends MockBufferGeometry {}
-  class MockRingGeometry extends MockBufferGeometry {}
-
-  class MockShape {
-    moveTo = vi.fn();
-    lineTo = vi.fn();
-    quadraticCurveTo = vi.fn();
-    bezierCurveTo = vi.fn();
-    closePath = vi.fn();
-    curves: unknown[] = [];
-    getPoints = vi.fn(() => []);
-  }
-
-  class MockObject3D {
-    name = "";
-    position = new MockVector3();
-    scale = new MockVector3(1, 1, 1);
-    children: MockObject3D[] = [];
-    userData: Record<string, unknown> = {};
-    getObjectByName(name: string): MockObject3D | undefined {
-      return this.children.find((c) => c.name === name);
-    }
-    traverse(callback: (obj: MockObject3D) => void) {
-      callback(this);
-      this.children.forEach((c) => c.traverse(callback));
-    }
-  }
-
-  class MockMesh extends MockObject3D {
-    geometry: MockBufferGeometry;
-    material: Material;
-    constructor(geometry?: MockBufferGeometry, material?: Material) {
-      super();
-      this.geometry = geometry ?? new MockBufferGeometry();
-      this.material = material ?? new Material();
-    }
-  }
-
-  class MockLine extends MockObject3D {
-    geometry: MockBufferGeometry;
-    material: Material;
-    constructor(geometry?: MockBufferGeometry, material?: Material) {
-      super();
-      this.geometry = geometry ?? new MockBufferGeometry();
-      this.material = material ?? new MockLineBasicMaterial();
-    }
-    computeLineDistances() { return this; }
-  }
-
-  class MockGroup extends MockObject3D {
-    add(obj: MockObject3D) {
-      this.children.push(obj);
-    }
-  }
-
-  class MockScene {
-    background: MockColor | null = null;
-    children: MockObject3D[] = [];
-    add = vi.fn((obj: MockObject3D) => {
-      this.children.push(obj);
-    });
-    remove = vi.fn((obj: MockObject3D) => {
-      const idx = this.children.indexOf(obj);
-      if (idx >= 0) this.children.splice(idx, 1);
-    });
-  }
-
-  class MockPerspectiveCamera {
-    position = new MockVector3();
-    aspect = 1;
-    lookAt = vi.fn();
-    updateProjectionMatrix = vi.fn();
-  }
-
-  class MockWebGLRenderer {
-    setPixelRatio = vi.fn();
-    setSize = vi.fn();
-    render = vi.fn();
-    dispose = vi.fn();
-  }
-
-  return {
-    WebGLRenderer: MockWebGLRenderer,
-    Scene: MockScene,
-    PerspectiveCamera: MockPerspectiveCamera,
-    Color: MockColor,
-    Vector3: MockVector3,
-    Mesh: MockMesh,
-    Line: MockLine,
-    Group: MockGroup,
-    Shape: MockShape,
-    ShapeGeometry: MockShapeGeometry,
-    CircleGeometry: MockCircleGeometry,
-    PlaneGeometry: MockPlaneGeometry,
-    RingGeometry: MockRingGeometry,
-    BufferGeometry: MockBufferGeometry,
-    Material,
-    Vector2: MockVector2,
-    MeshBasicMaterial: MockMeshBasicMaterial,
-    ShaderMaterial: MockShaderMaterial,
-    LineBasicMaterial: MockLineBasicMaterial,
-    LineDashedMaterial: MockLineDashedMaterial,
-    DoubleSide: 2,
-    NormalBlending: 1,
-    AdditiveBlending: 2,
-  };
-});
-
+import { Line2 } from "three/examples/jsm/lines/Line2.js";
 import { ThreeJSRenderer } from "../../src/renderers/ThreeJSRenderer";
 
 // ============================================================================
-// Simulation Helpers
+// Mock-state views
+// ============================================================================
+
+interface Vec3 { x: number; y: number; z: number }
+interface MockMaterial {
+  opacity: number;
+  blending: number;
+  depthWrite: boolean;
+  color: { r: number; g: number; b: number };
+  dispose: Mock;
+  uniforms: Record<string, { value: unknown }>;
+  fragmentShader: string;
+  resolution: { x: number; y: number };
+}
+interface MockObject {
+  position: Vec3;
+  scale: Vec3;
+  renderOrder: number;
+  geometry: { dispose: Mock; points: Vec3[] };
+  material: MockMaterial;
+}
+interface Internals {
+  scene: { children: MockObject[]; add: Mock };
+  camera: { fov: number; aspect: number; position: Vec3 };
+  renderer: { render: Mock };
+  entityObjects: Map<string, MockObject>;
+}
+
+const internals = (r: ThreeJSRenderer) => r as unknown as Internals;
+const objectFor = (r: ThreeJSRenderer, id: string) => internals(r).entityObjects.get(id)!;
+
+interface MockNode extends MockObject {
+  name: string;
+  visible: boolean;
+  children: MockNode[];
+  getObjectByName(name: string): MockNode | undefined;
+}
+const nodeFor = (r: ThreeJSRenderer, id: string) => objectFor(r, id) as unknown as MockNode;
+
+// ============================================================================
+// Fixtures
 // ============================================================================
 
 function createMockCanvas(): HTMLCanvasElement {
-  return {
-    width: 800,
-    height: 600,
-    style: {},
-  } as unknown as HTMLCanvasElement;
+  return { width: 800, height: 600, style: {} } as unknown as HTMLCanvasElement;
+}
+
+/** Deterministic PRNG (mulberry32) so dense scenes are reproducible. */
+function seededRandom(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 function makeColor(h: number, s = 0.7, v = 0.8): ColorHSVA {
@@ -284,23 +90,12 @@ function makeChordElement(
   interval: string,
   angle: number,
   tier: "triadic" | "seventh" | "extension",
-  hue: number
+  hue: number,
 ): ChordShapeElement {
-  return {
-    interval,
-    angle,
-    tier,
-    style: "wedge",
-    color: makeColor(hue),
-  };
+  return { interval, angle, radius: RADIUS_BY_TIER[tier], tier, style: "wedge", color: makeColor(hue) };
 }
 
-function makeChordShapeEntity(
-  id: string,
-  elements: ChordShapeElement[],
-  margin: string,
-  t: number
-): Entity {
+function makeChordShapeEntity(id: string, elements: ChordShapeElement[], margin: string, t: number): Entity {
   return {
     id,
     part: "main",
@@ -308,16 +103,8 @@ function makeChordShapeEntity(
     createdAt: t,
     updatedAt: t,
     position: { x: 0.5, y: 0.5 },
-    style: {
-      color: elements[0]?.color ?? makeColor(0),
-      size: 200,
-      opacity: 1,
-    },
-    data: {
-      type: "chord-shape",
-      elements,
-      margin,
-    },
+    style: { color: elements[0]?.color ?? makeColor(0), size: 200, opacity: 1 },
+    data: { type: "chord-shape", elements, margin },
   };
 }
 
@@ -329,15 +116,8 @@ function makeTensionBarEntity(id: string, tension: number, t: number): Entity {
     createdAt: t,
     updatedAt: t,
     position: { x: 0.9, y: 0.5 },
-    style: {
-      color: makeColor(0, 0, 0.5),
-      size: 50,
-      opacity: 1,
-    },
-    data: {
-      type: "tension-bar",
-      tension,
-    },
+    style: { color: makeColor(0, 0, 0.5), size: 50, opacity: 1 },
+    data: { type: "tension-bar", tension },
   };
 }
 
@@ -349,24 +129,12 @@ function makeBeatLineEntity(id: string, y: number, t: number): Entity {
     createdAt: t,
     updatedAt: t,
     position: { x: 0.5, y },
-    style: {
-      color: makeColor(0, 0, 0.3),
-      size: 2,
-      opacity: 0.5,
-    },
-    data: {
-      type: "beat-line",
-    },
+    style: { color: makeColor(0, 0, 0.3), size: 2, opacity: 0.5 },
+    data: { type: "beat-line" },
   };
 }
 
-function makeParticleEntity(
-  id: string,
-  x: number,
-  y: number,
-  hue: number,
-  t: number
-): Entity {
+function makeParticleEntity(id: string, x: number, y: number, hue: number, t: number): Entity {
   return {
     id,
     part: "main",
@@ -374,51 +142,23 @@ function makeParticleEntity(
     createdAt: t,
     updatedAt: t,
     position: { x, y },
-    style: {
-      color: makeColor(hue),
-      size: 15,
-      opacity: 1,
-    },
+    style: { color: makeColor(hue), size: 15, opacity: 1 },
   };
 }
 
 function makeFrame(t: number, entities: Entity[]): SceneFrame {
-  return {
-    t,
-    entities,
-    diagnostics: [],
-  };
+  return { t, entities, diagnostics: [] };
 }
 
-// ============================================================================
-// Chord Shape Fixtures
-// ============================================================================
-
 const MAJOR_TRIAD_ELEMENTS: ChordShapeElement[] = [
-  makeChordElement("1", 0, "triadic", 0),      // Root at 12 o'clock
-  makeChordElement("3", 120, "triadic", 120),  // Major 3rd
-  makeChordElement("5", 210, "triadic", 210),  // Perfect 5th
-];
-
-const MINOR_TRIAD_ELEMENTS: ChordShapeElement[] = [
   makeChordElement("1", 0, "triadic", 0),
-  makeChordElement("b3", 90, "triadic", 90),   // Minor 3rd
+  makeChordElement("3", 120, "triadic", 120),
   makeChordElement("5", 210, "triadic", 210),
 ];
 
 const DOMINANT_7_ELEMENTS: ChordShapeElement[] = [
-  makeChordElement("1", 0, "triadic", 0),
-  makeChordElement("3", 120, "triadic", 120),
-  makeChordElement("5", 210, "triadic", 210),
-  makeChordElement("b7", 300, "seventh", 300), // Dominant 7th
-];
-
-const EXTENDED_CHORD_ELEMENTS: ChordShapeElement[] = [
-  makeChordElement("1", 0, "triadic", 0),
-  makeChordElement("3", 72, "triadic", 72),
-  makeChordElement("5", 144, "triadic", 144),
-  makeChordElement("b7", 216, "seventh", 216),
-  makeChordElement("9", 288, "extension", 288),
+  ...MAJOR_TRIAD_ELEMENTS,
+  makeChordElement("b7", 300, "seventh", 300),
 ];
 
 // ============================================================================
@@ -426,75 +166,101 @@ const EXTENDED_CHORD_ELEMENTS: ChordShapeElement[] = [
 // ============================================================================
 
 describe("ThreeJSRenderer Simulations", () => {
+  const world = { worldWidth: 200, worldHeight: 120 };
   let renderer: ThreeJSRenderer;
-  let canvas: HTMLCanvasElement;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    renderer = new ThreeJSRenderer();
-    canvas = createMockCanvas();
-    renderer.attach(canvas);
+    renderer = new ThreeJSRenderer(world);
+    renderer.attach(createMockCanvas());
   });
 
-  describe("Chord Shape Transitions", () => {
-    it("handles transition from major to minor triad", () => {
-      // Frame 1: Major triad
-      renderer.render(makeFrame(0, [
-        makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", 0),
-      ]));
+  const sceneChildren = () => internals(renderer).scene.children;
 
-      // Frame 2: Minor triad (different elements)
-      renderer.render(makeFrame(500, [
-        makeChordShapeEntity("chord", MINOR_TRIAD_ELEMENTS, "wavy", 500),
-      ]));
+  /** The scene holds exactly the objects for these entity ids. */
+  const expectSceneHolds = (ids: string[]) => {
+    expect(sceneChildren()).toHaveLength(ids.length);
+    for (const id of ids) expect(sceneChildren()).toContain(objectFor(renderer, id));
+  };
 
-      // Should handle transition without errors
-      expect(true).toBe(true);
+  /** Every geometry and material in the object (recursively) was disposed. */
+  const expectFullyDisposed = (obj: MockNode) => {
+    const parts = obj.children.length > 0 ? obj.children : [obj];
+    for (const part of parts) {
+      expect(part.geometry.dispose).toHaveBeenCalled();
+      expect(part.material.dispose).toHaveBeenCalled();
+    }
+  };
+
+  describe("Chord shape transitions", () => {
+    it("keeps one group for a held chord across frames", () => {
+      for (const t of [0, 16, 33]) {
+        renderer.render(makeFrame(t, [makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", t)]));
+      }
+      expectSceneHolds(["chord"]);
+      expect(internals(renderer).scene.add).toHaveBeenCalledTimes(1);
     });
 
-    it("handles progression through multiple chord qualities", () => {
-      const progressions = [
-        { elements: MAJOR_TRIAD_ELEMENTS, margin: "straight", t: 0 },
-        { elements: MINOR_TRIAD_ELEMENTS, margin: "wavy", t: 1000 },
-        { elements: DOMINANT_7_ELEMENTS, margin: "straight", t: 2000 },
-        { elements: EXTENDED_CHORD_ELEMENTS, margin: "convex", t: 3000 },
-        { elements: MAJOR_TRIAD_ELEMENTS, margin: "concave", t: 4000 },
+    it("rebuilds when arm count, margin or bass changes, disposing the replaced group", () => {
+      const withBassOnThird = DOMINANT_7_ELEMENTS.map((el, i) => ({ ...el, isBass: i === 1 }));
+      const steps: Array<[ChordShapeElement[], string]> = [
+        [MAJOR_TRIAD_ELEMENTS, "straight"],
+        [DOMINANT_7_ELEMENTS, "straight"], // arm count
+        [DOMINANT_7_ELEMENTS, "wavy"], // margin
+        [withBassOnThird, "wavy"], // bass (inversion)
       ];
 
-      for (const { elements, margin, t } of progressions) {
-        renderer.render(makeFrame(t, [
-          makeChordShapeEntity("chord", elements, margin, t),
-        ]));
-      }
-
-      expect(true).toBe(true);
+      let previous: MockNode | undefined;
+      steps.forEach(([elements, margin], i) => {
+        renderer.render(makeFrame(i * 500, [makeChordShapeEntity("chord", elements, margin, i * 500)]));
+        const group = nodeFor(renderer, "chord");
+        expectSceneHolds(["chord"]);
+        if (previous) {
+          expect(group).not.toBe(previous);
+          expectFullyDisposed(previous);
+        }
+        previous = group;
+      });
     });
 
-    it("handles chord with all margin styles", () => {
-      const margins = ["straight", "wavy", "concave", "convex", "dash-short", "dash-long"];
+    it("dashes the hub outline only for dashed margins", () => {
+      const margins = ["straight", "wavy", "dash-short", "dash-long"];
+      renderer.render(makeFrame(0, margins.map((m) => makeChordShapeEntity(m, MAJOR_TRIAD_ELEMENTS, m, 0))));
+      const hasDashes = (id: string) =>
+        nodeFor(renderer, id).children.some(
+          (c) => c instanceof Line2 && (c.material as unknown as { dashed?: boolean }).dashed === true,
+        );
+      expect(margins.filter(hasDashes)).toEqual(["dash-short", "dash-long"]);
+    });
 
-      for (let i = 0; i < margins.length; i++) {
-        const t = i * 1000;
-        renderer.render(makeFrame(t, [
-          makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, margins[i], t),
-        ]));
-      }
+    it("fades fill and outline together, keeping the outline brighter", () => {
+      const opacities = (opacity: number) => {
+        const entity = makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", 0);
+        entity.style.opacity = opacity;
+        renderer.render(makeFrame(0, [entity]));
+        const group = nodeFor(renderer, "chord");
+        const fill = group.children.find((c) => c.material.uniforms?.opacity)!;
+        const outline = group.children.find((c) => c instanceof Line2)!;
+        return { fill: fill.material.uniforms.opacity.value as number, outline: outline.material.opacity };
+      };
+      const full = opacities(1);
+      const half = opacities(0.5);
+      expect(full.fill).toBeLessThan(full.outline);
+      expect(half.fill / full.fill).toBeCloseTo(0.5);
+      expect(half.outline / full.outline).toBeCloseTo(0.5);
+    });
 
-      expect(true).toBe(true);
+    it("removes the drawn glyph when its elements empty", () => {
+      renderer.render(makeFrame(0, [makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", 0)]));
+      const group = nodeFor(renderer, "chord");
+      renderer.render(makeFrame(16, [makeChordShapeEntity("chord", [], "straight", 16)]));
+      expect(sceneChildren()).toHaveLength(0);
+      expectFullyDisposed(group);
     });
   });
 
   describe("Glyph overtone steam (RFC 012)", () => {
-    type SteamMesh = {
-      visible: boolean;
-      material: { blending: number; uniforms: Record<string, { value: unknown }> };
-    };
-    const steamOf = () => {
-      const group = (renderer as unknown as {
-        entityObjects: Map<string, { getObjectByName(n: string): unknown }>;
-      }).entityObjects.get("chord")!;
-      return group.getObjectByName("overtone-steam") as SteamMesh | undefined;
-    };
+    const steamOf = () => nodeFor(renderer, "chord").getObjectByName("overtone-steam");
     const withPartials = (opacity: number, dissipation: number) => {
       const entity = makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", 0);
       entity.style.opacity = opacity;
@@ -510,9 +276,7 @@ describe("ThreeJSRenderer Simulations", () => {
     };
 
     it("adds no steam when the overlay is off", () => {
-      renderer.render(makeFrame(0, [
-        makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", 0),
-      ]));
+      renderer.render(makeFrame(0, [makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", 0)]));
       expect(steamOf()).toBeUndefined();
     });
 
@@ -532,236 +296,105 @@ describe("ThreeJSRenderer Simulations", () => {
 
     it("hides the steam when partials disappear", () => {
       renderer.render(makeFrame(0, [withPartials(1, 0)]));
-      renderer.render(makeFrame(16, [
-        makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", 16),
-      ]));
+      renderer.render(makeFrame(16, [makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", 16)]));
       expect(steamOf()!.visible).toBe(false);
     });
   });
 
-  describe("Beat Grid Dynamics", () => {
-    it("handles beat lines appearing and disappearing", () => {
-      // Frame 1: 4 beat lines
-      renderer.render(makeFrame(0, [
-        makeBeatLineEntity("beat-1", 0.2, 0),
-        makeBeatLineEntity("beat-2", 0.4, 0),
-        makeBeatLineEntity("beat-3", 0.6, 0),
-        makeBeatLineEntity("beat-4", 0.8, 0),
-      ]));
+  describe("Beat grid dynamics", () => {
+    it("tracks beat lines as they appear and disappear, disposing the departed", () => {
+      const lines = (t: number, spec: Array<[string, number]>) =>
+        makeFrame(t, spec.map(([id, y]) => makeBeatLineEntity(id, y, t)));
 
-      // Frame 2: Only 2 beat lines (others removed)
-      renderer.render(makeFrame(500, [
-        makeBeatLineEntity("beat-1", 0.2, 500),
-        makeBeatLineEntity("beat-3", 0.6, 500),
-      ]));
+      renderer.render(lines(0, [["beat-1", 0.2], ["beat-2", 0.4], ["beat-3", 0.6], ["beat-4", 0.8]]));
+      const first = new Map(["beat-1", "beat-2", "beat-3", "beat-4"].map((id) => [id, nodeFor(renderer, id)]));
 
-      // Frame 3: New beat lines
-      renderer.render(makeFrame(1000, [
-        makeBeatLineEntity("beat-new-1", 0.25, 1000),
-        makeBeatLineEntity("beat-new-2", 0.5, 1000),
-        makeBeatLineEntity("beat-new-3", 0.75, 1000),
-      ]));
+      renderer.render(lines(500, [["beat-1", 0.2], ["beat-3", 0.6]]));
+      expectSceneHolds(["beat-1", "beat-3"]);
+      expect(nodeFor(renderer, "beat-1")).toBe(first.get("beat-1"));
+      expect(nodeFor(renderer, "beat-3")).toBe(first.get("beat-3"));
+      expectFullyDisposed(first.get("beat-2")!);
+      expectFullyDisposed(first.get("beat-4")!);
 
-      expect(true).toBe(true);
+      renderer.render(lines(1000, [["beat-new-1", 0.25], ["beat-new-2", 0.5], ["beat-new-3", 0.75]]));
+      expectSceneHolds(["beat-new-1", "beat-new-2", "beat-new-3"]);
+      expectFullyDisposed(first.get("beat-1")!);
+      expectFullyDisposed(first.get("beat-3")!);
     });
 
-    it("handles scrolling beat grid (lines moving position)", () => {
-      // Simulate beat lines scrolling across screen
-      for (let frame = 0; frame < 10; frame++) {
-        const t = frame * 100;
-        const lines: Entity[] = [];
-
-        for (let i = 0; i < 5; i++) {
-          const y = ((i * 0.2) + (frame * 0.05)) % 1;
-          lines.push(makeBeatLineEntity(`beat-${i}`, y, t));
-        }
-
-        renderer.render(makeFrame(t, lines));
+    it("moves a scrolling beat line in place, spanning the world width", () => {
+      const line = () => nodeFor(renderer, "beat");
+      renderer.render(makeFrame(0, [makeBeatLineEntity("beat", 0, 0)]));
+      const object = line();
+      for (let frame = 1; frame <= 10; frame++) {
+        const y = frame * 0.05;
+        renderer.render(makeFrame(frame * 100, [makeBeatLineEntity("beat", y, frame * 100)]));
+        expect(line()).toBe(object);
+        const [left, right] = object.geometry.points;
+        expect(left.y).toBeCloseTo((1 - y) * world.worldHeight);
+        expect(right.y).toBeCloseTo(left.y);
+        expect(left.x).toBeCloseTo(0);
+        expect(right.x).toBeCloseTo(world.worldWidth);
       }
-
-      expect(true).toBe(true);
     });
   });
 
-  describe("Mixed Content", () => {
-    it("handles full scene with chord shape, tension bar, and beat lines", () => {
-      const frame = makeFrame(0, [
-        makeChordShapeEntity("chord", DOMINANT_7_ELEMENTS, "straight", 0),
-        makeTensionBarEntity("tension", 0.6, 0),
-        makeBeatLineEntity("beat-1", 0.25, 0),
-        makeBeatLineEntity("beat-2", 0.5, 0),
-        makeBeatLineEntity("beat-3", 0.75, 0),
-      ]);
-
-      renderer.render(frame);
-      expect(true).toBe(true);
-    });
-
-    it("handles scene with particles and chord shapes", () => {
-      const particles: Entity[] = [];
-      for (let i = 0; i < 10; i++) {
-        particles.push(makeParticleEntity(
-          `particle-${i}`,
-          0.1 + (i * 0.08),
-          0.3 + Math.sin(i) * 0.2,
-          (i * 36) % 360,
-          0
-        ));
-      }
-
-      renderer.render(makeFrame(0, [
-        makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", 0),
-        ...particles,
-      ]));
-
-      expect(true).toBe(true);
-    });
-  });
-
-  describe("Entity Lifecycle", () => {
-    it("handles rapid entity replacement", () => {
-      // Simulate rapid chord changes (like fast arpeggios detected as chords)
-      for (let i = 0; i < 20; i++) {
-        const t = i * 50;
-        const elements = i % 2 === 0 ? MAJOR_TRIAD_ELEMENTS : MINOR_TRIAD_ELEMENTS;
-        renderer.render(makeFrame(t, [
-          makeChordShapeEntity("chord", elements, "straight", t),
-        ]));
-      }
-
-      expect(true).toBe(true);
-    });
-
-    it("handles entity with decaying life", () => {
-      const entityWithLife: Entity = {
-        id: "decaying",
-        part: "main",
-        kind: "particle",
-        createdAt: 0,
-        updatedAt: 500,
-        position: { x: 0.5, y: 0.5 },
-        style: { color: makeColor(120), size: 30, opacity: 1 },
-        life: { ttlMs: 1000, ageMs: 500 },
+  describe("Tension bar", () => {
+    it("raises the indicator with tension, centred at 0.5", () => {
+      const indicatorY = (tension: number) => {
+        renderer.render(makeFrame(0, [makeTensionBarEntity("tension", tension, 0)]));
+        return nodeFor(renderer, "tension").getObjectByName("indicator")!.position.y;
       };
-
-      renderer.render(makeFrame(500, [entityWithLife]));
-
-      // Age to near death
-      const nearDeath = {
-        ...entityWithLife,
-        updatedAt: 900,
-        life: { ttlMs: 1000, ageMs: 900 },
-      };
-      renderer.render(makeFrame(900, [nearDeath]));
-
-      expect(true).toBe(true);
-    });
-
-    it("handles empty frame after populated frame", () => {
-      // Populated frame
-      renderer.render(makeFrame(0, [
-        makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", 0),
-        makeTensionBarEntity("tension", 0.5, 0),
-      ]));
-
-      // Empty frame (all entities removed)
-      renderer.render(makeFrame(500, []));
-
-      // Re-populated frame
-      renderer.render(makeFrame(1000, [
-        makeChordShapeEntity("new-chord", MINOR_TRIAD_ELEMENTS, "wavy", 1000),
-      ]));
-
-      expect(true).toBe(true);
+      const [low, mid, high] = [0, 0.5, 1].map(indicatorY);
+      expect(low).toBeLessThan(mid);
+      expect(mid).toBeLessThan(high);
+      expect(mid).toBeCloseTo(0);
     });
   });
 
-  describe("Performance Scenarios", () => {
-    it("handles many particles (dense visualization)", () => {
-      const particles: Entity[] = [];
-      for (let i = 0; i < 100; i++) {
-        particles.push(makeParticleEntity(
-          `p-${i}`,
-          Math.random(),
-          Math.random(),
-          Math.random() * 360,
-          0
-        ));
-      }
-
+  describe("Dense and sustained scenes", () => {
+    it("places every particle of a dense frame at its own position", () => {
+      const random = seededRandom(12345);
+      const particles = Array.from({ length: 100 }, (_, i) =>
+        makeParticleEntity(`p-${i}`, random(), random(), random() * 360, 0),
+      );
       renderer.render(makeFrame(0, particles));
-      expect(true).toBe(true);
+
+      expect(sceneChildren()).toHaveLength(particles.length);
+      for (const p of particles) {
+        const pos = objectFor(renderer, p.id).position;
+        expect(pos.x).toBeCloseTo(p.position!.x * world.worldWidth);
+        expect(pos.y).toBeCloseTo((1 - p.position!.y) * world.worldHeight);
+      }
     });
 
-    it("handles sustained rendering loop", () => {
-      // Simulate 60 frames (1 second at 60fps)
-      for (let frame = 0; frame < 60; frame++) {
-        const t = frame * 16.67;
+    it("keeps steady objects over a sustained loop while a flashing particle is recreated and disposed", () => {
+      const steady: Record<string, unknown> = {};
+      const flashes = new Set<MockNode>();
+      const FRAMES = 60;
+      const FRAME_MS = 1000 / 60;
 
-        // Mix of static and dynamic elements
-        const tension = 0.5 + Math.sin(frame * 0.1) * 0.3;
+      for (let frame = 0; frame < FRAMES; frame++) {
+        const t = frame * FRAME_MS;
+        const flashing = frame % 10 < 5;
         const entities: Entity[] = [
           makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", t),
-          makeTensionBarEntity("tension", tension, t),
+          makeTensionBarEntity("tension", 0.5 + Math.sin(frame * 0.1) * 0.3, t),
         ];
-
-        // Add some particles that come and go
-        if (frame % 10 < 5) {
-          entities.push(makeParticleEntity("flash", 0.3, 0.3, 60, t));
-        }
-
+        if (flashing) entities.push(makeParticleEntity("flash", 0.3, 0.3, 60, t));
         renderer.render(makeFrame(t, entities));
+
+        expectSceneHolds(entities.map((e) => e.id));
+        for (const id of ["chord", "tension"]) {
+          steady[id] ??= objectFor(renderer, id);
+          expect(objectFor(renderer, id)).toBe(steady[id]);
+        }
+        if (flashing) flashes.add(nodeFor(renderer, "flash"));
       }
 
-      expect(true).toBe(true);
-    });
-  });
-
-  describe("Edge Cases", () => {
-    it("handles chord shape with single element", () => {
-      const singleElement = [makeChordElement("1", 0, "triadic", 0)];
-      renderer.render(makeFrame(0, [
-        makeChordShapeEntity("chord", singleElement, "straight", 0),
-      ]));
-
-      expect(true).toBe(true);
-    });
-
-    it("handles chord shape with no elements (fallback to placeholder)", () => {
-      renderer.render(makeFrame(0, [
-        makeChordShapeEntity("chord", [], "straight", 0),
-      ]));
-
-      expect(true).toBe(true);
-    });
-
-    it("handles entities with missing optional fields", () => {
-      const minimalEntity: Entity = {
-        id: "minimal",
-        part: "main",
-        kind: "particle",
-        createdAt: 0,
-        updatedAt: 0,
-        style: {},
-      };
-
-      renderer.render(makeFrame(0, [minimalEntity]));
-      expect(true).toBe(true);
-    });
-
-    it("handles render after detach (no-op)", () => {
-      renderer.render(makeFrame(0, [
-        makeChordShapeEntity("chord", MAJOR_TRIAD_ELEMENTS, "straight", 0),
-      ]));
-
-      renderer.detach();
-
-      // Should be a no-op, not throw
-      renderer.render(makeFrame(500, [
-        makeChordShapeEntity("chord", MINOR_TRIAD_ELEMENTS, "wavy", 500),
-      ]));
-
-      expect(true).toBe(true);
+      // One object per appearance (6 in 60 frames), each disposed once it went.
+      expect(flashes.size).toBe(FRAMES / 10);
+      for (const flash of flashes) expect(flash.material.dispose).toHaveBeenCalled();
     });
   });
 });

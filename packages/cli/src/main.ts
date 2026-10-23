@@ -12,6 +12,7 @@
  * server — kept for standalone smoke testing without an LLM client.
  */
 
+import { createRequire } from "node:module";
 import { parseArgs, helpText, type StartOptions } from "./args.js";
 import { startMcpServer } from "./mcpServer.js";
 import { createPresetStore } from "./presets/presetStore.js";
@@ -19,10 +20,12 @@ import { spawnWebApp, type WebAppHandle } from "./webApp/spawnWebApp.js";
 import { openBrowser } from "./webApp/openBrowser.js";
 import { startWsBridge, type WsBridgeHandle } from "./engine/wsBridge.js";
 import { SessionManager } from "./session/sessionManager.js";
-import { composeSystemOverview } from "./resources/promptResources.js";
 
 const SERVER_NAME = "synesthetica";
-const SERVER_VERSION = "0.1.0";
+/** Reported to MCP clients. Read from the package's own package.json
+ *  (one level above dist/, in the repo and in the published tarball)
+ *  so it can't drift from the released version. */
+const SERVER_VERSION = (createRequire(import.meta.url)("../package.json") as { version: string }).version;
 
 /**
  * Short server-level primer set as the MCP `initialize` response's
@@ -90,7 +93,7 @@ async function runStart(options: StartOptions): Promise<number> {
         await task.run();
         writeErr(`  ✓ ${task.name} (${Date.now() - t0}ms)`);
       } catch (e) {
-        writeErr(`  ✗ ${task.name} (${Date.now() - t0}ms): ${e instanceof Error ? e.message : e}`);
+        writeErr(`  ✗ ${task.name} (${Date.now() - t0}ms): ${e instanceof Error ? e.message : String(e)}`);
       }
     }
     clearTimeout(forceExitTimer);
@@ -199,9 +202,6 @@ async function runNoMcpEagerPath(
   });
   return 0;
 }
-
-// Suppress unused-import warning under the split of paths above.
-void composeSystemOverview;
 
 // stdout carries the MCP protocol on stdio transport — human messages
 // must go to stderr to avoid corrupting the framing.

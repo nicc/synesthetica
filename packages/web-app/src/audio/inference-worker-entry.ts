@@ -9,5 +9,5 @@
  * up self.onmessage to receive init / stop messages and drives the
  * Basic Pitch inference loop.
  */
-import { installInferenceWorker } from "@synesthetica/adapters";
+import { installInferenceWorker } from "@synesthetica/adapters/worker";
 installInferenceWorker();

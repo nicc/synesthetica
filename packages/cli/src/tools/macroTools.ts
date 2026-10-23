@@ -20,7 +20,8 @@
  * system:colour-mapping:reference (and direction if needed).
  */
 
-import type { EngineHandle, StateSnapshot } from "../engine/engineHandle.js";
+import type { EngineHandle } from "../engine/engineHandle.js";
+import type { EngineStateSnapshot } from "@synesthetica/contracts";
 import type {
   MacroAnnotation,
   ContinuousMacroAnnotation,
@@ -31,15 +32,10 @@ import type {
 } from "@synesthetica/contracts";
 import { productionManifest as manifest } from "@synesthetica/contracts";
 import type { ToolSpec } from "./sessionTools.js";
+import { engineError, err } from "./toolResult.js";
+import type { ToolResult } from "./toolResult.js";
 
 type ToolInput = Record<string, unknown>;
-type ToolResult =
-  | { ok: true; state: StateSnapshot }
-  | { ok: false; error: { code: string; message: string; details?: unknown } };
-
-function err(code: string, message: string, details?: unknown): ToolResult {
-  return { ok: false, error: { code, message, ...(details ? { details } : {}) } };
-}
 
 // Build a fast lookup from macro id → annotation, at module load.
 const macroById: Map<string, MacroAnnotation> = new Map(
@@ -93,7 +89,7 @@ async function dispatchCompound(
   compound: CompoundMacroAnnotation,
   value: number,
   engine: EngineHandle,
-): Promise<StateSnapshot> {
+): Promise<EngineStateSnapshot> {
   // Fan out to each target with a linear map. Last write wins per
   // SPEC 013 §Resolution — no accumulation, no priority. Per-target
   // `invert` flips the compound axis so the target's range runs in
@@ -120,11 +116,11 @@ async function dispatchCompound(
 // set_macro
 // ============================================================================
 
-async function safeCall(fn: () => Promise<StateSnapshot>): Promise<ToolResult> {
+async function safeCall(fn: () => Promise<EngineStateSnapshot>): Promise<ToolResult> {
   try {
     return { ok: true, state: await fn() };
   } catch (e) {
-    return err("ENGINE_ERROR", e instanceof Error ? e.message : String(e));
+    return engineError(e);
   }
 }
 
@@ -286,10 +282,10 @@ export const setHueForPitchTool: ToolSpec = {
     // each semitone rotates hue by +30° from A.
     // hue(pc) = referenceHue + (pc - HUE_ANCHOR_PC) * 30 (mod 360) in cw direction.
     // Solve: referenceHue = hue - (pc - HUE_ANCHOR_PC) * 30 (mod 360)
-    const rawAnchor = (hue as number) - ((pc as number) - HUE_ANCHOR_PC) * 30;
+    const rawAnchor = (hue) - ((pc as number) - HUE_ANCHOR_PC) * 30;
     const anchor = ((rawAnchor % 360) + 360) % 360;
     return safeCall(() =>
-      engine.setHueForPitch(pc as number, hue as number).then(() =>
+      engine.setHueForPitch(pc as number, hue).then(() =>
         engine.setMacro("system:colour-mapping:reference", anchor),
       ),
     );

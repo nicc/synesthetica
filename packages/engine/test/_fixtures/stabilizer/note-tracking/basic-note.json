@@ -29,12 +29,7 @@
         "duration": 0,
         "release": null,
         "phase": "attack",
-        "confidence": 1.0,
-        "provenance": {
-          "source": "stabilizer",
-          "stream": "note-tracking",
-          "version": "0.1.0"
-        }
+        "confidence": 1.0
       }
     ],
     "chords": [],

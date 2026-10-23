@@ -1,20 +1,20 @@
 /**
  * Golden Test Harness
  *
- * Utilities for loading fixtures, comparing frames, and updating golden files.
- * Golden tests compare actual module output against saved "known good" fixtures.
+ * Utilities for loading fixtures and comparing frames. Golden tests
+ * compare actual module output against saved "known good" fixtures.
+ * Goldens are for contract and protocol shapes, compared on the fields
+ * that matter — pass `ignoreFields` for provenance, versions and the
+ * like (CLAUDE.md testing rule 8). Fixtures are edited by hand.
  *
  * Usage:
- *   const { input, expected } = loadFixture<StabilizerFixture>('stabilizer/note-tracking/basic-note.json');
- *   const actual = stabilizer.process(input);
- *   expectFrameEquals(actual, expected);
- *
- * To update fixtures when behavior intentionally changes:
- *   UPDATE_GOLDEN=1 npm test
+ *   const { input, expected } = loadFixture<Fixture<In, Out>>('stabilizer/note-tracking/basic-note.json');
+ *   const actual = stabilizer.apply(input, null);
+ *   expectFrameEquals(actual, expected, { ignoreFields: ["provenance"] });
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "fs";
-import { dirname, resolve } from "path";
+import { readFileSync, existsSync, readdirSync } from "fs";
+import { resolve } from "path";
 import { expect } from "vitest";
 
 // ============================================================================
@@ -81,7 +81,8 @@ export function loadFixture<T>(relativePath: string): T {
     return JSON.parse(content) as T;
   } catch (e) {
     throw new Error(
-      `Invalid JSON in fixture: ${relativePath}\n  ${e instanceof Error ? e.message : e}`
+      `Invalid JSON in fixture: ${relativePath}\n  ${e instanceof Error ? e.message : String(e)}`,
+      { cause: e },
     );
   }
 }
@@ -91,15 +92,20 @@ export function loadFixture<T>(relativePath: string): T {
  *
  * @param dir - Directory path relative to fixtures/
  * @returns Array of fixture data
+ * @throws If the directory is missing or holds no fixtures — a test
+ *   that silently loads nothing would pass while checking nothing.
  */
 export function loadFixturesFromDir<T>(dir: string): T[] {
   const fullPath = resolve(FIXTURES_DIR, dir);
 
   if (!existsSync(fullPath)) {
-    return [];
+    throw new Error(`Fixture directory not found: ${dir}\n  at: ${fullPath}`);
   }
 
   const files = readdirSync(fullPath).filter((f: string) => f.endsWith(".json"));
+  if (files.length === 0) {
+    throw new Error(`Fixture directory has no .json fixtures: ${dir}\n  at: ${fullPath}`);
+  }
 
   return files.map((f: string) => loadFixture<T>(`${dir}/${f}`));
 }
@@ -178,10 +184,10 @@ export function compareDeep(
       return `${path || "root"}: expected object, got ${Array.isArray(expected) ? "array" : typeof expected}`;
     }
 
-    const actualKeys = Object.keys(actual as object).filter(
+    const actualKeys = Object.keys(actual).filter(
       (k) => !ignoreFields.includes(k)
     );
-    const expectedKeys = Object.keys(expected as object).filter(
+    const expectedKeys = Object.keys(expected).filter(
       (k) => !ignoreFields.includes(k)
     );
 
@@ -227,62 +233,5 @@ export function expectFrameEquals<T>(
     expect.fail(
       `Frame mismatch:\n  ${diff}\n\nActual:\n${JSON.stringify(actual, null, 2)}\n\nExpected:\n${JSON.stringify(expected, null, 2)}`
     );
-  }
-}
-
-// ============================================================================
-// Fixture Updates
-// ============================================================================
-
-/**
- * Check if golden fixtures should be updated (UPDATE_GOLDEN=1 env var).
- */
-export function shouldUpdateGolden(): boolean {
-  return process.env.UPDATE_GOLDEN === "1";
-}
-
-/**
- * Update a fixture file with new expected output.
- * Only works when UPDATE_GOLDEN=1 is set.
- *
- * @param relativePath - Path relative to fixtures/
- * @param fixture - New fixture data to write
- */
-export function updateFixture<T>(relativePath: string, fixture: T): void {
-  if (!shouldUpdateGolden()) {
-    throw new Error(
-      "Cannot update fixture without UPDATE_GOLDEN=1 environment variable"
-    );
-  }
-
-  const fullPath = resolve(FIXTURES_DIR, relativePath);
-  const dir = dirname(fullPath);
-
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-
-  writeFileSync(fullPath, JSON.stringify(fixture, null, 2) + "\n", "utf-8");
-  console.log(`Updated fixture: ${relativePath}`);
-}
-
-/**
- * Helper for tests that auto-update when UPDATE_GOLDEN=1.
- * Compares actual to expected, updating fixture if env var is set.
- */
-export function assertOrUpdate<TInput, TOutput>(
-  relativePath: string,
-  fixture: Fixture<TInput, TOutput>,
-  actual: TOutput,
-  options: CompareOptions = {}
-): void {
-  if (shouldUpdateGolden()) {
-    const updated: Fixture<TInput, TOutput> = {
-      ...fixture,
-      expected: actual,
-    };
-    updateFixture(relativePath, updated);
-  } else {
-    expectFrameEquals(actual, fixture.expected, options);
   }
 }

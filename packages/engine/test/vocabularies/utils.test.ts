@@ -146,17 +146,17 @@ describe("buildChordShape", () => {
 
       // Root (C, pc=0) should have hue for C
       const rootEl = shape.elements.find((e) => e.interval === "1");
-      const expectedRootHue = pcToHue(0 as PitchClass, defaultInvariant);
+      const expectedRootHue = pcToHue(0, defaultInvariant);
       expect(rootEl?.color.h).toBe(expectedRootHue);
 
       // Third (E, pc=4) should have hue for E
       const thirdEl = shape.elements.find((e) => e.interval === "3");
-      const expectedThirdHue = pcToHue(4 as PitchClass, defaultInvariant);
+      const expectedThirdHue = pcToHue(4, defaultInvariant);
       expect(thirdEl?.color.h).toBe(expectedThirdHue);
 
       // Fifth (G, pc=7) should have hue for G
       const fifthEl = shape.elements.find((e) => e.interval === "5");
-      const expectedFifthHue = pcToHue(7 as PitchClass, defaultInvariant);
+      const expectedFifthHue = pcToHue(7, defaultInvariant);
       expect(fifthEl?.color.h).toBe(expectedFifthHue);
     });
 
@@ -216,7 +216,7 @@ describe("buildChordShape", () => {
   });
 
   describe("margin styles", () => {
-    const cases: Array<[MusicalChord["quality"], string]> = [
+    const cases: Array<[ChordQuality, string]> = [
       ["maj", "straight"],
       ["maj7", "straight"],
       ["dom7", "straight"],
@@ -311,12 +311,12 @@ describe("buildChordShape", () => {
 
     it("marks the bass-matching element isBass when bass differs from root", () => {
       // EbM triad with G in the bass (first inversion)
-      const chord = makeChord(3 as PitchClass, "maj", [0, 4, 7]); // Eb, G, Bb
+      const chord = makeChord(3, "maj", [0, 4, 7]); // Eb, G, Bb
       const shape = buildChordShape(
         chord.harmonic,
         chord.voicing,
         defaultInvariant,
-        7 as PitchClass, // bass = G
+        7, // bass = G
       );
       // G is 4 semitones from Eb → label "3"
       const gElement = shape.elements.find((e) => e.interval === "3");
@@ -327,12 +327,12 @@ describe("buildChordShape", () => {
     });
 
     it("does not mark bass when bass equals root (root position)", () => {
-      const chord = makeChord(3 as PitchClass, "maj", [0, 4, 7]);
+      const chord = makeChord(3, "maj", [0, 4, 7]);
       const shape = buildChordShape(
         chord.harmonic,
         chord.voicing,
         defaultInvariant,
-        3 as PitchClass, // bass = Eb = root
+        3, // bass = Eb = root
       );
       for (const el of shape.elements) {
         expect(el.isBass).toBeUndefined();

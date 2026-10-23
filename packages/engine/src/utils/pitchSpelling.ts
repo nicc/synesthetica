@@ -100,7 +100,7 @@ export function buildSpellingTable(key: PrescribedKey): Record<PitchClass, strin
   }
   // Flat keys already use DEFAULT_NAMES fallbacks (flats), so no action needed.
 
-  return table as Record<PitchClass, string>;
+  return table;
 }
 
 /**

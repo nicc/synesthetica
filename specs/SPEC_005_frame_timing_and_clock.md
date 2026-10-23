@@ -59,7 +59,7 @@ A session begins when the engine initializes. The epoch (T=0) is:
 - The moment the pipeline becomes ready to process
 - Before any adapters begin emitting events
 
-All raw input, musical frames, intents, and scene frames share this timeline.
+All raw input, musical frames, annotated frames, and scene frames share this timeline.
 
 ## Latency Handling
 
@@ -124,7 +124,7 @@ The compositor merges per-part SceneFrames into a unified visual output. This is
 2. For each active part:
    a. Adapter provides RawInputFrame up to targetTime
    b. Stabilizer transforms RawInputFrame → MusicalFrame
-   c. Vocabulary transforms MusicalFrame → VisualIntentFrame
+   c. Vocabulary annotates MusicalFrame → AnnotatedMusicalFrame
    d. Lens stack produces SceneFrame(part)
 3. Compositor merges per-part SceneFrames
 4. Merged SceneFrame returned to renderer

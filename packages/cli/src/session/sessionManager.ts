@@ -36,7 +36,7 @@ const PIPELINE_READY_TIMEOUT_MS = 15_000;
 export interface SessionManagerOptions {
   instanceLabel: string;
   wsPort?: number;
-  webAppPort?: number;
+  webAppPort?: number | undefined;
   openBrowser: boolean;
   browser: "default" | "chrome";
   /**
@@ -46,7 +46,19 @@ export interface SessionManagerOptions {
    */
   recentEventsBufferSize?: number;
   log?: (line: string) => void;
+  /** Override the bridge's reconnect grace period (tests). */
+  reconnectGraceMs?: number;
 }
+
+/** Side-effecting collaborators, injectable so tests can run a session
+ *  without a real web-app server or browser. */
+export interface SessionManagerDeps {
+  startWsBridge: typeof startWsBridge;
+  spawnWebApp: typeof spawnWebApp;
+  openBrowser: typeof openBrowser;
+}
+
+const DEFAULT_DEPS: SessionManagerDeps = { startWsBridge, spawnWebApp, openBrowser };
 
 export interface StartSessionSummary {
   instanceLabel: string;
@@ -57,12 +69,15 @@ export interface StartSessionSummary {
 
 export class SessionManager {
   private state: SessionState = "stopped";
-  private webApp?: WebAppHandle;
-  private bridge?: WsBridgeHandle;
-  private engine?: EngineHandle;
+  private webApp: WebAppHandle | undefined;
+  private bridge: WsBridgeHandle | undefined;
+  private engine: EngineHandle | undefined;
   private log: (line: string) => void;
 
-  constructor(private options: SessionManagerOptions) {
+  constructor(
+    private options: SessionManagerOptions,
+    private readonly deps: SessionManagerDeps = DEFAULT_DEPS,
+  ) {
     this.log = options.log ?? (() => {});
   }
 
@@ -89,21 +104,26 @@ export class SessionManager {
 
   async start(): Promise<StartSessionSummary> {
     if (this.state === "running") {
-      return this.currentSummary();
+      // Idempotent while the tab is connected. If the tab was closed or
+      // crashed, reopen it: start_session is how the LLM recovers from
+      // ENGINE_DISCONNECTED.
+      if (await this.engine?.awaitConnected()) return this.currentSummary(false);
+      return this.reopenTab();
     }
     if (this.state === "starting" || this.state === "stopping") {
       throw new Error(`session is ${this.state}; wait for it to settle before starting`);
     }
     this.state = "starting";
     try {
-      this.bridge = await startWsBridge({
+      this.bridge = await this.deps.startWsBridge({
         port: this.options.wsPort ?? 0,
         log: this.log,
+        ...(this.options.reconnectGraceMs !== undefined && { reconnectGraceMs: this.options.reconnectGraceMs }),
       });
       this.log(`engine bridge listening on ws://localhost:${this.bridge.port}`);
       this.engine = this.bridge.handleFor(this.options.instanceLabel);
 
-      this.webApp = await spawnWebApp({
+      this.webApp = await this.deps.spawnWebApp({
         port: this.options.webAppPort,
       });
       const openUrl = this.buildOpenUrl();
@@ -111,7 +131,7 @@ export class SessionManager {
 
       let openedInBrowser = false;
       if (this.options.openBrowser) {
-        openBrowser(openUrl, this.options.browser);
+        this.deps.openBrowser(openUrl, this.options.browser);
         openedInBrowser = true;
       }
 
@@ -127,7 +147,7 @@ export class SessionManager {
         );
       } catch (e) {
         this.log(
-          `pipeline-ready wait failed: ${e instanceof Error ? e.message : e}`,
+          `pipeline-ready wait failed: ${e instanceof Error ? e.message : String(e)}`,
         );
         throw e;
       }
@@ -175,7 +195,7 @@ export class SessionManager {
         this.log(`  ✓ ${name} (${Date.now() - t0}ms)`);
       } catch (e) {
         this.log(
-          `  ✗ ${name} (${Date.now() - t0}ms): ${e instanceof Error ? e.message : e}`,
+          `  ✗ ${name} (${Date.now() - t0}ms): ${e instanceof Error ? e.message : String(e)}`,
         );
       }
     }
@@ -184,7 +204,7 @@ export class SessionManager {
     this.engine = undefined;
   }
 
-  private currentSummary(): StartSessionSummary {
+  private currentSummary(openedInBrowser: boolean): StartSessionSummary {
     if (!this.bridge || !this.webApp) {
       throw new Error("currentSummary called on non-running session");
     }
@@ -192,8 +212,19 @@ export class SessionManager {
       instanceLabel: this.options.instanceLabel,
       wsPort: this.bridge.port,
       webAppUrl: this.buildOpenUrl(),
-      openedInBrowser: this.options.openBrowser,
+      openedInBrowser,
     };
+  }
+
+  /** Reopen the visualiser for a running session whose tab is gone, and
+   *  wait until the new tab's pipeline is ready. */
+  private async reopenTab(): Promise<StartSessionSummary> {
+    if (!this.bridge) throw new Error("reopenTab called on non-running session");
+    const openUrl = this.buildOpenUrl();
+    this.log(`tab for '${this.options.instanceLabel}' is disconnected; reopening ${openUrl}`);
+    if (this.options.openBrowser) this.deps.openBrowser(openUrl, this.options.browser);
+    await this.bridge.awaitPipelineReady(this.options.instanceLabel, PIPELINE_READY_TIMEOUT_MS);
+    return this.currentSummary(this.options.openBrowser);
   }
 
   /**

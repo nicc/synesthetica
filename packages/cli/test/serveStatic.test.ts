@@ -72,12 +72,31 @@ describe("serveStatic — basics", () => {
     expect(res.status).toBe(403);
   });
 
+  it("answers 400 to a malformed percent-escape instead of crashing", async () => {
+    const bad = await fetch(`${handle.url}%E0`);
+    expect(bad.status).toBe(400);
+    // The server is still up.
+    const ok = await fetch(handle.url);
+    expect(ok.status).toBe(200);
+  });
+
   it("throws at construction when the root has no index.html", async () => {
     const bare = mkdtempSync(join(tmpdir(), "syn-static-bare-"));
     await expect(
       serveStatic({ root: bare, port: 0, log: () => {} }),
     ).rejects.toThrow(/no index\.html/);
     rmSync(bare, { recursive: true, force: true });
+  });
+});
+
+describe("serveStatic — network exposure", () => {
+  it("binds to the loopback interface only", async () => {
+    const { networkInterfaces } = await import("node:os");
+    const external = Object.values(networkInterfaces())
+      .flat()
+      .find((i) => i && i.family === "IPv4" && !i.internal);
+    if (!external) return; // no non-loopback interface on this machine
+    await expect(fetch(`http://${external.address}:${handle.port}/`)).rejects.toThrow();
   });
 });
 

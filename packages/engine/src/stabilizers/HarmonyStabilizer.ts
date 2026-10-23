@@ -756,7 +756,7 @@ export class HarmonyStabilizer implements IMusicalStabilizer {
     const functionalEdges: FunctionalEdge[] =
       key && diatonicTable
         ? this.progression.flatMap((fc) =>
-            emitFunctionalEdges(fc, key, diatonicTable!),
+            emitFunctionalEdges(fc, key, diatonicTable),
           )
         : [];
 
