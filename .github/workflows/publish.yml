@@ -61,6 +61,14 @@ jobs:
           # requires the registry to be exactly this URL.
           registry-url: "https://registry.npmjs.org"
 
+      - name: Use an npm that supports trusted publishing
+        # OIDC trusted publishing needs npm >= 11.5.1; Node 22 ships npm 10,
+        # which signs provenance but publishes without credentials (npm then
+        # answers E404 — what happened to 1.0.1, synesthetica-aw1r).
+        run: |
+          npm install -g npm@11
+          npm --version
+
       - name: Install
         run: npm ci
 

@@ -30,6 +30,7 @@ Cutting a new version of `synesthetica` on npm.
    ```
 
    The tag push fires `.github/workflows/publish.yml`, which:
+   - Installs npm 11 (trusted publishing needs npm ≥ 11.5.1)
    - Re-runs the full quality gate (build + typecheck + test + lint)
    - Confirms the tag version matches `packages/cli/package.json`
    - Runs `npm publish --dry-run` for a tarball sanity print
@@ -58,11 +59,7 @@ The trusted-publisher flow only works once the package exists on the registry. S
    npm publish --provenance --access public
    ```
 
-3. On npmjs.com, go to the `synesthetica` package page → Settings → Access → **Trusted Publisher**. Configure:
-   - Publisher: GitHub Actions
-   - Repository: `nicc/synesthetica`
-   - Workflow file: `.github/workflows/publish.yml`
-   - Environment: `publish`
+3. On npmjs.com, configure the trusted publisher (see [Trusted publisher setup](#trusted-publisher-setup) below).
 
 4. On GitHub, go to Settings → Environments → **New environment**, name it `publish`. Optionally add a required-reviewer protection rule if you want a human "publish yes/no" gate before every release.
 
@@ -73,6 +70,36 @@ The trusted-publisher flow only works once the package exists on the registry. S
    ```
 
    The publish workflow will fire, hit the `synesthetica@1.0.0 already exists` error at the publish step, and stop. That's expected — 1.0.0 is already on the registry. From `1.0.1` onward every release runs cleanly through the workflow.
+
+## Trusted publisher setup
+
+The publish workflow authenticates to npm with GitHub's OIDC identity instead of a stored token. npm needs to be told which workflow may publish:
+
+1. Sign in to npmjs.com (2FA), open **Packages → synesthetica → Settings → Trusted publishing**, and choose **GitHub Actions**.
+2. Fill in exactly (all fields are case-sensitive):
+   - Organization or user: `nicc`
+   - Repository: `synesthetica`
+   - Workflow filename: `publish.yml` — the filename only, not `.github/workflows/publish.yml`
+   - Environment name: `publish`
+3. Save. npm does not check the configuration when you save it; mistakes only show up at publish time.
+4. **Publish within 2 days.** A trusted-publisher configuration expires if its first successful publish doesn't happen within 2 days of saving it. If it expires, delete it and save it again.
+
+Requirements on the workflow side, already in `publish.yml`:
+- `permissions: id-token: write` on the job.
+- npm CLI 11.5.1 or later (the job runs `npm install -g npm@11`; Node 22's bundled npm 10 is too old) and Node 22.14 or later.
+- A GitHub-hosted runner.
+- `repository.url` in `packages/cli/package.json` matching the GitHub repository.
+
+Provenance is generated automatically for an OIDC publish from a public repository.
+
+### If the publish step fails with E404
+
+`404 Not Found - PUT https://registry.npmjs.org/synesthetica` with "'synesthetica@X.Y.Z' is not in this registry" means npm received the publish without valid credentials. Check, in order:
+1. The job's npm version (`npm --version` is printed by the workflow) is at least 11.5.1.
+2. The trusted-publisher configuration exists, hasn't expired, and its fields match the list above exactly.
+3. The environment name in the workflow (`environment: publish`) matches the configuration.
+
+To retry after fixing the configuration, re-run the failed workflow from the Actions tab rather than re-tagging. If a fallback is needed, publish from a laptop: `npm login`, then `npm publish --access public` in `packages/cli`.
 
 ## Hotfixes
 

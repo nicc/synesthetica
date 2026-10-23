@@ -71,8 +71,6 @@ Just open a new chat and ask. This is the fun bit. Try stuff. You could say "I w
 
 There are three lenses.
 
-This describes the current `main` branch. Overtones, the note-name and interval-name labels, and the modal-interchange hints are not in the published npm package (1.0.1); they ship in the next release.
-
 #### Dynamics lens
 
 <img src="docs/readme/dynamics.png" alt="Dynamics lens — velocity bar" align="left" height="200" hspace="16">

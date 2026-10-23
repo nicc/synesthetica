@@ -4,6 +4,8 @@ Notable changes to Synesthetica. Format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+## [1.1.0] — 2026/10/23
+
 ### Added
 
 - **Overtones (harmonic series overlay).** Each played note's partials, up to the 9th harmonic, are modelled at their true pitch and drawn as slow-moving steam: a halo around the chord glyph (on by default) and overtone strips on the rhythm lens (off by default). Both toggles are in Basics; overtone level, rolloff and colour (landing pitch or originating note) are in Advanced. The model is theoretical; it does not analyse audio.
@@ -67,6 +69,7 @@ First public release.
 - Node.js 20+ required. Chromium-based browsers only (Web MIDI + WebAssembly Basic Pitch dependencies).
 - Swing timing not yet supported.
 
-[Unreleased]: https://github.com/nicc/synesthetica/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/nicc/synesthetica/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/nicc/synesthetica/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/nicc/synesthetica/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/nicc/synesthetica/releases/tag/v1.0.0
