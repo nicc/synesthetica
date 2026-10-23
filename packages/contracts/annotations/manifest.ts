@@ -1371,7 +1371,7 @@ const tools: ToolAnnotation[] = [
   {
     id: "start_session",
     description:
-      "Spawn the visualiser: open the web-app in a browser tab, start the WS bridge, and connect the engine. Call this when the user signals musical intent. Idempotent — a no-op if a session is already running and its tab is connected; if the tab was closed, it reopens it (the fix for ENGINE_DISCONNECTED). Every other engine tool (set_macro, set_key, get_state, etc.) requires a running session and returns ENGINE_NOT_STARTED otherwise.",
+      "Spawn the visualiser: open the web-app in a browser tab, start the WS bridge, and connect the engine. Call this when the user signals musical intent. Idempotent — a no-op if a session is already running and its tab is connected; if the tab was closed, it opens a new one (the fix for ENGINE_DISCONNECTED). A new tab starts fresh: session clock, recent events and all settings reset to defaults. Every other engine tool (set_macro, set_key, get_state, etc.) requires a running session and returns ENGINE_NOT_STARTED otherwise.",
     aliases: ["start", "let's play", "begin session", "open the visualiser"],
     notes: [
       "The browser tab opens automatically (Chrome by default) when the CLI is running under a windowed shell. Under headless / stdio-only conditions the visualiser URL is returned in the tool result's data.webAppUrl for manual open.",
