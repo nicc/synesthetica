@@ -142,14 +142,21 @@ async function init(message: Extract<MainToWorker, { type: "init" }>) {
     // WASM backend. Point tfjs at the .wasm binaries served
     // alongside the model files by the web app. Falls back to CPU
     // (pure JS, ~10× slower) if WASM init fails for any reason.
+    // setBackend reports failure by resolving false rather than
+    // throwing; without the check tfjs falls through to WebGL, which
+    // can't run in a worker.
+    let wasmReady = false;
     try {
-      setWasmPaths("/models/tfjs-wasm/");
-      await tf.setBackend("wasm");
-      await tf.ready();
+      setWasmPaths(message.wasmPathPrefix);
+      wasmReady = await tf.setBackend("wasm");
     } catch {
-      await tf.setBackend("cpu");
-      await tf.ready();
+      wasmReady = false;
     }
+    if (!wasmReady) {
+      console.warn("[inference-worker] WASM backend unavailable; using the CPU backend");
+      await tf.setBackend("cpu");
+    }
+    await tf.ready();
 
     const model = await tf.loadGraphModel(message.modelUrl);
     state.basicPitch = new BasicPitch(Promise.resolve(model));

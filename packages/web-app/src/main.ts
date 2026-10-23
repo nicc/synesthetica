@@ -72,6 +72,7 @@ import type {
 import INFERENCE_WORKER_URL from "./audio/inference-worker-entry.ts?worker&url";
 const AUDIO_CAPTURE_WORKLET_URL = `${import.meta.env.BASE_URL}audio-capture-worklet.js`;
 const BASIC_PITCH_MODEL_URL = `${import.meta.env.BASE_URL}models/basic-pitch/model.json`;
+const TFJS_WASM_PATH_PREFIX = `${import.meta.env.BASE_URL}models/tfjs-wasm/`;
 
 /* -----------------------------------------------------------------
  * DOM refs (three: canvas, status line, body host for the shell)
@@ -725,6 +726,7 @@ async function startAudioSession(deviceId?: string): Promise<void> {
   audioAdapter = new AudioInputAdapter({
     sessionStart,
     modelUrl: BASIC_PITCH_MODEL_URL,
+    wasmPathPrefix: TFJS_WASM_PATH_PREFIX,
     workerUrl: INFERENCE_WORKER_URL,
     workletUrl: AUDIO_CAPTURE_WORKLET_URL,
     debug: audioDebug,

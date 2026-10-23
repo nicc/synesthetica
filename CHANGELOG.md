@@ -4,6 +4,11 @@ Notable changes to Synesthetica. Format follows [Keep a Changelog](https://keepa
 
 ## [Unreleased]
 
+### Fixed
+
+- **Audio input failed when the web app is hosted under a subpath.** The audio worker loaded TensorFlow.js's WebAssembly files from the domain root (`/models/tfjs-wasm/`), so a deployment at, say, `example.com/synesthetica/` fetched an HTML page instead and audio failed to start. The path is now resolved against the page. The installed CLI serves from the root and was not affected.
+- **The audio worker's fallback to the CPU backend never ran.** When the WebAssembly backend failed to start, TensorFlow.js fell through to WebGL, which can't run in a worker. It now falls back to the (slower) CPU backend as intended.
+
 ## [1.1.0] — 2026/10/23
 
 ### Added

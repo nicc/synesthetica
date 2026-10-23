@@ -29,6 +29,9 @@ export interface WorkerInitMessage {
   /** URL of the Basic Pitch model JSON. The worker loads it via
    *  tf.loadGraphModel. */
   modelUrl: string;
+  /** Absolute URL of the directory holding tfjs-backend-wasm's .wasm
+   *  binaries, with a trailing slash. */
+  wasmPathPrefix: string;
   /** Onset detection confidence threshold (0..1). Higher = fewer
    *  spurious notes, more missed onsets. */
   onsetThreshold: number;

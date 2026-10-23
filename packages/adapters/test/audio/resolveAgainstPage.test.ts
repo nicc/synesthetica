@@ -10,6 +10,11 @@ describe("resolveAgainstPage", () => {
       .toBe("https://example.com/synesthetica/models/basic-pitch/model.json");
   });
 
+  it("keeps a directory URL's trailing slash (tfjs wasm path prefix) under a subpath", () => {
+    expect(resolveAgainstPage("./models/tfjs-wasm/", "https://example.com/synesthetica/"))
+      .toBe("https://example.com/synesthetica/models/tfjs-wasm/");
+  });
+
   it("leaves absolute URLs alone", () => {
     expect(resolveAgainstPage("https://cdn.example/model.json", "http://localhost:5173/"))
       .toBe("https://cdn.example/model.json");

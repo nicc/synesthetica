@@ -107,6 +107,13 @@ export interface AudioInputAdapterConfig {
   modelUrl: string;
 
   /**
+   * Directory URL (trailing slash) of tfjs-backend-wasm's .wasm files.
+   * Resolved against the page like modelUrl, so subpath deployments
+   * fetch them from under the app rather than the domain root.
+   */
+  wasmPathPrefix: string;
+
+  /**
    * URL of the compiled InferenceWorker script. The consumer (the web
    * app) is responsible for producing a URL that loads the worker —
    * typically via vite's `new URL('./InferenceWorker.ts', import.meta.url)`
@@ -289,6 +296,7 @@ export class AudioInputAdapter implements IRawSourceAdapter {
       sampleRate: SAMPLE_RATE,
       hopMs: this.config.hopMs,
       modelUrl: resolveAgainstPage(this.config.modelUrl),
+      wasmPathPrefix: resolveAgainstPage(this.config.wasmPathPrefix),
       onsetThreshold: this.config.onsetThreshold,
       frameThreshold: this.config.frameThreshold,
       minNoteLengthFrames: this.config.minNoteLengthFrames,
