@@ -79,13 +79,23 @@ Lint exemptions are `eslint-disable-next-line` comments that give the reason and
 
 The full rules are in [docs/testing.md](docs/testing.md). The core rule: a test protects a behaviour. It survives a retune of a default and fails when the behaviour breaks. So import tunables rather than retyping them, assert properties (orderings, bounds, ratios) over values, and check defaults only in `wiringCoverage.test.ts`.
 
-## Finishing work
+## Code conventions
 
-```bash
-npm run build && npm run typecheck && npm test && npm run lint
-```
+- **Visual parameters are named top-of-file constants** with a one-line comment, never inline literals; the user tunes them between sessions. Put units in the name (`_MS`, `_FRACTION`, `_WORLD`) and keep independent knobs independent.
+- **Freeze at creation.** Per-note facts (duration, drift) are computed once and cached, not recomputed from mutable frame state.
+- **Entity ids are stable** across frames (`lensId:descriptiveBase`, no counters); the renderer reuses objects by id.
+- **Derived state is a field, not prose.** When a control's meaning depends on session state (`harmony:linger` is seconds or bars depending on tempo), expose it as a `derivedState` manifest field, then move the leaf annotation in the manifest, the compound dispatcher (`packages/cli/src/tools/macroTools.ts`) and the primer guidance (`packages/contracts/prompts/system-overview.md`) with it.
+- **Shared Three.js test mocks** live in `packages/engine/test/_harness/threeMocks.ts`; extend them there.
 
-- Work on a branch, never on `main`. Commit at stopping points; lead commit messages with the product change.
-- When the work is ready, push the branch and open a PR with `gh pr create`. CI runs the same gates. The user reviews and merges.
-- `bd sync` pushes the issue database (a Dolt remote, independent of git branches).
-- After a rename, grep for the old term across `.ts` and `.md` before calling it done.
+## Finishing work: branch, PR, review
+
+`main` is protected; every change lands through a PR that the user merges.
+
+1. **Branch** from `main`. Commit at stopping points; lead commit messages with the product change. After a rename, grep `.ts` and `.md` for the old term.
+2. **Run the gates** before pushing: `npm run build && npm run typecheck && npm test && npm run lint`.
+3. **Open the PR**: push the branch and run `gh pr create`, filling every section of [.github/pull_request_template.md](.github/pull_request_template.md). Those are intent, behaviour changes, pertinent specs and RFCs, and the decisions and deliberate exceptions agreed in conversation. The reviewer sees only the repo and the PR, so whatever the description leaves out, it will miss or flag as a violation.
+4. **CI runs two checks** on every non-draft PR from this repo: the gates ([ci.yml](.github/workflows/ci.yml)) and an independent Claude review ([claude-review.yml](.github/workflows/claude-review.yml), following [.github/pr-review.md](.github/pr-review.md)). The review posts advisory comments and re-runs on each push, covering only what changed.
+5. **Loop on the review.** Wait for it with `gh pr checks <n> --watch`, then read it with `gh pr view <n> --comments` and `gh api repos/{owner}/{repo}/pulls/<n>/comments`. Treat its observations as evidence and its interpretations as claims to check against the principles and the agreed decisions. Fix what holds up and push; the next round reviews only the new changes. If a finding is wrong because the description lacked context, fix the description too. Stop when a round raises nothing you would act on, or after three rounds, whichever comes first.
+6. **Hand over.** Tell the user what you fixed and which findings you declined and why. Never drop one silently. The user reviews, then asks for changes or merges. After the merge, `bd sync` (the issue database is a Dolt remote, independent of git branches) and close the finished issues.
+
+If the review is repeatedly noisy or misses something, propose an edit to the brief rather than working around it.
