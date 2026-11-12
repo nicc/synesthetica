@@ -228,7 +228,7 @@ C. C major, held — D and B light up; C's 5th partial sits flat of the played E
 NOW ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-## Glossary terms (proposed; entered in GLOSSARY_FULL.md and lenses/GLOSSARY.md)
+## Glossary terms (proposed; entered in GLOSSARY.md and lenses/GLOSSARY.md)
 
 - **Harmonic series overlay** — the feature; the optional display of each note's implied partials.
 - **Partial** — one component of a note's harmonic series; a vocabulary annotation, not a note. Partial n is overtone n − 1; this project counts partials.

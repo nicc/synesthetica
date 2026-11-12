@@ -1,17 +1,5 @@
 # Vision
 
----
-id: VISION.core-v1
-status: draft
-owner: user
-last_updated: 2026-01-05
----
-
-## Purpose
-This document describes what Synesthetica is, who it is for, and why it should exist.
-
-It is intentionally **non-technical**, relatively stable, and acts as a north star for all downstream decisions.
-
 ## One-Sentence Vision
 > _A system that makes musical structure visible in real time, helping musicians develop intuition, ear, and expression through synesthetic feedback._
 

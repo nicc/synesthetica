@@ -4,29 +4,35 @@ Cutting a new version of `synesthetica` on npm.
 
 ## Every release
 
-1. **Update `CHANGELOG.md`.** Move whatever's under `## [Unreleased]` into a new `## [X.Y.Z] — YYYY-MM-DD` block. Add fresh comparison links at the foot. Keep the format from earlier releases.
+`main` is protected, so the version bump lands through a PR and the tag is pushed after the merge.
 
-2. **Verify the tree is clean and pushed.**
+1. **Branch from an up-to-date `main`.**
 
    ```bash
-   git status
-   git pull --rebase
+   git switch main && git pull --rebase
+   git switch -c release/vX.Y.Z
    ```
 
-3. **Bump the version.** From the CLI package (which is what publishes):
+2. **Update `CHANGELOG.md`.** Move whatever's under `## [Unreleased]` into a new `## [X.Y.Z] — YYYY-MM-DD` block. Add fresh comparison links at the foot. Keep the format from earlier releases.
+
+3. **Bump the version** in the CLI package (which is what publishes), without tagging:
 
    ```bash
-   cd packages/cli
-   npm version <patch|minor|major>
-   cd ../..
+   npm version <patch|minor|major> --no-git-tag-version -w synesthetica
+   git commit -am "Release X.Y.Z"
    ```
 
-   `npm version` bumps `packages/cli/package.json`, commits the bump, and creates a `vX.Y.Z` tag.
+   This bumps `packages/cli/package.json` and the lockfile entry.
 
-4. **Push the tag.**
+4. **Open a PR and merge it.** `git push -u origin release/vX.Y.Z`, then `gh pr create`. CI and the review run as on any PR.
+
+5. **Tag the merged commit and push the tag.**
 
    ```bash
-   git push --follow-tags
+   git switch main && git pull --rebase
+   git log -1 --oneline          # must be the release merge
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
    ```
 
    The tag push fires `.github/workflows/publish.yml`, which:
@@ -37,7 +43,7 @@ Cutting a new version of `synesthetica` on npm.
    - Publishes with `--provenance` via npm's trusted-publisher OIDC flow (no NPM_TOKEN secret)
    - Creates a matching GitHub Release with the CHANGELOG entry attached
 
-5. **Verify.**
+6. **Verify.**
 
    ```bash
    # Wait a minute for the registry to propagate, then:
@@ -45,31 +51,6 @@ Cutting a new version of `synesthetica` on npm.
    ```
 
    Also eyeball the package page at `https://www.npmjs.com/package/synesthetica` — the "Provenance" section should show a green "Built and signed on GitHub Actions" badge linking back to the tag commit.
-
-## First-time bootstrap
-
-The trusted-publisher flow only works once the package exists on the registry. So the very first release (`1.0.0`) is manual:
-
-1. Do steps 1–3 above.
-2. Skip step 4. Instead, from a fresh terminal:
-
-   ```bash
-   npm login   # requires 2FA
-   cd packages/cli
-   npm publish --provenance --access public
-   ```
-
-3. On npmjs.com, configure the trusted publisher (see [Trusted publisher setup](#trusted-publisher-setup) below).
-
-4. On GitHub, go to Settings → Environments → **New environment**, name it `publish`. Optionally add a required-reviewer protection rule if you want a human "publish yes/no" gate before every release.
-
-5. Push the `v1.0.0` tag so a Release object exists on GitHub even though the publish step was manual:
-
-   ```bash
-   git push --follow-tags
-   ```
-
-   The publish workflow will fire, hit the `synesthetica@1.0.0 already exists` error at the publish step, and stop. That's expected — 1.0.0 is already on the registry. From `1.0.1` onward every release runs cleanly through the workflow.
 
 ## Trusted publisher setup
 
@@ -103,7 +84,7 @@ To retry after fixing the configuration, re-run the failed workflow from the Act
 
 ## Hotfixes
 
-Same flow. Cherry-pick the fix onto main, run through steps 1–5.
+Same flow. Land the fix on `main` through a PR, then run steps 1–6.
 
 ## What's excluded from the tarball
 
