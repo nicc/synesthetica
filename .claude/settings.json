@@ -13,9 +13,6 @@
     ]
   },
   "permissions": {
-    "additionalDirectories": [
-      "/Users/nicyoung/.claude"
-    ],
     "allow": [
       "Skill(update-config)",
       "Skill(update-config:*)"

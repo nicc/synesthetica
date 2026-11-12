@@ -4,29 +4,35 @@ Cutting a new version of `synesthetica` on npm.
 
 ## Every release
 
-1. **Update `CHANGELOG.md`.** Move whatever's under `## [Unreleased]` into a new `## [X.Y.Z] — YYYY-MM-DD` block. Add fresh comparison links at the foot. Keep the format from earlier releases.
+`main` is protected, so the version bump lands through a PR and the tag is pushed after the merge.
 
-2. **Verify the tree is clean and pushed.**
+1. **Branch from an up-to-date `main`.**
 
    ```bash
-   git status
-   git pull --rebase
+   git switch main && git pull --rebase
+   git switch -c release/vX.Y.Z
    ```
 
-3. **Bump the version.** From the CLI package (which is what publishes):
+2. **Update `CHANGELOG.md`.** Move whatever's under `## [Unreleased]` into a new `## [X.Y.Z] — YYYY-MM-DD` block. Add fresh comparison links at the foot. Keep the format from earlier releases.
+
+3. **Bump the version** in the CLI package (which is what publishes), without tagging:
 
    ```bash
-   cd packages/cli
-   npm version <patch|minor|major>
-   cd ../..
+   npm version <patch|minor|major> --no-git-tag-version -w synesthetica
+   git commit -am "Release X.Y.Z"
    ```
 
-   `npm version` bumps `packages/cli/package.json`, commits the bump, and creates a `vX.Y.Z` tag.
+   This bumps `packages/cli/package.json` and the lockfile entry.
 
-4. **Push the tag.**
+4. **Open a PR and merge it.** `git push -u origin release/vX.Y.Z`, then `gh pr create`. CI and the review run as on any PR.
+
+5. **Tag the merged commit and push the tag.**
 
    ```bash
-   git push --follow-tags
+   git switch main && git pull --rebase
+   git log -1 --oneline          # must be the release merge
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
    ```
 
    The tag push fires `.github/workflows/publish.yml`, which:
@@ -37,7 +43,7 @@ Cutting a new version of `synesthetica` on npm.
    - Publishes with `--provenance` via npm's trusted-publisher OIDC flow (no NPM_TOKEN secret)
    - Creates a matching GitHub Release with the CHANGELOG entry attached
 
-5. **Verify.**
+6. **Verify.**
 
    ```bash
    # Wait a minute for the registry to propagate, then:
@@ -78,7 +84,7 @@ To retry after fixing the configuration, re-run the failed workflow from the Act
 
 ## Hotfixes
 
-Same flow. Cherry-pick the fix onto main, run through steps 1–5.
+Same flow. Land the fix on `main` through a PR, then run steps 1–6.
 
 ## What's excluded from the tarball
 

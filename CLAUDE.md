@@ -11,7 +11,7 @@ The principles below constrain every design and implementation decision. A viola
 - **Propose before building.** For anything non-trivial (new behaviour, multi-file change, refactor), describe what and how, then wait for approval. Trivial fixes and research don't need it.
 - **Specs are canonical.** A code change that affects specified behaviour updates the spec in the same commit. If something isn't specified, say so and ask; don't invent scope.
 - **Use the glossary.** [GLOSSARY.md](GLOSSARY.md) for project terms, [lens glossary](packages/engine/src/lenses/GLOSSARY.md) for visual elements. Restate loose terms in glossary language, ask when a term is ambiguous, and propose a definition before using a new one.
-- **Track work in bd.** No TODO or plan files. File discoveries (spec gaps, surprising behaviour) as issues when you find them, then ask the user to triage. `bd close -r "reason"`, not `--comment`.
+- **Track work and memory in bd.** No TODO or plan files, and no memory files: persistent notes go in `bd remember --key <slug> "..."`. File discoveries (spec gaps, surprising behaviour) as issues when you find them, then ask the user to triage. `bd close -r "reason"`, not `--comment`.
 - **Breaking changes are fine.** No shims, aliases or deprecated paths unless asked.
 - **Plain register.** No hype in docs, comments, commits or issues. Be precise about what exists versus what is planned.
 
