@@ -1,6 +1,8 @@
 # Tunables catalogue
 
-Canonical list of every controllable value in the pipeline. Written 2026-08-13 for a review of which levers actually matter for LLM-mediated control. Values and locations re-checked against the code 2026-10-22.
+Reference catalogue of the pipeline's tunable constants, compiled 2026-08-13 for a review of which levers matter for LLM-mediated control; values and locations re-checked against the code 2026-10-22.
+
+Not canonical. SPEC_014 defines how macros bind; its implementation, the annotation manifest (`packages/contracts/annotations/manifest.ts`), is the current macro list; the code holds current values.
 
 ## Reading this doc
 
@@ -10,7 +12,7 @@ Canonical list of every controllable value in the pipeline. Written 2026-08-13 f
 - **Experiential impact** — my best guess at what a user would notice; ⭐ = a change you'd see, ⭐⭐ = a change you'd feel, ⭐⭐⭐ = a change that reframes the reading
 - **Musical pertinence** — my best guess at how much this maps to musical intent; 🎵 = coloured by musical concept, 🎵🎵 = shapes a musical concept, 🎵🎵🎵 = load-bearing for musical interpretation
 - **Class** — how I'd categorise it: `layout` (spatial structure), `cosmetic` (visual polish), `dynamics` (temporal feel), `detection` (what the pipeline sees), `interpretive` (how the pipeline reads what it sees)
-- **Decision** — the outcome of the 2026-08-13 review: `internal`, or the macro id proposed for it at the time. Some proposed ids were later renamed or dropped; `packages/contracts/annotations/manifest.ts` is the canonical list of macros.
+- **Decision** — the outcome of the 2026-08-13 review: `internal`, or the macro id proposed for it at the time. Some proposed ids were later renamed or dropped; the manifest is the current list.
 
 Ranks are opinions — treat as starting points.
 
@@ -18,7 +20,7 @@ Ranks are opinions — treat as starting points.
 
 ## True macros (user-tunable in code)
 
-Lenses, ChordDetectionStabilizer and MusicalVisualVocabulary take macros from the manifest (`packages/contracts/annotations/manifest.ts`), which is the canonical list. The lens-local macro fields:
+Lenses, ChordDetectionStabilizer and MusicalVisualVocabulary take macros from the manifest (`packages/contracts/annotations/manifest.ts`, SPEC_014). The lens-local macro fields:
 
 | Macro field | File | Default | Range | Controls | Impact | Pertinence | Class | Manifest id |
 |---|---|---|---|---|---|---|---|---|

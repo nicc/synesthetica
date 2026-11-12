@@ -46,31 +46,6 @@ Cutting a new version of `synesthetica` on npm.
 
    Also eyeball the package page at `https://www.npmjs.com/package/synesthetica` — the "Provenance" section should show a green "Built and signed on GitHub Actions" badge linking back to the tag commit.
 
-## First-time bootstrap
-
-The trusted-publisher flow only works once the package exists on the registry. So the very first release (`1.0.0`) is manual:
-
-1. Do steps 1–3 above.
-2. Skip step 4. Instead, from a fresh terminal:
-
-   ```bash
-   npm login   # requires 2FA
-   cd packages/cli
-   npm publish --provenance --access public
-   ```
-
-3. On npmjs.com, configure the trusted publisher (see [Trusted publisher setup](#trusted-publisher-setup) below).
-
-4. On GitHub, go to Settings → Environments → **New environment**, name it `publish`. Optionally add a required-reviewer protection rule if you want a human "publish yes/no" gate before every release.
-
-5. Push the `v1.0.0` tag so a Release object exists on GitHub even though the publish step was manual:
-
-   ```bash
-   git push --follow-tags
-   ```
-
-   The publish workflow will fire, hit the `synesthetica@1.0.0 already exists` error at the publish step, and stop. That's expected — 1.0.0 is already on the registry. From `1.0.1` onward every release runs cleanly through the workflow.
-
 ## Trusted publisher setup
 
 The publish workflow authenticates to npm with GitHub's OIDC identity instead of a stored token. npm needs to be told which workflow may publish:

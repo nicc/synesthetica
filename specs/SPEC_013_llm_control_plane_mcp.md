@@ -591,5 +591,6 @@ Each instance has its own `state://<label>/*` resource. The `instances://` resou
 
 - SPEC 004 — LLM Mediation and Annotations (parent contract; being amended in parallel)
 - RFC 011 — LLM Control Plane and Transport Architecture (the decision doc this SPEC executes)
-- docs/tunables.md — canonical list of the underlying controllable values macros map to
+- SPEC 014 — macro binding; its implementation, `packages/contracts/annotations/manifest.ts`, is the current macro list
+- docs/tunables.md — reference catalogue of the internal constants behind the macros (not canonical)
 - docs/smoke-test/ — the semantic smoke test that validated the model

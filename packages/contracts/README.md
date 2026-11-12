@@ -3,8 +3,8 @@
 This folder defines the **contract surface** for Synesthetica: the types and interfaces
 used to build modules independently, plus the runtime pieces every package must agree on:
 
-- **Annotation manifest** (`annotations/manifest.ts`, `productionManifest`) — every macro,
-  session control and concept, with the annotations that drive the LLM primer and the web panel
+- **Annotation manifest** (`annotations/manifest.ts`, `productionManifest`) — the implemented
+  list of every macro, session control and concept (SPEC_014), with the annotations that drive the LLM primer and the web panel
 - **Panel generator** (`annotations/generatePanel.ts`) — builds the Basics / Advanced panel
   descriptors from the manifest
 - **Primer composer** (`prompts/composer.ts`, with `prompts/system-overview.md`) — composes
@@ -34,14 +34,19 @@ The runtime code is small, pure, and has no dependencies on other packages.
 14. **Routing** (`routing/*`) — parts-based routing
 15. **Diagnostics** (`diagnostics/*`) — runtime error and diagnostic types
 
-## Design invariants (high level)
+## Architecture rules
 
-- Meaning is encoded in **vocabularies**, not lenses.
-- Lenses decide **form**, not meaning. They see musical element categories (notes, chords, beats) but not musical analysis.
-- Lenses receive **annotated musical elements** and decide how/whether to render them (RFC 006).
-- Stabilizers form a **DAG** based on dependencies.
-- Control operations are **mechanical**; interpretation happens outside the engine.
-- All signals/events/entities are attributable to exactly one **PartId**.
+This package defines the types; the specs define the rules they serve. Read the relevant spec before changing a type:
+
+- [SPEC_008](../../specs/SPEC_008_pipeline_orchestration.md) — pipeline stages, the stabilizer DAG, what each stage consumes
+- [SPEC_009](../../specs/SPEC_009_pipeline_frame_types.md) — the frame types passed between stages
+- [SPEC_006](../../specs/SPEC_006_vocabulary_and_stabilizer_statefulness.md) — where state may live (stabilizers, not vocabularies or lenses)
+- [SPEC_003](../../specs/SPEC_003_instrument_identity_invariants.md) — the invariants, including what lenses may and must not do
+- [SPEC_010](../../specs/SPEC_010_visual_vocabulary.md) — the visual vocabulary and its annotations
+- [SPEC_004](../../specs/SPEC_004_llm_mediation_and_annotations.md), [SPEC_015](../../specs/SPEC_015_control_op_validation_errors.md) — control ops, queries and their validation
+- [SPEC_014](../../specs/SPEC_014_macro_binding_manifest_multimodal_discovery.md) — the annotation manifest and macro binding
+- [SPEC_013](../../specs/SPEC_013_llm_control_plane_mcp.md) — the engine-bridge protocol and MCP control plane
+- [SPEC_007](../../specs/SPEC_007_error_and_diagnostic_model.md) — diagnostics
 
 ## Versioning
 
