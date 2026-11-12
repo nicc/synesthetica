@@ -177,13 +177,13 @@ The web UI controls are generated from this same manifest, along with human-spec
 
 ## Design ethos
 
-This project was partly an experiment in operating alongside LLMs, both as user and builder. I tweaked a few things but Claude wrote all the code.
+This project is partly an experiment in operating alongside LLMs, both as user and builder. I tweaked a few things, but Claude has written all the code.
 
 See [PRINCIPLES.md](PRINCIPLES.md) for a canonical set of guiding principles. These were important.
 
-The workflow is interesting because this project is as much a design exercise as an engineering one. As such, it didn't work to heavily specify. I couldn't let a swarm of agents loose and grind until they're done because I had no idea what done was. Being inherently exploratory, the problem was not verifiable in significant iteration lengths. This demanded a very conversational workflow. I often found myself giving simple prompts like "write the spec", or "go ahead" after fully developing a shared understanding in dialogue. This demanded very careful management of terminology, with explicit promotion through iterative layers of communicative and design certainty. The chord glyph language, for example, was developed initially in unicode, then SVG, then HTML canvas, then WebGL canvas. Each stage layered new certainties into emergent specs and glossaries. <a href="https://mcnoose.com/synesthetica/chord-shapes/" target="_blank" rel="noopener noreferrer">Here's</a> an svg-stage test artefact for the curious.
+The workflow has been interesting. In exploring agentic engineering, I wanted to feel out how things work and what breaks before blindly copying best practices. So I didn't jump straight into heavy orchestration. I wanted to remain in the loop until I understood what I needed to automate. And because the project is essentially a design problem, I couldn't let agents grind away until they were done. I didn't know what done was. The combination of these factors demanded a very conversational workflow. I often found myself giving simple prompts like "write the spec" after fully developing a shared understanding in dialogue. These dialogues are where I noticed things like the importance of managing terminology, the value of verifying design decisions early, when to do evals, and what to enforce with linting. The chord glyph language, for example, was initially developed directly in the chat with Unicode, then offline SVG generation, then a cheap HTML canvas renderer, then the WebGL renderer. Glossaries, specs and instrumentation developed incrementally through this process. <a href="https://mcnoose.com/synesthetica/chord-shapes/" target="_blank" rel="noopener noreferrer">Here's</a> an example SVG-stage test artefact for the curious.
 
-Given the above, I erred towards verbosity and am absolutely not making efficient use of tokens (yet).
+Automation is emerging, but I'm trying to remain in the loop to see what works.
 
 ## Contributing
 
